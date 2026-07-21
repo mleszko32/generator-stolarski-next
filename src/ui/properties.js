@@ -24,6 +24,22 @@ export function initPropertiesPanel() {
     </div>
 
     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
+    
+    <h3>System pleców</h3>
+    <div class="property-group">
+      <label>Typ montażu:</label>
+      <select id="input-back-type">
+        <option value="nut" ${state.project.backPanel.type === 'nut' ? 'selected' : ''}>W nucie (boki)</option>
+        <option value="nakladane" ${state.project.backPanel.type === 'nakladane' ? 'selected' : ''}>Nakładane</option>
+      </select>
+    </div>
+
+    <div class="property-group" id="group-back-offset" style="${state.project.backPanel.type === 'nakladane' ? 'display: none;' : ''}">
+      <label>Odsunięcie nutu (mm):</label>
+      <input type="number" id="input-back-offset" value="${state.project.backPanel.offset}" />
+    </div>
+
+    <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
 
     <div class="property-group">
       <label>Ilość półek:</label>
@@ -35,34 +51,28 @@ export function initPropertiesPanel() {
 }
 
 function setupEventListeners() {
-  const widthInput = document.getElementById("input-width");
-  const heightInput = document.getElementById("input-height");
-  const depthInput = document.getElementById("input-depth");
-  const shelvesInput = document.getElementById("input-shelves");
+  const inputs = ['width', 'height', 'depth', 'shelves', 'back-offset'];
+  const updateAll = () => { updateSidebar(); update3D(); };
 
-  // Pomocnicza funkcja odświeżająca wszystko naraz
-  const updateAll = () => {
-    updateSidebar();
-    update3D();
-  };
-
-  widthInput.addEventListener("input", (e) => {
-    state.project.dimensions.width = Number(e.target.value);
-    updateAll();
+  inputs.forEach(id => {
+    document.getElementById(`input-${id}`).addEventListener('input', (e) => {
+      const val = Number(e.target.value);
+      if (id === 'width') state.project.dimensions.width = val;
+      if (id === 'height') state.project.dimensions.height = val;
+      if (id === 'depth') state.project.dimensions.depth = val;
+      if (id === 'shelves') state.project.interior.shelvesCount = val;
+      if (id === 'back-offset') state.project.backPanel.offset = val;
+      updateAll();
+    });
   });
 
-  heightInput.addEventListener("input", (e) => {
-    state.project.dimensions.height = Number(e.target.value);
-    updateAll();
-  });
-
-  depthInput.addEventListener("input", (e) => {
-    state.project.dimensions.depth = Number(e.target.value);
-    updateAll();
-  });
-
-  shelvesInput.addEventListener("input", (e) => {
-    state.project.interior.shelvesCount = Number(e.target.value);
+  const typeInput = document.getElementById('input-back-type');
+  const offsetGroup = document.getElementById('group-back-offset');
+  
+  typeInput.addEventListener('change', (e) => {
+    state.project.backPanel.type = e.target.value;
+    // Ukrywamy pole "Odsunięcie nutu", gdy wybrano nakładane
+    offsetGroup.style.display = e.target.value === 'nakladane' ? 'none' : 'block';
     updateAll();
   });
 }

@@ -75,49 +75,56 @@ function createBoard(width, height, depth, x, y, z) {
 
 export function update3D() {
   if (!cabinetGroup) return;
-  
   cabinetGroup.clear();
 
   const { width, height, depth } = state.project.dimensions;
   const board = state.project.materials.boardThickness; 
   const backThick = state.project.materials.backThickness;
-  const backOffset = state.project.materials.backOffset;
+  const { type, offset } = state.project.backPanel;
 
-  // 1-4. Korpus
-  const leftSide = createBoard(board, height, depth, -width/2 + board/2, height/2, 0);
-  cabinetGroup.add(leftSide);
+  const innerWidth = width - (board * 2);
 
-  const rightSide = createBoard(board, height, depth, width/2 - board/2, height/2, 0);
-  cabinetGroup.add(rightSide);
+  // Ustawiamy sztywną krawędź przodu szafki (Z = depth/2). Tył szafki to Z = -depth/2.
+  const frontZ = depth / 2;
+  const backZ = -depth / 2;
 
-  const bottomWidth = width - (board * 2);
-  const bottomShelf = createBoard(bottomWidth, board, depth, 0, board/2, 0);
-  cabinetGroup.add(bottomShelf);
+  let sideDepth, topBottomDepth, hdfZ;
 
-  const topShelf = createBoard(bottomWidth, board, depth, 0, height - board/2, 0);
-  cabinetGroup.add(topShelf);
+  if (type === 'nut') {
+    sideDepth = depth;
+    topBottomDepth = depth - offset - backThick;
+    hdfZ = backZ + offset + (backThick / 2);
+  } else { // nakładane
+    sideDepth = depth - backThick;
+    topBottomDepth = depth - backThick;
+    hdfZ = backZ + (backThick / 2);
+  }
 
-  // 5. Plecy HDF
-  const backZ = -depth/2 + backOffset + (backThick / 2);
-  const backPanel = createBoard(bottomWidth, height - (board*2), backThick, 0, height/2, backZ);
-  cabinetGroup.add(backPanel);
+  // Wyliczamy przesunięcia środków ciężkości formatek, by przód zawsze licował w Z=frontZ
+  const sideZ = frontZ - (sideDepth / 2);
+  const topBottomZ = frontZ - (topBottomDepth / 2);
 
-  // 6. Dynamiczne półki!
+  // 1-2. Boki
+  cabinetGroup.add(createBoard(board, height, sideDepth, -width/2 + board/2, height/2, sideZ));
+  cabinetGroup.add(createBoard(board, height, sideDepth, width/2 - board/2, height/2, sideZ));
+
+  // 3-4. Wieńce (w nucie widać 3D jak są cofnięte z tyłu względem boków!)
+  cabinetGroup.add(createBoard(innerWidth, board, topBottomDepth, 0, board/2, topBottomZ));
+  cabinetGroup.add(createBoard(innerWidth, board, topBottomDepth, 0, height - board/2, topBottomZ));
+
+  // 5. Plecy HDF (w uproszczeniu graficznym po prostu jako płyta)
+  cabinetGroup.add(createBoard(innerWidth, height - (board*2), backThick, 0, height/2, hdfZ));
+
+  // 6. Dynamiczne półki
   const shelvesCount = state.project.interior.shelvesCount;
   if (shelvesCount > 0) {
-    const shelfDepth = depth - backOffset - backThick - 5; 
-    const shelfZ = (-5 + backOffset + backThick) / 2;
-    
-    // Dzielimy światło szafki przez ilość wnęk (ilość półek + 1)
-    const innerHeight = height - (board * 2);
-    const spacing = innerHeight / (shelvesCount + 1);
+    const shelfDepth = topBottomDepth - 5; 
+    const shelfZ = frontZ - 5 - (shelfDepth / 2); // Cofnięta 5mm od frontu
+    const spacing = (height - (board * 2)) / (shelvesCount + 1);
 
-    // Pętla rysująca każdą półkę
     for (let i = 1; i <= shelvesCount; i++) {
-      // Obliczamy wysokość Y: startujemy od wieńca dolnego i dodajemy kolejne przestrzenie
       const shelfY = board + (spacing * i);
-      const shelf = createBoard(bottomWidth, board, shelfDepth, 0, shelfY, shelfZ);
-      cabinetGroup.add(shelf);
+      cabinetGroup.add(createBoard(innerWidth, board, shelfDepth, 0, shelfY, shelfZ));
     }
   }
 }
