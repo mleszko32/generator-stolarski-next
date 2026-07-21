@@ -83,7 +83,7 @@ export function update3D() {
   const backThick = state.project.materials.backThickness;
   const backOffset = state.project.materials.backOffset;
 
-  // 1-4. Korpus (bez zmian)
+  // 1-4. Korpus
   const leftSide = createBoard(board, height, depth, -width/2 + board/2, height/2, 0);
   cabinetGroup.add(leftSide);
 
@@ -97,21 +97,27 @@ export function update3D() {
   const topShelf = createBoard(bottomWidth, board, depth, 0, height - board/2, 0);
   cabinetGroup.add(topShelf);
 
-  // 5. Rysujemy plecy (HDF)
-  // Obliczamy pozycję tyłu. Krawędź tylna szafki to -depth/2. 
-  // Dodajemy cofnięcie (backOffset) i połowę grubości HDF, by znaleźć środek płyty.
+  // 5. Plecy HDF
   const backZ = -depth/2 + backOffset + (backThick / 2);
-  // Do widoku 3D używamy po prostu wymiaru światła szafki (dla uproszczenia wizualnego)
   const backPanel = createBoard(bottomWidth, height - (board*2), backThick, 0, height/2, backZ);
   cabinetGroup.add(backPanel);
 
-  // 6. Aktualizujemy pozycję półki środkowej
-  // Wyliczamy nową głębokość (tak jak w silniku)
-  const shelfDepth = depth - backOffset - backThick - 5; 
-  
-  // Magiczny wzór na środek półki (Z), tak aby opierała się o HDF z tyłu, a z przodu miała 5 mm luzu:
-  const shelfZ = (-5 + backOffset + backThick) / 2;
-  
-  const middleShelf = createBoard(bottomWidth, board, shelfDepth, 0, height/2, shelfZ);
-  cabinetGroup.add(middleShelf);
+  // 6. Dynamiczne półki!
+  const shelvesCount = state.project.interior.shelvesCount;
+  if (shelvesCount > 0) {
+    const shelfDepth = depth - backOffset - backThick - 5; 
+    const shelfZ = (-5 + backOffset + backThick) / 2;
+    
+    // Dzielimy światło szafki przez ilość wnęk (ilość półek + 1)
+    const innerHeight = height - (board * 2);
+    const spacing = innerHeight / (shelvesCount + 1);
+
+    // Pętla rysująca każdą półkę
+    for (let i = 1; i <= shelvesCount; i++) {
+      // Obliczamy wysokość Y: startujemy od wieńca dolnego i dodajemy kolejne przestrzenie
+      const shelfY = board + (spacing * i);
+      const shelf = createBoard(bottomWidth, board, shelfDepth, 0, shelfY, shelfZ);
+      cabinetGroup.add(shelf);
+    }
+  }
 }

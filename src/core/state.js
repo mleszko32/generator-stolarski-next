@@ -1,4 +1,3 @@
-// Główny stan aplikacji (Source of Truth)
 export const state = {
   project: {
     dimensions: {
@@ -8,8 +7,12 @@ export const state = {
     },
     materials: {
       boardThickness: 18,
-      backThickness: 3, // Grubość płyty HDF (plecy)
-      backOffset: 15    // Cofnięcie pleców od tyłu szafki (np. na nut)
+      backThickness: 3,
+      backOffset: 15
+    },
+    // Nowa sekcja na parametry wnętrza
+    interior: {
+      shelvesCount: 1 // Domyślnie startujemy z jedną półką
     }
   }
 };
