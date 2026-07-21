@@ -2,14 +2,21 @@ import { state } from "../core/state.js";
 
 export function calculateParts() {
   const { width, height, depth } = state.project.dimensions;
-  const board = state.project.materials.boardThickness; // Pobiera nasze 18mm ze stanu
+  const board = state.project.materials.boardThickness;
 
-  // Prosta kalkulacja: boki do ziemi, wieńce wpuszczane między boki
+  // Światło szafki (szerokość minus dwa boki)
+  const innerWidth = width - (board * 2);
+  
+  // Głębokość półki cofniętej o 5 mm od krawędzi przedniej
+  const shelfDepth = depth - 5;
+
   const parts = [
     { name: "Bok lewy", length: height, width: depth, qty: 1 },
     { name: "Bok prawy", length: height, width: depth, qty: 1 },
-    { name: "Wieniec dolny", length: width - (board * 2), width: depth, qty: 1 },
-    { name: "Wieniec górny", length: width - (board * 2), width: depth, qty: 1 }
+    { name: "Wieniec dolny", length: innerWidth, width: depth, qty: 1 },
+    { name: "Wieniec górny", length: innerWidth, width: depth, qty: 1 },
+    // Dodajemy nową formatkę:
+    { name: "Półka środkowa", length: innerWidth, width: shelfDepth, qty: 1 }
   ];
 
   return parts;

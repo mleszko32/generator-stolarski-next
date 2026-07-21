@@ -76,14 +76,10 @@ function createBoard(width, height, depth, x, y, z) {
 export function update3D() {
   if (!cabinetGroup) return;
   
-  // Zanim zbudujemy szafkę z nowymi wymiarami, kasujemy stare płyty
   cabinetGroup.clear();
 
   const { width, height, depth } = state.project.dimensions;
-  const board = state.project.materials.boardThickness; // Grubość płyty ze stanu
-
-  // Wyliczamy pozycje i budujemy 4 główne formatki
-  // Wektor 0,0,0 jest na środku szafki przy podłodze
+  const board = state.project.materials.boardThickness; 
 
   // 1. Bok lewy
   const leftSide = createBoard(board, height, depth, -width/2 + board/2, height/2, 0);
@@ -93,12 +89,19 @@ export function update3D() {
   const rightSide = createBoard(board, height, depth, width/2 - board/2, height/2, 0);
   cabinetGroup.add(rightSide);
 
-  // 3. Wieniec dolny (wpuszczany między boki)
+  // 3. Wieniec dolny
   const bottomWidth = width - (board * 2);
   const bottomShelf = createBoard(bottomWidth, board, depth, 0, board/2, 0);
   cabinetGroup.add(bottomShelf);
 
-  // 4. Wieniec górny (wpuszczany między boki)
+  // 4. Wieniec górny
   const topShelf = createBoard(bottomWidth, board, depth, 0, height - board/2, 0);
   cabinetGroup.add(topShelf);
+
+  // 5. Półka środkowa
+  const shelfDepth = depth - 5; // Zmiana na 5 mm cofnięcia (zgodnie z Twoim silnikiem)
+  
+  // Przesunięcie Z na -2.5 sprawia, że tył półki licuje z tyłem boków, a z przodu zostaje 5 mm luzu.
+  const middleShelf = createBoard(bottomWidth, board, shelfDepth, 0, height/2, -2.5);
+  cabinetGroup.add(middleShelf);
 }
