@@ -80,32 +80,26 @@ export function update3D() {
   const { width, height, depth } = state.project.dimensions;
   const board = state.project.materials.boardThickness; 
   const backThick = state.project.materials.backThickness;
-  // Pobieramy dodatkowo grooveDepth i clearance ze stanu
   const { type, offset, grooveDepth, clearance } = state.project.backPanel;
 
   const innerWidth = width - (board * 2);
-  const totalClearance = clearance * 2; // Łączny luz (4 mm)
+  const totalClearance = clearance * 2;
 
   const frontZ = depth / 2;
   const backZ = -depth / 2;
 
-  // Zmienne do trzymania wyliczonych wymiarów
   let sideDepth, topBottomDepth, hdfZ, hdfWidth, hdfHeight;
 
   if (type === 'nut') {
     sideDepth = depth;
     topBottomDepth = depth - offset - backThick;
     hdfZ = backZ + offset + (backThick / 2);
-    
-    // Prawdziwy wymiar 3D HDF w nucie
     hdfWidth = innerWidth + (grooveDepth * 2) - totalClearance;
     hdfHeight = height - totalClearance;
-  } else { // nakładane
+  } else {
     sideDepth = depth - backThick;
     topBottomDepth = depth - backThick;
     hdfZ = backZ + (backThick / 2);
-    
-    // Prawdziwy wymiar 3D HDF nakładanego (gabaryt minus luzy)
     hdfWidth = width - totalClearance;
     hdfHeight = height - totalClearance;
   }
@@ -117,11 +111,11 @@ export function update3D() {
   cabinetGroup.add(createBoard(board, height, sideDepth, -width/2 + board/2, height/2, sideZ));
   cabinetGroup.add(createBoard(board, height, sideDepth, width/2 - board/2, height/2, sideZ));
 
-  // 3-4. Wieńce 
+  // 3-4. Wieńce
   cabinetGroup.add(createBoard(innerWidth, board, topBottomDepth, 0, board/2, topBottomZ));
   cabinetGroup.add(createBoard(innerWidth, board, topBottomDepth, 0, height - board/2, topBottomZ));
 
-  // 5. Plecy HDF (Narysowane z prawidłowymi wymiarami hdfWidth i hdfHeight)
+  // 5. Plecy HDF
   cabinetGroup.add(createBoard(hdfWidth, hdfHeight, backThick, 0, height/2, hdfZ));
 
   // 6. Dynamiczne półki
@@ -135,5 +129,28 @@ export function update3D() {
       const shelfY = board + (spacing * i);
       cabinetGroup.add(createBoard(innerWidth, board, shelfDepth, 0, shelfY, shelfZ));
     }
+  }
+
+  // 7. FRONT (Nowość!)
+  if (state.project.front.active) {
+    const fc = state.project.front.clearance;
+    const fWidth = width - (fc.sides * 2);
+    const fHeight = height - fc.top - fc.bottom;
+    
+    // Obliczamy pozycję na osi Y. Zaczynamy od dolnego luzu i dodajemy połowę wysokości frontu.
+    const fY = fc.bottom + (fHeight / 2);
+    
+    // Na osi Z front zaczyna się tam, gdzie kończy się korpus (frontZ). 
+    // Dodajemy 1.5mm szczeliny na odbojnik silikonowy (silikonki).
+    const fZ = frontZ + 1.5 + (board / 2);
+
+    const frontMesh = createBoard(fWidth, fHeight, board, 0, fY, fZ);
+    
+    // Klonujemy materiał i robimy go półprzezroczystym "szkłem", by widzieć wnętrze szafki
+    frontMesh.material = frontMesh.material.clone();
+    frontMesh.material.transparent = true;
+    frontMesh.material.opacity = 0.6;
+    
+    cabinetGroup.add(frontMesh);
   }
 }

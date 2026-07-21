@@ -14,31 +14,50 @@ export function initPropertiesPanel() {
     </div>
     
     <div class="property-group">
-      <label>Szerokość szafki (mm):</label>
+      <label>Szerokość (mm):</label>
       <input type="number" id="input-width" value="${state.project.dimensions.width}" />
     </div>
-    
     <div class="property-group">
-      <label>Wysokość szafki (mm):</label>
+      <label>Wysokość (mm):</label>
       <input type="number" id="input-height" value="${state.project.dimensions.height}" />
     </div>
-    
     <div class="property-group">
-      <label>Głębokość szafki (mm):</label>
+      <label>Głębokość (mm):</label>
       <input type="number" id="input-depth" value="${state.project.dimensions.depth}" />
+    </div>
+
+    <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
+    
+    <h3>Front</h3>
+    <div class="property-group" style="flex-direction: row; align-items: center; justify-content: space-between;">
+      <label>Dodaj front:</label>
+      <input type="checkbox" id="input-front-active" ${state.project.front.active ? 'checked' : ''} style="width: auto;" />
+    </div>
+    <div id="group-front-clearance" style="${state.project.front.active ? 'display: block;' : 'display: none;'}">
+      <div class="property-group">
+        <label>Luz boki [L/P] (mm):</label>
+        <input type="number" id="input-front-sides" value="${state.project.front.clearance.sides}" step="0.5" />
+      </div>
+      <div class="property-group">
+        <label>Luz góra (mm):</label>
+        <input type="number" id="input-front-top" value="${state.project.front.clearance.top}" step="0.5" />
+      </div>
+      <div class="property-group">
+        <label>Luz dół (mm):</label>
+        <input type="number" id="input-front-bottom" value="${state.project.front.clearance.bottom}" step="0.5" />
+      </div>
     </div>
 
     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
     
     <h3>System pleców</h3>
     <div class="property-group">
-      <label>Typ montażu:</label>
+      <label>Montaż:</label>
       <select id="input-back-type">
-        <option value="nut" ${state.project.backPanel.type === 'nut' ? 'selected' : ''}>W nucie (boki)</option>
+        <option value="nut" ${state.project.backPanel.type === 'nut' ? 'selected' : ''}>W nucie</option>
         <option value="nakladane" ${state.project.backPanel.type === 'nakladane' ? 'selected' : ''}>Nakładane</option>
       </select>
     </div>
-
     <div class="property-group" id="group-back-offset" style="${state.project.backPanel.type === 'nakladane' ? 'display: none;' : ''}">
       <label>Odsunięcie nutu (mm):</label>
       <input type="number" id="input-back-offset" value="${state.project.backPanel.offset}" />
@@ -56,8 +75,7 @@ export function initPropertiesPanel() {
 }
 
 function setupEventListeners() {
-  // Dodaliśmy 'board-thick' do listy nasłuchiwanych inputów
-  const inputs = ['board-thick', 'width', 'height', 'depth', 'shelves', 'back-offset'];
+  const inputs = ['board-thick', 'width', 'height', 'depth', 'shelves', 'back-offset', 'front-sides', 'front-top', 'front-bottom'];
   const updateAll = () => { updateSidebar(); update3D(); };
 
   inputs.forEach(id => {
@@ -69,16 +87,22 @@ function setupEventListeners() {
       if (id === 'depth') state.project.dimensions.depth = val;
       if (id === 'shelves') state.project.interior.shelvesCount = val;
       if (id === 'back-offset') state.project.backPanel.offset = val;
+      if (id === 'front-sides') state.project.front.clearance.sides = val;
+      if (id === 'front-top') state.project.front.clearance.top = val;
+      if (id === 'front-bottom') state.project.front.clearance.bottom = val;
       updateAll();
     });
   });
 
-  const typeInput = document.getElementById('input-back-type');
-  const offsetGroup = document.getElementById('group-back-offset');
-  
-  typeInput.addEventListener('change', (e) => {
+  document.getElementById('input-back-type').addEventListener('change', (e) => {
     state.project.backPanel.type = e.target.value;
-    offsetGroup.style.display = e.target.value === 'nakladane' ? 'none' : 'block';
+    document.getElementById('group-back-offset').style.display = e.target.value === 'nakladane' ? 'none' : 'block';
+    updateAll();
+  });
+
+  document.getElementById('input-front-active').addEventListener('change', (e) => {
+    state.project.front.active = e.target.checked;
+    document.getElementById('group-front-clearance').style.display = e.target.checked ? 'block' : 'none';
     updateAll();
   });
 }

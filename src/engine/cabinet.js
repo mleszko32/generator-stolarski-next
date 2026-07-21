@@ -7,28 +7,22 @@ export function calculateParts() {
   const { type, offset, grooveDepth, clearance } = state.project.backPanel;
 
   const innerWidth = width - (board * 2);
-  const totalClearance = clearance * 2; // Luz całkowity (z obu stron)
+  const totalClearance = clearance * 2; 
 
   let sideDepth, topBottomDepth, backWidth, backHeight;
 
   if (type === 'nut') {
-    sideDepth = depth; // Boki pełne
-    topBottomDepth = depth - offset - backThick; // Wieńce krótsze, kończą się przed plecami
-    
-    // HDF szerokość: światło szafki + 2x wpuszczenie w nut - 2x luz montażowy
+    sideDepth = depth;
+    topBottomDepth = depth - offset - backThick;
     backWidth = innerWidth + (grooveDepth * 2) - totalClearance;
-    // HDF wysokość: wysokość szafki - 2x luz montażowy
     backHeight = height - totalClearance;
-  } else { // nakładane
-    sideDepth = depth - backThick; // Boki płytsze o HDF
-    topBottomDepth = depth - backThick; // Wieńce płytsze o HDF
-    
-    // HDF po obrysie szafki - 2x luz montażowy
+  } else { 
+    sideDepth = depth - backThick;
+    topBottomDepth = depth - backThick;
     backWidth = width - totalClearance;
     backHeight = height - totalClearance;
   }
 
-  // Półka zawsze względem wieńców pomniejszona o 5mm z przodu
   const shelfDepth = topBottomDepth - 5; 
 
   const parts = [
@@ -46,6 +40,20 @@ export function calculateParts() {
       length: innerWidth, 
       width: shelfDepth, 
       qty: shelvesCount 
+    });
+  }
+
+  // LOGIKA FRONTU
+  if (state.project.front.active) {
+    const fc = state.project.front.clearance;
+    const frontWidth = width - (fc.sides * 2);
+    const frontHeight = height - fc.top - fc.bottom;
+    
+    parts.push({
+      name: "Front (Nakładany)",
+      length: frontHeight,
+      width: frontWidth,
+      qty: 1
     });
   }
 
