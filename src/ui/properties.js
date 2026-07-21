@@ -7,6 +7,11 @@ export function initPropertiesPanel() {
 
   rightSidebar.innerHTML = `
     <h2>Parametry</h2>
+
+    <div class="property-group">
+      <label>Grubość płyty (mm):</label>
+      <input type="number" id="input-board-thick" value="${state.project.materials.boardThickness}" step="0.1" />
+    </div>
     
     <div class="property-group">
       <label>Szerokość szafki (mm):</label>
@@ -51,12 +56,14 @@ export function initPropertiesPanel() {
 }
 
 function setupEventListeners() {
-  const inputs = ['width', 'height', 'depth', 'shelves', 'back-offset'];
+  // Dodaliśmy 'board-thick' do listy nasłuchiwanych inputów
+  const inputs = ['board-thick', 'width', 'height', 'depth', 'shelves', 'back-offset'];
   const updateAll = () => { updateSidebar(); update3D(); };
 
   inputs.forEach(id => {
     document.getElementById(`input-${id}`).addEventListener('input', (e) => {
       const val = Number(e.target.value);
+      if (id === 'board-thick') state.project.materials.boardThickness = val;
       if (id === 'width') state.project.dimensions.width = val;
       if (id === 'height') state.project.dimensions.height = val;
       if (id === 'depth') state.project.dimensions.depth = val;
@@ -71,7 +78,6 @@ function setupEventListeners() {
   
   typeInput.addEventListener('change', (e) => {
     state.project.backPanel.type = e.target.value;
-    // Ukrywamy pole "Odsunięcie nutu", gdy wybrano nakładane
     offsetGroup.style.display = e.target.value === 'nakladane' ? 'none' : 'block';
     updateAll();
   });
