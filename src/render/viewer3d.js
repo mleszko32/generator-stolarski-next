@@ -107,50 +107,41 @@ export function update3D() {
   const sideZ = frontZ - (sideDepth / 2);
   const topBottomZ = frontZ - (topBottomDepth / 2);
 
-  // 1-2. Boki
+  // Korpus
   cabinetGroup.add(createBoard(board, height, sideDepth, -width/2 + board/2, height/2, sideZ));
   cabinetGroup.add(createBoard(board, height, sideDepth, width/2 - board/2, height/2, sideZ));
-
-  // 3-4. Wieńce
   cabinetGroup.add(createBoard(innerWidth, board, topBottomDepth, 0, board/2, topBottomZ));
   cabinetGroup.add(createBoard(innerWidth, board, topBottomDepth, 0, height - board/2, topBottomZ));
-
-  // 5. Plecy HDF
   cabinetGroup.add(createBoard(hdfWidth, hdfHeight, backThick, 0, height/2, hdfZ));
 
-  // 6. Dynamiczne półki
-  const shelvesCount = state.project.interior.shelvesCount;
-  if (shelvesCount > 0) {
-    const shelfDepth = topBottomDepth - 5; 
-    const shelfZ = frontZ - 5 - (shelfDepth / 2); 
-    const spacing = (height - (board * 2)) / (shelvesCount + 1);
-
-    for (let i = 1; i <= shelvesCount; i++) {
-      const shelfY = board + (spacing * i);
-      cabinetGroup.add(createBoard(innerWidth, board, shelfDepth, 0, shelfY, shelfZ));
-    }
-  }
-
-  // 7. FRONT (Nowość!)
+  // 7. FRONTY W STREFACH
   if (state.project.front.active) {
     const fc = state.project.front.clearance;
+    const count = state.project.front.count;
+    const gap = state.project.front.gap;
+
     const fWidth = width - (fc.sides * 2);
-    const fHeight = height - fc.top - fc.bottom;
+    const availableHeight = height - fc.top - fc.bottom;
+    const totalGaps = (count - 1) * gap;
+    const fHeight = (availableHeight - totalGaps) / count;
     
-    // Obliczamy pozycję na osi Y. Zaczynamy od dolnego luzu i dodajemy połowę wysokości frontu.
-    const fY = fc.bottom + (fHeight / 2);
-    
-    // Na osi Z front zaczyna się tam, gdzie kończy się korpus (frontZ). 
-    // Dodajemy 1.5mm szczeliny na odbojnik silikonowy (silikonki).
+    // Pozycja Z (na odbojnikach)
     const fZ = frontZ + 1.5 + (board / 2);
 
-    const frontMesh = createBoard(fWidth, fHeight, board, 0, fY, fZ);
-    
-    // Klonujemy materiał i robimy go półprzezroczystym "szkłem", by widzieć wnętrze szafki
-    frontMesh.material = frontMesh.material.clone();
-    frontMesh.material.transparent = true;
-    frontMesh.material.opacity = 0.6;
-    
-    cabinetGroup.add(frontMesh);
+    for(let i = 0; i < count; i++) {
+      // Obliczamy pozycję Y: 
+      // Zaczynamy od dołu (luz dolny).
+      // Przesuwamy się w górę o wysokość poprzednich frontów i szczelin: i * (fHeight + gap)
+      // Środek geometrii to + połowa wysokości obecnego frontu.
+      const fY = fc.bottom + (i * (fHeight + gap)) + (fHeight / 2);
+      
+      const frontMesh = createBoard(fWidth, fHeight, board, 0, fY, fZ);
+      
+      frontMesh.material = frontMesh.material.clone();
+      frontMesh.material.transparent = true;
+      frontMesh.material.opacity = 0.6;
+      
+      cabinetGroup.add(frontMesh);
+    }
   }
 }

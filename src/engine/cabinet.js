@@ -23,8 +23,6 @@ export function calculateParts() {
     backHeight = height - totalClearance;
   }
 
-  const shelfDepth = topBottomDepth - 5; 
-
   const parts = [
     { name: "Bok lewy", length: height, width: sideDepth, qty: 1 },
     { name: "Bok prawy", length: height, width: sideDepth, qty: 1 },
@@ -33,27 +31,28 @@ export function calculateParts() {
     { name: "Plecy (HDF)", length: backHeight, width: backWidth, qty: 1 }
   ];
 
-  const shelvesCount = state.project.interior.shelvesCount;
-  if (shelvesCount > 0) {
-    parts.push({ 
-      name: "Półka wewnętrzna", 
-      length: innerWidth, 
-      width: shelfDepth, 
-      qty: shelvesCount 
-    });
-  }
-
-  // LOGIKA FRONTU
+  // LOGIKA FRONTÓW (Strefy)
   if (state.project.front.active) {
     const fc = state.project.front.clearance;
+    const count = state.project.front.count;
+    const gap = state.project.front.gap;
+
     const frontWidth = width - (fc.sides * 2);
-    const frontHeight = height - fc.top - fc.bottom;
+    
+    // Obliczamy przestrzeń w pionie i odejmujemy luzy skrajne
+    const availableHeight = height - fc.top - fc.bottom;
+    
+    // Suma wszystkich szczelin MIĘDZY frontami (jest ich zawsze o 1 mniej niż frontów)
+    const totalGaps = (count - 1) * gap;
+    
+    // Wysokość pojedynczego frontu
+    const singleFrontHeight = (availableHeight - totalGaps) / count;
     
     parts.push({
-      name: "Front (Nakładany)",
-      length: frontHeight,
+      name: count > 1 ? "Front szuflady" : "Front główny",
+      length: Number(singleFrontHeight.toFixed(1)), // Zaokrąglamy do 1 miejsca po przecinku (np. 235.3 mm)
       width: frontWidth,
-      qty: 1
+      qty: count
     });
   }
 
