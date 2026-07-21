@@ -1,7 +1,6 @@
-// Główny obiekt przechowujący wszystkie dane naszego projektu
+// Główny stan aplikacji (Source of Truth)
 export const state = {
   project: {
-    name: "Szafka dolna",
     dimensions: {
       width: 600,
       height: 720,
@@ -9,15 +8,8 @@ export const state = {
     },
     materials: {
       boardThickness: 18,
-      backPanelThickness: 3
+      backThickness: 3, // Grubość płyty HDF (plecy)
+      backOffset: 15    // Cofnięcie pleców od tyłu szafki (np. na nut)
     }
-  },
-  ui: {
-    selectedElement: null // Tu w przyszłości zapiszemy, co kliknął użytkownik
   }
 };
-
-// Prosta funkcja do podglądu stanu w konsoli
-export function logState() {
-  console.log("Aktualny stan projektu:", state);
-}

@@ -80,28 +80,38 @@ export function update3D() {
 
   const { width, height, depth } = state.project.dimensions;
   const board = state.project.materials.boardThickness; 
+  const backThick = state.project.materials.backThickness;
+  const backOffset = state.project.materials.backOffset;
 
-  // 1. Bok lewy
+  // 1-4. Korpus (bez zmian)
   const leftSide = createBoard(board, height, depth, -width/2 + board/2, height/2, 0);
   cabinetGroup.add(leftSide);
 
-  // 2. Bok prawy
   const rightSide = createBoard(board, height, depth, width/2 - board/2, height/2, 0);
   cabinetGroup.add(rightSide);
 
-  // 3. Wieniec dolny
   const bottomWidth = width - (board * 2);
   const bottomShelf = createBoard(bottomWidth, board, depth, 0, board/2, 0);
   cabinetGroup.add(bottomShelf);
 
-  // 4. Wieniec górny
   const topShelf = createBoard(bottomWidth, board, depth, 0, height - board/2, 0);
   cabinetGroup.add(topShelf);
 
-  // 5. Półka środkowa
-  const shelfDepth = depth - 5; // Zmiana na 5 mm cofnięcia (zgodnie z Twoim silnikiem)
+  // 5. Rysujemy plecy (HDF)
+  // Obliczamy pozycję tyłu. Krawędź tylna szafki to -depth/2. 
+  // Dodajemy cofnięcie (backOffset) i połowę grubości HDF, by znaleźć środek płyty.
+  const backZ = -depth/2 + backOffset + (backThick / 2);
+  // Do widoku 3D używamy po prostu wymiaru światła szafki (dla uproszczenia wizualnego)
+  const backPanel = createBoard(bottomWidth, height - (board*2), backThick, 0, height/2, backZ);
+  cabinetGroup.add(backPanel);
+
+  // 6. Aktualizujemy pozycję półki środkowej
+  // Wyliczamy nową głębokość (tak jak w silniku)
+  const shelfDepth = depth - backOffset - backThick - 5; 
   
-  // Przesunięcie Z na -2.5 sprawia, że tył półki licuje z tyłem boków, a z przodu zostaje 5 mm luzu.
-  const middleShelf = createBoard(bottomWidth, board, shelfDepth, 0, height/2, -2.5);
+  // Magiczny wzór na środek półki (Z), tak aby opierała się o HDF z tyłu, a z przodu miała 5 mm luzu:
+  const shelfZ = (-5 + backOffset + backThick) / 2;
+  
+  const middleShelf = createBoard(bottomWidth, board, shelfDepth, 0, height/2, shelfZ);
   cabinetGroup.add(middleShelf);
 }
