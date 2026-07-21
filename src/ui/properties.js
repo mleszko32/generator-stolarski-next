@@ -1,5 +1,6 @@
 import { state } from "../core/state.js";
-import { updateSidebar } from "./sidebar.js"; // NOWY IMPORT
+import { updateSidebar } from "./sidebar.js";
+import { update3D } from "../render/viewer3d.js"; // NOWY IMPORT
 
 export function initPropertiesPanel() {
   const rightSidebar = document.querySelector(".sidebar-right");
@@ -33,16 +34,19 @@ function setupEventListeners() {
 
   widthInput.addEventListener("input", (e) => {
     state.project.dimensions.width = Number(e.target.value);
-    updateSidebar(); // Przelicz i odśwież panel przy zmianie
+    updateSidebar();
+    update3D(); // Aktualizacja bryły 3D
   });
 
   heightInput.addEventListener("input", (e) => {
     state.project.dimensions.height = Number(e.target.value);
-    updateSidebar(); // Przelicz i odśwież panel przy zmianie
+    updateSidebar();
+    update3D(); // Aktualizacja bryły 3D
   });
 
   depthInput.addEventListener("input", (e) => {
     state.project.dimensions.depth = Number(e.target.value);
-    updateSidebar(); // Przelicz i odśwież panel przy zmianie
+    updateSidebar();
+    update3D(); // Aktualizacja bryły 3D
   });
 }
