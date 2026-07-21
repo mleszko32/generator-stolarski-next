@@ -80,27 +80,36 @@ export function update3D() {
   const { width, height, depth } = state.project.dimensions;
   const board = state.project.materials.boardThickness; 
   const backThick = state.project.materials.backThickness;
-  const { type, offset } = state.project.backPanel;
+  // Pobieramy dodatkowo grooveDepth i clearance ze stanu
+  const { type, offset, grooveDepth, clearance } = state.project.backPanel;
 
   const innerWidth = width - (board * 2);
+  const totalClearance = clearance * 2; // Łączny luz (4 mm)
 
-  // Ustawiamy sztywną krawędź przodu szafki (Z = depth/2). Tył szafki to Z = -depth/2.
   const frontZ = depth / 2;
   const backZ = -depth / 2;
 
-  let sideDepth, topBottomDepth, hdfZ;
+  // Zmienne do trzymania wyliczonych wymiarów
+  let sideDepth, topBottomDepth, hdfZ, hdfWidth, hdfHeight;
 
   if (type === 'nut') {
     sideDepth = depth;
     topBottomDepth = depth - offset - backThick;
     hdfZ = backZ + offset + (backThick / 2);
+    
+    // Prawdziwy wymiar 3D HDF w nucie
+    hdfWidth = innerWidth + (grooveDepth * 2) - totalClearance;
+    hdfHeight = height - totalClearance;
   } else { // nakładane
     sideDepth = depth - backThick;
     topBottomDepth = depth - backThick;
     hdfZ = backZ + (backThick / 2);
+    
+    // Prawdziwy wymiar 3D HDF nakładanego (gabaryt minus luzy)
+    hdfWidth = width - totalClearance;
+    hdfHeight = height - totalClearance;
   }
 
-  // Wyliczamy przesunięcia środków ciężkości formatek, by przód zawsze licował w Z=frontZ
   const sideZ = frontZ - (sideDepth / 2);
   const topBottomZ = frontZ - (topBottomDepth / 2);
 
@@ -108,18 +117,18 @@ export function update3D() {
   cabinetGroup.add(createBoard(board, height, sideDepth, -width/2 + board/2, height/2, sideZ));
   cabinetGroup.add(createBoard(board, height, sideDepth, width/2 - board/2, height/2, sideZ));
 
-  // 3-4. Wieńce (w nucie widać 3D jak są cofnięte z tyłu względem boków!)
+  // 3-4. Wieńce 
   cabinetGroup.add(createBoard(innerWidth, board, topBottomDepth, 0, board/2, topBottomZ));
   cabinetGroup.add(createBoard(innerWidth, board, topBottomDepth, 0, height - board/2, topBottomZ));
 
-  // 5. Plecy HDF (w uproszczeniu graficznym po prostu jako płyta)
-  cabinetGroup.add(createBoard(innerWidth, height - (board*2), backThick, 0, height/2, hdfZ));
+  // 5. Plecy HDF (Narysowane z prawidłowymi wymiarami hdfWidth i hdfHeight)
+  cabinetGroup.add(createBoard(hdfWidth, hdfHeight, backThick, 0, height/2, hdfZ));
 
   // 6. Dynamiczne półki
   const shelvesCount = state.project.interior.shelvesCount;
   if (shelvesCount > 0) {
     const shelfDepth = topBottomDepth - 5; 
-    const shelfZ = frontZ - 5 - (shelfDepth / 2); // Cofnięta 5mm od frontu
+    const shelfZ = frontZ - 5 - (shelfDepth / 2); 
     const spacing = (height - (board * 2)) / (shelvesCount + 1);
 
     for (let i = 1; i <= shelvesCount; i++) {
