@@ -33,9 +33,17 @@ export function initPropertiesPanel() {
     </div>
     <div id="group-front-clearance" style="${state.project.front.active ? 'display: block;' : 'display: none;'}">
       <div class="property-group">
-        <label>Podział wysokości (od dołu):</label>
+      <label>Podział wysokości (od dołu):</label>
 <input type="text" id="input-front-distribution" value="${state.project.front.distribution || '1'}" placeholder="np. 1:1:141" />
       </div>
+      <label>System szuflad:</label>
+        <select id="input-drawer-system">
+          <option value="merivobox" ${state.project.front.drawerSystem === 'merivobox' ? 'selected' : ''}>Blum Merivobox</option>
+          <option value="legrabox" ${state.project.front.drawerSystem === 'legrabox' ? 'selected' : ''}>Blum Legrabox</option>
+          <option value="tandembox" ${state.project.front.drawerSystem === 'tandembox' ? 'selected' : ''}>Blum TANDEMBOX antaro</option>
+        </select>
+      </div>  
+      
       <div class="property-group">
         <label>Przerwa między nimi (mm):</label>
         <input type="number" id="input-front-gap" value="${state.project.front.gap}" step="0.5" />
@@ -117,5 +125,10 @@ function setupEventListeners() {
     state.project.front.active = e.target.checked;
     document.getElementById('group-front-clearance').style.display = e.target.checked ? 'block' : 'none';
     updateAll();
+  });
+
+  document.getElementById('input-drawer-system').addEventListener('change', (e) => {
+    state.project.front.drawerSystem = e.target.value;
+    updateAll(); 
   });
 }

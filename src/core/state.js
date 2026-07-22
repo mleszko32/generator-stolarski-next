@@ -9,7 +9,7 @@ export const state = {
       distribution: "1:1:141",
       gap: 3, // Szczelina między frontami w pionie (np. 3 mm)
       // NOWE: Wybrany system szuflad dla całego korpusu
-      drawerSystem: 'antaro',
+      drawerSystem: 'merivobox',
       clearance: {
         sides: 1.5,
         top: 5,

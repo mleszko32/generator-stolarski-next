@@ -1,3 +1,4 @@
+import { getBlumMountingData } from '../hardware/blum.js';
 import { state } from "../core/state.js";
 import { getDrawerComponents } from "../core/drawerMath.js";
 
@@ -31,7 +32,52 @@ export function calculateParts() {
     { name: "Wieniec górny", length: innerWidth, width: topBottomDepth, qty: 1, material: "Płyta 18mm" },
     { name: "Plecy (HDF)", length: backHeight, width: backWidth, qty: 1, material: "HDF 3mm" }
   ];
+// --- POCZĄTEK KODU DO WKLEJENIA ---
 
+  // 1. Przeliczamy wysokości frontów na podstawie podziału z interfejsu
+  let drawers = [];
+  
+  if (state.project.front.active) {
+    const fc = state.project.front.clearance;
+    const gap = state.project.front.gap;
+    const distributionStr = String(state.project.front.distribution || "1").trim();
+    
+    let parsedZones = [];
+    // Rozpoznajemy, czy użytkownik wpisał np. "1:1:141" czy użył przecinków
+    const separator = distributionStr.includes(':') ? ':' : ',';
+    const zones = distributionStr.split(separator).map(s => s.trim());
+    
+    parsedZones = zones.map(zone => {
+      const val = parseFloat(zone);
+      // Jeśli wartość <= 10, traktujemy jako proporcję (fr), w przeciwnym razie jako stały wymiar w mm
+      return (val <= 10) ? { type: 'fr', value: val } : { type: 'fixed', value: val };
+    });
+
+    const count = parsedZones.length;
+    let availableHeight = height - fc.top - fc.bottom - ((count - 1) * gap);
+    
+    let fixedTotal = 0;
+    let frTotal = 0;
+    
+    parsedZones.forEach(zone => {
+      if (zone.type === 'fixed') fixedTotal += zone.value;
+      if (zone.type === 'fr') frTotal += zone.value;
+    });
+
+    availableHeight -= fixedTotal;
+    const singleFrValue = frTotal > 0 ? availableHeight / frTotal : 0;
+
+    // Generujemy ostateczną tablicę szuflad z konkretnymi wymiarami frontów dla algorytmu Bluma
+    drawers = parsedZones.map(zone => ({
+      frontHeight: zone.type === 'fixed' ? zone.value : zone.value * singleFrValue
+    }));
+  }
+
+  // 2. Wywołujemy funkcję od Bluma z gotową tablicą szuflad
+  const mountingData = getBlumMountingData(state.project, drawers, state.project.front.drawerSystem);
+  console.log("Wyliczone nawierty CNC:", mountingData);
+
+  // --- KONIEC KODU DO WKLEJENIA ---
   // LOGIKA FRONTÓW I SZUFLAD
   if (state.project.front.active) {
     const fc = state.project.front.clearance;
@@ -69,8 +115,10 @@ export function calculateParts() {
 
     availableHeight -= fixedTotal;
     const singleFrValue = frTotal > 0 ? availableHeight / frTotal : 0;
-
+    
+    
     // Przechodzimy po wszystkich strefach i generujemy części
+    
     parsedZones.forEach((zone, index) => {
       const frontHeight = zone.type === 'fixed' ? zone.value : zone.value * singleFrValue;
       
@@ -106,5 +154,6 @@ export function calculateParts() {
     });
   }
 
-  return parts;
+    
+  return { parts, mountingData }; 
 }
