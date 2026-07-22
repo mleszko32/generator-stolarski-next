@@ -73,6 +73,8 @@ function createBoard(width, height, depth, x, y, z) {
   return mesh;
 }
 
+// ... reszta górnej części pliku bez zmian
+
 export function update3D() {
   if (!cabinetGroup) return;
   cabinetGroup.clear();
@@ -114,34 +116,72 @@ export function update3D() {
   cabinetGroup.add(createBoard(innerWidth, board, topBottomDepth, 0, height - board/2, topBottomZ));
   cabinetGroup.add(createBoard(hdfWidth, hdfHeight, backThick, 0, height/2, hdfZ));
 
-  // 7. FRONTY W STREFACH
+  // 7. FRONTY W STREFACH (Z nowym algorytmem asymetrycznym)
   if (state.project.front.active) {
     const fc = state.project.front.clearance;
-    const count = state.project.front.count;
     const gap = state.project.front.gap;
-
-    const fWidth = width - (fc.sides * 2);
-    const availableHeight = height - fc.top - fc.bottom;
-    const totalGaps = (count - 1) * gap;
-    const fHeight = (availableHeight - totalGaps) / count;
     
-    // Pozycja Z (na odbojnikach)
+    const distributionStr = String(state.project.front.distribution || "1").trim();
+    let parsedZones = [];
+
+    // Tłumaczymy ciąg tekstowy (dokładnie to samo co w cabinet.js)
+    if (!distributionStr.includes(':') && !distributionStr.includes(',') && !isNaN(distributionStr)) {
+      const count = parseInt(distributionStr, 10);
+      for (let i = 0; i < count; i++) {
+        parsedZones.push({ type: 'fr', value: 1 });
+      }
+    } else {
+      const separator = distributionStr.includes(':') ? ':' : ',';
+      const zones = distributionStr.split(separator).map(s => s.trim());
+      
+      parsedZones = zones.map(zone => {
+        if (zone.toLowerCase().endsWith('fr')) return { type: 'fr', value: parseFloat(zone) || 1 };
+        const val = parseFloat(zone);
+        return (val <= 10) ? { type: 'fr', value: val } : { type: 'fixed', value: val };
+      });
+    }
+
+    const count = parsedZones.length;
+    const fWidth = width - (fc.sides * 2);
+    
+    let availableHeight = height - fc.top - fc.bottom - ((count - 1) * gap);
+    let fixedTotal = 0;
+    let frTotal = 0;
+
+    parsedZones.forEach(zone => {
+      if (zone.type === 'fixed') fixedTotal += zone.value;
+      if (zone.type === 'fr') frTotal += zone.value;
+    });
+
+    availableHeight -= fixedTotal;
+    const singleFrValue = frTotal > 0 ? availableHeight / frTotal : 0;
+    
+    // Pozycja Z (wysunięcie do przodu + 1.5mm na odbojnik)
     const fZ = frontZ + 1.5 + (board / 2);
 
-    for(let i = 0; i < count; i++) {
-      // Obliczamy pozycję Y: 
-      // Zaczynamy od dołu (luz dolny).
-      // Przesuwamy się w górę o wysokość poprzednich frontów i szczelin: i * (fHeight + gap)
-      // Środek geometrii to + połowa wysokości obecnego frontu.
-      const fY = fc.bottom + (i * (fHeight + gap)) + (fHeight / 2);
+    // Kursor po osi Y - zaczynamy rysowanie od poziomu dolnego luza
+    let currentY = fc.bottom;
+
+    // Rysujemy po kolei od dołu do góry
+    parsedZones.forEach(zone => {
+      const fHeight = zone.type === 'fixed' ? zone.value : zone.value * singleFrValue;
       
-      const frontMesh = createBoard(fWidth, fHeight, board, 0, fY, fZ);
+      // Środek dla geometrii (bo Three.js pozycjonuje od środka mesha) to aktualny dół + połowa wysokości frontu
+      const meshY = currentY + (fHeight / 2);
       
+      const frontMesh = createBoard(fWidth, fHeight, board, 0, meshY, fZ);
+      
+      // Półprzezroczystość, by widzieć środek korpusu
       frontMesh.material = frontMesh.material.clone();
       frontMesh.material.transparent = true;
       frontMesh.material.opacity = 0.6;
+      // Możemy im dać lekko pomarańczowy odcień dla kontrastu (jak u Bluma!)
+      frontMesh.material.color.setHex(0xffa040); 
       
       cabinetGroup.add(frontMesh);
-    }
+      
+      // Przesuwamy nasz kursor osi Y w górę o dodany front + wymaganą szczelinę, gotowi na kolejny front
+      currentY += fHeight + gap;
+    });
   }
 }

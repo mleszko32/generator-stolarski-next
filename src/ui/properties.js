@@ -33,8 +33,8 @@ export function initPropertiesPanel() {
     </div>
     <div id="group-front-clearance" style="${state.project.front.active ? 'display: block;' : 'display: none;'}">
       <div class="property-group">
-        <label>Ilość frontów (szuflad):</label>
-        <input type="number" id="input-front-count" value="${state.project.front.count}" min="1" max="10" />
+        <label>Podział wysokości (od dołu):</label>
+<input type="text" id="input-front-distribution" value="${state.project.front.distribution || '1'}" placeholder="np. 1:1:141" />
       </div>
       <div class="property-group">
         <label>Przerwa między nimi (mm):</label>
@@ -70,13 +70,15 @@ export function initPropertiesPanel() {
 }
 
 function setupEventListeners() {
-  const inputs = [
+  // Usunęliśmy 'front-count', bo to teraz ciąg znaków, a nie zwykła liczba
+  const numberInputs = [
     'board-thick', 'width', 'height', 'depth', 
-    'front-count', 'front-gap', 'front-sides', 'front-top', 'front-bottom'
+    'front-gap', 'front-sides', 'front-top', 'front-bottom'
   ];
   const updateAll = () => { updateSidebar(); update3D(); };
 
-  inputs.forEach(id => {
+  // 1. Obsługa wszystkich pól numerycznych
+  numberInputs.forEach(id => {
     const el = document.getElementById(`input-${id}`);
     if(el) {
       el.addEventListener('input', (e) => {
@@ -86,7 +88,6 @@ function setupEventListeners() {
         if (id === 'height') state.project.dimensions.height = val;
         if (id === 'depth') state.project.dimensions.depth = val;
         
-        if (id === 'front-count') state.project.front.count = val;
         if (id === 'front-gap') state.project.front.gap = val;
         if (id === 'front-sides') state.project.front.clearance.sides = val;
         if (id === 'front-top') state.project.front.clearance.top = val;
@@ -96,6 +97,17 @@ function setupEventListeners() {
     }
   });
 
+  // 2. Oddzielna obsługa pola tekstowego (ciąg dystrybucyjny)
+  const distInput = document.getElementById('input-front-distribution');
+  if (distInput) {
+    distInput.addEventListener('input', (e) => {
+      // Zapisujemy wartość jako tekst (string) bezpośrednio do stanu
+      state.project.front.distribution = e.target.value;
+      updateAll();
+    });
+  }
+
+  // 3. Obsługa pozostałych elementów (select, checkbox)
   document.getElementById('input-back-type').addEventListener('change', (e) => {
     state.project.backPanel.type = e.target.value;
     updateAll();

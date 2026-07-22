@@ -31,28 +31,74 @@ export function calculateParts() {
     { name: "Plecy (HDF)", length: backHeight, width: backWidth, qty: 1 }
   ];
 
-  // LOGIKA FRONTÓW (Strefy)
+  // LOGIKA FRONTÓW (Strefy - Algorytm BLUM)
   if (state.project.front.active) {
     const fc = state.project.front.clearance;
-    const count = state.project.front.count;
     const gap = state.project.front.gap;
+    
+    // Domyślna wartość to "1" (jeden front na całość)
+    const distributionStr = String(state.project.front.distribution || "1").trim();
+    
+    let parsedZones = [];
 
+    // SCENARIUSZ 1: Pojedyncza liczba (np. "3") -> równe fronty
+    if (!distributionStr.includes(':') && !distributionStr.includes(',') && !isNaN(distributionStr)) {
+      const count = parseInt(distributionStr, 10);
+      for (let i = 0; i < count; i++) {
+        parsedZones.push({ type: 'fr', value: 1 });
+      }
+    } else {
+      // SCENARIUSZ 2: Ciąg z separatorami (Blum używa dwukropka)
+      const separator = distributionStr.includes(':') ? ':' : ',';
+      const zones = distributionStr.split(separator).map(s => s.trim());
+      
+      parsedZones = zones.map(zone => {
+        // Zabezpieczenie, gdyby ktoś wciąż używał "fr"
+        if (zone.toLowerCase().endsWith('fr')) {
+          return { type: 'fr', value: parseFloat(zone) || 1 };
+        }
+        
+        const val = parseFloat(zone);
+        // HEURYSTYKA: liczby <= 10 to "części/udziały" (zmienne), powyżej 10 to milimetry (stałe)
+        if (val <= 10) {
+          return { type: 'fr', value: val };
+        } else {
+          return { type: 'fixed', value: val };
+        }
+      });
+    }
+
+    const count = parsedZones.length;
     const frontWidth = width - (fc.sides * 2);
     
-    // Obliczamy przestrzeń w pionie i odejmujemy luzy skrajne
-    const availableHeight = height - fc.top - fc.bottom;
+    // Odliczamy luzy skrajne i wszystkie szczeliny między frontami
+    let availableHeight = height - fc.top - fc.bottom - ((count - 1) * gap);
+
+    let fixedTotal = 0;
+    let frTotal = 0;
+
+    // Podliczamy, ile miejsca zajmują fronty stałe, a ile części zmiennych mamy do obdzielenia
+    parsedZones.forEach(zone => {
+      if (zone.type === 'fixed') fixedTotal += zone.value;
+      if (zone.type === 'fr') frTotal += zone.value;
+    });
+
+    // Z dostępnego światła wycinamy stałe wymiary
+    availableHeight -= fixedTotal;
     
-    // Suma wszystkich szczelin MIĘDZY frontami (jest ich zawsze o 1 mniej niż frontów)
-    const totalGaps = (count - 1) * gap;
-    
-    // Wysokość pojedynczego frontu
-    const singleFrontHeight = (availableHeight - totalGaps) / count;
-    
-    parts.push({
-      name: count > 1 ? "Front szuflady" : "Front główny",
-      length: Number(singleFrontHeight.toFixed(1)), // Zaokrąglamy do 1 miejsca po przecinku (np. 235.3 mm)
-      width: frontWidth,
-      qty: count
+    // Obliczamy ile milimetrów przypada na jedną jednostkę zmienną ("1")
+    const singleFrValue = frTotal > 0 ? availableHeight / frTotal : 0;
+
+    // Generowanie formatek (Kolejność: Front 1 to sam dół, kolejne idą w górę)
+    parsedZones.forEach((zone, index) => {
+      const frontHeight = zone.type === 'fixed' ? zone.value : zone.value * singleFrValue;
+      
+      parts.push({
+        name: `Front ${index + 1} (${zone.type === 'fixed' ? 'stały' : 'zmienny'})`,
+        length: Number(frontHeight.toFixed(1)), // Dokładność do 0.1 mm
+        width: frontWidth,
+        qty: 1
+      });
     });
   }
 
