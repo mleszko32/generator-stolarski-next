@@ -2,6 +2,7 @@ import * as THREE from 'three';
 // Importujemy moduł do obracania kamerą za pomocą myszki
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { state } from '../core/state.js';
+import { getDrawerComponents } from '../core/drawerMath.js'; // DODANE
 
 let scene, camera, renderer, cabinetGroup, controls;
 
@@ -116,7 +117,7 @@ export function update3D() {
   cabinetGroup.add(createBoard(innerWidth, board, topBottomDepth, 0, height - board/2, topBottomZ));
   cabinetGroup.add(createBoard(hdfWidth, hdfHeight, backThick, 0, height/2, hdfZ));
 
-  // 7. FRONTY W STREFACH (Z nowym algorytmem asymetrycznym)
+  // 7. FRONTY I WNĘTRZA SZUFLAD
   if (state.project.front.active) {
     const fc = state.project.front.clearance;
     const gap = state.project.front.gap;
@@ -124,7 +125,6 @@ export function update3D() {
     const distributionStr = String(state.project.front.distribution || "1").trim();
     let parsedZones = [];
 
-    // Tłumaczymy ciąg tekstowy (dokładnie to samo co w cabinet.js)
     if (!distributionStr.includes(':') && !distributionStr.includes(',') && !isNaN(distributionStr)) {
       const count = parseInt(distributionStr, 10);
       for (let i = 0; i < count; i++) {
@@ -133,7 +133,6 @@ export function update3D() {
     } else {
       const separator = distributionStr.includes(':') ? ':' : ',';
       const zones = distributionStr.split(separator).map(s => s.trim());
-      
       parsedZones = zones.map(zone => {
         if (zone.toLowerCase().endsWith('fr')) return { type: 'fr', value: parseFloat(zone) || 1 };
         const val = parseFloat(zone);
@@ -143,7 +142,6 @@ export function update3D() {
 
     const count = parsedZones.length;
     const fWidth = width - (fc.sides * 2);
-    
     let availableHeight = height - fc.top - fc.bottom - ((count - 1) * gap);
     let fixedTotal = 0;
     let frTotal = 0;
@@ -156,31 +154,53 @@ export function update3D() {
     availableHeight -= fixedTotal;
     const singleFrValue = frTotal > 0 ? availableHeight / frTotal : 0;
     
-    // Pozycja Z (wysunięcie do przodu + 1.5mm na odbojnik)
     const fZ = frontZ + 1.5 + (board / 2);
-
-    // Kursor po osi Y - zaczynamy rysowanie od poziomu dolnego luza
     let currentY = fc.bottom;
 
-    // Rysujemy po kolei od dołu do góry
+    // Rysowanie z uwzględnieniem pudeł szuflad
     parsedZones.forEach(zone => {
       const fHeight = zone.type === 'fixed' ? zone.value : zone.value * singleFrValue;
-      
-      // Środek dla geometrii (bo Three.js pozycjonuje od środka mesha) to aktualny dół + połowa wysokości frontu
       const meshY = currentY + (fHeight / 2);
       
+      // MESH FRONTU
       const frontMesh = createBoard(fWidth, fHeight, board, 0, meshY, fZ);
-      
-      // Półprzezroczystość, by widzieć środek korpusu
       frontMesh.material = frontMesh.material.clone();
       frontMesh.material.transparent = true;
-      frontMesh.material.opacity = 0.6;
-      // Możemy im dać lekko pomarańczowy odcień dla kontrastu (jak u Bluma!)
+      frontMesh.material.opacity = 0.4;
       frontMesh.material.color.setHex(0xffa040); 
-      
       cabinetGroup.add(frontMesh);
       
-      // Przesuwamy nasz kursor osi Y w górę o dodany front + wymaganą szczelinę, gotowi na kolejny front
+      // MESH ELEMENTÓW SZUFLADY
+      // Przekazujemy fHeight, aby algorytm dobrał odpowiednią wysokość tyłu (M, K, C, D)
+      const drawerDetails = getDrawerComponents(state.project.front.drawerSystem, innerWidth, topBottomDepth, fHeight);
+
+      if (drawerDetails) {
+        const bottomW = drawerDetails.bottom.width;
+        const bottomL = drawerDetails.bottom.length;
+        const drawerBoardThickness = 16; 
+
+        // Pozycja dna szuflady
+        const dnoY = currentY + 15 + (drawerBoardThickness / 2);
+        const dnoZ = frontZ - (bottomL / 2) - 2; 
+        
+        const bottomMesh = createBoard(bottomW, drawerBoardThickness, bottomL, 0, dnoY, dnoZ);
+        bottomMesh.material = bottomMesh.material.clone();
+        bottomMesh.material.color.setHex(0xaaaaaa); 
+        cabinetGroup.add(bottomMesh);
+
+        // Pozycja ścianki tylnej szuflady (wysokość pobrana bezpośrednio z wariantu)
+        const backW = drawerDetails.back.width;
+        const backH = drawerDetails.back.height; 
+        
+        const backY = dnoY + (drawerBoardThickness / 2) + (backH / 2);
+        const backZ = frontZ - bottomL - (drawerBoardThickness / 2) - 2;
+
+        const backMesh = createBoard(backW, backH, drawerBoardThickness, 0, backY, backZ);
+        backMesh.material = backMesh.material.clone();
+        backMesh.material.color.setHex(0xaaaaaa);
+        cabinetGroup.add(backMesh);
+      }
+
       currentY += fHeight + gap;
     });
   }
