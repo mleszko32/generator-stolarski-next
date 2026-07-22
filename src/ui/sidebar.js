@@ -28,16 +28,32 @@ export function updateSidebar() {
     html += `<ul class="parts-list">`;
     
     mountingData.forEach((slide, index) => {
-      // Wyciągamy wartość Y z pierwszego otworu montażowego w tablicy
-      let yValue = "Brak";
+      // Oś prowadnicy na boku korpusu
+      let slideY = "Brak";
       if (slide.slideSideHoles && slide.slideSideHoles.length > 0) {
-        yValue = slide.slideSideHoles[0].y;
+        slideY = slide.slideSideHoles[0].y;
+      }
+
+      // Nawierty mocowania frontu (formatujemy do zgrabnej listy)
+      let frontHolesHtml = "";
+      if (slide.frontHoles && slide.frontHoles.length > 0) {
+        frontHolesHtml = slide.frontHoles.map(h => 
+          `Y: <b>${h.y} mm</b> (X: ${h.xOffset} mm, ⌀${h.diameter})`
+        ).join('<br>');
       }
 
       html += `
-        <li style="margin-bottom: 10px;">
+        <li style="margin-bottom: 15px;">
           <strong>Szuflada ${index + 1}</strong><br>
-          <span>Wysokość (Y): <b>${yValue !== null ? yValue + ' mm' : '<span style="color:red">null</span>'}</b></span>
+          
+          <div style="margin-top: 4px; color: #1e293b;">
+            Korpus (Oś prowadnicy): <b>${slideY !== "Brak" ? slideY + ' mm' : 'Brak'}</b>
+          </div>
+          
+          <div style="margin-top: 6px; font-size: 0.9em; padding-left: 10px; border-left: 3px solid #cbd5e1;">
+            <b>Front (od dolnej krawędzi):</b><br>
+            ${frontHolesHtml}
+          </div>
         </li>
       `;
     });
@@ -45,5 +61,5 @@ export function updateSidebar() {
     html += `</ul>`;
   } // Koniec bloku "if"
 
-  leftSidebar.innerHTML = html; // Wstrzykujemy całość do lewego panelu
-} // Koniec głównej funkcji updateSidebar
+  leftSidebar.innerHTML = html; 
+} // Koniec głównej funkcji

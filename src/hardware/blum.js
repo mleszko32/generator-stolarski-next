@@ -27,10 +27,10 @@ export function getBlumMountingData(cabinetConfig, drawers, systemType = 'merivo
     const frontBottom = currentFrontBottom;
     const frontTop = frontBottom + drawer.frontHeight;
 
-    // NOWA LOGIKA DLA OSI Y
+    // NOWA LOGIKA DLA OSI Y PROWADNIC
     let slideY;
     if (index === 0) {
-      // Pierwsza prowadnica: od wewnętrznej strony dna (wieniec 18 mm + 54 mm)
+      // Pierwsza prowadnica: od wewnętrznej strony dna (wieniec 18 mm + offset)
       const innerBottom = config.isInsetBottom ? config.bottomPanelThickness : 0;
       slideY = innerBottom + systemParams.railOffset;
     } else {
@@ -49,10 +49,19 @@ export function getBlumMountingData(cabinetConfig, drawers, systemType = 'merivo
       slideHoles.push({ x: 357, y: slideY, desc: "Otwór tylny" });
     }
 
-    // Otwory montażowe na froncie (zależne od bazy systemu)
+    // NOWA LOGIKA DLA NAWIERTÓW FRONTU
+    let localFrontHolesBase = systemParams.frontHolesBase;
+
+    // Korekta tylko dla pierwszej szuflady (nadmiar zakrywający wieniec dolny)
+    if (index === 0) {
+      const bottomOverlap = config.bottomPanelThickness - config.bottomGap; 
+      localFrontHolesBase += bottomOverlap;
+    }
+
+    // Otwory montażowe na froncie (lokalne, liczone od dolnej krawędzi formatki)
     const frontHoles = [
-      { y: frontBottom + systemParams.frontHolesBase, xOffset: 12, diameter: 10, desc: `Front ${index+1}: Dolny otwór` },
-      { y: frontBottom + systemParams.frontHolesBase + 32, xOffset: 12, diameter: 10, desc: `Front ${index+1}: Górny otwór` }
+      { y: localFrontHolesBase, xOffset: 12, diameter: 10, desc: `Front ${index+1}: Dolny otwór` },
+      { y: localFrontHolesBase + 32, xOffset: 12, diameter: 10, desc: `Front ${index+1}: Górny otwór` }
     ];
 
     results.push({
