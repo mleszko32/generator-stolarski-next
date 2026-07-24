@@ -1,8 +1,8 @@
 // src/render/viewer2d.js
 
 export function generateSidePanelSVG(height, depth, mountingData) {
-  // Zwiększone marginesy, aby zmieścić oznaczenie bazy i wymiary
-  const marginX = 100; 
+  // Zwiększony margines X, aby zmieścić kaskadowe linie wymiarowe po prawej stronie
+  const marginX = 140; 
   const marginY = 100;
   const svgWidth = depth + marginX * 2;
   const svgHeight = height + marginY * 2;
@@ -44,38 +44,58 @@ export function generateSidePanelSVG(height, depth, mountingData) {
   svg += `<line x1="0" y1="-20" x2="${depth}" y2="-20" stroke="#475569" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)" />`;
   svg += `<text x="${depth / 2}" y="-30" font-size="14" fill="#1e293b" text-anchor="middle" font-weight="bold">${depth} mm</text>`;
 
-  // 4. Gabaryt - Wysokość (lewa strona, przesunięte by nie nachodzić na bazę)
-  svg += `<line x1="-50" y1="0" x2="-50" y2="${height}" stroke="#475569" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)" />`;
-  svg += `<text x="-60" y="${height / 2}" font-size="14" fill="#1e293b" text-anchor="middle" font-weight="bold" transform="rotate(-90, -60, ${height / 2})">${height} mm</text>`;
+  // 4. Gabaryt - Wysokość (lewa strona, przesunięte)
+  svg += `<line x1="-60" y1="0" x2="-60" y2="${height}" stroke="#475569" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)" />`;
+  svg += `<text x="-70" y="${height / 2}" font-size="14" fill="#1e293b" text-anchor="middle" font-weight="bold" transform="rotate(-90, -70, ${height / 2})">${height} mm</text>`;
 
-  // 5. Nanoszenie nawiertów i osi prowadnic
+  // 5. Nanoszenie nawiertów i kaskadowych osi prowadnic
   if (mountingData) {
-    mountingData.forEach((drawer) => {
-      if (!drawer.slideSideHoles || drawer.slideSideHoles.length === 0) return;
-
-      const axisYFromBottom = drawer.slideSideHoles[0].y; 
-      const svgY = height - axisYFromBottom;
-
-      // Przerywana oś prowadnicy
-      svg += `<line x1="0" y1="${svgY}" x2="${depth}" y2="${svgY}" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="6,4" />`;
+    // Obliczamy ile mamy realnych szuflad, żeby narysować odpowiednio długą linię bazową na dole
+    const validDrawers = mountingData.filter(d => d.slideSideHoles && d.slideSideHoles.length > 0);
+    
+    if (validDrawers.length > 0) {
+      // Maksymalne wysunięcie linii wymiarowych w prawo
+      const maxDimX = depth + 20 + ((validDrawers.length - 1) * 30);
       
-      // Pionowa linia wymiarowa po prawej stronie, łącząca dolną krawędź z osią
-      svg += `<line x1="${depth + 15}" y1="${height}" x2="${depth + 15}" y2="${svgY}" stroke="#94a3b8" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)" />`;
+      // Wyciągnięcie przerywanej linii bazowej (od dołu boku w prawo)
+      svg += `<line x1="${depth}" y1="${height}" x2="${maxDimX + 10}" y2="${height}" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2,2" />`;
       
-      // Wartość Y w pionie na linii wymiarowej
-      const textY = svgY + (axisYFromBottom / 2);
-      svg += `<text x="${depth + 22}" y="${textY}" font-size="13" fill="#0f172a" font-weight="bold" transform="rotate(-90, ${depth + 22}, ${textY})" text-anchor="middle">${axisYFromBottom.toFixed(1)}</text>`;
+      let drawnCount = 0;
+      
+      mountingData.forEach((drawer) => {
+        if (!drawer.slideSideHoles || drawer.slideSideHoles.length === 0) return;
 
-      // Punkty wierceń i same wartości X nad nimi
-      drawer.slideSideHoles.forEach(hole => {
-        const svgX = hole.x;
-        const hY = height - hole.y; 
+        const axisYFromBottom = drawer.slideSideHoles[0].y; 
+        const svgY = height - axisYFromBottom;
 
-        svg += `<circle cx="${svgX}" cy="${hY}" r="4" fill="#dc2626" />`;
-        // Czysta liczba nad czerwonym punktem (zastępuje "X: ...")
-        svg += `<text x="${svgX}" y="${hY - 10}" font-size="13" fill="#dc2626" text-anchor="middle" font-weight="bold">${svgX.toFixed(1)}</text>`;
+        // Przerywana oś prowadnicy na formacie boku
+        svg += `<line x1="0" y1="${svgY}" x2="${depth}" y2="${svgY}" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="6,4" />`;
+        
+        // Obliczamy pozycję X dla danej linii wymiarowej (każda szuflada jest o 30px dalej w prawo)
+        const dimX = depth + 20 + (drawnCount * 30);
+
+        // Przedłużenie osi prowadnicy do jej dedykowanej linii wymiarowej
+        svg += `<line x1="${depth}" y1="${svgY}" x2="${dimX}" y2="${svgY}" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2,2" />`;
+        
+        // Indywidualna pionowa strzałka wymiarowa dla tej konkretnej szuflady
+        svg += `<line x1="${dimX}" y1="${height}" x2="${dimX}" y2="${svgY}" stroke="#94a3b8" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)" />`;
+        
+        // Tekst obok strzałki (odsunięty o 12px, aby linia go nie przecinała)
+        const textY = svgY + (axisYFromBottom / 2);
+        svg += `<text x="${dimX + 12}" y="${textY}" font-size="12" fill="#0f172a" font-weight="bold" transform="rotate(-90, ${dimX + 12}, ${textY})" text-anchor="middle">${axisYFromBottom.toFixed(1)}</text>`;
+
+        // Punkty wierceń i czyste wartości X
+        drawer.slideSideHoles.forEach(hole => {
+          const svgX = hole.x;
+          const hY = height - hole.y; 
+
+          svg += `<circle cx="${svgX}" cy="${hY}" r="4" fill="#dc2626" />`;
+          svg += `<text x="${svgX}" y="${hY - 10}" font-size="13" fill="#dc2626" text-anchor="middle" font-weight="bold">${svgX.toFixed(1)}</text>`;
+        });
+
+        drawnCount++;
       });
-    });
+    }
   }
 
   svg += `</g></svg>`;
