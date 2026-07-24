@@ -1,5 +1,4 @@
 import { calculateParts } from "../engine/cabinet.js";
-// PAMIĘTAJ O TYM IMPORCIE: Pobieramy funkcję rysującą 2D z nowego pliku
 import { generateSidePanelSVG } from "../render/viewer2d.js"; 
 
 export function updateSidebar() {
@@ -8,15 +7,12 @@ export function updateSidebar() {
   // Odbieramy oba zestawy danych z naszego silnika
   const { parts, mountingData } = calculateParts();
 
-  // 1. Dodajemy przycisk na samej górze lewego panelu
   let html = `
     <button id="btn-print-2d" style="width: 100%; padding: 10px; margin-bottom: 15px; background-color: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
       📄 Generuj Rysunek 2D (Bok)
     </button>
   `;
 
-  // 2. Używamy znacznika <details>, żeby zrobić zwijaną listę formatek
-  // Atrybut "open" sprawia, że przy starcie jest rozwinięta
   html += `<details open style="margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">`;
   html += `<summary style="font-weight: bold; cursor: pointer; outline: none;">Lista formatek</summary>`;
   html += `<ul class="parts-list" style="margin-top: 10px; padding-left: 20px;">`;
@@ -32,7 +28,6 @@ export function updateSidebar() {
 
   html += `</ul></details>`;
 
-  // 3. Zwijana sekcja nawiertów (domyślnie zwinięta, żeby nie zaśmiecać ekranu)
   if (mountingData && mountingData.length > 0) {
     html += `<details style="background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">`;
     html += `<summary style="font-weight: bold; cursor: pointer; outline: none;">Osie prowadnic i nawierty</summary>`;
@@ -54,11 +49,9 @@ export function updateSidebar() {
       html += `
         <li style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #cbd5e1;">
           <strong>Szuflada ${index + 1}</strong><br>
-          
           <div style="margin-top: 4px; color: #1e293b;">
             Oś prowadnicy (bok): <b>${slideY !== "Brak" ? slideY + ' mm' : 'Brak'}</b>
           </div>
-          
           <div style="margin-top: 6px; font-size: 0.9em; padding-left: 10px; border-left: 3px solid #cbd5e1;">
             <b>Front (od dolnej krawędzi):</b><br>
             ${frontHolesHtml}
@@ -70,20 +63,31 @@ export function updateSidebar() {
     html += `</ul></details>`;
   }
 
-  // Wstrzykujemy gotowy kod do panelu
   leftSidebar.innerHTML = html; 
 
-  // 4. Podpinamy akcję pod nowo utworzony przycisk
   const printBtn = document.getElementById('btn-print-2d');
   if (printBtn) {
     printBtn.addEventListener('click', () => {
       
-      const currentHeight = parseFloat(document.getElementById('input-height').value) || 720;
-      const currentDepth = parseFloat(document.getElementById('input-depth').value) || 510;
+      // SZUKAMY WYMIARÓW KONKRETNEJ FORMATKI
+      // Dzięki temu ignorujemy wymiar korpusu i bierzemy to, co pójdzie na piłę
+      const sidePanel = parts.find(p => p.name.toLowerCase().includes('bok'));
       
-      const svgContent = generateSidePanelSVG(currentHeight, currentDepth, mountingData);
+      let drawHeight = 720;
+      let drawDepth = 510;
+
+      if (sidePanel) {
+        // Jeśli znajdziemy bok w formakach, bierzemy jego wymiary (czyli głębokość pomniejszoną o plecy)
+        drawHeight = sidePanel.length;
+        drawDepth = sidePanel.width;
+      } else {
+        // Zabezpieczenie, gdyby ktoś wykasował boki z logiki
+        drawHeight = parseFloat(document.getElementById('input-height').value) || 720;
+        drawDepth = parseFloat(document.getElementById('input-depth').value) || 510;
+      }
       
-      // 1. Zapisujemy cały kod HTML do jednej zmiennej
+      const svgContent = generateSidePanelSVG(drawHeight, drawDepth, mountingData);
+      
       const htmlContent = `
         <!DOCTYPE html>
         <html lang="pl">
@@ -110,10 +114,7 @@ export function updateSidebar() {
         </html>
       `;
 
-      // 2. Tworzymy "paczkę" (Blob) z naszym kodem typu HTML
       const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-      
-      // 3. Generujemy tymczasowy link i otwieramy go w nowej karcie
       const blobUrl = URL.createObjectURL(blob);
       window.open(blobUrl, '_blank');
     });
