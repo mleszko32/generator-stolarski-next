@@ -77,19 +77,18 @@ export function updateSidebar() {
   const printBtn = document.getElementById('btn-print-2d');
   if (printBtn) {
     printBtn.addEventListener('click', () => {
-      // Pobieramy aktualne wymiary z panelu prawego używając ID z Twojego kodu properties.js
+      
       const currentHeight = parseFloat(document.getElementById('input-height').value) || 720;
       const currentDepth = parseFloat(document.getElementById('input-depth').value) || 510;
-
-      // Generujemy rysunek
+      
       const svgContent = generateSidePanelSVG(currentHeight, currentDepth, mountingData);
       
-      // Otwieramy w nowym oknie
-      const printWindow = window.open('', '_blank');
-      printWindow.document.write(`
+      // 1. Zapisujemy cały kod HTML do jednej zmiennej
+      const htmlContent = `
         <!DOCTYPE html>
-        <html>
+        <html lang="pl">
           <head>
+            <meta charset="UTF-8">
             <title>Wydruk na produkcję - Bok szafki</title>
             <style>
               body { margin: 0; padding: 20px; font-family: sans-serif; background-color: #f1f5f9; }
@@ -109,8 +108,14 @@ export function updateSidebar() {
             </div>
           </body>
         </html>
-      `);
-      printWindow.document.close(); 
+      `;
+
+      // 2. Tworzymy "paczkę" (Blob) z naszym kodem typu HTML
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+      
+      // 3. Generujemy tymczasowy link i otwieramy go w nowej karcie
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank');
     });
   }
 }
