@@ -18,14 +18,18 @@ export function calculateNominalLength(internalDepth) {
 }
 
 // NOWE: Funkcja dobierająca wariant szuflady na podstawie wysokości frontu
-export function getDrawerVariant(frontHeight) {
-  // Klasyfikacja oparta na standardach (np. Blum Antaro)
+// ZMIENIONE: Funkcja przyjmuje systemId, aby poprawnie nadać nazwy wariantów
+export function getDrawerVariant(frontHeight, systemId) {
   if (frontHeight < 160) {
-    return { type: 'M', backHeight: 84 }; // Niska (np. na sztućce)
+    return { type: 'M', backHeight: 84 }; 
   } else if (frontHeight >= 160 && frontHeight < 280) {
-    return { type: 'C', backHeight: 167 }; // Średnia 
+    const type = systemId === 'merivobox' ? 'K' : 'C'; 
+    return { type: type, backHeight: 167 }; 
   } else {
-    return { type: 'D', backHeight: 199 }; // Wysoka (garnkowa)
+    // Wysoka szuflada z relingiem (Merivobox = E, Antaro = D)
+    const type = systemId === 'merivobox' ? 'E' : 'D';
+    const backHeight = systemId === 'merivobox' ? 192 : 199;
+    return { type: type, backHeight: backHeight }; 
   }
 }
 
@@ -39,9 +43,7 @@ export function getDrawerComponents(systemId, internalWidth, internalDepth, fron
   }
 
   const nl = calculateNominalLength(internalDepth);
-  
-  // Pobieramy dokładne dane o wariancie (typ i wysokość tyłu)
-  const variant = getDrawerVariant(frontHeight);
+  const variant = getDrawerVariant(frontHeight, systemId);
 
   const bottomWidth = internalWidth - system.bottomWidthDeduct;
   const bottomLength = nl - system.bottomLengthDeduct;
@@ -50,14 +52,11 @@ export function getDrawerComponents(systemId, internalWidth, internalDepth, fron
   return {
     systemName: system.name,
     nominalLength: nl,
-    bottom: {
-      width: bottomWidth,
-      length: bottomLength
-    },
+    bottom: { width: bottomWidth, length: bottomLength },
     back: {
       width: backWidth,
-      height: variant.backHeight, // Dokładna wysokość z katalogu
-      variantType: variant.type // M, C lub D
+      height: variant.backHeight, 
+      variantType: variant.type   
     }
   };
 }

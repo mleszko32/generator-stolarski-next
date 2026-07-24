@@ -74,10 +74,21 @@ export function getBlumMountingData(cabinetConfig, drawers, systemType = 'merivo
     const localFrontHolesX = systemParams.frontHolesXBase + frontOverlapX;
 
     // Otwory montażowe na froncie (lokalne, liczone od dolnej krawędzi formatki oraz od boków)
+    // Otwory montażowe na froncie (średnica 3 mm)
     const frontHoles = [
-      { y: localFrontHolesBase, xOffset: localFrontHolesX, diameter: 10, desc: `Front ${index+1}: Dolny otwór` },
-      { y: localFrontHolesBase + 32, xOffset: localFrontHolesX, diameter: 10, desc: `Front ${index+1}: Górny otwór` }
+      { y: localFrontHolesBase, xOffset: localFrontHolesX, diameter: 3, desc: `Front ${index+1}: Dolny otwór` },
+      { y: localFrontHolesBase + 32, xOffset: localFrontHolesX, diameter: 3, desc: `Front ${index+1}: Górny otwór` }
     ];
+
+    // Dodatkowy otwór na reling dla wysokiej szuflady (front od 280 mm w górę)
+    if (drawer.frontHeight >= 280) {
+      frontHoles.push({
+        y: localFrontHolesBase + 160, 
+        xOffset: localFrontHolesX, 
+        diameter: 3, 
+        desc: `Front ${index+1}: Otwór na reling`
+      });
+    }
 
     results.push({
       level: index + 1,

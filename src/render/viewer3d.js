@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { state } from '../core/state.js';
 import { getDrawerComponents } from '../core/drawerMath.js'; // DODANE
+import { calculateParts } from '../engine/cabinet.js'; // Dodany import
 
 let scene, camera, renderer, cabinetGroup, controls;
 
@@ -111,8 +112,36 @@ export function update3D() {
   const topBottomZ = frontZ - (topBottomDepth / 2);
 
   // Korpus
-  cabinetGroup.add(createBoard(board, height, sideDepth, -width/2 + board/2, height/2, sideZ));
-  cabinetGroup.add(createBoard(board, height, sideDepth, width/2 - board/2, height/2, sideZ));
+  const { mountingData } = calculateParts(); // Pobieramy nawierty z silnika
+
+  const leftSide = createBoard(board, height, sideDepth, -width/2 + board/2, height/2, sideZ);
+  const rightSide = createBoard(board, height, sideDepth, width/2 - board/2, height/2, sideZ);
+
+  // Funkcja wiercąca otwory w bokach szafki (średnica 5 mm -> promień 2.5 mm)
+  function attachSideHoles(boardMesh, isRight) {
+    if (!mountingData) return;
+    const holeMaterial = new THREE.MeshBasicMaterial({ color: 0x1a202c }); 
+    const geom = new THREE.CylinderGeometry(2.5, 2.5, 10, 16); 
+    geom.rotateZ(Math.PI / 2);
+
+    mountingData.forEach(drawer => {
+      if (!drawer.slideSideHoles) return;
+      drawer.slideSideHoles.forEach(hole => {
+        const mesh = new THREE.Mesh(geom, holeMaterial);
+        const localY = (-height / 2) + hole.y; 
+        const localZ = (sideDepth / 2) - hole.x; 
+        const localX = (isRight ? -board : board) / 2; 
+        mesh.position.set(localX, localY, localZ);
+        boardMesh.add(mesh);
+      });
+    });
+  }
+
+  attachSideHoles(leftSide, false);
+  attachSideHoles(rightSide, true);
+
+  cabinetGroup.add(leftSide);
+  cabinetGroup.add(rightSide);
   cabinetGroup.add(createBoard(innerWidth, board, topBottomDepth, 0, board/2, topBottomZ));
   cabinetGroup.add(createBoard(innerWidth, board, topBottomDepth, 0, height - board/2, topBottomZ));
   cabinetGroup.add(createBoard(hdfWidth, hdfHeight, backThick, 0, height/2, hdfZ));
@@ -146,7 +175,7 @@ export function update3D() {
     let fixedTotal = 0;
     let frTotal = 0;
 
-    parsedZones.forEach(zone => {
+    parsedZones.forEach((zone, index) => {
       if (zone.type === 'fixed') fixedTotal += zone.value;
       if (zone.type === 'fr') frTotal += zone.value;
     });
@@ -158,7 +187,7 @@ export function update3D() {
     let currentY = fc.bottom;
 
     // Rysowanie z uwzględnieniem pudeł szuflad
-    parsedZones.forEach(zone => {
+    parsedZones.forEach((zone, index) => {
       const fHeight = zone.type === 'fixed' ? zone.value : zone.value * singleFrValue;
       const meshY = currentY + (fHeight / 2);
       
@@ -169,7 +198,24 @@ export function update3D() {
       frontMesh.material.opacity = 0.4;
       frontMesh.material.color.setHex(0xffa040); 
       cabinetGroup.add(frontMesh);
-      
+      // Renderowanie otworów o średnicy 3 mm na lewej i prawej krawędzi frontu
+      if (mountingData && mountingData[index] && mountingData[index].frontHoles) {
+        const frontHoleMat = new THREE.MeshBasicMaterial({ color: 0x1a202c });
+        const frontGeom = new THREE.CylinderGeometry(1.5, 1.5, 10, 16); // Wiertło 3 mm (promień 1.5 mm)
+        frontGeom.rotateX(Math.PI / 2); 
+
+        mountingData[index].frontHoles.forEach(hole => {
+          [-1, 1].forEach(sideMultiplier => {
+             const mesh = new THREE.Mesh(frontGeom, frontHoleMat);
+             const localY = (-fHeight / 2) + hole.y;
+             const localX = (sideMultiplier * (fWidth / 2)) + (sideMultiplier * -hole.xOffset);
+             const localZ = (-board / 2); 
+             mesh.position.set(localX, localY, localZ);
+             frontMesh.add(mesh);
+          });
+        });
+      }
+
       // MESH ELEMENTÓW SZUFLADY
       // Przekazujemy fHeight, aby algorytm dobrał odpowiednią wysokość tyłu (M, K, C, D)
       const drawerDetails = getDrawerComponents(state.project.front.drawerSystem, innerWidth, topBottomDepth, fHeight);
