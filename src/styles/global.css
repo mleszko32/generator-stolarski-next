@@ -41,7 +41,8 @@ body {
 }
 
 .sidebar-left, .sidebar-right {
-  width: 250px;
+  width: 500px;
+  height: auto;
   background: #ffffff;
   border-right: 1px solid #ddd;
   padding: 15px;

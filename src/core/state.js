@@ -1,20 +1,54 @@
+// src/state.js
+
 export const state = {
   project: {
-    dimensions: { width: 600, height: 720, depth: 513 },
-    materials: { boardThickness: 18, backThickness: 3 },
-    backPanel: { type: 'nakladane', offset: 17, grooveDepth: 12, clearance: 2 },
+    name: "Zabudowa Wielomodułowa",
+    materials: {
+      boardThickness: 18,
+      backThickness: 3
+    },
+    backPanel: {
+      type: "nakladane",
+      offset: 20,
+      grooveDepth: 7,
+      clearance: 2
+    },
     front: {
       active: true,
-      // Zamiast starego "count: 3", używamy naszego nowego ciągu dystrybucyjnego
       distribution: "1:1:141",
-      gap: 3, // Szczelina między frontami w pionie (np. 3 mm)
-      // NOWE: Wybrany system szuflad dla całego korpusu
-      drawerSystem: 'merivobox',
-      clearance: {
-        sides: 1.5,
-        top: 5,
-        bottom: 0
+      drawerSystem: "merivobox",
+      gap: 3,
+      clearance: { sides: 1.5, top: 5, bottom: 0 }
+    },
+    modules: [
+      {
+        id: "mod-1",
+        type: "base_cabinet",
+        dimensions: { width: 600, height: 720, depth: 513 },
+        position: { x: 0, y: 0, z: 0 },
+        interior: {
+          id: "root-space",
+          splitDirection: "vertical", 
+          children: [
+            {
+              id: "left-space",
+              size: "1fr", // zajmuje równą część dostępnego miejsca
+              splitDirection: "horizontal", 
+              children: [
+                { id: "shelf-1", size: "1fr", splitDirection: "none", children: [] },
+                { id: "shelf-2", size: "1fr", splitDirection: "none", children: [] },
+                { id: "shelf-3", size: "1fr", splitDirection: "none", children: [] }
+              ]
+            },
+            {
+              id: "right-space",
+              size: "1fr", // druga równa część dostępnego miejsca
+              splitDirection: "none",
+              children: []
+            }
+          ]
+        }
       }
-    }
+    ]
   }
 };

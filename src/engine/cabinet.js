@@ -1,91 +1,214 @@
-import { getBlumMountingData } from '../hardware/blum.js';
+// src/engine/cabinet.js
 import { state } from "../core/state.js";
-import { getDrawerComponents } from "../core/drawerMath.js";
+import { calculateDrawerHoles } from "../core/drawerMath.js";
+
+/**
+ * Rekurencyjna funkcja wyliczająca pozycje formatek wewnętrznych
+ */
+function calculateInteriorPanels(node, x, y, z, width, height, depth, boardThick) {
+  if (!node) return [];
+
+  const panels = [];
+
+  // ---- NOWE: Rejestrujemy pustą przestrzeń (powietrze), aby można było w nią kliknąć ----
+  if (node.splitDirection === 'none') {
+    panels.push({
+      type: 'empty_space',
+      width: width,
+      height: height,
+      depth: depth,
+      centerX: x + (width / 2),
+      centerY: y + (height / 2),
+      centerZ: z + (depth / 2),
+      nodeRef: node // Przekazujemy referencję do węzła, by móc go później edytować!
+    });
+    return panels; // Kończymy, bo nie ma tu więcej podziałów
+  }
+
+  // Zabezpieczenie przed błędami, gdyby węzeł miał kierunek, ale brak dzieci
+  if (!node.children || node.children.length === 0) return panels;
+
+  const numChildren = node.children.length;
+  const numDividers = numChildren - 1;
+
+  if (node.splitDirection === 'vertical') {
+    // ---- CIĘCIE PIONOWE (WSTAWIANIE PRZEGRÓD) ----
+    const availableWidth = width - (numDividers * boardThick);
+    
+    // Zliczanie proporcji (np. "1fr", "2fr")
+    let totalFr = 0;
+    node.children.forEach(child => {
+      totalFr += parseFloat(child.size) || 1;
+    });
+
+    let currentX = x;
+    
+    for (let i = 0; i < numChildren; i++) {
+      const childNode = node.children[i];
+      const childFr = parseFloat(childNode.size) || 1;
+      const sectionWidth = availableWidth * (childFr / totalFr);
+      
+      panels.push(...calculateInteriorPanels(
+        childNode, currentX, y, z, sectionWidth, height, depth, boardThick
+      ));
+      
+      currentX += sectionWidth;
+      
+      if (i < numDividers) {
+        panels.push({
+          type: 'vertical_partition',
+          width: boardThick,
+          height: height,
+          depth: depth,
+          centerX: currentX + (boardThick / 2),
+          centerY: y + (height / 2),
+          centerZ: z + (depth / 2)
+        });
+        currentX += boardThick; 
+      }
+    }
+
+  } else if (node.splitDirection === 'horizontal') {
+    // ---- CIĘCIE POZIOME (WSTAWIANIE PÓŁEK) ----
+    const availableHeight = height - (numDividers * boardThick);
+    
+    let totalFr = 0;
+    node.children.forEach(child => {
+      totalFr += parseFloat(child.size) || 1;
+    });
+
+    let currentY = y;
+    
+    for (let i = 0; i < numChildren; i++) {
+      const childNode = node.children[i];
+      const childFr = parseFloat(childNode.size) || 1;
+      const sectionHeight = availableHeight * (childFr / totalFr);
+      
+      panels.push(...calculateInteriorPanels(
+        childNode, x, currentY, z, width, sectionHeight, depth, boardThick
+      ));
+      
+      currentY += sectionHeight;
+      
+      if (i < numDividers) {
+        panels.push({
+          type: 'horizontal_shelf',
+          width: width,
+          height: boardThick,
+          depth: depth,
+          centerX: x + (width / 2),
+          centerY: currentY + (boardThick / 2),
+          centerZ: z + (depth / 2)
+        });
+        currentY += boardThick; 
+      }
+    }
+  }
+
+  return panels;
+}
 
 export function calculateParts() {
-  const { width, height, depth } = state.project.dimensions;
+  // Zabezpieczenie: jeśli nie ma modułów, zwracamy puste dane
+  if (!state.project.modules || state.project.modules.length === 0) {
+    return { parts: [], mountingData: [] };
+  }
+
+  // Na ten moment obliczamy formatki dla aktywnego (pierwszego) modułu
+  const mod = state.project.modules[0];
+  const { width, height, depth } = mod.dimensions;
+  
   const board = state.project.materials.boardThickness;
   const backThick = state.project.materials.backThickness;
   const { type, offset, grooveDepth, clearance } = state.project.backPanel;
 
-  const innerWidth = width - (board * 2);
-  const totalClearance = clearance * 2; 
+  let parts = [];
 
-  let sideDepth, topBottomDepth, backWidth, backHeight;
+  // 1. Boki (2 szt.)
+  let sideDepth = type === 'nut' ? depth : depth - backThick;
+  parts.push({ name: "Bok (L/P)", length: height, width: sideDepth, qty: 2 });
 
+  // 2. Wieniec górny / dolny (2 szt.)
+  let topBottomDepth = type === 'nut' ? depth - offset - backThick : depth - backThick;
+  parts.push({ name: "Wieniec (G/D)", length: width - (board * 2), width: topBottomDepth, qty: 2 });
+
+  // 3. Plecy (HDF) - 1 szt.
+  let hdfWidth, hdfHeight;
+  const totalClearance = clearance * 2;
   if (type === 'nut') {
-    sideDepth = depth;
-    topBottomDepth = depth - offset - backThick;
-    backWidth = innerWidth + (grooveDepth * 2) - totalClearance;
-    backHeight = height - totalClearance;
-  } else { 
-    sideDepth = depth - backThick;
-    topBottomDepth = depth - backThick;
-    backWidth = width - totalClearance;
-    backHeight = height - totalClearance;
+    hdfWidth = width - (board * 2) + (grooveDepth * 2) - totalClearance;
+    hdfHeight = height - totalClearance;
+  } else {
+    hdfWidth = width - totalClearance;
+    hdfHeight = height - totalClearance;
   }
+  parts.push({ name: "Plecy (HDF)", length: hdfHeight, width: hdfWidth, qty: 1 });
 
-  const parts = [
-    { name: "Bok lewy", length: height, width: sideDepth, qty: 1, material: "Płyta 18mm" },
-    { name: "Bok prawy", length: height, width: sideDepth, qty: 1, material: "Płyta 18mm" },
-    { name: "Wieniec dolny", length: innerWidth, width: topBottomDepth, qty: 1, material: "Płyta 18mm" },
-    { name: "Wieniec górny", length: innerWidth, width: topBottomDepth, qty: 1, material: "Płyta 18mm" },
-    { name: "Plecy (HDF)", length: backHeight, width: backWidth, qty: 1, material: "HDF 3mm" }
-  ];
-// --- POCZĄTEK KODU DO WKLEJENIA ---
+  // 4. Wnętrze (Półki i Przegrody ze struktury drzewa)
+  if (mod.interior) {
+    const innerWidth = width - (board * 2);
+    const innerHeight = height - (board * 2);
+    const innerDepth = topBottomDepth; // Półki zazwyczaj trzymają głębokość wieńców
+    
+    // Punkt startowy wewnątrz szafki (pomijamy grubości boków i wieńca dolnego)
+    const startX = board; 
+    const startY = board;
+    const startZ = 0;
 
-  // 1. Przeliczamy wysokości frontów na podstawie podziału z interfejsu
-  let drawers = [];
-  
-  if (state.project.front.active) {
+    const interiorPanels = calculateInteriorPanels(
+      mod.interior, 
+      startX, 
+      startY, 
+      startZ, 
+      innerWidth, 
+      innerHeight, 
+      innerDepth, 
+      board
+    );
+    
+    interiorPanels.forEach((panel, index) => {
+      if (panel.type === 'vertical_partition') {
+        parts.push({ 
+          name: `Przegroda pionowa ${index + 1}`, 
+          length: parseFloat(panel.height.toFixed(1)), 
+          width: parseFloat(panel.depth.toFixed(1)), 
+          qty: 1,
+          renderData: panel // Zachowujemy dane do silnika 3D
+        });
+      } else if (panel.type === 'horizontal_shelf') {
+        parts.push({ 
+          name: `Półka ${index + 1}`, 
+          length: parseFloat(panel.width.toFixed(1)), 
+          width: parseFloat(panel.depth.toFixed(1)), 
+          qty: 1,
+          renderData: panel // Zachowujemy dane do silnika 3D
+        });
+      } else if (panel.type === 'empty_space') {
+        // NOWE: Przepuszczamy "powietrze" do silnika 3D
+        parts.push({
+          name: `Pusta przestrzeń`,
+          length: 0,
+          width: 0,
+          qty: 0,
+          renderData: panel
+        });
+      } // <-- 1. Zamknięcie bloku else if
+    }); // <-- 2. Zamknięcie pętli forEach
+  } // <-- 3. Zamknięcie bloku if (mod.interior)
+
+  // 5. Fronty i szuflady
+  let mountingData = [];
+  if (state.project.front && state.project.front.active) {
+    const fc = state.project.front.clearance;
+
+  // 5. Fronty i szuflady
+  let mountingData = [];
+  if (state.project.front && state.project.front.active) {
     const fc = state.project.front.clearance;
     const gap = state.project.front.gap;
     const distributionStr = String(state.project.front.distribution || "1").trim();
     
     let parsedZones = [];
-    // Rozpoznajemy, czy użytkownik wpisał np. "1:1:141" czy użył przecinków
-    const separator = distributionStr.includes(':') ? ':' : ',';
-    const zones = distributionStr.split(separator).map(s => s.trim());
-    
-    parsedZones = zones.map(zone => {
-      const val = parseFloat(zone);
-      // Jeśli wartość <= 10, traktujemy jako proporcję (fr), w przeciwnym razie jako stały wymiar w mm
-      return (val <= 10) ? { type: 'fr', value: val } : { type: 'fixed', value: val };
-    });
-
-    const count = parsedZones.length;
-    let availableHeight = height - fc.top - fc.bottom - ((count - 1) * gap);
-    
-    let fixedTotal = 0;
-    let frTotal = 0;
-    
-    parsedZones.forEach(zone => {
-      if (zone.type === 'fixed') fixedTotal += zone.value;
-      if (zone.type === 'fr') frTotal += zone.value;
-    });
-
-    availableHeight -= fixedTotal;
-    const singleFrValue = frTotal > 0 ? availableHeight / frTotal : 0;
-
-    // Generujemy ostateczną tablicę szuflad z konkretnymi wymiarami frontów dla algorytmu Bluma
-    drawers = parsedZones.map(zone => ({
-      frontHeight: zone.type === 'fixed' ? zone.value : zone.value * singleFrValue
-    }));
-  }
-
-  // 2. Wywołujemy funkcję od Bluma z gotową tablicą szuflad
-  const mountingData = getBlumMountingData(state.project, drawers, state.project.front.drawerSystem);
-  console.log("Wyliczone nawierty CNC:", mountingData);
-
-  // --- KONIEC KODU DO WKLEJENIA ---
-  // LOGIKA FRONTÓW I SZUFLAD
-  if (state.project.front.active) {
-    const fc = state.project.front.clearance;
-    const gap = state.project.front.gap;
-    const distributionStr = String(state.project.front.distribution || "1").trim();
-    
-    let parsedZones = [];
-
     if (!distributionStr.includes(':') && !distributionStr.includes(',') && !isNaN(distributionStr)) {
       const count = parseInt(distributionStr, 10);
       for (let i = 0; i < count; i++) {
@@ -93,67 +216,56 @@ export function calculateParts() {
       }
     } else {
       const separator = distributionStr.includes(':') ? ':' : ',';
-      const zones = distributionStr.split(separator).map(s => s.trim());
-      
-      parsedZones = zones.map(zone => {
+      parsedZones = distributionStr.split(separator).map(s => {
+        let zone = s.trim();
         if (zone.toLowerCase().endsWith('fr')) return { type: 'fr', value: parseFloat(zone) || 1 };
         const val = parseFloat(zone);
-        return val <= 10 ? { type: 'fr', value: val } : { type: 'fixed', value: val };
+        return (val <= 10) ? { type: 'fr', value: val } : { type: 'fixed', value: val };
       });
     }
 
     const count = parsedZones.length;
-    const frontWidth = width - (fc.sides * 2);
+    const fWidth = width - (fc.sides * 2);
     let availableHeight = height - fc.top - fc.bottom - ((count - 1) * gap);
+    
     let fixedTotal = 0;
     let frTotal = 0;
-
-    parsedZones.forEach(zone => {
-      if (zone.type === 'fixed') fixedTotal += zone.value;
-      if (zone.type === 'fr') frTotal += zone.value;
+    parsedZones.forEach(z => {
+      if (z.type === 'fixed') fixedTotal += z.value;
+      if (z.type === 'fr') frTotal += z.value;
     });
 
     availableHeight -= fixedTotal;
     const singleFrValue = frTotal > 0 ? availableHeight / frTotal : 0;
-    
-    
-    // Przechodzimy po wszystkich strefach i generujemy części
-    
+
+    let currentY = fc.bottom;
     parsedZones.forEach((zone, index) => {
-      const frontHeight = zone.type === 'fixed' ? zone.value : zone.value * singleFrValue;
+      const fHeight = zone.type === 'fixed' ? zone.value : zone.value * singleFrValue;
       
       parts.push({
         name: `Front ${index + 1}`,
-        length: Number(frontHeight.toFixed(1)),
-        width: frontWidth,
-        qty: 1,
-        material: "Płyta 18mm"
+        length: parseFloat(fHeight.toFixed(1)),
+        width: parseFloat(fWidth.toFixed(1)),
+        qty: 1
       });
 
-      // Wyliczamy elementy wewnętrzne, tym razem podając też wysokość frontu (frontHeight)
-      const drawerDetails = getDrawerComponents(state.project.front.drawerSystem, innerWidth, topBottomDepth, frontHeight);
-
-      if (drawerDetails) {
-        parts.push({
-          name: `Dno szuflady ${index + 1} (${drawerDetails.systemName}, NL: ${drawerDetails.nominalLength})`,
-          length: Number(drawerDetails.bottom.length.toFixed(1)), 
-          width: Number(drawerDetails.bottom.width.toFixed(1)),
-          qty: 1,
-          material: "Płyta 16mm" 
-        });
-        
-        // Zapisujemy wyliczony konkretny wariant z uwzględnieniem prawidłowej wysokości tyłu
-        parts.push({
-          name: `Tył szuflady ${index + 1} (Wariant ${drawerDetails.back.variantType})`,
-          length: Number(drawerDetails.back.height.toFixed(1)), 
-          width: Number(drawerDetails.back.width.toFixed(1)),
-          qty: 1,
-          material: "Płyta 16mm"
-        });
+      // Nawierty
+      if (typeof calculateDrawerHoles === 'function') {
+        const drawerHoles = calculateDrawerHoles(
+          state.project.front.drawerSystem,
+          currentY,
+          fHeight,
+          board,
+          index,
+          index === 0
+        );
+        if (drawerHoles) mountingData.push(drawerHoles);
       }
+
+      currentY += fHeight + gap;
     });
   }
 
-    
-  return { parts, mountingData }; 
-}
+  return { parts, mountingData };
+  }}
+

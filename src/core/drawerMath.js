@@ -1,4 +1,5 @@
 import { drawerSystems } from './drawerSystems.js';
+import { state } from './state.js';
 
 // Funkcja do obliczania optymalnej długości prowadnicy (NL)
 export function calculateNominalLength(internalDepth) {
@@ -58,5 +59,73 @@ export function getDrawerComponents(systemId, internalWidth, internalDepth, fron
       height: variant.backHeight, 
       variantType: variant.type   
     }
+  };
+}
+
+
+// ... (reszta Twojego pliku drawerMath.js) ...
+
+// Funkcja obliczająca nawierty odzwierciedlająca logikę z src/hardware/blum.js
+export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick, index, isBottom) {
+  // 1. Zaciągamy ustawienia luzów z globalnego stanu projektu
+  const config = state.project;
+  const bottomGap = Number(config.front.clearance.bottom ?? 0);
+  const sideGap = Number(config.front.clearance.sides ?? 1.5);
+
+  // 2. Słownik offsetów Bluma
+  const BLUM_OFFSETS = {
+    'merivobox': { railOffset: 54, frontHolesBase: 33.5, frontHolesXBase: 20.5 },
+    'legrabox': { railOffset: 38, frontHolesBase: 25, frontHolesXBase: 21.5 }, 
+    'tandembox': { railOffset: 33, frontHolesBase: 22, frontHolesXBase: 15.5 },
+    'antaro': { railOffset: 33, frontHolesBase: 22, frontHolesXBase: 15.5 }
+  };
+
+  const systemParams = BLUM_OFFSETS[systemId.toLowerCase()] || BLUM_OFFSETS['merivobox'];
+
+  // --- OŚ Y PROWADNIC NA BOKU KORPUSU ---
+  let slideY;
+  if (isBottom) {
+    // Pierwsza prowadnica: od wewnętrznej strony dna (wieniec dolny + offset)
+    slideY = boardThick + systemParams.railOffset;
+  } else {
+    // Kolejne prowadnice: pozycjonowane względem dolnej krawędzi frontu
+    slideY = currentY + systemParams.railOffset;
+  }
+
+  // --- OŚ Y NAWIERTÓW FRONTU ---
+  let localFrontHolesBase = systemParams.frontHolesBase;
+  if (isBottom) {
+    // Korekta dla pierwszej szuflady (nadmiar zakrywający wieniec dolny)
+    const bottomOverlap = boardThick - bottomGap; 
+    localFrontHolesBase += bottomOverlap;
+  }
+
+  // --- OŚ X NAWIERTÓW FRONTU ---
+  // Obliczamy nałożenie frontu na bok (grubość boku - luz boczny)
+  const frontOverlapX = boardThick - sideGap;
+  const localFrontHolesX = systemParams.frontHolesXBase + frontOverlapX;
+
+  // Kompletujemy nawierty we froncie
+  const frontHoles = [
+    { y: localFrontHolesBase, xOffset: localFrontHolesX, diameter: 3 },
+    { y: localFrontHolesBase + 32, xOffset: localFrontHolesX, diameter: 3 }
+  ];
+
+  // Dodatkowy otwór na reling dla wysokiej szuflady (front od 280 mm w górę)
+  if (frontHeight >= 280) {
+    frontHoles.push({
+      y: localFrontHolesBase + 160, 
+      xOffset: localFrontHolesX, 
+      diameter: 3
+    });
+  }
+
+  return {
+    slideSideHoles: [
+      { x: 37, y: slideY },
+      { x: 69, y: slideY },
+      { x: 261, y: slideY }
+    ],
+    frontHoles: frontHoles
   };
 }
