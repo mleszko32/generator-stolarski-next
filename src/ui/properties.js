@@ -2,45 +2,10 @@
 import { state } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
+import { renderEditor2D } from "../render/editor2d.js"; // Ważne: import nowego silnika
 
-// Rekurencyjna funkcja budująca interfejs struktury wnętrza
-function generateInteriorUI(node, path = "interior") {
-  // Jeśli węzeł jest podzielony, renderujemy jego dzieci
-  if (node.splitDirection !== 'none' && node.children && node.children.length > 0) {
-    let childrenHtml = node.children.map((child, index) => {
-      return generateInteriorUI(child, `${path}.children[${index}]`);
-    }).join('');
-
-    // Dodajemy obramowanie i etykietę, żeby było widać podział
-    const directionLabel = node.splitDirection === 'vertical' ? 'Podział Pionowy (Przegrody)' : 'Podział Poziomy (Półki)';
-    
-    return `
-      <div style="border: 1px solid #cbd5e1; margin: 5px 0; padding: 10px; border-radius: 4px; background: #f8fafc;">
-        <div style="font-size: 0.85em; color: #64748b; margin-bottom: 8px; display: flex; justify-content: space-between;">
-          <span>${directionLabel}</span>
-          <button class="btn-clear-space" data-path="${path}" style="background: #ef4444; color: white; border: none; border-radius: 3px; cursor: pointer; padding: 2px 6px; font-size: 0.8em;">Usuń podział</button>
-        </div>
-        <div style="display: flex; gap: 10px; flex-direction: ${node.splitDirection === 'vertical' ? 'row' : 'column'};">
-          ${childrenHtml}
-        </div>
-      </div>
-    `;
-  }
-
-  // Jeśli węzeł to pusta przestrzeń, dajemy przyciski do jej podziału
-  return `
-    <div style="flex: 1; border: 1px dashed #94a3b8; padding: 10px; text-align: center; background: #ffffff; border-radius: 4px; min-height: 50px; display: flex; flex-direction: column; justify-content: center; gap: 5px;">
-      <span style="font-size: 0.8em; color: #475569;">Pusta komora</span>
-      <div style="display: flex; justify-content: center; gap: 5px;">
-        <button class="btn-split" data-path="${path}" data-type="vertical" title="Dodaj przegrodę pionową" style="cursor: pointer; padding: 4px 8px;"><b>|</b></button>
-        <button class="btn-split" data-path="${path}" data-type="horizontal" title="Dodaj półkę poziomą" style="cursor: pointer; padding: 4px 8px;"><b>-</b></button>
-      </div>
-    </div>
-  `;
-}
 export function initPropertiesPanel() {
   const rightSidebar = document.querySelector(".sidebar-right");
-  // Pobieramy pierwszy moduł jako domyślny do edycji
   const activeModule = state.project.modules[0];
 
   rightSidebar.innerHTML = `
@@ -72,9 +37,12 @@ export function initPropertiesPanel() {
     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
     
     <h3>Wypełnienie Korpusu</h3>
-    <div id="interior-designer-container">
-      ${generateInteriorUI(activeModule.interior)}
+    <!-- ZAMIAST SKOMPLIKOWANEGO DRZEWA, DAJEMY KONTROKI DO PŁASKIEJ LISTY -->
+    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+      <button id="btn-add-shelf" style="flex: 1; padding: 10px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">+ Dodaj Półkę</button>
+      <button id="btn-add-partition" style="flex: 1; padding: 10px; background: #16a34a; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">+ Przegrodę</button>
     </div>
+    <p style="font-size: 0.8em; color: #64748b;">Kliknij półkę na rysunku 2D, aby ją usunąć.</p>
 
     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
     
@@ -114,10 +82,6 @@ export function initPropertiesPanel() {
         <input type="number" id="input-front-bottom" value="${state.project.front.clearance.bottom}" step="0.5" />
       </div>
     </div>
-
-    <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
-    
-    
   `;
 
   setupEventListeners();
@@ -128,14 +92,20 @@ function setupEventListeners() {
     'board-thick', 'width', 'height', 'depth', 
     'front-gap', 'front-sides', 'front-top', 'front-bottom'
   ];
-  const updateAll = () => { updateSidebar(); update3D(); };
+  
+  // Główna funkcja odświeżająca wszystko naraz
+  const updateAll = () => { 
+    renderEditor2D();
+    update3D(); 
+    updateSidebar(); 
+  };
 
   numberInputs.forEach(id => {
     const el = document.getElementById(`input-${id}`);
     if(el) {
       el.addEventListener('input', (e) => {
         const val = Number(e.target.value);
-        const mod = state.project.modules[0]; // Modyfikujemy pierwszy moduł
+        const mod = state.project.modules[0]; 
 
         if (id === 'board-thick') state.project.materials.boardThickness = val;
         if (id === 'width') mod.dimensions.width = val;
@@ -149,6 +119,37 @@ function setupEventListeners() {
         updateAll();
       });
     }
+  });
+
+  // Dodawanie elementów do płaskiej tablicy
+  document.getElementById('btn-add-shelf').addEventListener('click', () => {
+    const mod = state.project.modules[0];
+    const th = state.project.materials.boardThickness;
+    // Półka wpada dokładnie na środek (dla testów), rozciągnięta od boku do boku
+    mod.elements.push({
+      id: 'poziom-' + Date.now(),
+      typ: 'poziom',
+      x: th, 
+      y: mod.dimensions.height / 2 - (th/2), 
+      w: mod.dimensions.width - (th * 2),
+      h: th
+    });
+    updateAll();
+  });
+
+  document.getElementById('btn-add-partition').addEventListener('click', () => {
+    const mod = state.project.modules[0];
+    const th = state.project.materials.boardThickness;
+    // Przegroda wpada dokładnie na środek (dla testów), od dołu do góry
+    mod.elements.push({
+      id: 'pion-' + Date.now(),
+      typ: 'pion',
+      x: mod.dimensions.width / 2 - (th/2), 
+      y: th, 
+      w: th,
+      h: mod.dimensions.height - (th * 2)
+    });
+    updateAll();
   });
 
   const distInput = document.getElementById('input-front-distribution');
