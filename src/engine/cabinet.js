@@ -14,6 +14,10 @@ export function calculateParts() {
   const backThick = state.project.materials.backThickness;
   const { type, offset, grooveDepth, clearance } = state.project.backPanel;
 
+  // Pobieramy typ frontu (dla określenia głębokości wnętrza przy wpuszczanych)
+  const frontType = state.project.front && state.project.front.type ? state.project.front.type : 'nakladane';
+  const isInset = frontType === 'wpuszczane';
+
   let parts = [];
 
   // 1. Boki (2 szt.)
@@ -36,78 +40,75 @@ export function calculateParts() {
   }
   parts.push({ name: "Plecy (HDF)", length: hdfHeight, width: hdfWidth, qty: 1 });
 
-  // 4. Wnętrze bezpośrednio z płaskiej listy formatek (Flat Data)
+  // 4. Wnętrze (Półki i Przegrody czytane z Edytora 2D)
+  const innerDepthOffset = isInset ? board : 0;
+  const innerPartDepth = topBottomDepth - innerDepthOffset;
+
+  let shelfCount = 0;
+  let partitionCount = 0;
+
   if (mod.elements && mod.elements.length > 0) {
-    mod.elements.forEach((el, index) => {
+    mod.elements.forEach(el => {
       if (el.typ === 'pion') {
-        parts.push({ name: `Przegroda pionowa ${index + 1}`, length: parseFloat(el.h.toFixed(1)), width: topBottomDepth, qty: 1 });
+        partitionCount++;
+        parts.push({ name: `Przegroda pionowa ${partitionCount}`, length: parseFloat(el.h.toFixed(1)), width: innerPartDepth, qty: 1 });
       } else if (el.typ === 'poziom') {
-        parts.push({ name: `Półka ${index + 1}`, length: parseFloat(el.w.toFixed(1)), width: topBottomDepth, qty: 1 });
+        shelfCount++;
+        parts.push({ name: `Półka ${shelfCount}`, length: parseFloat(el.w.toFixed(1)), width: innerPartDepth, qty: 1 });
       }
     });
   }
 
-  // 5. Fronty i szuflady
+  // 5. Fronty i szuflady (Czytane BEZPOŚREDNIO ze zaktualizowanych danych CAD)
   let mountingData = [];
-  if (state.project.front && state.project.front.active) {
-    const fc = state.project.front.clearance;
-    const gap = state.project.front.gap;
-    const distributionStr = String(state.project.front.distribution || "1").trim();
-    
-    let parsedZones = [];
-    if (!distributionStr.includes(':') && !distributionStr.includes(',') && !isNaN(distributionStr)) {
-      const count = parseInt(distributionStr, 10);
-      for (let i = 0; i < count; i++) {
-        parsedZones.push({ type: 'fr', value: 1 });
+  const fronts = mod.elements ? mod.elements.filter(el => el.typ === 'front') : [];
+
+  if (fronts.length > 0) {
+    // Sortujemy po osi Y (od dołu do góry), żeby odpowiednio numerować na liście i w nawiertach
+    fronts.sort((a, b) => a.y - b.y);
+
+    let drawerCount = 0;
+    let doorCount = 0;
+
+    fronts.forEach(front => {
+      // Inteligentne nazewnictwo w zależności od wybranej opcji w 2D
+      let partName = "Front";
+      if (front.subtype === 'szuflada') {
+        drawerCount++;
+        partName = `Front szuflady ${drawerCount}`;
+      } else if (front.subtype === 'drzwi') {
+        doorCount++;
+        partName = `Drzwi ${doorCount}`;
+      } else if (front.subtype === 'drzwi-lp') {
+        const side = front.id.endsWith('-L') ? 'Lewe' : 'Prawe';
+        partName = `Drzwi ${side}`;
       }
-    } else {
-      const separator = distributionStr.includes(':') ? ':' : ',';
-      parsedZones = distributionStr.split(separator).map(s => {
-        let zone = s.trim();
-        if (zone.toLowerCase().endsWith('fr')) return { type: 'fr', value: parseFloat(zone) || 1 };
-        const val = parseFloat(zone);
-        return (val <= 10) ? { type: 'fr', value: val } : { type: 'fixed', value: val };
-      });
-    }
 
-    const count = parsedZones.length;
-    const fWidth = width - (fc.sides * 2);
-    let availableHeight = height - fc.top - fc.bottom - ((count - 1) * gap);
-    
-    let fixedTotal = 0;
-    let frTotal = 0;
-    parsedZones.forEach(z => {
-      if (z.type === 'fixed') fixedTotal += z.value;
-      if (z.type === 'fr') frTotal += z.value;
-    });
-
-    availableHeight -= fixedTotal;
-    const singleFrValue = frTotal > 0 ? availableHeight / frTotal : 0;
-
-    let currentY = fc.bottom;
-    parsedZones.forEach((zone, index) => {
-      const fHeight = zone.type === 'fixed' ? zone.value : zone.value * singleFrValue;
-      
+      // Wrzucamy gotowe wymiary z edytora na listę formatek
       parts.push({
-        name: `Front ${index + 1}`,
-        length: parseFloat(fHeight.toFixed(1)),
-        width: parseFloat(fWidth.toFixed(1)),
+        name: partName,
+        length: parseFloat(front.h.toFixed(1)),
+        width: parseFloat(front.w.toFixed(1)),
         qty: 1
       });
 
-      if (typeof calculateDrawerHoles === 'function') {
+      // --- GENEROWANIE NAWIERTÓW (Tylko dla szuflad) ---
+      if (front.subtype === 'szuflada' && typeof calculateDrawerHoles === 'function') {
+        
+        // Zapisaliśmy w editor2d `frontIndex`. Jeśli to 0, znaczy że to najniższa szuflada w swojej grupie.
+        const isBottomInZone = front.frontIndex === 0;
+
+        // Przekazujemy front.y - nasz Edytor 2D dba o to, że to dokładna współrzędna początku frontu na osi Y
         const drawerHoles = calculateDrawerHoles(
           state.project.front.drawerSystem,
-          currentY,
-          fHeight,
+          front.y, 
+          front.h,
           board,
-          index,
-          index === 0
+          drawerCount - 1, 
+          isBottomInZone
         );
         if (drawerHoles) mountingData.push(drawerHoles);
       }
-
-      currentY += fHeight + gap;
     });
   }
 

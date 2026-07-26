@@ -134,16 +134,28 @@ export function update3D() {
   createBoard(width - th*2, th, depth, th, 0, 0, boardMat); 
   createBoard(width - th*2, th, depth, th, height - th, 0, boardMat); 
 
+  // Odczytujemy typ frontu z zabezpieczeniem domyślnym
+  const frontType = state.project.front.type || 'nakladane';
+  const isInset = frontType === 'wpuszczane';
+  
+  // Jeśli fronty są wpuszczane, wnętrze szafki musi cofnąć się o grubość frontu
+  const insetOffset = isInset ? th : 0; 
+
   mod.elements.forEach(el => {
     if (el.typ === 'poziom') {
-      createBoard(el.w, th, depth - th, el.x, el.y, 0, boardMat);
+      // Cofamy półki i zmniejszamy ich głębokość tylko dla frontów wpuszczanych
+      createBoard(el.w, th, depth - insetOffset, el.x, el.y, 0, boardMat);
     } 
     else if (el.typ === 'pion') {
-      createBoard(th, el.h, depth - th, el.x, el.y, 0, boardMat);
+      // Podobnie dla pionowych przegród
+      createBoard(th, el.h, depth - insetOffset, el.x, el.y, 0, boardMat);
     } 
     else if (el.typ === 'front') {
       if (frontsVisible) {
-        createBoard(el.w, el.h, th, el.x, el.y, depth - th, frontMat);
+        // Obliczamy pozycję Z dla frontu
+        // Nakładane wysuwają się na grubość korpusu (depth), wpuszczane cofają do wnętrza (depth - th)
+        const zPos = isInset ? (depth - th) : depth;
+        createBoard(el.w, el.h, th, el.x, el.y, zPos, frontMat);
       }
     }
   });

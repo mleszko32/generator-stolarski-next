@@ -2,7 +2,7 @@
 import { state } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
-import { renderEditor2D } from "../render/editor2d.js"; // Ważne: import nowego silnika
+import { renderEditor2D } from "../render/editor2d.js"; 
 
 export function initPropertiesPanel() {
   const rightSidebar = document.querySelector(".sidebar-right");
@@ -37,24 +37,24 @@ export function initPropertiesPanel() {
     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
     
     <h3>Wypełnienie Korpusu</h3>
-    <!-- ZAMIAST SKOMPLIKOWANEGO DRZEWA, DAJEMY KONTROKI DO PŁASKIEJ LISTY -->
     <div style="display: flex; gap: 10px; margin-bottom: 15px;">
       <button id="btn-add-shelf" style="flex: 1; padding: 10px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">+ Dodaj Półkę</button>
       <button id="btn-add-partition" style="flex: 1; padding: 10px; background: #16a34a; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">+ Przegrodę</button>
     </div>
-    <p style="font-size: 0.8em; color: #64748b;">Kliknij półkę na rysunku 2D, aby ją usunąć.</p>
+    <p style="font-size: 0.8em; color: #64748b;">Kliknij element na rysunku 2D, aby nim zarządzać.</p>
 
     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
     
-    <h3>Fronty / Strefy</h3>
-    <div class="property-group" style="flex-direction: row; align-items: center; justify-content: space-between;">
-      <label>Dodaj fronty:</label>
-      <input type="checkbox" id="input-front-active" ${state.project.front.active ? 'checked' : ''} style="width: auto;" />
-    </div>
-    <div id="group-front-clearance" style="${state.project.front.active ? 'display: block;' : 'display: none;'}">
+    <h3>Ustawienia Frontów i Szuflad</h3>
+    <p style="font-size: 0.8em; color: #64748b; margin-bottom: 10px;">(Wstawiaj szuflady klikając w puste strefy na widoku 2D)</p>
+    
+    <div id="group-front-clearance">
       <div class="property-group">
-        <label>Podział wysokości (od dołu):</label>
-        <input type="text" id="input-front-distribution" value="${state.project.front.distribution || '1'}" placeholder="np. 1:1:1" />
+        <label>Typ frontów:</label>
+        <select id="input-front-type">
+          <option value="nakladane" ${(!state.project.front.type || state.project.front.type === 'nakladane') ? 'selected' : ''}>Nakładane</option>
+          <option value="wpuszczane" ${state.project.front.type === 'wpuszczane' ? 'selected' : ''}>Wpuszczane</option>
+        </select>
       </div>
       <div class="property-group">
         <label>System szuflad:</label>
@@ -93,12 +93,21 @@ function setupEventListeners() {
     'front-gap', 'front-sides', 'front-top', 'front-bottom'
   ];
   
-  // Główna funkcja odświeżająca wszystko naraz
+  // Zaktualizowana funkcja odświeżająca - usunęliśmy stąd globalne nadpisywanie frontów!
+  // Teraz tylko czysto odświeża widoki.
   const updateAll = () => { 
     renderEditor2D();
     update3D(); 
     updateSidebar(); 
   };
+  
+  const typeInput = document.getElementById('input-front-type');
+  if (typeInput) {
+    typeInput.addEventListener('change', (e) => {
+      state.project.front.type = e.target.value;
+      updateAll();
+    });
+  }
 
   numberInputs.forEach(id => {
     const el = document.getElementById(`input-${id}`);
@@ -121,11 +130,9 @@ function setupEventListeners() {
     }
   });
 
-  // Dodawanie elementów do płaskiej tablicy
   document.getElementById('btn-add-shelf').addEventListener('click', () => {
     const mod = state.project.modules[0];
     const th = state.project.materials.boardThickness;
-    // Półka wpada dokładnie na środek (dla testów), rozciągnięta od boku do boku
     mod.elements.push({
       id: 'poziom-' + Date.now(),
       typ: 'poziom',
@@ -140,7 +147,6 @@ function setupEventListeners() {
   document.getElementById('btn-add-partition').addEventListener('click', () => {
     const mod = state.project.modules[0];
     const th = state.project.materials.boardThickness;
-    // Przegroda wpada dokładnie na środek (dla testów), od dołu do góry
     mod.elements.push({
       id: 'pion-' + Date.now(),
       typ: 'pion',
@@ -152,22 +158,8 @@ function setupEventListeners() {
     updateAll();
   });
 
-  const distInput = document.getElementById('input-front-distribution');
-  if (distInput) {
-    distInput.addEventListener('input', (e) => {
-      state.project.front.distribution = e.target.value;
-      updateAll();
-    });
-  }
-
   document.getElementById('input-back-type').addEventListener('change', (e) => {
     state.project.backPanel.type = e.target.value;
-    updateAll();
-  });
-
-  document.getElementById('input-front-active').addEventListener('change', (e) => {
-    state.project.front.active = e.target.checked;
-    document.getElementById('group-front-clearance').style.display = e.target.checked ? 'block' : 'none';
     updateAll();
   });
 
