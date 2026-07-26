@@ -18,7 +18,8 @@ export function initLayout() {
           <!-- Divy 2D polecą tutaj -->
         </section>
         
-        <section class="viewport-3d" style="flex: 1; position: relative;">
+        <!-- NAPRAWIONY KONTENER 3D Z ID -->
+        <section id="viewer-3d-container" class="viewport-3d" style="flex: 1; position: relative;">
           <!-- Three.js Canvas wpadnie tutaj -->
         </section>
         
