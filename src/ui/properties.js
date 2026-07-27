@@ -114,8 +114,12 @@ export function initPropertiesPanel() {
         <input type="number" id="input-front-gap" value="${state.project.front.gap}" step="0.5" />
       </div>
       <div class="property-group">
-        <label>Luz boki [L/P] (mm):</label>
-        <input type="number" id="input-front-sides" value="${state.project.front.clearance.sides}" step="0.5" />
+        <label>Luz lewy (mm):</label>
+        <input type="number" id="input-front-left" value="${state.project.front.clearance.left ?? state.project.front.clearance.sides ?? 1.5}" step="0.5" />
+      </div>
+      <div class="property-group">
+        <label>Luz prawy (mm):</label>
+        <input type="number" id="input-front-right" value="${state.project.front.clearance.right ?? state.project.front.clearance.sides ?? 1.5}" step="0.5" />
       </div>
       <div class="property-group">
         <label>Luz góra (mm):</label>
@@ -135,7 +139,7 @@ function setupEventListeners() {
   const numberInputs = [
     'traverse-width',
     'board-thick', 'width', 'height', 'depth', 
-    'front-gap', 'front-sides', 'front-top', 'front-bottom',
+    'front-gap', 'front-left', 'front-right', 'front-top', 'front-bottom',
     'back-offset', 'back-groove'
   ];
   
@@ -145,7 +149,6 @@ function setupEventListeners() {
     updateSidebar(); 
   };
   
-  // Konstrukcja
   const joinTypeInput = document.getElementById('input-join-type');
   if (joinTypeInput) {
     joinTypeInput.addEventListener('change', (e) => {
@@ -164,7 +167,6 @@ function setupEventListeners() {
     });
   }
 
-  // Fronty
   const typeInput = document.getElementById('input-front-type');
   if (typeInput) {
     typeInput.addEventListener('change', (e) => {
@@ -173,7 +175,6 @@ function setupEventListeners() {
     });
   }
 
-  // Plecy
   const backType = document.getElementById('input-back-type');
   const nutOptions = document.getElementById('nut-options');
   if (backType && nutOptions) {
@@ -192,7 +193,6 @@ function setupEventListeners() {
     });
   }
 
-  // Number Inputs
   numberInputs.forEach(id => {
     const el = document.getElementById(`input-${id}`);
     if(el) {
@@ -208,7 +208,9 @@ function setupEventListeners() {
         if (id === 'depth') mod.dimensions.depth = val;
         
         if (id === 'front-gap') state.project.front.gap = val;
-        if (id === 'front-sides') state.project.front.clearance.sides = val;
+        // Mapowanie osobnych luzów na stan aplikacji
+        if (id === 'front-left') state.project.front.clearance.left = val;
+        if (id === 'front-right') state.project.front.clearance.right = val;
         if (id === 'front-top') state.project.front.clearance.top = val;
         if (id === 'front-bottom') state.project.front.clearance.bottom = val;
         

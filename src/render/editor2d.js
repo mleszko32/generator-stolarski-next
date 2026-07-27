@@ -2,6 +2,7 @@
 import { state } from "../core/state.js";
 import { updateSidebar } from "../ui/sidebar.js";
 import { update3D } from "./viewer3d.js"; 
+import { autoDistributeShelves } from "../core/shelfMath.js"; 
 
 let isFrontsVisible2D = true;
 let isDimensionsVisible = true; 
@@ -33,11 +34,11 @@ export function renderEditor2D() {
   const fc = f.clearance || {};
   const isInset = f.type === 'wpuszczane';
 
-  const cSides = parseFloat(fc.sides ?? fc.leftRight ?? fc.boki ?? 2) || 0;
+  const cLeft = parseFloat(fc.left ?? fc.sides ?? 1.5) || 0;
+  const cRight = parseFloat(fc.right ?? fc.sides ?? 1.5) || 0;
   const cTop = parseFloat(fc.top ?? fc.gora ?? 2) || 0;
   const cBottom = parseFloat(fc.bottom ?? fc.dol ?? 2) || 0;
 
-  // Ustalenie parametrów konstrukcyjnych korpusu
   const cons = config.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
   const isTopBottomFullWidth = cons.joinType === 'wience_przelotowe';
   const hasTraverses = cons.topType.includes('trawersy');
@@ -50,11 +51,9 @@ export function renderEditor2D() {
         
         if (el.baseZone.boundBottom) {
           const getBound = (id, type, fallback) => {
-            // W zależności od konstrukcji, boki szafki ograniczają strefy
             if (id === 'cab-left') return th;
             if (id === 'cab-right') return width - th;
             if (id === 'cab-bottom') return th;
-            // Góra szafki również zależy od trawersów vs pełny wieniec
             if (id === 'cab-top') {
               if (hasTraverses) {
                  return isVerticalTraverse ? height - traverseWidth : height - th;
@@ -103,11 +102,10 @@ export function renderEditor2D() {
           const isLeftOuter = minX <= th + 1; 
           const isRightOuter = maxX >= width - th - 1;
           const isBottomOuter = minY <= th + 1;
-          // Zmieniona logika sprawdzania czy dany box jest na górnej krawędzi uwzględniająca ewentualne trawersy
           const isTopOuter = maxY >= (hasTraverses && isVerticalTraverse ? height - traverseWidth - 1 : height - th - 1);
 
-          const overLeft = isLeftOuter ? (isInset ? -cSides : th - cSides) : (isBoundLeftFront ? -gapVal : ((th / 2) - (gapVal / 2)));
-          const overRight = isRightOuter ? (isInset ? -cSides : th - cSides) : (isBoundRightFront ? -gapVal : ((th / 2) - (gapVal / 2)));
+          const overLeft = isLeftOuter ? (isInset ? -cLeft : th - cLeft) : (isBoundLeftFront ? -gapVal : ((th / 2) - (gapVal / 2)));
+          const overRight = isRightOuter ? (isInset ? -cRight : th - cRight) : (isBoundRightFront ? -gapVal : ((th / 2) - (gapVal / 2)));
           const overBottom = isBottomOuter ? (isInset ? -cBottom : th - cBottom) : (isBoundBottomFront ? -gapVal : ((th / 2) - (gapVal / 2)));
           const overTop = isTopOuter ? (isInset ? -cTop : th - cTop) : (isBoundTopFront ? -gapVal : ((th / 2) - (gapVal / 2)));
 
@@ -208,38 +206,26 @@ export function renderEditor2D() {
     return div;
   };
 
-  // --- RYSOWANIE KORPUSU 2D (Boki, Wieńce, Trawersy) ---
   const sideH = isTopBottomFullWidth ? height - (th * 2) : height;
   const sideY = isTopBottomFullWidth ? th : 0;
   const tbW = isTopBottomFullWidth ? width : width - (th * 2);
   const tbX = isTopBottomFullWidth ? 0 : th;
 
-  // Lewy i prawy bok
   cabinetDiv.appendChild(createPart(0, sideY, th, sideH, '#cbd5e1')); 
   cabinetDiv.appendChild(createPart(width - th, sideY, th, sideH, '#cbd5e1')); 
-  
-  // Wieniec dolny
   cabinetDiv.appendChild(createPart(tbX, 0, tbW, th, '#cbd5e1')); 
 
-  // Górna część korpusu
   if (!hasTraverses) {
-    // Pełny wieniec
     cabinetDiv.appendChild(createPart(tbX, height - th, tbW, th, '#cbd5e1')); 
   } else {
-    // Trawersy
     if (isVerticalTraverse) {
-      // Rysujemy po bokach "przekroje" pionowe trawersów (grubość płyty)
-      // W widoku z przodu wyglądałyby szerzej, ale tu rysujemy je symbolicznie
       cabinetDiv.appendChild(createPart(tbX, height - traverseWidth, th, traverseWidth, '#cbd5e1'));
       cabinetDiv.appendChild(createPart(tbX + tbW - th, height - traverseWidth, th, traverseWidth, '#cbd5e1'));
-      // Linii łączącej brak, bo trawers jest pionowy
     } else {
-      // Trawersy poziome - z przodu widać tylko grubość płyty
       cabinetDiv.appendChild(createPart(tbX, height - th, tbW, th, '#cbd5e1'));
     }
   }
 
-  // --- RYSOWANIE ELEMENTÓW WNĘTRZA I FRONTÓW ---
   mod.elements.forEach(plyta => {
     const isFront = plyta.typ === 'front';
     if (isFront && !isFrontsVisible2D) return;
@@ -275,7 +261,6 @@ export function renderEditor2D() {
         const innerBox = document.createElement('div'); innerBox.style.position = 'absolute'; innerBox.style.width = '80%'; innerBox.style.height = '60%'; innerBox.style.bottom = '15%'; innerBox.style.border = '2px solid rgba(255, 255, 255, 0.8)'; innerBox.style.borderTop = 'none'; innerBox.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'; innerBox.style.boxSizing = 'border-box'; innerBox.style.pointerEvents = 'none';
         const line = document.createElement('div'); line.style.position = 'absolute'; line.style.bottom = '20%'; line.style.left = '0'; line.style.width = '100%'; line.style.borderBottom = '1px dashed rgba(255, 255, 255, 0.6)'; innerBox.appendChild(line); div.appendChild(innerBox);
         
-        // ZNACZNIK WYMUSZONEGO WARIANTU SZUFLADY
         if (plyta.forceVariant && plyta.forceVariant !== 'auto') {
           const badge = document.createElement('div');
           badge.innerText = plyta.forceVariant.toUpperCase();
@@ -285,9 +270,18 @@ export function renderEditor2D() {
 
       } else if (plyta.subtype.includes('drzwi')) {
          const handle = document.createElement('div'); handle.style.width = '12px'; handle.style.height = '12px'; handle.style.backgroundColor = 'rgba(255, 255, 255, 0.8)'; handle.style.borderRadius = '50%'; handle.style.pointerEvents = 'none'; handle.style.position = 'absolute';
+         
          if (plyta.subtype === 'drzwi-lp') {
-            handle.style.top = '50%'; if (plyta.id.endsWith('-L')) handle.style.right = '15px'; else handle.style.left = '15px'; 
-         } else { handle.style.top = '50%'; handle.style.left = '15px'; }
+            handle.style.top = '50%'; 
+            if (plyta.id.endsWith('-L')) handle.style.right = '15px'; else handle.style.left = '15px'; 
+         } else { 
+            handle.style.top = '50%'; 
+            if ((plyta.openingSide || 'left') === 'left') {
+                handle.style.right = '15px'; // Zawiasy po lewej, uchwyt po prawej
+            } else {
+                handle.style.left = '15px'; // Zawiasy po prawej, uchwyt po lewej
+            }
+         }
          div.appendChild(handle);
       }
     }
@@ -341,7 +335,28 @@ export function renderEditor2D() {
             menu.appendChild(btnSnap);
         }
 
-        // WYMUSZANIE WARIANTU SZUFLADY
+        if (plyta.subtype === 'drzwi') {
+            const wrap = document.createElement('div'); wrap.style.padding = '8px'; wrap.style.borderTop = '1px solid #e2e8f0'; wrap.style.marginTop = '4px';
+            const lbl = document.createElement('div'); lbl.innerText = 'Strona otwierania (zawiasy):'; lbl.style.fontSize = '12px'; lbl.style.fontWeight = 'bold'; lbl.style.marginBottom = '6px';
+            
+            const sel = document.createElement('select'); sel.style.width = '100%'; sel.style.padding = '4px'; sel.style.borderRadius = '4px'; sel.style.border = '1px solid #cbd5e1';
+            const opts = [{val: 'left', txt: 'Lewa'}, {val: 'right', txt: 'Prawa'}];
+            
+            opts.forEach(o => {
+              const opt = document.createElement('option'); opt.value = o.val; opt.innerText = o.txt;
+              if ((plyta.openingSide || 'left') === o.val) opt.selected = true;
+              sel.appendChild(opt);
+            });
+
+            sel.onchange = (evt) => {
+              evt.stopPropagation();
+              plyta.openingSide = sel.value;
+              menu.remove(); renderEditor2D(); update3D(); updateSidebar();
+            };
+
+            wrap.appendChild(lbl); wrap.appendChild(sel); menu.appendChild(wrap);
+        }
+
         if (plyta.subtype.includes('szuflada')) {
           const wrap = document.createElement('div'); wrap.style.padding = '8px'; wrap.style.borderTop = '1px solid #e2e8f0'; wrap.style.marginTop = '4px';
           const lbl = document.createElement('div'); lbl.innerText = 'Wymuś wariant szuflady:'; lbl.style.fontSize = '12px'; lbl.style.fontWeight = 'bold'; lbl.style.marginBottom = '6px';
@@ -358,7 +373,6 @@ export function renderEditor2D() {
           sel.onchange = (evt) => {
             evt.stopPropagation();
             plyta.forceVariant = sel.value;
-            // Aktualizujemy szuflady z tej samej strefy by miały ten sam wymuszony wymiar jeśli są z jednego podziału (opcjonalnie)
             menu.remove(); renderEditor2D(); update3D(); updateSidebar();
           };
 
@@ -372,7 +386,6 @@ export function renderEditor2D() {
           ...mod.elements.filter(el => el.typ !== 'front' && el.id !== plyta.id),
           { id: 'cab-left', x: 0, y: 0, w: th, h: height }, { id: 'cab-right', x: width - th, y: 0, w: th, h: height },
           { id: 'cab-bottom', x: 0, y: 0, w: width, h: th }, 
-          // Ograniczenie z góry musi brać pod uwagę trawers
           { id: 'cab-top', x: 0, y: (hasTraverses && isVerticalTraverse) ? height - traverseWidth : height - th, w: width, h: (hasTraverses && isVerticalTraverse) ? traverseWidth : th }
         ];
 
@@ -502,7 +515,6 @@ export function renderEditor2D() {
     const mouseX = (e.clientX - rect.left) / scale; 
     const mouseY = (rect.bottom - e.clientY) / scale;
     
-    // Obsługa ograniczeń na podstawie typu konstrukcji korpusu
     const topZoneY = hasTraverses && isVerticalTraverse ? height - traverseWidth : height - th;
     const topZoneH = hasTraverses && isVerticalTraverse ? traverseWidth : th;
 
@@ -578,10 +590,94 @@ export function renderEditor2D() {
     const btnShelfHalf = createMenuOption('Półka (dokładnie w połowie)', '➗');
     btnShelfHalf.onclick = (event) => { event.stopPropagation(); const halfY = zoneMinY + (zoneMaxY - zoneMinY) / 2; mod.elements.push({ id: 'poziom-' + Date.now(), typ: 'poziom', x: zoneMinX, y: halfY - (th / 2), w: zoneMaxX - zoneMinX, h: th, isStructural: false }); menu.remove(); renderEditor2D(); update3D(); updateSidebar(); };
 
+    // --- ZMIENIONY PRZYCISK PÓŁEK ---
+    const btnAutoShelves = createMenuOption('Półki (rozmieść równomiernie)', '📚');
+    btnAutoShelves.onclick = (event) => {
+      event.stopPropagation();
+      
+      // Przebudowujemy menu na własny formularz ilości półek
+      menu.innerHTML = ''; 
+      menu.style.padding = '12px'; 
+      menu.style.width = '240px';
+      
+      const title = document.createElement('div'); 
+      title.innerText = 'Równomierne półki'; 
+      title.style.fontWeight = 'bold'; 
+      title.style.marginBottom = '12px'; 
+      title.style.fontSize = '14px';
+      
+      const wrap = document.createElement('div'); 
+      wrap.style.marginBottom = '8px'; 
+      
+      const lbl = document.createElement('div'); 
+      lbl.style.fontSize = '12px'; 
+      lbl.innerText = 'Podaj ilość półek:'; 
+      
+      const inp = document.createElement('input'); 
+      inp.type = 'number'; 
+      inp.value = '2'; 
+      inp.min = '1';
+      inp.style.width = '100%'; 
+      inp.style.boxSizing = 'border-box'; 
+      inp.style.padding = '6px'; 
+      inp.style.marginTop = '4px'; 
+      inp.style.border = '1px solid #cbd5e1'; 
+      inp.style.borderRadius = '4px'; 
+      
+      wrap.appendChild(lbl); 
+      wrap.appendChild(inp);
+      
+      const applyBtn = document.createElement('button'); 
+      applyBtn.innerText = 'Wstaw półki'; 
+      applyBtn.style.width = '100%'; 
+      applyBtn.style.padding = '8px'; 
+      applyBtn.style.marginTop = '8px'; 
+      applyBtn.style.backgroundColor = '#2563eb'; 
+      applyBtn.style.color = 'white'; 
+      applyBtn.style.border = 'none'; 
+      applyBtn.style.borderRadius = '4px'; 
+      applyBtn.style.cursor = 'pointer'; 
+      applyBtn.style.fontWeight = 'bold';
+      
+      applyBtn.onclick = (genEvent) => {
+        genEvent.stopPropagation();
+        const shelfCount = parseInt(inp.value, 10);
+        
+        // Zabezpieczenie przed błędną wartością (ignoruje, bez blokującego alerta)
+        if (isNaN(shelfCount) || shelfCount <= 0) return; 
+        
+        const internalHeight = zoneMaxY - zoneMinY;
+        const newShelvesBase = autoDistributeShelves(internalHeight, th, shelfCount);
+        
+        const newShelves = newShelvesBase.map((s, idx) => ({
+          id: 'poziom-auto-' + Date.now() + '-' + idx,
+          typ: 'poziom',
+          x: zoneMinX,
+          y: zoneMinY + s.y, // Od dołu obecnej strefy
+          w: zoneMaxX - zoneMinX,
+          h: th,
+          isStructural: false
+        }));
+        
+        mod.elements.push(...newShelves);
+        menu.remove(); renderEditor2D(); update3D(); updateSidebar();
+      };
+      
+      menu.appendChild(title); 
+      menu.appendChild(wrap); 
+      menu.appendChild(applyBtn);
+      
+      // Aktywacja pola tekstowego
+      setTimeout(() => inp.focus(), 10);
+    };
+
     const btnPartHalf = createMenuOption('Przegroda (w połowie)', '➕');
     btnPartHalf.onclick = (event) => { event.stopPropagation(); const halfX = zoneMinX + (zoneMaxX - zoneMinX) / 2; mod.elements.push({ id: 'pion-' + Date.now(), typ: 'pion', x: halfX - (th / 2), y: zoneMinY, w: th, h: zoneMaxY - zoneMinY }); menu.remove(); renderEditor2D(); update3D(); updateSidebar(); };
 
-    menu.appendChild(btnShelf); menu.appendChild(btnShelfHalf); menu.appendChild(btnPartHalf);
+    menu.appendChild(btnShelf); 
+    menu.appendChild(btnShelfHalf); 
+    menu.appendChild(btnAutoShelves); 
+    menu.appendChild(btnPartHalf);
 
     const showDrawerMenu = (event, targetBaseZone, subtypeName, titleTxt) => {
       event.stopPropagation();
@@ -625,7 +721,7 @@ export function renderEditor2D() {
                 gap: gapValInput,
                 intGapX: gX,
                 intGapY: gY,
-                forceVariant: 'auto' // Domyślnie automatyczny dobór po wygenerowaniu
+                forceVariant: 'auto'
             }); 
         }
         menu.remove(); renderEditor2D(); update3D(); updateSidebar();
@@ -641,7 +737,7 @@ export function renderEditor2D() {
     menu.appendChild(createHeader('Zabuduj wnękę (między półkami)'));
 
     const btnDoor = createMenuOption('Drzwi pojedyncze', '🚪');
-    btnDoor.onclick = (event) => { event.stopPropagation(); mod.elements.push({ id: 'front-' + Date.now(), typ: 'front', subtype: 'drzwi', baseZone: localBaseZone, frontCount: 1, frontIndex: 0, gap: 3 }); menu.remove(); renderEditor2D(); update3D(); updateSidebar(); };
+    btnDoor.onclick = (event) => { event.stopPropagation(); mod.elements.push({ id: 'front-' + Date.now(), typ: 'front', subtype: 'drzwi', baseZone: localBaseZone, openingSide: 'left', frontCount: 1, frontIndex: 0, gap: 3 }); menu.remove(); renderEditor2D(); update3D(); updateSidebar(); };
     menu.appendChild(btnDoor);
 
     const btnDrawers = createMenuOption('Szuflady (zewnętrzne)', '📦');
@@ -655,7 +751,7 @@ export function renderEditor2D() {
     menu.appendChild(createHeader('Zabuduj resztę (ignoruje półki)', '#2563eb'));
 
     const btnDoorCol = createMenuOption('Drzwi na całą wysokość', '🚪', '#1e40af');
-    btnDoorCol.onclick = (event) => { event.stopPropagation(); mod.elements.push({ id: 'front-' + Date.now(), typ: 'front', subtype: 'drzwi', baseZone: colBaseZone, frontCount: 1, frontIndex: 0, gap: 3 }); menu.remove(); renderEditor2D(); update3D(); updateSidebar(); };
+    btnDoorCol.onclick = (event) => { event.stopPropagation(); mod.elements.push({ id: 'front-' + Date.now(), typ: 'front', subtype: 'drzwi', baseZone: colBaseZone, openingSide: 'left', frontCount: 1, frontIndex: 0, gap: 3 }); menu.remove(); renderEditor2D(); update3D(); updateSidebar(); };
     menu.appendChild(btnDoorCol);
 
     const btnDoorLP = createMenuOption('Drzwi L/P na całą wysokość', '🚪', '#1e40af');

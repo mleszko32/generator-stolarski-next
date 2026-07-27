@@ -2,7 +2,6 @@
 import { drawerSystems } from './drawerSystems.js';
 import { state } from './state.js';
 
-// Funkcja do obliczania optymalnej długości prowadnicy (NL)
 export function calculateNominalLength(internalDepth) {
   const standardNLs = [270, 300, 350, 400, 450, 500, 550, 600, 650];
   const safetyClearance = 5; 
@@ -19,7 +18,6 @@ export function calculateNominalLength(internalDepth) {
   return selectedNL > 0 ? selectedNL : 270; 
 }
 
-// Funkcja dobierająca wariant szuflady na podstawie światła szafki LUB wymuszenia
 export function getDrawerVariant(availableSpace, systemId, forceVariant = 'auto') {
   const CATALOG_DATA = {
     'merivobox': {
@@ -63,9 +61,7 @@ export function getDrawerVariant(availableSpace, systemId, forceVariant = 'auto'
   const safeSystemId = systemId ? systemId.toLowerCase() : 'merivobox';
   const systemData = CATALOG_DATA[safeSystemId] || CATALOG_DATA['merivobox'];
 
-  // 1. Jeśli użytkownik ręcznie wymusił konkretny wariant (np. z poziomu UI)
   if (forceVariant && forceVariant !== 'auto' && systemData[forceVariant]) {
-    // Sprawdzamy dla pewności, czy mimo wszystko wymuszona szuflada się zmieści (zapobiega to błędom kolizji)
     if (availableSpace >= systemData[forceVariant].minSpace) {
       return { type: systemData[forceVariant].type, backHeight: systemData[forceVariant].height };
     } else {
@@ -73,7 +69,6 @@ export function getDrawerVariant(availableSpace, systemId, forceVariant = 'auto'
     }
   }
 
-  // 2. Tryb automatyczny - sprawdza od największej do najmniejszej
   if (systemData.bardzowysoka && availableSpace >= systemData.bardzowysoka.minSpace) {
     return { type: systemData.bardzowysoka.type, backHeight: systemData.bardzowysoka.height };
   } 
@@ -104,8 +99,6 @@ export function getDrawerComponents(systemId, internalWidth, internalDepth, avai
   }
 
   const nl = calculateNominalLength(internalDepth);
-  
-  // Przekazujemy wymuszenie do funkcji wariantów
   const variant = getDrawerVariant(availableSpace, systemId, forceVariant);
 
   const bottomWidth = internalWidth - system.bottomWidthDeduct;
@@ -123,10 +116,14 @@ export function getDrawerComponents(systemId, internalWidth, internalDepth, avai
     }
   };
 }
+
 export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick, index, isBottom) {
   const config = state.project;
   const bottomGap = Number(config.front.clearance.bottom ?? 0);
-  const sideGap = Number(config.front.clearance.sides ?? 1.5);
+  
+  // Zaktualizowany pobór luzów (osobno dla lewej i prawej strony)
+  const leftGap = Number(config.front.clearance.left ?? config.front.clearance.sides ?? 1.5);
+  const rightGap = Number(config.front.clearance.right ?? config.front.clearance.sides ?? 1.5);
 
   const HARDWARE_OFFSETS = {
     'merivobox': { railOffset: 54, frontHolesBase: 33.5, frontHolesXBase: 20.5 },
@@ -140,7 +137,6 @@ export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick
   const safeSystemId = systemId ? systemId.toLowerCase() : 'merivobox';
   const systemParams = HARDWARE_OFFSETS[safeSystemId] || HARDWARE_OFFSETS['merivobox'];
 
-  // --- OŚ Y PROWADNIC NA BOKU KORPUSU ---
   let slideY;
   if (isBottom) {
     slideY = boardThick + systemParams.railOffset;
@@ -148,27 +144,26 @@ export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick
     slideY = currentY + systemParams.railOffset;
   }
 
-  // --- OŚ Y NAWIERTÓW FRONTU ---
   let localFrontHolesBase = systemParams.frontHolesBase;
   if (isBottom) {
     const bottomOverlap = boardThick - bottomGap; 
     localFrontHolesBase += bottomOverlap;
   }
 
-  // --- OŚ X NAWIERTÓW FRONTU ---
-  const frontOverlapX = boardThick - sideGap;
-  const localFrontHolesX = systemParams.frontHolesXBase + frontOverlapX;
+  // Osobne przesunięcia otworów dla lewej i prawej strony frontu
+  const localFrontHolesX_Left = systemParams.frontHolesXBase + (boardThick - leftGap);
+  const localFrontHolesX_Right = systemParams.frontHolesXBase + (boardThick - rightGap);
 
   const frontHoles = [
-    { y: localFrontHolesBase, xOffset: localFrontHolesX, diameter: 3 },
-    { y: localFrontHolesBase + 32, xOffset: localFrontHolesX, diameter: 3 }
+    { y: localFrontHolesBase, xOffsetLeft: localFrontHolesX_Left, xOffsetRight: localFrontHolesX_Right, diameter: 3 },
+    { y: localFrontHolesBase + 32, xOffsetLeft: localFrontHolesX_Left, xOffsetRight: localFrontHolesX_Right, diameter: 3 }
   ];
 
-  // Nawiert na reling dla wysokich frontów
   if (frontHeight >= 280) {
     frontHoles.push({
       y: localFrontHolesBase + 160, 
-      xOffset: localFrontHolesX, 
+      xOffsetLeft: localFrontHolesX_Left, 
+      xOffsetRight: localFrontHolesX_Right, 
       diameter: 3
     });
   }

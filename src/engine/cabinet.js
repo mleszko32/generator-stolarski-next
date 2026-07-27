@@ -1,10 +1,8 @@
 // src/engine/cabinet.js
 import { state } from "../core/state.js";
 import { calculateDrawerHoles, getDrawerComponents } from "../core/drawerMath.js";
+import { calculateHinges } from "../core/hingeMath.js"; // NOWY IMPORT
 
-// ============================================================================
-// GŁÓWNA FUNKCJA SILNIKA
-// ============================================================================
 export function calculateParts() {
   if (!state.project.modules || state.project.modules.length === 0) {
     return { parts: [], mountingData: [] };
@@ -27,10 +25,6 @@ export function calculateParts() {
   return { parts, mountingData };
 }
 
-// ============================================================================
-// FUNKCJE POMOCNICZE
-// ============================================================================
-
 function getCorpusParts(mod, config) {
   const parts = [];
   const { width, height, depth } = mod.dimensions;
@@ -38,33 +32,24 @@ function getCorpusParts(mod, config) {
   const backThick = config.materials.backThickness;
   const { type, offset } = config.backPanel;
   
-  // Domyślne wartości zapobiegające błędom, gdyby nie było ich w stanie
   const construction = config.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
   const isTopBottomFullWidth = construction.joinType === 'wience_przelotowe';
 
-  // --- BOKI ---
   const sideDepth = type === 'nut' ? depth : depth - backThick;
-  // Jeśli wieńce idą przez całą szafkę, boki są o nie skrócone
   const sideHeight = isTopBottomFullWidth ? height - (board * 2) : height;
   parts.push({ name: "Bok (L/P)", length: parseFloat(sideHeight.toFixed(1)), width: sideDepth, qty: 2 });
 
-  // --- WIEŃCE I TRAWERSY ---
   const tbDepth = type === 'nut' ? depth - offset - backThick : depth - backThick;
-  // Jeśli boki są przelotowe (do ziemi), wieniec jest skrócony
   const tbWidth = isTopBottomFullWidth ? width : width - (board * 2);
 
-  // Wieniec dolny zawsze istnieje
   parts.push({ name: "Wieniec dolny", length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1 });
 
-  // Konstrukcja góry
   if (construction.topType === 'pelny') {
     parts.push({ name: "Wieniec górny", length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1 });
   } else if (construction.topType.includes('trawersy')) {
     const isVertical = construction.topType === 'trawersy_pion';
     const trWidth = construction.traverseWidth || 100;
     
-    // Trawersy poziome mają wymiar (Długość X Szerokość w osi Z) tak jak wieńce.
-    // Trawersy pionowe są ustawione węższą krawędzią do frontu/pleców (Wymiar w osi Y).
     parts.push({ 
         name: `Trawers górny (${isVertical ? 'pionowy' : 'poziomy'})`, 
         length: parseFloat(tbWidth.toFixed(1)), 
@@ -73,7 +58,6 @@ function getCorpusParts(mod, config) {
     });
   }
 
-  // Półki konstrukcyjne (zawsze są między bokami niezależnie od konstrukcji korpusu)
   const structuralShelvesCount = mod.elements ? mod.elements.filter(el => el.typ === 'poziom' && el.isStructural).length : 0;
   if (structuralShelvesCount > 0) {
     const shelfWidth = width - (board * 2);
@@ -143,6 +127,9 @@ function getFrontsAndDrawers(mod, config) {
   const parts = [];
   const mountingData = [];
   const fronts = mod.elements ? mod.elements.filter(el => el.typ === 'front') : [];
+  
+  // Pobieramy obiekty, które mogą kolidować z zawiasami
+  const obstacles = mod.elements ? mod.elements.filter(el => el.typ === 'poziom' || el.subtype === 'szuflada-wewnetrzna') : [];
 
   if (fronts.length === 0) return { parts, mountingData };
 
@@ -177,38 +164,27 @@ function getFrontsAndDrawers(mod, config) {
       qty: 1
     });
 
+    // LOGIKA SZUFLAD
     if (front.subtype === 'szuflada') {
       const isBottomInZone = front.frontIndex === 0;
       const isTopInZone = index === fronts.length - 1;
       
       if (typeof calculateDrawerHoles === 'function') {
         const drawerHoles = calculateDrawerHoles(config.front.drawerSystem, front.y, front.h, board, drawerCount - 1, isBottomInZone);
-        if (drawerHoles) mountingData.push(drawerHoles);
+        if (drawerHoles) {
+            drawerHoles.frontId = front.id; // Dodane powiązanie dla SVG
+            drawerHoles.type = 'drawer';
+            mountingData.push(drawerHoles);
+        }
       }
 
       if (typeof getDrawerComponents === 'function') {
         let availableSpace = front.h;
-        
-        if (isBottomInZone) {
-          const bottomOverlap = board - (config.front.clearance.bottom || 0);
-          availableSpace -= bottomOverlap;
-        }
-        
-        if (isTopInZone) {
-          const topOverlap = board - (config.front.clearance.top || 0);
-          availableSpace -= topOverlap;
-        }
+        if (isBottomInZone) availableSpace -= (board - (config.front.clearance.bottom || 0));
+        if (isTopInZone) availableSpace -= (board - (config.front.clearance.top || 0));
 
-        // TĄ ZMIENNĄ UŻYTKOWNIK BEDZIE MOGŁ NADAĆ Z POZIOMU UI KLIKAJĄC WE FRONT NA WIDOKU 2D
         const userForcedVariant = front.forceVariant || 'auto';
-
-        const drawerComps = getDrawerComponents(
-          config.front.drawerSystem, 
-          width - (board * 2), 
-          topBottomDepth, 
-          availableSpace,
-          userForcedVariant // <--- PRZEKAZANIE WYMUSZENIA!
-        );
+        const drawerComps = getDrawerComponents(config.front.drawerSystem, width - (board * 2), topBottomDepth, availableSpace, userForcedVariant);
         
         if (drawerComps) {
           parts.push({
@@ -225,6 +201,12 @@ function getFrontsAndDrawers(mod, config) {
           });
         }
       }
+    } 
+    // LOGIKA ZAWIASÓW
+    else if (front.subtype.includes('drzwi')) {
+      const side = front.subtype === 'drzwi-lp' ? (front.id.endsWith('-L') ? 'left' : 'right') : (front.openingSide || 'left');
+      const hinges = calculateHinges(front, board, obstacles, side);
+      mountingData.push({ type: 'door', name: partName, side: side, frontId: front.id, hinges: hinges });
     }
   });
 
