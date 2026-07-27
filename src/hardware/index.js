@@ -1,15 +1,19 @@
 // src/hardware/index.js
 import { getBlumMountingData } from './blum.js';
+import { getGtvMountingData } from './gtv.js';
 
-export function getHardwareMounting(brand, variantType, nominalLength) {
+export function getHardwareMounting(brand, cabinetConfig, drawers, systemType) {
   switch (brand?.toLowerCase()) {
     case 'blum':
     case 'blum metal':
-      return getBlumMountingData(variantType, nominalLength);
+      return getBlumMountingData(cabinetConfig, drawers, systemType);
     
-    // W przyszłości łatwo dodasz kolejnych producentów:
+    case 'gtv':
+      return getGtvMountingData(cabinetConfig, drawers, systemType);
+
+    // W przyszłości łatwo dodasz kolejnych producentów odkomentowując i dodając nowy import:
     // case 'hettich':
-    //   return getHettichMountingData(variantType, nominalLength);
+    //   return getHettichMountingData(cabinetConfig, drawers, systemType);
 
     default:
       return null;

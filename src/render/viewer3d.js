@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { state } from '../core/state.js';
+import { getDrawerComponents } from '../core/drawerMath.js'; // DODANY IMPORT
 
 let scene, camera, renderer, controls;
 let cabinetGroup;
@@ -97,7 +98,6 @@ export function update3D() {
   const matDrawer = new THREE.MeshLambertMaterial({ color: 0xe2e8f0, transparent: true, opacity: 0.4, side: THREE.DoubleSide }); 
   const lineMatDrawer = new THREE.LineBasicMaterial({ color: 0x475569, opacity: 0.5, transparent: true });
 
-  // NOWOŚĆ: Wyraźny pomarańczowy dla pleców HDF
   const matHDF = new THREE.MeshLambertMaterial({ color: 0xf97316, transparent: true, opacity: 0.55, side: THREE.DoubleSide }); 
   const lineMatHDF = new THREE.LineBasicMaterial({ color: 0x9a3412, opacity: 0.7, transparent: true });
 
@@ -132,13 +132,11 @@ export function update3D() {
       bpW = (W - 2*th) + (2 * groove); bpX = th - groove;
       bpH = (H - 2*th) + (2 * groove); bpY = th - groove;
     } else if (nutBuild === 'sides') {
-      // Boki nutowane, wieńce skracane
       bpW = (W - 2*th) + (2 * groove); bpX = th - groove;
-      bpH = H; bpY = 0; // Plecy idą góra-dół po całości
-      tbZ = offset + hdfThick; // Wieńce zaczynają się za plecami HDF
-      tbD = D - tbZ;           // i są odpowiednio skrócone
+      bpH = H; bpY = 0; 
+      tbZ = offset + hdfThick; 
+      tbD = D - tbZ;           
     } else if (nutBuild === 'top_bottom') {
-      // Wieńce nutowane, boki skracane (rzadsza opcja)
       bpW = W; bpX = 0;
       bpH = (H - 2*th) + (2 * groove); bpY = th - groove;
       sidesZ = offset + hdfThick;
@@ -147,12 +145,11 @@ export function update3D() {
   }
 
   // --- RYSOWANIE KORPUSU ---
-  createBoard(th, H, sidesD, 0, 0, sidesZ, matBody, lineMatBody); // Lewy bok
-  createBoard(th, H, sidesD, W - th, 0, sidesZ, matBody, lineMatBody); // Prawy bok
-  createBoard(W - 2*th, th, tbD, th, 0, tbZ, matBody, lineMatBody); // Wieniec dolny
-  createBoard(W - 2*th, th, tbD, th, H - th, tbZ, matBody, lineMatBody); // Wieniec górny
+  createBoard(th, H, sidesD, 0, 0, sidesZ, matBody, lineMatBody); 
+  createBoard(th, H, sidesD, W - th, 0, sidesZ, matBody, lineMatBody); 
+  createBoard(W - 2*th, th, tbD, th, 0, tbZ, matBody, lineMatBody); 
+  createBoard(W - 2*th, th, tbD, th, H - th, tbZ, matBody, lineMatBody); 
   
-  // Plecy
   createBoard(bpW, bpH, hdfThick, bpX, bpY, bpZ, matHDF, lineMatHDF);
 
   // --- ELEMENTY Z EDYTORA 2D ---
@@ -161,17 +158,12 @@ export function update3D() {
       if (isNaN(el.x) || isNaN(el.y) || isNaN(el.w) || isNaN(el.h)) return;
 
       if (el.typ === 'poziom' || el.typ === 'pion') {
-        // Elementy wewnętrzne dociskają się do pleców
         let elZ = backType === 'nut' ? offset + hdfThick : 0;
-        
-        // baseD to pełna dostępna głębokość wewnątrz modułu
         let baseD = D - elZ; 
-        
-        // Domyślnie pełna głębokość dla półek konstrukcyjnych (wieńców) i ew. przegród
         let elD = baseD; 
         
         if (el.typ === 'poziom' && !el.isStructural) {
-           elD = baseD - 5; // Półki luźne cofamy dodatkowo o 5 mm
+           elD = baseD - 5; 
         }
 
         createBoard(el.w, el.h, elD, el.x, el.y, elZ, matBody, lineMatBody);
@@ -187,13 +179,34 @@ export function update3D() {
 
         if (el.subtype === 'szuflada' || isInternalDrawer) {
             const innerWidth = el.baseZone ? (el.baseZone.maxX - el.baseZone.minX) : el.w;
-            const boxW = innerWidth - 30; 
-            const boxH = Math.min(el.h * 0.75, 180); 
-            const boxD = Math.min(D - 35, 500); 
+            
+            // --- OBLICZANIE RZECZYWISTYCH WYMIARÓW SZUFLADY ---
+            let availableSpace = el.h;
+            // Jeśli to najniższy front, odliczamy zachodzenie na wieniec dolny
+            if (el.frontIndex === 0) availableSpace -= th;
+            
+            const drawerComps = getDrawerComponents(
+              state.project.front.drawerSystem,
+              innerWidth,
+              tbD, // głębokość w świetle
+              availableSpace
+            );
+
+            // Zmienne początkowe (fallback)
+            let boxW = innerWidth - 30; 
+            let boxH = Math.min(el.h * 0.75, 180); 
+            let boxD = Math.min(D - 35, 500); 
+
+            // Nadpisujemy zmienne tym, co rzeczywiście wyliczył system
+            if (drawerComps) {
+              boxD = drawerComps.nominalLength;               // Głębokość = idealnie dobrana prowadnica
+              boxH = drawerComps.back.height + 16;            // Wysokość = tył katalogowy + dno 16mm
+              boxW = innerWidth - 25;                         // Szerokość zewn. szuflady (ok. 12.5mm grubości prowadnicy na stronę)
+            }
             
             const centerX = el.baseZone ? (el.baseZone.minX + el.baseZone.maxX) / 2 : el.x + el.w / 2;
             const boxX = centerX - boxW / 2;
-            const boxY = el.y + 15; 
+            const boxY = el.y + 15; // Delikatne przesunięcie szuflady w górę od krawędzi frontu dla lepszego wyglądu
             const boxZ = frontZ - boxD; 
             
             createBoard(boxW, boxH, boxD, boxX, boxY, boxZ, matDrawer, lineMatDrawer);

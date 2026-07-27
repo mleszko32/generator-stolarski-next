@@ -76,6 +76,9 @@ export function initPropertiesPanel() {
           <option value="merivobox" ${state.project.front.drawerSystem === 'merivobox' ? 'selected' : ''}>Blum Merivobox</option>
           <option value="legrabox" ${state.project.front.drawerSystem === 'legrabox' ? 'selected' : ''}>Blum Legrabox</option>
           <option value="tandembox" ${state.project.front.drawerSystem === 'tandembox' ? 'selected' : ''}>Blum TANDEMBOX antaro</option>
+          <!-- DODANE OPCJE GTV -->
+          <option value="gtv_axis_16" ${state.project.front.drawerSystem === 'gtv_axis_16' ? 'selected' : ''}>GTV Axis Pro (płyta 16mm)</option>
+          <option value="gtv_axis_18" ${state.project.front.drawerSystem === 'gtv_axis_18' ? 'selected' : ''}>GTV Axis Pro (płyta 18mm)</option>
         </select>
       </div>  
       
