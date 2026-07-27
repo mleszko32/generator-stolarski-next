@@ -1,3 +1,4 @@
+// src/ui/sidebar.js
 import { calculateParts } from "../engine/cabinet.js";
 import { generateSidePanelSVG } from "../render/viewer2d.js"; 
 
@@ -89,29 +90,77 @@ export function updateSidebar() {
       const svgContent = generateSidePanelSVG(drawHeight, drawDepth, mountingData);
       
       const htmlContent = `
-        <!DOCTYPE html>
-        <html lang="pl">
-          <head>
-            <meta charset="UTF-8">
-            <title>Wydruk na produkcję - Bok szafki</title>
-            <style>
-              body { margin: 0; padding: 20px; font-family: sans-serif; background-color: #f1f5f9; }
-              .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-              h2 { color: #1e293b; margin-top: 0; }
-              @media print {
-                body { background-color: white; padding: 0; }
-                .container { box-shadow: none; padding: 0; max-width: 100%; }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <h2>Rysunek techniczny: Bok szafki (nawierty pod prowadnice)</h2>
-              <p>Wymiary podane od przedniej, dolnej krawędzi formatki (X, Y).</p>
-              ${svgContent}
-            </div>
-          </body>
-        </html>
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wydruk na produkcję - Bok szafki</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      height: 100vh; /* Rozciąga body na całą wysokość ekranu */
+      overflow: hidden; /* Blokuje domyślne przewijanie strony, skrypt odzyskuje kółko myszy */
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .header {
+      background-color: #ffffff;
+      padding: 16px 24px;
+      border-bottom: 1px solid #cbd5e1;
+      flex-shrink: 0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      z-index: 10;
+    }
+    
+    .header h1 {
+      margin: 0 0 6px 0;
+      font-size: 20px;
+      color: #0f172a;
+    }
+    
+    .header p {
+      margin: 0;
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    .svg-container {
+      flex-grow: 1;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #f8fafc;
+    }
+    
+    /* Ukrywanie paska nawigacji podczas fizycznego wydruku */
+    @media print {
+      body { height: auto; overflow: visible; display: block; background: white; }
+      .header { display: none; }
+      .svg-container { display: block; overflow: visible; background: white; }
+    }
+  </style>
+</head>
+<body>
+  
+  <div class="header">
+    <h1>Rysunek techniczny: Bok szafki (nawierty)</h1>
+    <p>Wymiary podane od przedniej, dolnej krawędzi formatki (X, Y). Użyj kółka myszy, aby przybliżać/oddalać. Przeciągaj lewym przyciskiem myszy, aby przesuwać obszar roboczy.</p>
+  </div>
+
+  <div class="svg-container">
+    ${svgContent}
+  </div>
+
+</body>
+</html>
       `;
 
       const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });

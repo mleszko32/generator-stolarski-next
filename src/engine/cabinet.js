@@ -12,11 +12,11 @@ export function calculateParts() {
   
   const board = state.project.materials.boardThickness;
   const backThick = state.project.materials.backThickness;
-  const { type, offset, grooveDepth, clearance } = state.project.backPanel;
+  const { type, offset, grooveDepth, clearance, nutBuild } = state.project.backPanel;
 
-  // Pobieramy typ frontu (dla określenia głębokości wnętrza przy wpuszczanych)
   const frontType = state.project.front && state.project.front.type ? state.project.front.type : 'nakladane';
   const isInset = frontType === 'wpuszczane';
+  const currentNutBuild = nutBuild || 'all';
 
   let parts = [];
 
@@ -24,23 +24,32 @@ export function calculateParts() {
   let sideDepth = type === 'nut' ? depth : depth - backThick;
   parts.push({ name: "Bok (L/P)", length: height, width: sideDepth, qty: 2 });
 
-  // 2. Wieniec górny / dolny (2 szt.)
+  // 2. Wieniec (Góra + Dół + Półki konstrukcyjne)
   let topBottomDepth = type === 'nut' ? depth - offset - backThick : depth - backThick;
-  parts.push({ name: "Wieniec (G/D)", length: width - (board * 2), width: topBottomDepth, qty: 2 });
+  
+  const structuralShelvesCount = mod.elements ? mod.elements.filter(el => el.typ === 'poziom' && el.isStructural).length : 0;
+  const wieniecQty = 2 + structuralShelvesCount;
+  
+  parts.push({ name: "Wieniec", length: width - (board * 2), width: topBottomDepth, qty: wieniecQty });
 
-  // 3. Plecy (HDF) - 1 szt.
+  // 3. Plecy (HDF) - 1 szt. (Z UWZGLĘDNIENIEM NUTU DOOKOŁA)
   let hdfWidth, hdfHeight;
   const totalClearance = clearance * 2;
+  
   if (type === 'nut') {
-    hdfWidth = width - (board * 2) + (grooveDepth * 2) - totalClearance;
-    hdfHeight = height - totalClearance;
+    // Szerokość HDF: światło między bokami + głębokość nutów z obu stron boku - luz
+    hdfWidth = (width - (board * 2)) + ((currentNutBuild === 'all' || currentNutBuild === 'sides') ? (grooveDepth * 2) : 0) - totalClearance;
+    
+    // Wysokość HDF: światło między wieńcami + głębokość nutów z góry i dołu - luz
+    hdfHeight = (height - (board * 2)) + ((currentNutBuild === 'all' || currentNutBuild === 'top_bottom') ? (grooveDepth * 2) : 0) - totalClearance;
   } else {
     hdfWidth = width - totalClearance;
     hdfHeight = height - totalClearance;
   }
-  parts.push({ name: "Plecy (HDF)", length: hdfHeight, width: hdfWidth, qty: 1 });
+  
+  parts.push({ name: "Plecy (HDF)", length: parseFloat(hdfHeight.toFixed(1)), width: parseFloat(hdfWidth.toFixed(1)), qty: 1 });
 
-  // 4. Wnętrze (Półki i Przegrody czytane z Edytora 2D)
+  // 4. Wnętrze (Półki luźne i Przegrody)
   const innerDepthOffset = isInset ? board : 0;
   const innerPartDepth = topBottomDepth - innerDepthOffset;
 
@@ -53,25 +62,25 @@ export function calculateParts() {
         partitionCount++;
         parts.push({ name: `Przegroda pionowa ${partitionCount}`, length: parseFloat(el.h.toFixed(1)), width: innerPartDepth, qty: 1 });
       } else if (el.typ === 'poziom') {
-        shelfCount++;
-        parts.push({ name: `Półka ${shelfCount}`, length: parseFloat(el.w.toFixed(1)), width: innerPartDepth, qty: 1 });
+        if (!el.isStructural) {
+          shelfCount++;
+          parts.push({ name: `Półka ${shelfCount}`, length: parseFloat(el.w.toFixed(1)), width: innerPartDepth - 5, qty: 1 });
+        }
       }
     });
   }
 
-  // 5. Fronty i szuflady (Czytane BEZPOŚREDNIO ze zaktualizowanych danych CAD)
+  // 5. Fronty i szuflady
   let mountingData = [];
   const fronts = mod.elements ? mod.elements.filter(el => el.typ === 'front') : [];
 
   if (fronts.length > 0) {
-    // Sortujemy po osi Y (od dołu do góry), żeby odpowiednio numerować na liście i w nawiertach
     fronts.sort((a, b) => a.y - b.y);
 
     let drawerCount = 0;
     let doorCount = 0;
 
     fronts.forEach(front => {
-      // Inteligentne nazewnictwo w zależności od wybranej opcji w 2D
       let partName = "Front";
       if (front.subtype === 'szuflada') {
         drawerCount++;
@@ -84,7 +93,6 @@ export function calculateParts() {
         partName = `Drzwi ${side}`;
       }
 
-      // Wrzucamy gotowe wymiary z edytora na listę formatek
       parts.push({
         name: partName,
         length: parseFloat(front.h.toFixed(1)),
@@ -92,13 +100,8 @@ export function calculateParts() {
         qty: 1
       });
 
-      // --- GENEROWANIE NAWIERTÓW (Tylko dla szuflad) ---
       if (front.subtype === 'szuflada' && typeof calculateDrawerHoles === 'function') {
-        
-        // Zapisaliśmy w editor2d `frontIndex`. Jeśli to 0, znaczy że to najniższa szuflada w swojej grupie.
         const isBottomInZone = front.frontIndex === 0;
-
-        // Przekazujemy front.y - nasz Edytor 2D dba o to, że to dokładna współrzędna początku frontu na osi Y
         const drawerHoles = calculateDrawerHoles(
           state.project.front.drawerSystem,
           front.y, 

@@ -5,181 +5,204 @@ import { state } from '../core/state.js';
 
 let scene, camera, renderer, controls;
 let cabinetGroup;
-let frontsVisible = true;
 let isInitialized = false;
 
-export function update3D() {
-  if (!state || !state.project || !state.project.modules || !state.project.modules[0]) return;
-  
-  const mod = state.project.modules[0];
-  const th = state.project.materials.boardThickness;
-  const { width, height } = mod.dimensions;
-  const depth = mod.dimensions.depth || 513; 
-
-  // SZEROKA SIEĆ - szukamy kontenera pod różnymi najczęstszymi nazwami
-  const container = document.getElementById('viewer-3d') || 
-                    document.getElementById('viewer-3d-container') || 
-                    document.getElementById('viewer3d') || 
-                    document.getElementById('3d-viewer') ||
-                    document.querySelector('.viewer-3d-wrapper');
-                    
-  if (!container) {
-    console.error("BŁĄD KRYTYCZNY: Nie znaleziono div-a dla 3D. Sprawdź jakie ID ma ten element w pliku index.html!");
-    return;
-  }
-
-  if (!isInitialized) {
-    container.innerHTML = ''; 
-    container.style.position = 'relative';
-
-    const cw = container.clientWidth > 0 ? container.clientWidth : 800;
-    const ch = container.clientHeight > 0 ? container.clientHeight : 600;
-
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color('#f1f5f9');
-
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambientLight);
-
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
-    dirLight.position.set(1000, 2000, 1500);
-    scene.add(dirLight);
-
-    camera = new THREE.PerspectiveCamera(45, cw / ch, 1, 5000);
-    camera.position.set(0, 400, 1800); 
-
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(cw, ch);
-    renderer.domElement.style.width = '100%';
-    renderer.domElement.style.height = '100%';
-    renderer.domElement.style.display = 'block';
-    container.appendChild(renderer.domElement);
-
-    controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-
-    cabinetGroup = new THREE.Group();
-    scene.add(cabinetGroup);
-
-    const toggleBtn = document.createElement('button');
-    toggleBtn.innerHTML = '👁️ Pokaż / Ukryj Fronty';
-    toggleBtn.style.position = 'absolute';
-    toggleBtn.style.top = '10px';
-    toggleBtn.style.right = '10px';
-    toggleBtn.style.padding = '8px 12px';
-    toggleBtn.style.backgroundColor = '#ffffff';
-    toggleBtn.style.border = '1px solid #cbd5e1';
-    toggleBtn.style.borderRadius = '6px';
-    toggleBtn.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-    toggleBtn.style.cursor = 'pointer';
-    toggleBtn.style.fontWeight = 'bold';
-    toggleBtn.style.color = '#334155';
-    toggleBtn.style.zIndex = '10';
-    
-    toggleBtn.onclick = () => {
-      frontsVisible = !frontsVisible;
-      update3D(); 
-    };
-    container.appendChild(toggleBtn);
-
-    const animate = function () {
-      requestAnimationFrame(animate);
-      controls.update();
-      renderer.render(scene, camera);
-    };
-    animate();
-
-    window.addEventListener('resize', () => {
-      if (container && renderer) {
-        const newCw = container.clientWidth > 0 ? container.clientWidth : 800;
-        const newCh = container.clientHeight > 0 ? container.clientHeight : 600;
-        camera.aspect = newCw / newCh;
-        camera.updateProjectionMatrix();
-        renderer.setSize(newCw, newCh);
-      }
-    });
-
-    isInitialized = true;
-  }
-
-  while (cabinetGroup.children.length > 0) {
-    const child = cabinetGroup.children[0];
-    cabinetGroup.remove(child);
-    if (child.geometry) child.geometry.dispose();
-    if (child.material) {
-      if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
-      else child.material.dispose();
-    }
-  }
-
-  const boardMat = new THREE.MeshStandardMaterial({ color: '#a68a68', roughness: 0.9 });
-  const frontMat = new THREE.MeshStandardMaterial({ color: '#8b7355', roughness: 0.7 });
-  const edgeMat = new THREE.LineBasicMaterial({ color: 0x3e2723, opacity: 0.3, transparent: true });
-
-  const createBoard = (w, h, d, x, y, z, mat) => {
-    const geo = new THREE.BoxGeometry(w, h, d);
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x + w/2, y + h/2, z + d/2);
-    
-    const edges = new THREE.EdgesGeometry(geo);
-    const line = new THREE.LineSegments(edges, edgeMat);
-    mesh.add(line);
-    
-    cabinetGroup.add(mesh);
-  };
-
-  createBoard(th, height, depth, 0, 0, 0, boardMat); 
-  createBoard(th, height, depth, width - th, 0, 0, boardMat); 
-  createBoard(width - th*2, th, depth, th, 0, 0, boardMat); 
-  createBoard(width - th*2, th, depth, th, height - th, 0, boardMat); 
-
-  // Odczytujemy typ frontu z zabezpieczeniem domyślnym
-  const frontType = state.project.front.type || 'nakladane';
-  const isInset = frontType === 'wpuszczane';
-  
-  // Jeśli fronty są wpuszczane, wnętrze szafki musi cofnąć się o grubość frontu
-  const insetOffset = isInset ? th : 0; 
-
-  mod.elements.forEach(el => {
-    if (el.typ === 'poziom') {
-      // Cofamy półki i zmniejszamy ich głębokość tylko dla frontów wpuszczanych
-      createBoard(el.w, th, depth - insetOffset, el.x, el.y, 0, boardMat);
-    } 
-    else if (el.typ === 'pion') {
-      // Podobnie dla pionowych przegród
-      createBoard(th, el.h, depth - insetOffset, el.x, el.y, 0, boardMat);
-    } 
-    else if (el.typ === 'front') {
-      if (frontsVisible) {
-        // Obliczamy pozycję Z dla frontu
-        // Nakładane wysuwają się na grubość korpusu (depth), wpuszczane cofają do wnętrza (depth - th)
-        const zPos = isInset ? (depth - th) : depth;
-        createBoard(el.w, el.h, th, el.x, el.y, zPos, frontMat);
-      }
-    }
-  });
-
-  cabinetGroup.position.set(-width / 2, -height / 2, -depth / 2);
-}
-
 export function init3DViewer() {
-  // Mechanizm oczekiwania na dynamiczny DOM
   const checkExist = setInterval(() => {
     const container = document.getElementById('viewer-3d-container') || 
-                      document.getElementById('viewer-3d') || 
-                      document.getElementById('viewer3d') || 
-                      document.getElementById('3d-viewer') ||
-                      document.querySelector('.viewer-3d-wrapper');
+                      document.querySelector('.viewport-3d');
                       
     if (container) {
-      clearInterval(checkExist); // Znaleziono kontener, przerywamy pętlę szukającą
-      update3D();                // Odpalamy silnik 3D
-    }
-  }, 50); // Sprawdzaj co 50 milisekund
+      clearInterval(checkExist); 
+      
+      if (isInitialized) return;
 
-  // Zabezpieczenie przed nieskończoną pętlą (przerwij po 5 sekundach, jeśli coś poszło nie tak)
-  setTimeout(() => {
-    clearInterval(checkExist);
-  }, 5000); 
+      container.innerHTML = ''; 
+
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xf1f5f9); 
+
+      camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 10000);
+      camera.position.set(1200, 1000, 1800);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      container.appendChild(renderer.domElement);
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+      scene.add(ambientLight);
+      
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.4);
+      dirLight.position.set(1000, 2000, 1000);
+      scene.add(dirLight);
+
+      const gridHelper = new THREE.GridHelper(3000, 60, 0x94a3b8, 0xcbd5e1);
+      gridHelper.material.opacity = 0.5;
+      gridHelper.material.transparent = true;
+      scene.add(gridHelper);
+
+      cabinetGroup = new THREE.Group();
+      scene.add(cabinetGroup);
+
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+
+      isInitialized = true;
+
+      const animate = function () {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      };
+      animate();
+
+      update3D();
+
+      window.addEventListener('resize', () => {
+         if (container) {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+         }
+      });
+    }
+  }, 50); 
+}
+
+export function update3D() {
+  if (!cabinetGroup) return; 
+  
+  while(cabinetGroup.children.length > 0){ 
+      const child = cabinetGroup.children[0];
+      cabinetGroup.remove(child); 
+  }
+
+  const mod = state.project.modules[0];
+  const th = parseFloat(state.project.materials.boardThickness) || 18;
+  const W = parseFloat(mod.dimensions.width) || 600;
+  const H = parseFloat(mod.dimensions.height) || 720;
+  const D = parseFloat(mod.dimensions.depth) || 513;
+
+  // --- MATERIAŁY (TRANSPARENTNE / X-RAY) ---
+  const matBody = new THREE.MeshLambertMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.4, side: THREE.DoubleSide }); 
+  const lineMatBody = new THREE.LineBasicMaterial({ color: 0x1e3a8a, opacity: 0.5, transparent: true });
+
+  const matFront = new THREE.MeshLambertMaterial({ color: 0x6ee7b7, transparent: true, opacity: 0.45, side: THREE.DoubleSide }); 
+  const lineMatFront = new THREE.LineBasicMaterial({ color: 0x064e3b, opacity: 0.5, transparent: true });
+
+  const matFrontInternal = new THREE.MeshLambertMaterial({ color: 0xfde047, transparent: true, opacity: 0.4, side: THREE.DoubleSide }); 
+  const lineMatFrontInternal = new THREE.LineBasicMaterial({ color: 0xb45309, opacity: 0.5, transparent: true });
+
+  const matDrawer = new THREE.MeshLambertMaterial({ color: 0xe2e8f0, transparent: true, opacity: 0.4, side: THREE.DoubleSide }); 
+  const lineMatDrawer = new THREE.LineBasicMaterial({ color: 0x475569, opacity: 0.5, transparent: true });
+
+  // NOWOŚĆ: Wyraźny pomarańczowy dla pleców HDF
+  const matHDF = new THREE.MeshLambertMaterial({ color: 0xf97316, transparent: true, opacity: 0.55, side: THREE.DoubleSide }); 
+  const lineMatHDF = new THREE.LineBasicMaterial({ color: 0x9a3412, opacity: 0.7, transparent: true });
+
+  const createBoard = (w, h, d, x, y, z, material, lineMaterial) => {
+    const geo = new THREE.BoxGeometry(w, h, d);
+    const mesh = new THREE.Mesh(geo, material);
+    mesh.position.set(x + w/2, y + h/2, z + d/2);
+    cabinetGroup.add(mesh);
+    
+    const edges = new THREE.EdgesGeometry(geo);
+    const line = new THREE.LineSegments(edges, lineMaterial);
+    mesh.add(line);
+  };
+
+  // --- LOGIKA PLECÓW I KORPUSU ---
+  const backType = state.project.backPanel?.type || 'nakladane';
+  const nutBuild = state.project.backPanel?.nutBuild || 'all';
+  const offset = state.project.backPanel?.offset !== undefined ? parseFloat(state.project.backPanel.offset) : 16;
+  const groove = state.project.backPanel?.grooveDepth !== undefined ? parseFloat(state.project.backPanel.grooveDepth) : 6;
+  const hdfThick = 3; 
+
+  let sidesD = D, sidesZ = 0;
+  let tbD = D, tbZ = 0;
+  let bpW = W, bpH = H, bpX = 0, bpY = 0, bpZ = -hdfThick;
+
+  if (backType === 'nakladane') {
+    bpW = W; bpH = H; bpX = 0; bpY = 0; bpZ = -hdfThick;
+  } else if (backType === 'nut') {
+    bpZ = offset;
+    
+    if (nutBuild === 'all') {
+      bpW = (W - 2*th) + (2 * groove); bpX = th - groove;
+      bpH = (H - 2*th) + (2 * groove); bpY = th - groove;
+    } else if (nutBuild === 'sides') {
+      // Boki nutowane, wieńce skracane
+      bpW = (W - 2*th) + (2 * groove); bpX = th - groove;
+      bpH = H; bpY = 0; // Plecy idą góra-dół po całości
+      tbZ = offset + hdfThick; // Wieńce zaczynają się za plecami HDF
+      tbD = D - tbZ;           // i są odpowiednio skrócone
+    } else if (nutBuild === 'top_bottom') {
+      // Wieńce nutowane, boki skracane (rzadsza opcja)
+      bpW = W; bpX = 0;
+      bpH = (H - 2*th) + (2 * groove); bpY = th - groove;
+      sidesZ = offset + hdfThick;
+      sidesD = D - sidesZ;
+    }
+  }
+
+  // --- RYSOWANIE KORPUSU ---
+  createBoard(th, H, sidesD, 0, 0, sidesZ, matBody, lineMatBody); // Lewy bok
+  createBoard(th, H, sidesD, W - th, 0, sidesZ, matBody, lineMatBody); // Prawy bok
+  createBoard(W - 2*th, th, tbD, th, 0, tbZ, matBody, lineMatBody); // Wieniec dolny
+  createBoard(W - 2*th, th, tbD, th, H - th, tbZ, matBody, lineMatBody); // Wieniec górny
+  
+  // Plecy
+  createBoard(bpW, bpH, hdfThick, bpX, bpY, bpZ, matHDF, lineMatHDF);
+
+  // --- ELEMENTY Z EDYTORA 2D ---
+  if (mod.elements) {
+    mod.elements.forEach(el => {
+      if (isNaN(el.x) || isNaN(el.y) || isNaN(el.w) || isNaN(el.h)) return;
+
+      if (el.typ === 'poziom' || el.typ === 'pion') {
+        // Elementy wewnętrzne dociskają się do pleców
+        let elZ = backType === 'nut' ? offset + hdfThick : 0;
+        
+        // baseD to pełna dostępna głębokość wewnątrz modułu
+        let baseD = D - elZ; 
+        
+        // Domyślnie pełna głębokość dla półek konstrukcyjnych (wieńców) i ew. przegród
+        let elD = baseD; 
+        
+        if (el.typ === 'poziom' && !el.isStructural) {
+           elD = baseD - 5; // Półki luźne cofamy dodatkowo o 5 mm
+        }
+
+        createBoard(el.w, el.h, elD, el.x, el.y, elZ, matBody, lineMatBody);
+      }
+      else if (el.typ === 'front') {
+        const isInternalDrawer = el.subtype === 'szuflada-wewnetrzna';
+        const isInset = state.project.front?.type === 'wpuszczane';
+        const frontZ = isInternalDrawer ? (D - th - 15) : (isInset ? D - th : D + 2);
+        const currentMatFront = isInternalDrawer ? matFrontInternal : matFront;
+        const currentLineMat = isInternalDrawer ? lineMatFrontInternal : lineMatFront;
+
+        createBoard(el.w, el.h, th, el.x, el.y, frontZ, currentMatFront, currentLineMat);
+
+        if (el.subtype === 'szuflada' || isInternalDrawer) {
+            const innerWidth = el.baseZone ? (el.baseZone.maxX - el.baseZone.minX) : el.w;
+            const boxW = innerWidth - 30; 
+            const boxH = Math.min(el.h * 0.75, 180); 
+            const boxD = Math.min(D - 35, 500); 
+            
+            const centerX = el.baseZone ? (el.baseZone.minX + el.baseZone.maxX) / 2 : el.x + el.w / 2;
+            const boxX = centerX - boxW / 2;
+            const boxY = el.y + 15; 
+            const boxZ = frontZ - boxD; 
+            
+            createBoard(boxW, boxH, boxD, boxX, boxY, boxZ, matDrawer, lineMatDrawer);
+        }
+      }
+    });
+  }
+
+  const box = new THREE.Box3().setFromObject(cabinetGroup);
+  const center = box.getCenter(new THREE.Vector3());
+  if (controls) controls.target.copy(center);
 }

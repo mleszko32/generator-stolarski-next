@@ -34,19 +34,33 @@ export function initPropertiesPanel() {
         <option value="nakladane" ${state.project.backPanel.type === 'nakladane' ? 'selected' : ''}>Nakładane</option>
       </select>
     </div>
-    <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
     
-    <h3>Wypełnienie Korpusu</h3>
-    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-      <button id="btn-add-shelf" style="flex: 1; padding: 10px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">+ Dodaj Półkę</button>
-      <button id="btn-add-partition" style="flex: 1; padding: 10px; background: #16a34a; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">+ Przegrodę</button>
+    <!-- SEKCA KONTROLI NUTU (pokazywana warunkowo) -->
+    <div id="nut-options" style="display: ${state.project.backPanel.type === 'nut' ? 'block' : 'none'}; background: #f8fafc; padding: 10px; border: 1px dashed #cbd5e1; border-radius: 4px; margin-bottom: 15px;">
+      <div class="property-group" style="margin-bottom: 8px;">
+        <label style="font-size: 11px; font-weight: bold;">Konstrukcja nutu:</label>
+        <select id="input-nut-build">
+          <option value="all" ${(!state.project.backPanel.nutBuild || state.project.backPanel.nutBuild === 'all') ? 'selected' : ''}>Boki i wieńce nutowane</option>
+          <option value="sides" ${state.project.backPanel.nutBuild === 'sides' ? 'selected' : ''}>Boki nutowane, wieńce skracane</option>
+          <option value="top_bottom" ${state.project.backPanel.nutBuild === 'top_bottom' ? 'selected' : ''}>Wieńce nutowane, boki skracane</option>
+        </select>
+      </div>
+      <div class="property-group" style="margin-bottom: 8px;">
+        <label style="font-size: 11px;">Odsunięcie nutu od tyłu (mm):</label>
+        <input type="number" id="input-back-offset" value="${state.project.backPanel.offset !== undefined ? state.project.backPanel.offset : 16}" step="1" />
+      </div>
+      <div class="property-group" style="margin-bottom: 0;">
+        <label style="font-size: 11px;">Głębokość nutu w płycie (mm):</label>
+        <input type="number" id="input-back-groove" value="${state.project.backPanel.grooveDepth !== undefined ? state.project.backPanel.grooveDepth : 6}" step="1" />
+      </div>
     </div>
-    <p style="font-size: 0.8em; color: #64748b;">Kliknij element na rysunku 2D, aby nim zarządzać.</p>
 
     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
     
     <h3>Ustawienia Frontów i Szuflad</h3>
-    <p style="font-size: 0.8em; color: #64748b; margin-bottom: 10px;">(Wstawiaj szuflady klikając w puste strefy na widoku 2D)</p>
+    <p style="font-size: 0.8em; color: #64748b; margin-bottom: 10px;">
+      (Wstawiaj fronty, półki i szuflady klikając w puste strefy na widoku 2D)
+    </p>
     
     <div id="group-front-clearance">
       <div class="property-group">
@@ -90,11 +104,10 @@ export function initPropertiesPanel() {
 function setupEventListeners() {
   const numberInputs = [
     'board-thick', 'width', 'height', 'depth', 
-    'front-gap', 'front-sides', 'front-top', 'front-bottom'
+    'front-gap', 'front-sides', 'front-top', 'front-bottom',
+    'back-offset', 'back-groove'
   ];
   
-  // Zaktualizowana funkcja odświeżająca - usunęliśmy stąd globalne nadpisywanie frontów!
-  // Teraz tylko czysto odświeża widoki.
   const updateAll = () => { 
     renderEditor2D();
     update3D(); 
@@ -105,6 +118,24 @@ function setupEventListeners() {
   if (typeInput) {
     typeInput.addEventListener('change', (e) => {
       state.project.front.type = e.target.value;
+      updateAll();
+    });
+  }
+
+  const backType = document.getElementById('input-back-type');
+  const nutOptions = document.getElementById('nut-options');
+  if (backType && nutOptions) {
+    backType.addEventListener('change', (e) => {
+      state.project.backPanel.type = e.target.value;
+      nutOptions.style.display = e.target.value === 'nut' ? 'block' : 'none';
+      updateAll();
+    });
+  }
+  
+  const nutBuildInput = document.getElementById('input-nut-build');
+  if (nutBuildInput) {
+    nutBuildInput.addEventListener('change', (e) => {
+      state.project.backPanel.nutBuild = e.target.value;
       updateAll();
     });
   }
@@ -125,46 +156,20 @@ function setupEventListeners() {
         if (id === 'front-sides') state.project.front.clearance.sides = val;
         if (id === 'front-top') state.project.front.clearance.top = val;
         if (id === 'front-bottom') state.project.front.clearance.bottom = val;
+        
+        if (id === 'back-offset') state.project.backPanel.offset = val;
+        if (id === 'back-groove') state.project.backPanel.grooveDepth = val;
+        
         updateAll();
       });
     }
   });
 
-  document.getElementById('btn-add-shelf').addEventListener('click', () => {
-    const mod = state.project.modules[0];
-    const th = state.project.materials.boardThickness;
-    mod.elements.push({
-      id: 'poziom-' + Date.now(),
-      typ: 'poziom',
-      x: th, 
-      y: mod.dimensions.height / 2 - (th/2), 
-      w: mod.dimensions.width - (th * 2),
-      h: th
+  const drawerSysInput = document.getElementById('input-drawer-system');
+  if(drawerSysInput) {
+    drawerSysInput.addEventListener('change', (e) => {
+      state.project.front.drawerSystem = e.target.value;
+      updateAll(); 
     });
-    updateAll();
-  });
-
-  document.getElementById('btn-add-partition').addEventListener('click', () => {
-    const mod = state.project.modules[0];
-    const th = state.project.materials.boardThickness;
-    mod.elements.push({
-      id: 'pion-' + Date.now(),
-      typ: 'pion',
-      x: mod.dimensions.width / 2 - (th/2), 
-      y: th, 
-      w: th,
-      h: mod.dimensions.height - (th * 2)
-    });
-    updateAll();
-  });
-
-  document.getElementById('input-back-type').addEventListener('change', (e) => {
-    state.project.backPanel.type = e.target.value;
-    updateAll();
-  });
-
-  document.getElementById('input-drawer-system').addEventListener('change', (e) => {
-    state.project.front.drawerSystem = e.target.value;
-    updateAll(); 
-  });
+  }
 }
