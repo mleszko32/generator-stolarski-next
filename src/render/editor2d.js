@@ -23,12 +23,13 @@ export function renderEditor2D() {
   container.innerHTML = '';
 
   const mod = state.project.modules[0];
+  const config = state.project;
   
-  const th = parseFloat(state.project.materials.boardThickness) || 18;
+  const th = parseFloat(config.materials.boardThickness) || 18;
   const width = parseFloat(mod.dimensions.width) || 600;
   const height = parseFloat(mod.dimensions.height) || 720;
   
-  const f = state.project.front || {};
+  const f = config.front || {};
   const fc = f.clearance || {};
   const isInset = f.type === 'wpuszczane';
 
@@ -36,16 +37,30 @@ export function renderEditor2D() {
   const cTop = parseFloat(fc.top ?? fc.gora ?? 2) || 0;
   const cBottom = parseFloat(fc.bottom ?? fc.dol ?? 2) || 0;
 
+  // Ustalenie parametrów konstrukcyjnych korpusu
+  const cons = config.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
+  const isTopBottomFullWidth = cons.joinType === 'wience_przelotowe';
+  const hasTraverses = cons.topType.includes('trawersy');
+  const isVerticalTraverse = cons.topType === 'trawersy_pion';
+  const traverseWidth = cons.traverseWidth || 100;
+
   if (mod.elements) {
     mod.elements.forEach(el => {
       if (el.typ === 'front' && el.baseZone) {
         
         if (el.baseZone.boundBottom) {
           const getBound = (id, type, fallback) => {
+            // W zależności od konstrukcji, boki szafki ograniczają strefy
             if (id === 'cab-left') return th;
             if (id === 'cab-right') return width - th;
             if (id === 'cab-bottom') return th;
-            if (id === 'cab-top') return height - th;
+            // Góra szafki również zależy od trawersów vs pełny wieniec
+            if (id === 'cab-top') {
+              if (hasTraverses) {
+                 return isVerticalTraverse ? height - traverseWidth : height - th;
+              }
+              return height - th;
+            }
             
             const found = mod.elements.find(e => e.id === id);
             if (found) {
@@ -88,7 +103,8 @@ export function renderEditor2D() {
           const isLeftOuter = minX <= th + 1; 
           const isRightOuter = maxX >= width - th - 1;
           const isBottomOuter = minY <= th + 1;
-          const isTopOuter = maxY >= height - th - 1;
+          // Zmieniona logika sprawdzania czy dany box jest na górnej krawędzi uwzględniająca ewentualne trawersy
+          const isTopOuter = maxY >= (hasTraverses && isVerticalTraverse ? height - traverseWidth - 1 : height - th - 1);
 
           const overLeft = isLeftOuter ? (isInset ? -cSides : th - cSides) : (isBoundLeftFront ? -gapVal : ((th / 2) - (gapVal / 2)));
           const overRight = isRightOuter ? (isInset ? -cSides : th - cSides) : (isBoundRightFront ? -gapVal : ((th / 2) - (gapVal / 2)));
@@ -192,11 +208,38 @@ export function renderEditor2D() {
     return div;
   };
 
-  cabinetDiv.appendChild(createPart(0, 0, th, height, '#cbd5e1')); 
-  cabinetDiv.appendChild(createPart(width - th, 0, th, height, '#cbd5e1')); 
-  cabinetDiv.appendChild(createPart(th, 0, width - th*2, th, '#cbd5e1')); 
-  cabinetDiv.appendChild(createPart(th, height - th, width - th*2, th, '#cbd5e1')); 
+  // --- RYSOWANIE KORPUSU 2D (Boki, Wieńce, Trawersy) ---
+  const sideH = isTopBottomFullWidth ? height - (th * 2) : height;
+  const sideY = isTopBottomFullWidth ? th : 0;
+  const tbW = isTopBottomFullWidth ? width : width - (th * 2);
+  const tbX = isTopBottomFullWidth ? 0 : th;
 
+  // Lewy i prawy bok
+  cabinetDiv.appendChild(createPart(0, sideY, th, sideH, '#cbd5e1')); 
+  cabinetDiv.appendChild(createPart(width - th, sideY, th, sideH, '#cbd5e1')); 
+  
+  // Wieniec dolny
+  cabinetDiv.appendChild(createPart(tbX, 0, tbW, th, '#cbd5e1')); 
+
+  // Górna część korpusu
+  if (!hasTraverses) {
+    // Pełny wieniec
+    cabinetDiv.appendChild(createPart(tbX, height - th, tbW, th, '#cbd5e1')); 
+  } else {
+    // Trawersy
+    if (isVerticalTraverse) {
+      // Rysujemy po bokach "przekroje" pionowe trawersów (grubość płyty)
+      // W widoku z przodu wyglądałyby szerzej, ale tu rysujemy je symbolicznie
+      cabinetDiv.appendChild(createPart(tbX, height - traverseWidth, th, traverseWidth, '#cbd5e1'));
+      cabinetDiv.appendChild(createPart(tbX + tbW - th, height - traverseWidth, th, traverseWidth, '#cbd5e1'));
+      // Linii łączącej brak, bo trawers jest pionowy
+    } else {
+      // Trawersy poziome - z przodu widać tylko grubość płyty
+      cabinetDiv.appendChild(createPart(tbX, height - th, tbW, th, '#cbd5e1'));
+    }
+  }
+
+  // --- RYSOWANIE ELEMENTÓW WNĘTRZA I FRONTÓW ---
   mod.elements.forEach(plyta => {
     const isFront = plyta.typ === 'front';
     if (isFront && !isFrontsVisible2D) return;
@@ -231,6 +274,15 @@ export function renderEditor2D() {
       if (plyta.subtype.includes('szuflada')) {
         const innerBox = document.createElement('div'); innerBox.style.position = 'absolute'; innerBox.style.width = '80%'; innerBox.style.height = '60%'; innerBox.style.bottom = '15%'; innerBox.style.border = '2px solid rgba(255, 255, 255, 0.8)'; innerBox.style.borderTop = 'none'; innerBox.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'; innerBox.style.boxSizing = 'border-box'; innerBox.style.pointerEvents = 'none';
         const line = document.createElement('div'); line.style.position = 'absolute'; line.style.bottom = '20%'; line.style.left = '0'; line.style.width = '100%'; line.style.borderBottom = '1px dashed rgba(255, 255, 255, 0.6)'; innerBox.appendChild(line); div.appendChild(innerBox);
+        
+        // ZNACZNIK WYMUSZONEGO WARIANTU SZUFLADY
+        if (plyta.forceVariant && plyta.forceVariant !== 'auto') {
+          const badge = document.createElement('div');
+          badge.innerText = plyta.forceVariant.toUpperCase();
+          badge.style.position = 'absolute'; badge.style.top = '4px'; badge.style.right = '4px'; badge.style.backgroundColor = '#ef4444'; badge.style.color = 'white'; badge.style.fontSize = '9px'; badge.style.padding = '2px 4px'; badge.style.borderRadius = '3px'; badge.style.fontWeight = 'bold';
+          div.appendChild(badge);
+        }
+
       } else if (plyta.subtype.includes('drzwi')) {
          const handle = document.createElement('div'); handle.style.width = '12px'; handle.style.height = '12px'; handle.style.backgroundColor = 'rgba(255, 255, 255, 0.8)'; handle.style.borderRadius = '50%'; handle.style.pointerEvents = 'none'; handle.style.position = 'absolute';
          if (plyta.subtype === 'drzwi-lp') {
@@ -253,7 +305,6 @@ export function renderEditor2D() {
       menu.style.position = 'fixed'; menu.style.left = `${e.clientX}px`; menu.style.top = `${e.clientY}px`;
       menu.style.backgroundColor = '#ffffff'; menu.style.border = '1px solid #cbd5e1'; menu.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; menu.style.borderRadius = '6px'; menu.style.padding = '4px'; menu.style.zIndex = '1000'; menu.style.minWidth = '240px'; menu.style.fontFamily = 'sans-serif';
 
-      // --- WSPÓLNE FUNKCJE DO BUDOWY MENU ---
       const createMenuOption = (text, icon, color = '#1e293b') => {
         const btn = document.createElement('div'); btn.innerHTML = `${icon} <span style="margin-left: 6px;">${text}</span>`; btn.style.padding = '8px 12px'; btn.style.cursor = 'pointer'; btn.style.fontSize = '14px'; btn.style.color = color; btn.style.borderRadius = '4px';
         btn.onmouseenter = () => btn.style.backgroundColor = '#f1f5f9'; btn.onmouseleave = () => btn.style.backgroundColor = 'transparent'; return btn;
@@ -262,20 +313,16 @@ export function renderEditor2D() {
         const hdr = document.createElement('div'); hdr.innerText = text; hdr.style.fontSize = '11px'; hdr.style.color = color; hdr.style.textTransform = 'uppercase'; hdr.style.margin = '8px 8px 4px 8px'; hdr.style.fontWeight = 'bold'; return hdr;
       };
 
-      // === OPCJE DLA FRONTU ===
       if (isFront) {
         menu.appendChild(createHeader('Opcje frontu'));
         
-        // Funkcja wymuszająca pozycję półki na podstawie frontu (tzw. bottom-up)
         const topBoundId = plyta.baseZone?.boundTop;
         const topBoundEl = mod.elements.find(e => e.id === topBoundId);
         
-        // Jeśli nad frontem fizycznie jest półka, pozwólmy ją "popchnąć"
         if (topBoundEl && topBoundEl.typ === 'poziom') {
             const btnSnap = createMenuOption('Dopasuj półkę nad frontami', '↕️', '#059669');
             btnSnap.onclick = (evt) => {
                 evt.stopPropagation();
-                // Szukamy wszystkich frontów wygenerowanych w tej samej "wnęce"
                 const siblings = mod.elements.filter(e => e.typ === 'front' && e.baseZone?.boundTop === topBoundId && e.baseZone?.boundBottom === plyta.baseZone.boundBottom);
                 
                 let maxFrontTop = 0;
@@ -284,26 +331,49 @@ export function renderEditor2D() {
                     if (topEdge > maxFrontTop) maxFrontTop = topEdge;
                 });
 
-                // Sprawdzamy nałożenie półki (standard to grubość/2 - szczelina/2)
                 const gapVal = parseFloat(plyta.gap ?? state.project.front?.gap ?? 3) || 0;
                 const overTop = (th / 2) - (gapVal / 2);
                 
-                // Nowa pozycja Y półki (liczona od dołu, jako jej dolna krawędź)
                 topBoundEl.y = maxFrontTop - overTop;
 
                 menu.remove(); renderEditor2D(); update3D(); updateSidebar();
             };
             menu.appendChild(btnSnap);
         }
+
+        // WYMUSZANIE WARIANTU SZUFLADY
+        if (plyta.subtype.includes('szuflada')) {
+          const wrap = document.createElement('div'); wrap.style.padding = '8px'; wrap.style.borderTop = '1px solid #e2e8f0'; wrap.style.marginTop = '4px';
+          const lbl = document.createElement('div'); lbl.innerText = 'Wymuś wariant szuflady:'; lbl.style.fontSize = '12px'; lbl.style.fontWeight = 'bold'; lbl.style.marginBottom = '6px';
+          
+          const sel = document.createElement('select'); sel.style.width = '100%'; sel.style.padding = '4px'; sel.style.borderRadius = '4px'; sel.style.border = '1px solid #cbd5e1';
+          const opts = ['auto', 'bardzoniska', 'niska', 'srednia', 'wysoka', 'bardzowysoka'];
+          
+          opts.forEach(o => {
+            const opt = document.createElement('option'); opt.value = o; opt.innerText = o.toUpperCase();
+            if ((plyta.forceVariant || 'auto') === o) opt.selected = true;
+            sel.appendChild(opt);
+          });
+
+          sel.onchange = (evt) => {
+            evt.stopPropagation();
+            plyta.forceVariant = sel.value;
+            // Aktualizujemy szuflady z tej samej strefy by miały ten sam wymuszony wymiar jeśli są z jednego podziału (opcjonalnie)
+            menu.remove(); renderEditor2D(); update3D(); updateSidebar();
+          };
+
+          wrap.appendChild(lbl); wrap.appendChild(sel); menu.appendChild(wrap);
+        }
       }
 
-      // === OPCJE DLA PŁYT KORPUSU (PÓŁEK I PIONÓW) ===
       if (plyta.typ === 'poziom' || plyta.typ === 'pion') {
         const isPoziom = plyta.typ === 'poziom';
         const obstacles = [
           ...mod.elements.filter(el => el.typ !== 'front' && el.id !== plyta.id),
           { id: 'cab-left', x: 0, y: 0, w: th, h: height }, { id: 'cab-right', x: width - th, y: 0, w: th, h: height },
-          { id: 'cab-bottom', x: 0, y: 0, w: width, h: th }, { id: 'cab-top', x: 0, y: height - th, w: width, h: th }
+          { id: 'cab-bottom', x: 0, y: 0, w: width, h: th }, 
+          // Ograniczenie z góry musi brać pod uwagę trawers
+          { id: 'cab-top', x: 0, y: (hasTraverses && isVerticalTraverse) ? height - traverseWidth : height - th, w: width, h: (hasTraverses && isVerticalTraverse) ? traverseWidth : th }
         ];
 
         let boundMin = 0; let boundMax = isPoziom ? height : width;
@@ -366,13 +436,11 @@ export function renderEditor2D() {
         menu.appendChild(btnStruct);
       }
 
-      // === WSPÓLNE (USUWANIE) ===
       menu.appendChild(createHeader('Akcje'));
       const btnDelete = createMenuOption(isFront ? 'Usuń fronty z tej wnęki' : 'Usuń element', '🗑️', '#dc2626');
       btnDelete.onmouseenter = () => btnDelete.style.backgroundColor = '#fee2e2'; 
       btnDelete.onclick = (evt) => { 
         evt.stopPropagation(); 
-        // Jeśli usuwamy fronty, usuną się od razu wszystkie wygenerowane z danego podziału (np. obie szuflady naraz)
         if (isFront && plyta.baseZone) {
             mod.elements = mod.elements.filter(el => !(el.typ === 'front' && el.baseZone.boundTop === plyta.baseZone.boundTop && el.baseZone.boundBottom === plyta.baseZone.boundBottom));
         } else {
@@ -389,7 +457,7 @@ export function renderEditor2D() {
   });
 
   if (isDimensionsVisible) {
-    let yLines = [0, th, height - th, height];
+    let yLines = [0, th, height - (hasTraverses && isVerticalTraverse ? traverseWidth : th), height];
     let xLines = [0, th, width - th, width];
     mod.elements.forEach(el => { if (el.typ === 'poziom') { yLines.push(el.y); yLines.push(el.y + el.h); } if (el.typ === 'pion') { xLines.push(el.x); xLines.push(el.x + el.w); } });
     yLines = [...new Set(yLines)].sort((a, b) => a - b); xLines = [...new Set(xLines)].sort((a, b) => a - b);
@@ -434,10 +502,16 @@ export function renderEditor2D() {
     const mouseX = (e.clientX - rect.left) / scale; 
     const mouseY = (rect.bottom - e.clientY) / scale;
     
+    // Obsługa ograniczeń na podstawie typu konstrukcji korpusu
+    const topZoneY = hasTraverses && isVerticalTraverse ? height - traverseWidth : height - th;
+    const topZoneH = hasTraverses && isVerticalTraverse ? traverseWidth : th;
+
     const localObstacles = [
       ...mod.elements.filter(el => el.typ !== 'front'),
-      { id: 'cab-left', x: 0, y: 0, w: th, h: height }, { id: 'cab-right', x: width - th, y: 0, w: th, h: height },
-      { id: 'cab-bottom', x: 0, y: 0, w: width, h: th }, { id: 'cab-top', x: 0, y: height - th, w: width, h: th }
+      { id: 'cab-left', x: 0, y: 0, w: th, h: height }, 
+      { id: 'cab-right', x: width - th, y: 0, w: th, h: height },
+      { id: 'cab-bottom', x: 0, y: 0, w: width, h: th }, 
+      { id: 'cab-top', x: 0, y: topZoneY, w: width, h: topZoneH }
     ];
 
     let zoneMinX = 0, zoneMaxX = width, zoneMinY = 0, zoneMaxY = height;
@@ -470,7 +544,8 @@ export function renderEditor2D() {
 
     const frontObstacles = [
       ...mod.elements.filter(el => el.typ === 'front'),
-      { id: 'cab-bottom', x: 0, y: 0, w: width, h: th }, { id: 'cab-top', x: 0, y: height - th, w: width, h: th }
+      { id: 'cab-bottom', x: 0, y: 0, w: width, h: th }, 
+      { id: 'cab-top', x: 0, y: topZoneY, w: width, h: topZoneH }
     ];
 
     frontObstacles.forEach(obs => {
@@ -549,7 +624,8 @@ export function renderEditor2D() {
                 frontIndex: i, 
                 gap: gapValInput,
                 intGapX: gX,
-                intGapY: gY
+                intGapY: gY,
+                forceVariant: 'auto' // Domyślnie automatyczny dobór po wygenerowaniu
             }); 
         }
         menu.remove(); renderEditor2D(); update3D(); updateSidebar();

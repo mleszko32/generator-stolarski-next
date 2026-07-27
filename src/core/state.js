@@ -6,6 +6,12 @@ export const state = {
       boardThickness: 18,
       backThickness: 3
     },
+    // NOWOŚĆ: Ustawienia konstrukcyjne korpusu
+    construction: {
+      joinType: "boki_przelotowe", // 'boki_przelotowe' (wieńce wpuszczane) lub 'wience_przelotowe' (boki wpuszczane)
+      topType: "pelny",            // 'pelny' (wieniec), 'trawersy_poziom' (płaskie), 'trawersy_pion' (wertykalne)
+      traverseWidth: 100           // Szerokość trawersu w mm
+    },
     backPanel: {
       type: "nakladane",
       offset: 20,
@@ -25,7 +31,8 @@ export const state = {
         type: "base_cabinet",
         dimensions: { width: 600, height: 720, depth: 513 },
         position: { x: 0, y: 0, z: 0 },
-        // ZAMIAST DRZEWA INTERIOR - PŁASKA LISTA WSTAWIONYCH ELEMENTÓW
+        // Przykład, jak element frontu może wymusić szufladę. 
+        // Właściwość 'forceVariant' może przyjmować: 'auto', 'niska', 'srednia', 'wysoka'
         elements: [] 
       }
     ]

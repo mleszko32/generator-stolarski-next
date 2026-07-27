@@ -19,9 +19,8 @@ export function calculateNominalLength(internalDepth) {
   return selectedNL > 0 ? selectedNL : 270; 
 }
 
-// Funkcja dobierająca wariant szuflady na podstawie światła szafki (dostępnej przestrzeni)
-export function getDrawerVariant(availableSpace, systemId) {
-  // Słownik z danymi: height = wysokość płyty tyłu, minSpace = minimalna przestrzeń montażowa w korpusie
+// Funkcja dobierająca wariant szuflady na podstawie światła szafki LUB wymuszenia
+export function getDrawerVariant(availableSpace, systemId, forceVariant = 'auto') {
   const CATALOG_DATA = {
     'merivobox': {
       bardzoniska:  { type: 'N', height: 60.5,  minSpace: 85.5 },
@@ -33,7 +32,7 @@ export function getDrawerVariant(availableSpace, systemId) {
       bardzoniska:  { type: 'N', height: 69,    minSpace: 82.5 },
       niska:        { type: 'M', height: 84,    minSpace: 98.5 },
       srednia:      { type: 'K', height: 116,   minSpace: 130.5 },
-      wysoka:       { type: 'C', height: 167,   minSpace: 192 }, // Dodany brakujący przecinek
+      wysoka:       { type: 'C', height: 167,   minSpace: 192 }, 
       bardzowysoka: { type: 'D', height: 199,   minSpace: 224 }
     },
     'tandembox': {
@@ -64,8 +63,17 @@ export function getDrawerVariant(availableSpace, systemId) {
   const safeSystemId = systemId ? systemId.toLowerCase() : 'merivobox';
   const systemData = CATALOG_DATA[safeSystemId] || CATALOG_DATA['merivobox'];
 
-  // Zaktualizowana logika sprawdzania wariantów - od najwyższego do najniższego.
-  // Używamy "systemData.nazwaWariantu &&", aby sprawdzić czy dany system w ogóle ma ten wariant (np. GTV nie ma "bardzowysoka").
+  // 1. Jeśli użytkownik ręcznie wymusił konkretny wariant (np. z poziomu UI)
+  if (forceVariant && forceVariant !== 'auto' && systemData[forceVariant]) {
+    // Sprawdzamy dla pewności, czy mimo wszystko wymuszona szuflada się zmieści (zapobiega to błędom kolizji)
+    if (availableSpace >= systemData[forceVariant].minSpace) {
+      return { type: systemData[forceVariant].type, backHeight: systemData[forceVariant].height };
+    } else {
+      console.warn(`Wymuszono szufladę ${forceVariant}, ale jest na nią za mało miejsca. Wracam do trybu auto.`);
+    }
+  }
+
+  // 2. Tryb automatyczny - sprawdza od największej do najmniejszej
   if (systemData.bardzowysoka && availableSpace >= systemData.bardzowysoka.minSpace) {
     return { type: systemData.bardzowysoka.type, backHeight: systemData.bardzowysoka.height };
   } 
@@ -82,14 +90,12 @@ export function getDrawerVariant(availableSpace, systemId) {
     return { type: systemData.bardzoniska.type, backHeight: systemData.bardzoniska.height };
   } 
   else {
-    // Fallback bezpieczeństwa: jeśli światło jest mniejsze niż minimum najniższej szuflady, 
-    // dobieramy najniższą dostępną z danego systemu, by cokolwiek wygenerować (zazwyczaj niska lub bardzoniska).
     const lowestAvailable = systemData.bardzoniska || systemData.niska;
     return { type: lowestAvailable.type, backHeight: lowestAvailable.height };
   }
 }
 
-export function getDrawerComponents(systemId, internalWidth, internalDepth, availableSpace) {
+export function getDrawerComponents(systemId, internalWidth, internalDepth, availableSpace, forceVariant = 'auto') {
   const system = drawerSystems[systemId];
   
   if (!system) {
@@ -98,7 +104,9 @@ export function getDrawerComponents(systemId, internalWidth, internalDepth, avai
   }
 
   const nl = calculateNominalLength(internalDepth);
-  const variant = getDrawerVariant(availableSpace, systemId);
+  
+  // Przekazujemy wymuszenie do funkcji wariantów
+  const variant = getDrawerVariant(availableSpace, systemId, forceVariant);
 
   const bottomWidth = internalWidth - system.bottomWidthDeduct;
   const bottomLength = nl - system.bottomLengthDeduct;
@@ -115,7 +123,6 @@ export function getDrawerComponents(systemId, internalWidth, internalDepth, avai
     }
   };
 }
-
 export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick, index, isBottom) {
   const config = state.project;
   const bottomGap = Number(config.front.clearance.bottom ?? 0);

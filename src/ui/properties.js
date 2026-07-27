@@ -7,9 +7,38 @@ import { renderEditor2D } from "../render/editor2d.js";
 export function initPropertiesPanel() {
   const rightSidebar = document.querySelector(".sidebar-right");
   const activeModule = state.project.modules[0];
+  const cons = state.project.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
 
   rightSidebar.innerHTML = `
     <h2>Parametry</h2>
+    
+    <h3>Konstrukcja Korpusu</h3>
+    <div class="property-group">
+      <label>Sposób łączenia:</label>
+      <select id="input-join-type">
+        <option value="boki_przelotowe" ${cons.joinType === 'boki_przelotowe' ? 'selected' : ''}>Boki do ziemi (wieńce wpuszczane)</option>
+        <option value="wience_przelotowe" ${cons.joinType === 'wience_przelotowe' ? 'selected' : ''}>Wieńce pełne (boki wpuszczane)</option>
+      </select>
+    </div>
+    
+    <div class="property-group">
+      <label>Zamknięcie góry:</label>
+      <select id="input-top-type">
+        <option value="pelny" ${cons.topType === 'pelny' ? 'selected' : ''}>Pełny wieniec</option>
+        <option value="trawersy_poziom" ${cons.topType === 'trawersy_poziom' ? 'selected' : ''}>Trawersy poziome</option>
+        <option value="trawersy_pion" ${cons.topType === 'trawersy_pion' ? 'selected' : ''}>Trawersy pionowe</option>
+      </select>
+    </div>
+
+    <div id="traverse-options" style="display: ${cons.topType !== 'pelny' ? 'block' : 'none'}; background: #f8fafc; padding: 10px; border: 1px dashed #cbd5e1; border-radius: 4px; margin-bottom: 15px;">
+      <div class="property-group" style="margin-bottom: 0;">
+        <label style="font-size: 11px;">Szerokość trawersu (mm):</label>
+        <input type="number" id="input-traverse-width" value="${cons.traverseWidth}" step="1" />
+      </div>
+    </div>
+
+    <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
+
     <div class="property-group">
       <label>Grubość płyty (mm):</label>
       <input type="number" id="input-board-thick" value="${state.project.materials.boardThickness}" step="0.1" />
@@ -35,7 +64,6 @@ export function initPropertiesPanel() {
       </select>
     </div>
     
-    <!-- SEKCA KONTROLI NUTU (pokazywana warunkowo) -->
     <div id="nut-options" style="display: ${state.project.backPanel.type === 'nut' ? 'block' : 'none'}; background: #f8fafc; padding: 10px; border: 1px dashed #cbd5e1; border-radius: 4px; margin-bottom: 15px;">
       <div class="property-group" style="margin-bottom: 8px;">
         <label style="font-size: 11px; font-weight: bold;">Konstrukcja nutu:</label>
@@ -76,7 +104,6 @@ export function initPropertiesPanel() {
           <option value="merivobox" ${state.project.front.drawerSystem === 'merivobox' ? 'selected' : ''}>Blum Merivobox</option>
           <option value="legrabox" ${state.project.front.drawerSystem === 'legrabox' ? 'selected' : ''}>Blum Legrabox</option>
           <option value="tandembox" ${state.project.front.drawerSystem === 'tandembox' ? 'selected' : ''}>Blum TANDEMBOX antaro</option>
-          <!-- DODANE OPCJE GTV -->
           <option value="gtv_axis_16" ${state.project.front.drawerSystem === 'gtv_axis_16' ? 'selected' : ''}>GTV Axis Pro (płyta 16mm)</option>
           <option value="gtv_axis_18" ${state.project.front.drawerSystem === 'gtv_axis_18' ? 'selected' : ''}>GTV Axis Pro (płyta 18mm)</option>
         </select>
@@ -106,6 +133,7 @@ export function initPropertiesPanel() {
 
 function setupEventListeners() {
   const numberInputs = [
+    'traverse-width',
     'board-thick', 'width', 'height', 'depth', 
     'front-gap', 'front-sides', 'front-top', 'front-bottom',
     'back-offset', 'back-groove'
@@ -117,6 +145,26 @@ function setupEventListeners() {
     updateSidebar(); 
   };
   
+  // Konstrukcja
+  const joinTypeInput = document.getElementById('input-join-type');
+  if (joinTypeInput) {
+    joinTypeInput.addEventListener('change', (e) => {
+      state.project.construction.joinType = e.target.value;
+      updateAll();
+    });
+  }
+
+  const topTypeInput = document.getElementById('input-top-type');
+  const traverseOptions = document.getElementById('traverse-options');
+  if (topTypeInput && traverseOptions) {
+    topTypeInput.addEventListener('change', (e) => {
+      state.project.construction.topType = e.target.value;
+      traverseOptions.style.display = e.target.value !== 'pelny' ? 'block' : 'none';
+      updateAll();
+    });
+  }
+
+  // Fronty
   const typeInput = document.getElementById('input-front-type');
   if (typeInput) {
     typeInput.addEventListener('change', (e) => {
@@ -125,6 +173,7 @@ function setupEventListeners() {
     });
   }
 
+  // Plecy
   const backType = document.getElementById('input-back-type');
   const nutOptions = document.getElementById('nut-options');
   if (backType && nutOptions) {
@@ -143,6 +192,7 @@ function setupEventListeners() {
     });
   }
 
+  // Number Inputs
   numberInputs.forEach(id => {
     const el = document.getElementById(`input-${id}`);
     if(el) {
@@ -150,6 +200,8 @@ function setupEventListeners() {
         const val = Number(e.target.value);
         const mod = state.project.modules[0]; 
 
+        if (id === 'traverse-width') state.project.construction.traverseWidth = val;
+        
         if (id === 'board-thick') state.project.materials.boardThickness = val;
         if (id === 'width') mod.dimensions.width = val;
         if (id === 'height') mod.dimensions.height = val;

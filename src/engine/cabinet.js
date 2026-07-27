@@ -37,14 +37,48 @@ function getCorpusParts(mod, config) {
   const board = config.materials.boardThickness;
   const backThick = config.materials.backThickness;
   const { type, offset } = config.backPanel;
-
-  const sideDepth = type === 'nut' ? depth : depth - backThick;
-  parts.push({ name: "Bok (L/P)", length: height, width: sideDepth, qty: 2 });
-
-  const topBottomDepth = type === 'nut' ? depth - offset - backThick : depth - backThick;
-  const structuralShelvesCount = mod.elements ? mod.elements.filter(el => el.typ === 'poziom' && el.isStructural).length : 0;
   
-  parts.push({ name: "Wieniec", length: width - (board * 2), width: topBottomDepth, qty: 2 + structuralShelvesCount });
+  // Domyślne wartości zapobiegające błędom, gdyby nie było ich w stanie
+  const construction = config.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
+  const isTopBottomFullWidth = construction.joinType === 'wience_przelotowe';
+
+  // --- BOKI ---
+  const sideDepth = type === 'nut' ? depth : depth - backThick;
+  // Jeśli wieńce idą przez całą szafkę, boki są o nie skrócone
+  const sideHeight = isTopBottomFullWidth ? height - (board * 2) : height;
+  parts.push({ name: "Bok (L/P)", length: parseFloat(sideHeight.toFixed(1)), width: sideDepth, qty: 2 });
+
+  // --- WIEŃCE I TRAWERSY ---
+  const tbDepth = type === 'nut' ? depth - offset - backThick : depth - backThick;
+  // Jeśli boki są przelotowe (do ziemi), wieniec jest skrócony
+  const tbWidth = isTopBottomFullWidth ? width : width - (board * 2);
+
+  // Wieniec dolny zawsze istnieje
+  parts.push({ name: "Wieniec dolny", length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1 });
+
+  // Konstrukcja góry
+  if (construction.topType === 'pelny') {
+    parts.push({ name: "Wieniec górny", length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1 });
+  } else if (construction.topType.includes('trawersy')) {
+    const isVertical = construction.topType === 'trawersy_pion';
+    const trWidth = construction.traverseWidth || 100;
+    
+    // Trawersy poziome mają wymiar (Długość X Szerokość w osi Z) tak jak wieńce.
+    // Trawersy pionowe są ustawione węższą krawędzią do frontu/pleców (Wymiar w osi Y).
+    parts.push({ 
+        name: `Trawers górny (${isVertical ? 'pionowy' : 'poziomy'})`, 
+        length: parseFloat(tbWidth.toFixed(1)), 
+        width: trWidth, 
+        qty: 2 
+    });
+  }
+
+  // Półki konstrukcyjne (zawsze są między bokami niezależnie od konstrukcji korpusu)
+  const structuralShelvesCount = mod.elements ? mod.elements.filter(el => el.typ === 'poziom' && el.isStructural).length : 0;
+  if (structuralShelvesCount > 0) {
+    const shelfWidth = width - (board * 2);
+    parts.push({ name: "Półka konstrukcyjna", length: parseFloat(shelfWidth.toFixed(1)), width: tbDepth, qty: structuralShelvesCount });
+  }
 
   return parts;
 }
@@ -136,7 +170,6 @@ function getFrontsAndDrawers(mod, config) {
       partName = `Drzwi ${side}`;
     }
 
-    // Dodanie formatki frontu
     parts.push({
       name: partName,
       length: parseFloat(front.h.toFixed(1)),
@@ -146,34 +179,36 @@ function getFrontsAndDrawers(mod, config) {
 
     if (front.subtype === 'szuflada') {
       const isBottomInZone = front.frontIndex === 0;
-      // Sprawdzamy czy to najwyższa szuflada w szafce
       const isTopInZone = index === fronts.length - 1;
       
-      // NAWIERTY
       if (typeof calculateDrawerHoles === 'function') {
         const drawerHoles = calculateDrawerHoles(config.front.drawerSystem, front.y, front.h, board, drawerCount - 1, isBottomInZone);
         if (drawerHoles) mountingData.push(drawerHoles);
       }
 
-      // KOMPONENTY SZUFLADY
       if (typeof getDrawerComponents === 'function') {
-        
-        // --- TWOJA LOGIKA OBLICZANIA RZECZYWISTEGO ŚWIATŁA ---
         let availableSpace = front.h;
         
-        // Szuflada dolna - odejmujemy nachodzenie na wieniec dolny
         if (isBottomInZone) {
           const bottomOverlap = board - (config.front.clearance.bottom || 0);
           availableSpace -= bottomOverlap;
         }
         
-        // Szuflada górna - odejmujemy nachodzenie na wieniec górny
         if (isTopInZone) {
           const topOverlap = board - (config.front.clearance.top || 0);
           availableSpace -= topOverlap;
         }
 
-        const drawerComps = getDrawerComponents(config.front.drawerSystem, width - (board * 2), topBottomDepth, availableSpace);
+        // TĄ ZMIENNĄ UŻYTKOWNIK BEDZIE MOGŁ NADAĆ Z POZIOMU UI KLIKAJĄC WE FRONT NA WIDOKU 2D
+        const userForcedVariant = front.forceVariant || 'auto';
+
+        const drawerComps = getDrawerComponents(
+          config.front.drawerSystem, 
+          width - (board * 2), 
+          topBottomDepth, 
+          availableSpace,
+          userForcedVariant // <--- PRZEKAZANIE WYMUSZENIA!
+        );
         
         if (drawerComps) {
           parts.push({
