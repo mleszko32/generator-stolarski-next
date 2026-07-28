@@ -23,21 +23,103 @@ export function calculateParts() {
   return { parts, mountingData };
 }
 
+// NOWA FUNKCJA: Zliczanie i grupowanie formatek dla CAŁEJ KUCHNI
+export function calculateAllProjectParts() {
+  const config = state.project;
+  let allParts = [];
+
+  // 1. Zbieramy formatki ze wszystkich szafek
+  config.modules.forEach(mod => {
+    const modParts = [];
+    modParts.push(...getCorpusParts(mod, config));
+    modParts.push(...getBackPanelParts(mod, config));
+    modParts.push(...getInteriorParts(mod, config));
+
+    const frontsAndDrawers = getFrontsAndDrawers(mod, config);
+    modParts.push(...frontsAndDrawers.parts);
+
+    // Dodajemy do każdej formatki informację, z jakiej szafki pochodzi
+    allParts.push(...modParts.map(p => ({ ...p, moduleName: mod.name })));
+  });
+
+  // 2. Kalkulacja połączonych cokołów
+  const baseCabinets = config.modules.filter(m => m.legs && m.legs.active && m.legs.plinth);
+  baseCabinets.sort((a, b) => (parseFloat(a.position.x) || 0) - (parseFloat(b.position.x) || 0));
+  
+  let plinthRuns = [];
+  baseCabinets.forEach(mod => {
+      const x = parseFloat(mod.position.x) || 0;
+      const y = parseFloat(mod.position.y) || 0;
+      const z = parseFloat(mod.position.z) || 0;
+      const w = parseFloat(mod.dimensions.width);
+      const d = parseFloat(mod.dimensions.depth);
+      const h = parseFloat(mod.legs.height);
+      const offset = parseFloat(mod.legs.plinthOffset !== undefined ? mod.legs.plinthOffset : 40);
+      const frontZ = z + d; 
+
+      let joined = false;
+      if (plinthRuns.length > 0) {
+          let last = plinthRuns[plinthRuns.length - 1];
+          if (Math.abs((last.x + last.w) - x) <= 1 && last.y === y && last.h === h && last.offset === offset && last.frontZ === frontZ) {
+              last.w += w + (x - (last.x + last.w)); 
+              joined = true;
+          }
+      }
+      if (!joined) {
+          plinthRuns.push({ x, y, z, w, d, h, offset, frontZ });
+      }
+  });
+
+  plinthRuns.forEach((run, index) => {
+    allParts.push({
+      name: `Cokół dolny (Odcinek ${index + 1})`,
+      length: parseFloat(run.w.toFixed(1)), // Szerokość szafek to dla cokołu długość
+      width: parseFloat(run.h.toFixed(1)),  // Wysokość nóżek to szerokość formatki cokołu
+      qty: 1,
+      moduleName: "Elementy zbiorcze"
+    });
+  });
+
+  // 3. Agregacja (grupowanie takich samych formatek)
+  const aggregated = {};
+  allParts.forEach(part => {
+     // Tworzymy unikalny klucz dla identycznych formatek
+     const key = `${part.name}_${part.length}_${part.width}`;
+     
+     if (aggregated[key]) {
+         aggregated[key].qty += part.qty;
+         if (!aggregated[key].modules.includes(part.moduleName)) {
+             aggregated[key].modules.push(part.moduleName);
+         }
+     } else {
+         aggregated[key] = {
+             name: part.name,
+             length: part.length,
+             width: part.width,
+             qty: part.qty,
+             modules: [part.moduleName]
+         };
+     }
+  });
+
+  return Object.values(aggregated);
+}
+
 function getCorpusParts(mod, config) {
   const parts = [];
   const { width, height, depth } = mod.dimensions;
   const board = config.materials.boardThickness;
   const backThick = config.materials.backThickness;
-  const { type, offset } = mod.backPanel; // ODCZYT Z MODUŁU
+  const backP = mod.backPanel || { type: 'nakladane', offset: 16 }; 
   
   const construction = config.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
   const isTopBottomFullWidth = construction.joinType === 'wience_przelotowe';
 
-  const sideDepth = type === 'nut' ? depth : depth - backThick;
+  const sideDepth = backP.type === 'nut' ? depth : depth - backThick;
   const sideHeight = isTopBottomFullWidth ? height - (board * 2) : height;
   parts.push({ name: "Bok (L/P)", length: parseFloat(sideHeight.toFixed(1)), width: sideDepth, qty: 2 });
 
-  const tbDepth = type === 'nut' ? depth - offset - backThick : depth - backThick;
+  const tbDepth = backP.type === 'nut' ? depth - backP.offset - backThick : depth - backThick;
   const tbWidth = isTopBottomFullWidth ? width : width - (board * 2);
 
   parts.push({ name: "Wieniec dolny", length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1 });
@@ -47,13 +129,7 @@ function getCorpusParts(mod, config) {
   } else if (construction.topType.includes('trawersy')) {
     const isVertical = construction.topType === 'trawersy_pion';
     const trWidth = construction.traverseWidth || 100;
-    
-    parts.push({ 
-        name: `Trawers górny (${isVertical ? 'pionowy' : 'poziomy'})`, 
-        length: parseFloat(tbWidth.toFixed(1)), 
-        width: trWidth, 
-        qty: 2 
-    });
+    parts.push({ name: `Trawers górny (${isVertical ? 'pionowy' : 'poziomy'})`, length: parseFloat(tbWidth.toFixed(1)), width: trWidth, qty: 2 });
   }
 
   const structuralShelvesCount = mod.elements ? mod.elements.filter(el => el.typ === 'poziom' && el.isStructural).length : 0;
@@ -68,23 +144,19 @@ function getCorpusParts(mod, config) {
 function getBackPanelParts(mod, config) {
   const { width, height } = mod.dimensions;
   const board = config.materials.boardThickness;
-  const { type, grooveDepth, clearance, nutBuild } = mod.backPanel; // ODCZYT Z MODUŁU
+  const backP = mod.backPanel || { type: 'nakladane', grooveDepth: 6, clearance: 2, nutBuild: 'all' };
   
   let hdfWidth, hdfHeight;
-  const totalClearance = clearance !== undefined ? clearance * 2 : 4; 
-  const currentNutBuild = nutBuild || 'all';
+  const totalClearance = backP.clearance !== undefined ? backP.clearance * 2 : 4; 
+  const currentNutBuild = backP.nutBuild || 'all';
 
-  if (type === 'nut') {
+  if (backP.type === 'nut') {
     hdfWidth = (currentNutBuild === 'all' || currentNutBuild === 'sides') 
-      ? width - (board * 2) + (grooveDepth * 2) - totalClearance 
-      : width - 4;
-      
+      ? width - (board * 2) + (backP.grooveDepth * 2) - totalClearance : width - 4;
     hdfHeight = (currentNutBuild === 'all' || currentNutBuild === 'top_bottom') 
-      ? height - (board * 2) + (grooveDepth * 2) - totalClearance 
-      : height - 4;
+      ? height - (board * 2) + (backP.grooveDepth * 2) - totalClearance : height - 4;
   } else {
-    hdfWidth = width - 4; 
-    hdfHeight = height - 4;
+    hdfWidth = width - 4; hdfHeight = height - 4;
   }
 
   return [{ name: "Plecy (HDF)", length: parseFloat(hdfHeight.toFixed(1)), width: parseFloat(hdfWidth.toFixed(1)), qty: 1 }];
@@ -97,12 +169,12 @@ function getInteriorParts(mod, config) {
   const { depth } = mod.dimensions;
   const board = config.materials.boardThickness;
   const backThick = config.materials.backThickness;
-  const { type, offset } = mod.backPanel; // ODCZYT Z MODUŁU
+  const backP = mod.backPanel || { type: 'nakladane', offset: 16 };
   
   const frontType = config.front && config.front.type ? config.front.type : 'nakladane';
   const isInset = frontType === 'wpuszczane';
 
-  const topBottomDepth = type === 'nut' ? depth - offset - backThick : depth - backThick;
+  const topBottomDepth = backP.type === 'nut' ? depth - backP.offset - backThick : depth - backThick;
   const innerPartDepth = topBottomDepth - (isInset ? board : 0);
 
   let shelfCount = 0;
@@ -125,16 +197,14 @@ function getFrontsAndDrawers(mod, config) {
   const parts = [];
   const mountingData = [];
   const fronts = mod.elements ? mod.elements.filter(el => el.typ === 'front') : [];
-  
   const obstacles = mod.elements ? mod.elements.filter(el => el.typ === 'poziom' || el.subtype === 'szuflada-wewnetrzna') : [];
 
   if (fronts.length === 0) return { parts, mountingData };
-
   fronts.sort((a, b) => a.y - b.y);
 
   const { width, depth } = mod.dimensions;
   const board = config.materials.boardThickness;
-  const backP = mod.backPanel; // ODCZYT Z MODUŁU
+  const backP = mod.backPanel || { type: 'nakladane', offset: 16 };
   const topBottomDepth = backP.type === 'nut' ? depth - backP.offset - config.materials.backThickness : depth - config.materials.backThickness;
 
   let drawerCount = 0;
@@ -142,13 +212,9 @@ function getFrontsAndDrawers(mod, config) {
 
   fronts.forEach((front, index) => {
     let partName = "Front";
-    if (front.subtype === 'szuflada') {
-      drawerCount++;
-      partName = `Front szuflady ${drawerCount}`;
-    } else if (front.subtype === 'drzwi') {
-      doorCount++;
-      partName = `Drzwi ${doorCount}`;
-    } else if (front.subtype === 'drzwi-lp') {
+    if (front.subtype === 'szuflada') { drawerCount++; partName = `Front szuflady ${drawerCount}`; } 
+    else if (front.subtype === 'drzwi') { doorCount++; partName = `Drzwi ${doorCount}`; } 
+    else if (front.subtype === 'drzwi-lp') {
       const side = front.id.endsWith('-L') ? 'Lewe' : 'Prawe';
       partName = `Drzwi ${side}`;
     }
@@ -172,8 +238,8 @@ function getFrontsAndDrawers(mod, config) {
         const drawerComps = getDrawerComponents(config.front.drawerSystem, width - (board * 2), topBottomDepth, availableSpace, userForcedVariant);
         
         if (drawerComps) {
-          parts.push({ name: `Dno szuflady ${drawerCount} (NL: ${drawerComps.nominalLength})`, length: parseFloat(drawerComps.bottom.length.toFixed(1)), width: parseFloat(drawerComps.bottom.width.toFixed(1)), qty: 1 });
-          parts.push({ name: `Tył szuflady ${drawerCount} (Wariant ${drawerComps.back.variantType})`, length: parseFloat(drawerComps.back.width.toFixed(1)), width: parseFloat(drawerComps.back.height.toFixed(1)), qty: 1 });
+          parts.push({ name: `Dno szuflady (NL: ${drawerComps.nominalLength})`, length: parseFloat(drawerComps.bottom.length.toFixed(1)), width: parseFloat(drawerComps.bottom.width.toFixed(1)), qty: 1 });
+          parts.push({ name: `Tył szuflady (Wariant ${drawerComps.back.variantType})`, length: parseFloat(drawerComps.back.width.toFixed(1)), width: parseFloat(drawerComps.back.height.toFixed(1)), qty: 1 });
         }
       }
     } 

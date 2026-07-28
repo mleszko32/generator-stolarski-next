@@ -1,5 +1,5 @@
 // src/ui/sidebar.js
-import { calculateParts } from "../engine/cabinet.js";
+import { calculateParts, calculateAllProjectParts } from "../engine/cabinet.js";
 import { generateSidePanelSVG } from "../render/viewer2d.js"; 
 import { state, getActiveModule, addModule } from "../core/state.js";
 import { renderEditor2D } from "../render/editor2d.js";
@@ -8,7 +8,7 @@ import { initPropertiesPanel } from "./properties.js";
 
 export function updateSidebar() {
   const leftSidebar = document.querySelector(".sidebar-left");
-  const { parts, mountingData } = calculateParts();
+  const { parts, mountingData } = calculateParts(); 
   const activeMod = getActiveModule();
   
   let html = `
@@ -19,6 +19,19 @@ export function updateSidebar() {
   if (state.project.modules.length === 0) {
      html += `<div style="font-size: 11px; color: #64748b; margin-bottom: 10px; text-align: center;">Brak szafek. Dodaj pierwszą poniżej.</div>`;
   } else {
+    // --- NOWY PRZYCISK: POKAŻ CAŁOŚĆ ---
+    const isAllActive = state.activeModuleId === null;
+    const bgAll = isAllActive ? '#3b82f6' : '#f8fafc';
+    const colorAll = isAllActive ? '#ffffff' : '#1e293b';
+    const borderAll = isAllActive ? '#2563eb' : '#cbd5e1';
+    
+    html += `
+      <div id="btn-show-all" style="padding: 10px; margin-bottom: 15px; background-color: ${bgAll}; color: ${colorAll}; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; border: 1px solid ${borderAll}; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.2s;">
+        👁️ Pokaż całą zabudowę (3D)
+      </div>
+    `;
+
+    // Lista modułów
     state.project.modules.forEach(m => {
       const isActive = m.id === state.activeModuleId;
       const bg = isActive ? '#3b82f6' : '#f8fafc';
@@ -47,9 +60,23 @@ export function updateSidebar() {
     <hr style="margin: 15px 0; border: 0; border-top: 1px dashed #cbd5e1;">
   `;
 
+  if (state.project.modules.length > 0) {
+    html += `
+      <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+        <button id="btn-print-2d" ${!activeMod ? 'disabled style="opacity: 0.5;"' : ''} style="flex: 1; padding: 10px; background-color: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          📄 Rysunek
+        </button>
+        <button id="btn-export-csv" style="flex: 1; padding: 10px; background-color: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          📊 CSV (Produkcja)
+        </button>
+      </div>
+    `;
+    if (!activeMod) {
+      html += `<div style="font-size: 11px; color: #ef4444; margin-top: -10px; margin-bottom: 15px; text-align: center;">Wybierz szafkę, aby wygenerować rysunek 2D.</div>`;
+    }
+  }
+
   if (activeMod) {
-    html += `<button id="btn-print-2d" style="width: 100%; padding: 10px; margin-bottom: 15px; background-color: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📄 Rysunek techniczny</button>`;
-    
     html += `<details open style="margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">`;
     html += `<summary style="font-weight: bold; cursor: pointer; outline: none;">Lista formatek (Aktywna)</summary>`;
     html += `<ul class="parts-list" style="margin-top: 10px; padding-left: 20px;">`;
@@ -77,6 +104,18 @@ export function updateSidebar() {
 
   leftSidebar.innerHTML = html; 
 
+  // ZDARZENIA KLIKNIĘĆ
+  const btnShowAll = document.getElementById('btn-show-all');
+  if (btnShowAll) {
+    btnShowAll.addEventListener('click', () => {
+      state.activeModuleId = null; // Odznaczamy wszystko!
+      initPropertiesPanel(); 
+      renderEditor2D(); 
+      update3D(); 
+      updateSidebar();
+    });
+  }
+
   document.querySelectorAll('.module-item').forEach(el => {
     el.addEventListener('click', (e) => {
       state.activeModuleId = e.currentTarget.getAttribute('data-id');
@@ -100,6 +139,23 @@ export function updateSidebar() {
       const htmlContent = `<!DOCTYPE html><html lang="pl"><head><meta charset="UTF-8"><title>Wydruk na produkcję</title><style>body { margin: 0; padding: 0; background-color: #f1f5f9; display: flex; flex-direction: column; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; } .header { background-color: #ffffff; padding: 16px 24px; border-bottom: 1px solid #cbd5e1; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); z-index: 10; } .header h1 { margin: 0 0 6px 0; font-size: 20px; color: #0f172a; } .header p { margin: 0; font-size: 13px; color: #64748b; } .svg-container { flex-grow: 1; width: 100%; height: 100%; overflow: hidden; display: flex; justify-content: center; align-items: center; background-color: #f8fafc; } @media print { body { height: auto; overflow: visible; display: block; background: white; } .header { display: none; } .svg-container { display: block; overflow: visible; background: white; } }</style></head><body><div class="header"><h1>Rysunek techniczny (Nawierty)</h1><p>Wymiary od krawędzi (X, Y). Użyj kółka myszy, aby przybliżać/oddalać. Przeciągaj LKM.</p></div><div class="svg-container">${svgContent}</div></body></html>`;
       const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
       window.open(URL.createObjectURL(blob), '_blank');
+    });
+  }
+
+  const exportBtn = document.getElementById('btn-export-csv');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', () => {
+      const allParts = calculateAllProjectParts();
+      if(allParts.length === 0) return;
+      let csvContent = "\uFEFFNazwa;Dlugosc(mm);Szerokosc(mm);Ilosc;Zrodlo\n";
+      allParts.forEach(part => { csvContent += `"${part.name}";${part.length};${part.width};${part.qty};"${part.modules.join(" + ")}"\n`; });
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `Formatki_${state.project.name.replace(/\s+/g, '_')}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     });
   }
 }

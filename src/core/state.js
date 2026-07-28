@@ -1,13 +1,12 @@
 // src/core/state.js
 export const state = {
-  activeModuleId: null, // Na start nie ma aktywnej szafki
+  activeModuleId: null, 
   project: {
     name: "Zabudowa Wielomodułowa",
     materials: { boardThickness: 18, backThickness: 3 },
     construction: { joinType: "boki_przelotowe", topType: "pelny", traverseWidth: 100 },
-    // Globalne plecy usunięte - teraz to parametr indywidualny szafki!
     front: { active: true, distribution: "1:1:1", drawerSystem: "merivobox", gap: 3, clearance: { sides: 1.5, top: 5, bottom: 0 } },
-    modules: [] // Pusta tablica na start
+    modules: [] 
   }
 };
 
@@ -24,12 +23,16 @@ export function addModule(type = "base_cabinet") {
   let height = 720;
   let depth = 513;
   let posY = 0;
+  
+  // Domyślne ustawienia nóżek i cokołu
+  let legs = { active: true, height: 100, plinth: true, plinthOffset: 40 };
 
   if (isUpper) {
     name = "Szafka wisząca";
     height = 720;
     depth = 320;
     posY = 1450;
+    legs = { active: false, height: 100, plinth: false, plinthOffset: 40 }; // Wiszące nie mają nóżek
   } else if (isTall) {
     name = "Słupek";
     height = 2070;
@@ -37,7 +40,6 @@ export function addModule(type = "base_cabinet") {
     posY = 0;
   }
 
-  // Szuka prawej krawędzi całej zabudowy, aby nowa szafka nie najechała na inne
   let nextX = 0;
   if (state.project.modules.length > 0) {
     nextX = Math.max(...state.project.modules.map(m => m.position.x + parseFloat(m.dimensions.width)));
@@ -49,7 +51,8 @@ export function addModule(type = "base_cabinet") {
     type: type,
     dimensions: { width: 600, height: height, depth: depth }, 
     position: { x: nextX, y: posY, z: 0 }, 
-    backPanel: { type: "nakladane", offset: 20, grooveDepth: 7, nutBuild: "all", clearance: 2 }, // PLECY PER MODUŁ
+    backPanel: { type: "nakladane", offset: 20, grooveDepth: 7, nutBuild: "all", clearance: 2 },
+    legs: legs, // NOWY PARAMETR
     elements: []
   };
   
