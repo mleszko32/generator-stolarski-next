@@ -6,6 +6,12 @@ export const state = {
     materials: { boardThickness: 18, backThickness: 3 },
     construction: { joinType: "boki_przelotowe", topType: "pelny", traverseWidth: 100 },
     front: { active: true, distribution: "1:1:1", drawerSystem: "merivobox", gap: 3, clearance: { sides: 1.5, top: 5, bottom: 0 } },
+    // --- NOWE: PARAMETRY POMIESZCZENIA (ŚCIANY) ---
+    room: {
+      width: 3500,  // Szerokość ściany od lewej do prawej (mm)
+      height: 2600, // Wysokość pomieszczenia (mm)
+      depth: 600    // Głębokość podłogi (mm)
+    },
     modules: [] 
   }
 };
@@ -24,7 +30,6 @@ export function addModule(type = "base_cabinet") {
   let depth = 513;
   let posY = 0;
   
-  // Domyślne ustawienia nóżek i cokołu
   let legs = { active: true, height: 100, plinth: true, plinthOffset: 40 };
 
   if (isUpper) {
@@ -32,7 +37,7 @@ export function addModule(type = "base_cabinet") {
     height = 720;
     depth = 320;
     posY = 1450;
-    legs = { active: false, height: 100, plinth: false, plinthOffset: 40 }; // Wiszące nie mają nóżek
+    legs = { active: false, height: 100, plinth: false, plinthOffset: 40 };
   } else if (isTall) {
     name = "Słupek";
     height = 2070;
@@ -52,7 +57,7 @@ export function addModule(type = "base_cabinet") {
     dimensions: { width: 600, height: height, depth: depth }, 
     position: { x: nextX, y: posY, z: 0 }, 
     backPanel: { type: "nakladane", offset: 20, grooveDepth: 7, nutBuild: "all", clearance: 2 },
-    legs: legs, // NOWY PARAMETR
+    legs: legs,
     elements: []
   };
   

@@ -116,3 +116,7 @@ if (btnLoad) {
     document.body.appendChild(modalOverlay);
   });
 }
+
+window.addEventListener('cabinetMoved', () => {
+  initPropertiesPanel(); // Odświeża suwaki i inputy z prawej strony
+});

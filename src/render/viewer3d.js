@@ -3,10 +3,22 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { state } from '../core/state.js';
 import { getDrawerComponents } from '../core/drawerMath.js';
+import { initPropertiesPanel } from '../ui/properties.js';
+import { updateSidebar } from '../ui/sidebar.js';
+import { renderEditor2D } from './editor2d.js';
 
 let scene, camera, renderer, controls;
 let cabinetGroup;
+let roomGroup; // Grupa przechowująca ściany i podłogę
 let isInitialized = false;
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let isDragging = false;
+let draggedModuleId = null;
+let dragOffset = 0;
+const dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0); 
+let dragIntersection = new THREE.Vector3();
 
 export function init3DViewer() {
   const checkExist = setInterval(() => {
@@ -20,7 +32,7 @@ export function init3DViewer() {
       scene.background = new THREE.Color(0xf1f5f9); 
 
       camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 10000);
-      camera.position.set(1200, 1000, 1800);
+      camera.position.set(1500, 1200, 2200);
 
       renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(container.clientWidth, container.clientHeight);
@@ -33,10 +45,9 @@ export function init3DViewer() {
       dirLight.position.set(1000, 2000, 1000);
       scene.add(dirLight);
 
-      const gridHelper = new THREE.GridHelper(4000, 80, 0x94a3b8, 0xcbd5e1);
-      gridHelper.material.opacity = 0.5;
-      gridHelper.material.transparent = true;
-      scene.add(gridHelper);
+      // Grupy sceny
+      roomGroup = new THREE.Group();
+      scene.add(roomGroup);
 
       cabinetGroup = new THREE.Group();
       scene.add(cabinetGroup);
@@ -44,7 +55,112 @@ export function init3DViewer() {
       controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
       controls.dampingFactor = 0.05;
-      controls.target.set(600, 400, 0);
+      controls.target.set(1000, 500, 0);
+
+      // --- OBSŁUGA MYSZY (DRAG & DROP + ŚCIANY) ---
+      const canvas = renderer.domElement;
+
+      canvas.addEventListener('pointerdown', (event) => {
+          if (event.button !== 0) return; 
+
+          const rect = canvas.getBoundingClientRect();
+          mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+          mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+          raycaster.setFromCamera(mouse, camera);
+          const intersects = raycaster.intersectObjects(cabinetGroup.children, true);
+
+          if (intersects.length > 0) {
+              let object = intersects[0].object;
+              while (object && !object.userData.moduleId) {
+                  object = object.parent;
+              }
+              
+              if (object && object.userData.moduleId) {
+                  draggedModuleId = object.userData.moduleId;
+                  isDragging = true;
+                  controls.enabled = false; 
+
+                  if (state.activeModuleId !== draggedModuleId) {
+                      state.activeModuleId = draggedModuleId;
+                      initPropertiesPanel();
+                      updateSidebar();
+                      renderEditor2D();
+                      update3D();
+                  }
+
+                  raycaster.ray.intersectPlane(dragPlane, dragIntersection);
+                  const mod = state.project.modules.find(m => m.id === draggedModuleId);
+                  if (mod) dragOffset = dragIntersection.x - (mod.position.x || 0);
+              }
+          }
+      });
+
+      canvas.addEventListener('pointermove', (event) => {
+          if (!isDragging || !draggedModuleId) return;
+
+          const rect = canvas.getBoundingClientRect();
+          mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+          mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+          raycaster.setFromCamera(mouse, camera);
+          if (raycaster.ray.intersectPlane(dragPlane, dragIntersection)) {
+              let newX = dragIntersection.x - dragOffset;
+              const mod = state.project.modules.find(m => m.id === draggedModuleId);
+              if (!mod) return;
+
+              const roomW = state.project.room?.width || 3500;
+              const draggedW = parseFloat(mod.dimensions.width) || 600;
+
+              // --- LOGIKA MAGNESU I ŚCIAN ---
+              let snapX = newX;
+              const snapDistance = 40; // mm
+
+              // 1. Przyciąganie do ścian granicznych
+              if (Math.abs(snapX - 0) < snapDistance) {
+                  snapX = 0; // Lewa ściana
+              } else if (Math.abs((snapX + draggedW) - roomW) < snapDistance) {
+                  snapX = roomW - draggedW; // Prawa ściana
+              }
+
+              // 2. Przyciąganie do innych szafek
+              state.project.modules.forEach(otherMod => {
+                  if (otherMod.id !== draggedModuleId) {
+                      const otherX = parseFloat(otherMod.position.x) || 0;
+                      const otherW = parseFloat(otherMod.dimensions.width);
+                      
+                      if (Math.abs(snapX - (otherX + otherW)) < snapDistance) {
+                          snapX = otherX + otherW;
+                      } else if (Math.abs((snapX + draggedW) - otherX) < snapDistance) {
+                          snapX = otherX - draggedW;
+                      } else if (Math.abs(snapX - otherX) < snapDistance) {
+                          snapX = otherX;
+                      }
+                  }
+              });
+
+              // Twarde ograniczenie fizyczne (nie pozwól wyjechać poza ściany pomieszczenia)
+              if (snapX < 0) snapX = 0;
+              if (snapX + draggedW > roomW) snapX = roomW - draggedW;
+
+              const targetGroup = cabinetGroup.children.find(g => g.userData.moduleId === draggedModuleId);
+              if (targetGroup) targetGroup.position.x = snapX;
+              
+              mod.position.x = snapX; 
+          }
+      });
+
+      window.addEventListener('pointerup', () => {
+          if (isDragging) {
+              isDragging = false;
+              draggedModuleId = null;
+              controls.enabled = true; 
+              
+              update3D(); 
+              initPropertiesPanel(); 
+              window.dispatchEvent(new CustomEvent('cabinetMoved')); 
+          }
+      });
 
       isInitialized = true;
 
@@ -82,23 +198,49 @@ function clearGroupMemory(group) {
 }
 
 export function update3D() {
-  if (!cabinetGroup) return; 
+  if (!cabinetGroup || !roomGroup) return; 
+  
+  // Czyszczenie pamięci
   clearGroupMemory(cabinetGroup);
+  clearGroupMemory(roomGroup);
 
   const config = state.project;
-  const th = parseFloat(config.materials.boardThickness) || 18;
+  const room = config.room || { width: 3500, height: 2600, depth: 600 };
   
-  const activeModuleId = state.activeModuleId;
-  const isAnyModuleActive = activeModuleId !== null; // Czy w ogóle mamy włączony "tryb pojedynczej edycji"
+  // --- RYSOWANIE POMIESZCZENIA (ŚCIANY I PODŁOGA) ---
+  const matFloor = new THREE.MeshLambertMaterial({ color: 0xe2e8f0, side: THREE.DoubleSide });
+  const matWall = new THREE.MeshLambertMaterial({ color: 0xf8fafc, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
+  const lineMatWall = new THREE.LineBasicMaterial({ color: 0xcbd5e1 });
 
-  // PĘTLA PO WSZYSTKICH MODUŁACH
+  // 1. Podłoga
+  const floorGeo = new THREE.BoxGeometry(room.width, 20, 1500);
+  const floorMesh = new THREE.Mesh(floorGeo, matFloor);
+  floorMesh.position.set(room.width / 2, -10, 1500 / 2 - 300);
+  roomGroup.add(floorMesh);
+
+  // 2. Ściana tylna
+  const backWallGeo = new THREE.BoxGeometry(room.width, room.height, 20);
+  const backWallMesh = new THREE.Mesh(backWallGeo, matWall);
+  backWallMesh.position.set(room.width / 2, room.height / 2, -10);
+  roomGroup.add(backWallMesh);
+  
+  const backEdges = new THREE.EdgesGeometry(backWallGeo);
+  const backLine = new THREE.LineSegments(backEdges, lineMatWall);
+  backWallMesh.add(backLine);
+
+  // 3. Ściana lewa
+  const leftWallGeo = new THREE.BoxGeometry(20, room.height, 1200);
+  const leftWallMesh = new THREE.Mesh(leftWallGeo, matWall);
+  leftWallMesh.position.set(-10, room.height / 2, 400);
+  roomGroup.add(leftWallMesh);
+
+  // --- RYSOWANIE SZAFEK ---
+  const th = parseFloat(config.materials.boardThickness) || 18;
+  const activeModuleId = state.activeModuleId;
+  const isAnyModuleActive = activeModuleId !== null;
+
   state.project.modules.forEach(mod => {
-    
-    // Czy to konkretnie ta szafka jest edytowana?
     const isThisModuleActive = mod.id === activeModuleId;
-    
-    // Jeśli nie edytujemy żadnej szafki, rysuj wszystkie normalnie. 
-    // Jeśli edytujemy, rysuj normalnie TYLKO tę edytowaną.
     const renderAsActive = !isAnyModuleActive || isThisModuleActive;
     
     const opacityMesh = renderAsActive ? 0.5 : 0.15;
@@ -127,8 +269,8 @@ export function update3D() {
 
     const matLegs = new THREE.MeshLambertMaterial({ color: 0x333333, transparent: true, opacity: renderAsActive ? 1.0 : 0.3 }); 
 
-
     const moduleGroup = new THREE.Group();
+    moduleGroup.userData = { moduleId: mod.id }; 
     moduleGroup.position.set(mod.position.x || 0, mod.position.y || 0, mod.position.z || 0);
     cabinetGroup.add(moduleGroup);
 
@@ -183,8 +325,7 @@ export function update3D() {
     const isVerticalTraverse = cons.topType === 'trawersy_pion';
     const traverseWidth = cons.traverseWidth || 100;
 
-    let sidesD = D, sidesZ = 0;
-    let tbD = D, tbZ = 0;
+    let sidesD = D, sidesZ = 0, tbD = D, tbZ = 0;
     let bpW = W, bpH = H, bpX = 0, bpY = 0, bpZ = -hdfThick;
 
     if (backType === 'nakladane') {
@@ -192,18 +333,11 @@ export function update3D() {
     } else if (backType === 'nut') {
       bpZ = offset;
       if (nutBuild === 'all') {
-        bpW = (W - 2*th) + (2 * groove); bpX = th - groove;
-        bpH = (H - 2*th) + (2 * groove); bpY = th - groove;
+        bpW = (W - 2*th) + (2 * groove); bpX = th - groove; bpH = (H - 2*th) + (2 * groove); bpY = th - groove;
       } else if (nutBuild === 'sides') {
-        bpW = (W - 2*th) + (2 * groove); bpX = th - groove;
-        bpH = H; bpY = 0; 
-        tbZ = offset + hdfThick; 
-        tbD = D - tbZ;           
+        bpW = (W - 2*th) + (2 * groove); bpX = th - groove; bpH = H; bpY = 0; tbZ = offset + hdfThick; tbD = D - tbZ;           
       } else if (nutBuild === 'top_bottom') {
-        bpW = W; bpX = 0;
-        bpH = (H - 2*th) + (2 * groove); bpY = th - groove;
-        sidesZ = offset + hdfThick;
-        sidesD = D - sidesZ;
+        bpW = W; bpX = 0; bpH = (H - 2*th) + (2 * groove); bpY = th - groove; sidesZ = offset + hdfThick; sidesD = D - sidesZ;
       }
     }
 
@@ -271,7 +405,6 @@ export function update3D() {
       });
     }
 
-    // --- RAMKA ZAZNACZENIA (Tylko jeśli JAKAŚ szafka jest w ogóle wybrana) ---
     if (isAnyModuleActive && isThisModuleActive) {
         moduleGroup.updateMatrixWorld(true);
         const boxHelper = new THREE.BoxHelper(moduleGroup, 0xea580c); 
@@ -279,7 +412,7 @@ export function update3D() {
     }
   }); 
 
-  // --- INTELIGENTNE ŁĄCZENIE COKOŁU (GLOBALNE) ---
+  // --- ŁĄCZENIE COKOŁU ---
   const baseCabinets = state.project.modules.filter(m => m.legs && m.legs.active && m.legs.plinth);
   baseCabinets.sort((a, b) => a.position.x - b.position.x); 
 
@@ -302,12 +435,9 @@ export function update3D() {
               joined = true;
           }
       }
-      if (!joined) {
-          plinthRuns.push({ x: x, y: y, z: z, w: w, d: d, h: h, offset: offset, frontZ: frontZ });
-      }
+      if (!joined) plinthRuns.push({ x: x, y: y, z: z, w: w, d: d, h: h, offset: offset, frontZ: frontZ });
   });
 
-  // Cokół szarawy, żeby ładnie współgrał i nie dominował na scenie
   const plinthMat = new THREE.MeshLambertMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.5, side: THREE.DoubleSide }); 
   const plinthLineMat = new THREE.LineBasicMaterial({ color: 0x475569, opacity: 0.5, transparent: true });
 

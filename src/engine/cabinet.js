@@ -23,12 +23,10 @@ export function calculateParts() {
   return { parts, mountingData };
 }
 
-// NOWA FUNKCJA: Zliczanie i grupowanie formatek dla CAŁEJ KUCHNI
 export function calculateAllProjectParts() {
   const config = state.project;
   let allParts = [];
 
-  // 1. Zbieramy formatki ze wszystkich szafek
   config.modules.forEach(mod => {
     const modParts = [];
     modParts.push(...getCorpusParts(mod, config));
@@ -38,11 +36,9 @@ export function calculateAllProjectParts() {
     const frontsAndDrawers = getFrontsAndDrawers(mod, config);
     modParts.push(...frontsAndDrawers.parts);
 
-    // Dodajemy do każdej formatki informację, z jakiej szafki pochodzi
     allParts.push(...modParts.map(p => ({ ...p, moduleName: mod.name })));
   });
 
-  // 2. Kalkulacja połączonych cokołów
   const baseCabinets = config.modules.filter(m => m.legs && m.legs.active && m.legs.plinth);
   baseCabinets.sort((a, b) => (parseFloat(a.position.x) || 0) - (parseFloat(b.position.x) || 0));
   
@@ -73,19 +69,16 @@ export function calculateAllProjectParts() {
   plinthRuns.forEach((run, index) => {
     allParts.push({
       name: `Cokół dolny (Odcinek ${index + 1})`,
-      length: parseFloat(run.w.toFixed(1)), // Szerokość szafek to dla cokołu długość
-      width: parseFloat(run.h.toFixed(1)),  // Wysokość nóżek to szerokość formatki cokołu
+      length: parseFloat(run.w.toFixed(1)),
+      width: parseFloat(run.h.toFixed(1)),
       qty: 1,
       moduleName: "Elementy zbiorcze"
     });
   });
 
-  // 3. Agregacja (grupowanie takich samych formatek)
   const aggregated = {};
   allParts.forEach(part => {
-     // Tworzymy unikalny klucz dla identycznych formatek
      const key = `${part.name}_${part.length}_${part.width}`;
-     
      if (aggregated[key]) {
          aggregated[key].qty += part.qty;
          if (!aggregated[key].modules.includes(part.moduleName)) {
@@ -103,6 +96,74 @@ export function calculateAllProjectParts() {
   });
 
   return Object.values(aggregated);
+}
+
+// AGREGATOR OKUĆ Z UWZGLĘDNIENIEM WARIANTÓW WYSOKOŚCI (N, M, K, E)
+export function calculateProjectHardware() {
+  const config = state.project;
+  const hardwareList = {};
+
+  config.modules.forEach(mod => {
+    const W = parseFloat(mod.dimensions.width) || 600;
+    const D = parseFloat(mod.dimensions.depth) || 513;
+    const board = config.materials.boardThickness || 18;
+    const backThick = config.materials.backThickness || 3;
+    const backP = mod.backPanel || { type: 'nakladane', offset: 16 };
+    const topBottomDepth = backP.type === 'nut' ? D - backP.offset - backThick : D - backThick;
+
+    if (mod.legs && mod.legs.active) {
+      const legH = mod.legs.height || 100;
+      const legKey = `Nóżka regulowana H-${legH}`;
+      if (!hardwareList[legKey]) hardwareList[legKey] = { name: legKey, qty: 0, unit: 'szt.' };
+      hardwareList[legKey].qty += 4; 
+    }
+
+    if (!mod.elements) return;
+
+    const fronts = mod.elements.filter(el => el.typ === 'front');
+    const obstacles = mod.elements.filter(el => el.typ === 'poziom' || el.subtype === 'szuflada-wewnetrzna');
+    fronts.sort((a, b) => a.y - b.y);
+
+    fronts.forEach((front, index) => {
+      const isInternalDrawer = front.subtype === 'szuflada-wewnetrzna';
+      
+      if (front.subtype === 'szuflada' || isInternalDrawer) {
+        const isBottomInZone = front.frontIndex === 0;
+        const isTopInZone = index === fronts.length - 1;
+
+        let availableSpace = front.h;
+        if (isBottomInZone) availableSpace -= (board - (config.front.clearance.bottom || 0));
+        if (isTopInZone) availableSpace -= (board - (config.front.clearance.top || 0));
+
+        const innerWidth = front.baseZone ? (front.baseZone.maxX - front.baseZone.minX) : W - (board * 2);
+        const userForcedVariant = front.forceVariant || 'auto';
+        const drawerComps = getDrawerComponents(config.front.drawerSystem, innerWidth, topBottomDepth, availableSpace, userForcedVariant);
+
+        if (drawerComps) {
+          const sysName = config.front.drawerSystem || 'merivobox';
+          const nl = drawerComps.nominalLength;
+          // Pobieramy wariant wysokości (np. 'M', 'K', 'E', 'N') z obliczeń prowadnic
+          const variantType = drawerComps.back.variantType ? drawerComps.back.variantType.toUpperCase() : 'M';
+          
+          const hwKey = `Komplet szuflady (${sysName.toUpperCase()} - H:${variantType} L-${nl})`;
+          
+          if (!hardwareList[hwKey]) hardwareList[hwKey] = { name: hwKey, qty: 0, unit: 'kpl.' };
+          hardwareList[hwKey].qty += 1;
+        }
+      } 
+      else if (front.subtype.includes('drzwi')) {
+        const side = front.subtype === 'drzwi-lp' ? (front.id.endsWith('-L') ? 'left' : 'right') : (front.openingSide || 'left');
+        const hinges = calculateHinges(front, board, obstacles, side);
+        const hingeCount = hinges.length;
+
+        const hingeKey = `Zawias meblowy + prowadnik (puszka 35mm)`;
+        if (!hardwareList[hingeKey]) hardwareList[hingeKey] = { name: hingeKey, qty: 0, unit: 'szt.' };
+        hardwareList[hingeKey].qty += hingeCount;
+      }
+    });
+  });
+
+  return Object.values(hardwareList);
 }
 
 function getCorpusParts(mod, config) {

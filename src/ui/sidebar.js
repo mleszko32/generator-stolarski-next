@@ -1,5 +1,5 @@
 // src/ui/sidebar.js
-import { calculateParts, calculateAllProjectParts } from "../engine/cabinet.js";
+import { calculateParts, calculateAllProjectParts, calculateProjectHardware } from "../engine/cabinet.js";
 import { generateSidePanelSVG } from "../render/viewer2d.js"; 
 import { state, getActiveModule, addModule } from "../core/state.js";
 import { renderEditor2D } from "../render/editor2d.js";
@@ -11,6 +11,9 @@ export function updateSidebar() {
   const { parts, mountingData } = calculateParts(); 
   const activeMod = getActiveModule();
   
+  // Pobieramy okucia dla CAŁEGO projektu, żeby od razu widzieć pełne zestawienie
+  const projectHardware = calculateProjectHardware();
+  
   let html = `
     <h2 style="font-size: 14px; margin-bottom: 10px; color: #1e293b;">Lista Szafek (Moduły)</h2>
     <div style="margin-bottom: 15px;">
@@ -19,7 +22,6 @@ export function updateSidebar() {
   if (state.project.modules.length === 0) {
      html += `<div style="font-size: 11px; color: #64748b; margin-bottom: 10px; text-align: center;">Brak szafek. Dodaj pierwszą poniżej.</div>`;
   } else {
-    // --- NOWY PRZYCISK: POKAŻ CAŁOŚĆ ---
     const isAllActive = state.activeModuleId === null;
     const bgAll = isAllActive ? '#3b82f6' : '#f8fafc';
     const colorAll = isAllActive ? '#ffffff' : '#1e293b';
@@ -31,7 +33,6 @@ export function updateSidebar() {
       </div>
     `;
 
-    // Lista modułów
     state.project.modules.forEach(m => {
       const isActive = m.id === state.activeModuleId;
       const bg = isActive ? '#3b82f6' : '#f8fafc';
@@ -60,14 +61,20 @@ export function updateSidebar() {
     <hr style="margin: 15px 0; border: 0; border-top: 1px dashed #cbd5e1;">
   `;
 
+  // --- PRZYCISKI EKSPORTU DO PLIKU ---
   if (state.project.modules.length > 0) {
     html += `
-      <div style="display: flex; gap: 8px; margin-bottom: 15px;">
-        <button id="btn-print-2d" ${!activeMod ? 'disabled style="opacity: 0.5;"' : ''} style="flex: 1; padding: 10px; background-color: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-          📄 Rysunek
-        </button>
-        <button id="btn-export-csv" style="flex: 1; padding: 10px; background-color: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-          📊 CSV (Produkcja)
+      <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 15px;">
+        <div style="display: flex; gap: 6px;">
+            <button id="btn-print-2d" ${!activeMod ? 'disabled style="opacity: 0.5;"' : ''} style="flex: 1; padding: 8px; background-color: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px;">
+              📄 Rysunek
+            </button>
+            <button id="btn-export-csv" style="flex: 1; padding: 8px; background-color: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px;">
+              📊 Formatki CSV
+            </button>
+        </div>
+        <button id="btn-export-hardware" style="width: 100%; padding: 9px; background-color: #d97706; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          🛒 Pobierz listę zakupów (CSV)
         </button>
       </div>
     `;
@@ -76,6 +83,7 @@ export function updateSidebar() {
     }
   }
 
+  // --- SEKCJA AKTYWNEJ SZAFKI (FORMATKI I NAWIERTY) ---
   if (activeMod) {
     html += `<details open style="margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">`;
     html += `<summary style="font-weight: bold; cursor: pointer; outline: none;">Lista formatek (Aktywna)</summary>`;
@@ -84,7 +92,7 @@ export function updateSidebar() {
     html += `</ul></details>`;
 
     if (mountingData && mountingData.length > 0) {
-      html += `<details style="background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;"><summary style="font-weight: bold; cursor: pointer; outline: none;">Nawierty (Aktywna)</summary><ul class="parts-list" style="margin-top: 10px; padding-left: 0; list-style: none;">`;
+      html += `<details style="margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;"><summary style="font-weight: bold; cursor: pointer; outline: none;">Nawierty (Aktywna)</summary><ul class="parts-list" style="margin-top: 10px; padding-left: 0; list-style: none;">`;
       let currentDrawerIndex = 1;
       mountingData.forEach((item) => {
         if (item.type === 'door') {
@@ -102,13 +110,29 @@ export function updateSidebar() {
     }
   }
 
+  // --- NOWOŚĆ: ZBIORCZA LISTA ZAKUPÓW (OKUCIA) NA BIEŻĄCO W PANELU ---
+  if (state.project.modules.length > 0) {
+    html += `<details style="background: #fffbeb; padding: 10px; border-radius: 6px; border: 1px solid #fcd34d;">`;
+    html += `<summary style="font-weight: bold; cursor: pointer; outline: none; color: #92400e;">🛒 Lista zakupów (Okucia - Całość)</summary>`;
+    html += `<ul class="parts-list" style="margin-top: 10px; padding-left: 20px;">`;
+    
+    if (projectHardware.length === 0) {
+      html += `<li style="font-size: 11px; color: #b45309;">Brak zdefiniowanych okuć w projekcie.</li>`;
+    } else {
+      projectHardware.forEach(hw => {
+        html += `<li style="margin-bottom: 6px; font-size: 12px; color: #78350f;"><strong>${hw.name}</strong><br><span style="color: #92400e;">Ilość: <b>${hw.qty} ${hw.unit}</b></span></li>`;
+      });
+    }
+    
+    html += `</ul></details>`;
+  }
+
   leftSidebar.innerHTML = html; 
 
-  // ZDARZENIA KLIKNIĘĆ
   const btnShowAll = document.getElementById('btn-show-all');
   if (btnShowAll) {
     btnShowAll.addEventListener('click', () => {
-      state.activeModuleId = null; // Odznaczamy wszystko!
+      state.activeModuleId = null; 
       initPropertiesPanel(); 
       renderEditor2D(); 
       update3D(); 
@@ -153,6 +177,33 @@ export function updateSidebar() {
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
       link.download = `Formatki_${state.project.name.replace(/\s+/g, '_')}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+  }
+
+  const exportHardwareBtn = document.getElementById('btn-export-hardware');
+  if (exportHardwareBtn) {
+    exportHardwareBtn.addEventListener('click', () => {
+      const hardware = calculateProjectHardware();
+      if(hardware.length === 0) {
+        alert("Brak okuć do wygenerowania.");
+        return;
+      }
+
+      let csvContent = "\uFEFF";
+      csvContent += "Nazwa akcesorium;Ilosc;Jednostka\n";
+      
+      hardware.forEach(item => {
+          csvContent += `"${item.name}";${item.qty};"${item.unit}"\n`;
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.setAttribute("href", URL.createObjectURL(blob));
+      link.setAttribute("download", `Lista_Zakupow_Okucia_${state.project.name.replace(/\s+/g, '_')}.csv`);
+      link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
