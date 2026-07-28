@@ -1,9 +1,9 @@
 // src/core/shelfMath.js
-import { state } from "./state.js";
+import { state, getActiveModule } from "./state.js";
 
 export function calculateShelfHoles() {
   const holes = [];
-  const mod = state.project.modules[0];
+  const mod = getActiveModule();
   if (!mod || !mod.elements) return holes;
 
   const th = parseFloat(state.project.materials.boardThickness) || 18;

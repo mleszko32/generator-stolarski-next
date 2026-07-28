@@ -1,8 +1,16 @@
 // src/render/editor2d.js
-import { state } from "../core/state.js";
+import { state, getActiveModule } from "../core/state.js";
 import { updateSidebar } from "../ui/sidebar.js";
 import { update3D } from "./viewer3d.js"; 
 import { autoDistributeShelves } from "../core/shelfMath.js"; 
+
+// Globalna funkcja do zamykania menu i odświeżania widoków
+function applyChangesAndClose(menuElement) {
+  if (menuElement) menuElement.remove();
+  renderEditor2D();
+  update3D();
+  updateSidebar();
+}
 
 let isFrontsVisible2D = true;
 let isDimensionsVisible = true; 
@@ -23,7 +31,7 @@ export function renderEditor2D() {
   
   container.innerHTML = '';
 
-  const mod = state.project.modules[0];
+  const mod = getActiveModule();
   const config = state.project;
   
   const th = parseFloat(config.materials.boardThickness) || 18;
@@ -277,9 +285,9 @@ export function renderEditor2D() {
          } else { 
             handle.style.top = '50%'; 
             if ((plyta.openingSide || 'left') === 'left') {
-                handle.style.right = '15px'; // Zawiasy po lewej, uchwyt po prawej
+                handle.style.right = '15px'; 
             } else {
-                handle.style.left = '15px'; // Zawiasy po prawej, uchwyt po lewej
+                handle.style.left = '15px'; 
             }
          }
          div.appendChild(handle);
@@ -299,12 +307,36 @@ export function renderEditor2D() {
       menu.style.position = 'fixed'; menu.style.left = `${e.clientX}px`; menu.style.top = `${e.clientY}px`;
       menu.style.backgroundColor = '#ffffff'; menu.style.border = '1px solid #cbd5e1'; menu.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; menu.style.borderRadius = '6px'; menu.style.padding = '4px'; menu.style.zIndex = '1000'; menu.style.minWidth = '240px'; menu.style.fontFamily = 'sans-serif';
 
-      const createMenuOption = (text, icon, color = '#1e293b') => {
-        const btn = document.createElement('div'); btn.innerHTML = `${icon} <span style="margin-left: 6px;">${text}</span>`; btn.style.padding = '8px 12px'; btn.style.cursor = 'pointer'; btn.style.fontSize = '14px'; btn.style.color = color; btn.style.borderRadius = '4px';
-        btn.onmouseenter = () => btn.style.backgroundColor = '#f1f5f9'; btn.onmouseleave = () => btn.style.backgroundColor = 'transparent'; return btn;
-      };
+      // --- ZREFAKTORYZOWANE FUNKCJE ---
       const createHeader = (text, color = '#64748b') => {
-        const hdr = document.createElement('div'); hdr.innerText = text; hdr.style.fontSize = '11px'; hdr.style.color = color; hdr.style.textTransform = 'uppercase'; hdr.style.margin = '8px 8px 4px 8px'; hdr.style.fontWeight = 'bold'; return hdr;
+        const hdr = document.createElement('div');
+        hdr.innerText = text;
+        Object.assign(hdr.style, {
+          fontSize: '11px', color: color, textTransform: 'uppercase',
+          margin: '8px 8px 4px 8px', fontWeight: 'bold'
+        });
+        return hdr;
+      };
+
+      const createMenuOption = (text, icon, actionCallback, color = '#1e293b') => {
+        const btn = document.createElement('div');
+        btn.innerHTML = `${icon} <span style="margin-left: 6px;">${text}</span>`;
+        Object.assign(btn.style, {
+          padding: '8px 12px', cursor: 'pointer', fontSize: '14px', 
+          color: color, borderRadius: '4px', transition: 'background-color 0.1s'
+        });
+        
+        btn.onmouseenter = () => btn.style.backgroundColor = color === '#dc2626' ? '#fee2e2' : '#f1f5f9';
+        btn.onmouseleave = () => btn.style.backgroundColor = 'transparent';
+        
+        if (actionCallback) {
+          btn.onclick = (evt) => {
+            evt.stopPropagation();
+            actionCallback(evt);
+            applyChangesAndClose(menu);
+          };
+        }
+        return btn;
       };
 
       if (isFront) {
@@ -314,24 +346,17 @@ export function renderEditor2D() {
         const topBoundEl = mod.elements.find(e => e.id === topBoundId);
         
         if (topBoundEl && topBoundEl.typ === 'poziom') {
-            const btnSnap = createMenuOption('Dopasuj półkę nad frontami', '↕️', '#059669');
-            btnSnap.onclick = (evt) => {
-                evt.stopPropagation();
+            const btnSnap = createMenuOption('Dopasuj półkę nad frontami', '↕️', () => {
                 const siblings = mod.elements.filter(e => e.typ === 'front' && e.baseZone?.boundTop === topBoundId && e.baseZone?.boundBottom === plyta.baseZone.boundBottom);
-                
                 let maxFrontTop = 0;
                 siblings.forEach(sib => {
                     const topEdge = sib.y + sib.h;
                     if (topEdge > maxFrontTop) maxFrontTop = topEdge;
                 });
-
                 const gapVal = parseFloat(plyta.gap ?? state.project.front?.gap ?? 3) || 0;
                 const overTop = (th / 2) - (gapVal / 2);
-                
                 topBoundEl.y = maxFrontTop - overTop;
-
-                menu.remove(); renderEditor2D(); update3D(); updateSidebar();
-            };
+            }, '#059669');
             menu.appendChild(btnSnap);
         }
 
@@ -351,7 +376,7 @@ export function renderEditor2D() {
             sel.onchange = (evt) => {
               evt.stopPropagation();
               plyta.openingSide = sel.value;
-              menu.remove(); renderEditor2D(); update3D(); updateSidebar();
+              applyChangesAndClose(menu);
             };
 
             wrap.appendChild(lbl); wrap.appendChild(sel); menu.appendChild(wrap);
@@ -373,7 +398,7 @@ export function renderEditor2D() {
           sel.onchange = (evt) => {
             evt.stopPropagation();
             plyta.forceVariant = sel.value;
-            menu.remove(); renderEditor2D(); update3D(); updateSidebar();
+            applyChangesAndClose(menu);
           };
 
           wrap.appendChild(lbl); wrap.appendChild(sel); menu.appendChild(wrap);
@@ -435,7 +460,10 @@ export function renderEditor2D() {
 
         const applyPosition = (evt) => {
           evt.stopPropagation(); const newVal1 = parseFloat(inp1.value);
-          if (!isNaN(newVal1)) { if (isPoziom) plyta.y = boundMin + newVal1; else plyta.x = boundMin + newVal1; menu.remove(); renderEditor2D(); update3D(); updateSidebar(); }
+          if (!isNaN(newVal1)) { 
+             if (isPoziom) plyta.y = boundMin + newVal1; else plyta.x = boundMin + newVal1; 
+             applyChangesAndClose(menu);
+          }
         };
 
         applyBtn.onclick = applyPosition; inp1.onkeydown = (evt) => { if (evt.key === 'Enter') applyPosition(evt); }; inp2.onkeydown = (evt) => { if (evt.key === 'Enter') applyPosition(evt); };
@@ -444,23 +472,21 @@ export function renderEditor2D() {
       }
 
       if (plyta.typ === 'poziom') {
-        const btnStruct = createMenuOption(plyta.isStructural ? 'Zmień na półkę ruchomą' : 'Zmień na konstrukcyjną', '🔩', plyta.isStructural ? '#2e7d32' : '#1e293b');
-        btnStruct.onclick = (evt) => { evt.stopPropagation(); plyta.isStructural = !plyta.isStructural; menu.remove(); renderEditor2D(); update3D(); updateSidebar(); };
+        const btnStruct = createMenuOption(plyta.isStructural ? 'Zmień na półkę ruchomą' : 'Zmień na konstrukcyjną', '🔩', () => {
+           plyta.isStructural = !plyta.isStructural;
+        }, plyta.isStructural ? '#2e7d32' : '#1e293b');
         menu.appendChild(btnStruct);
       }
 
       menu.appendChild(createHeader('Akcje'));
-      const btnDelete = createMenuOption(isFront ? 'Usuń fronty z tej wnęki' : 'Usuń element', '🗑️', '#dc2626');
-      btnDelete.onmouseenter = () => btnDelete.style.backgroundColor = '#fee2e2'; 
-      btnDelete.onclick = (evt) => { 
-        evt.stopPropagation(); 
+      
+      const btnDelete = createMenuOption(isFront ? 'Usuń fronty z tej wnęki' : 'Usuń element', '🗑️', () => {
         if (isFront && plyta.baseZone) {
             mod.elements = mod.elements.filter(el => !(el.typ === 'front' && el.baseZone.boundTop === plyta.baseZone.boundTop && el.baseZone.boundBottom === plyta.baseZone.boundBottom));
         } else {
             mod.elements = mod.elements.filter(el => el.id !== plyta.id); 
         }
-        menu.remove(); renderEditor2D(); update3D(); updateSidebar(); 
-      };
+      }, '#dc2626');
       menu.appendChild(btnDelete); 
 
       document.body.appendChild(menu);
@@ -574,28 +600,56 @@ export function renderEditor2D() {
     menu.style.position = 'fixed'; menu.style.left = `${e.clientX}px`; menu.style.top = `${e.clientY}px`;
     menu.style.backgroundColor = '#ffffff'; menu.style.border = '1px solid #cbd5e1'; menu.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; menu.style.borderRadius = '6px'; menu.style.padding = '4px'; menu.style.zIndex = '1000'; menu.style.minWidth = '220px'; menu.style.fontFamily = 'sans-serif';
 
-    const createMenuOption = (text, icon, color = '#1e293b') => {
-      const btn = document.createElement('div'); btn.innerHTML = `${icon} <span style="margin-left: 6px;">${text}</span>`; btn.style.padding = '8px 12px'; btn.style.cursor = 'pointer'; btn.style.fontSize = '14px'; btn.style.color = color; btn.style.borderRadius = '4px';
-      btn.onmouseenter = () => btn.style.backgroundColor = '#f1f5f9'; btn.onmouseleave = () => btn.style.backgroundColor = 'transparent'; return btn;
-    };
+    // --- ZREFAKTORYZOWANE FUNKCJE ---
     const createHeader = (text, color = '#64748b') => {
-      const hdr = document.createElement('div'); hdr.innerText = text; hdr.style.fontSize = '11px'; hdr.style.color = color; hdr.style.textTransform = 'uppercase'; hdr.style.margin = '8px 8px 4px 8px'; hdr.style.fontWeight = 'bold'; return hdr;
+      const hdr = document.createElement('div');
+      hdr.innerText = text;
+      Object.assign(hdr.style, {
+        fontSize: '11px', color: color, textTransform: 'uppercase',
+        margin: '8px 8px 4px 8px', fontWeight: 'bold'
+      });
+      return hdr;
+    };
+
+    const createMenuOption = (text, icon, actionCallback, color = '#1e293b') => {
+      const btn = document.createElement('div');
+      btn.innerHTML = `${icon} <span style="margin-left: 6px;">${text}</span>`;
+      Object.assign(btn.style, {
+        padding: '8px 12px', cursor: 'pointer', fontSize: '14px', 
+        color: color, borderRadius: '4px', transition: 'background-color 0.1s'
+      });
+      
+      btn.onmouseenter = () => btn.style.backgroundColor = color === '#dc2626' ? '#fee2e2' : '#f1f5f9';
+      btn.onmouseleave = () => btn.style.backgroundColor = 'transparent';
+      
+      if (actionCallback) {
+        btn.onclick = (evt) => {
+          evt.stopPropagation();
+          actionCallback(evt);
+          applyChangesAndClose(menu);
+        };
+      }
+      return btn;
     };
 
     menu.appendChild(createHeader('Elementy konstrukcyjne'));
     
-    const btnShelf = createMenuOption('Półka (w miejscu myszki)', '➖');
-    btnShelf.onclick = (event) => { event.stopPropagation(); mod.elements.push({ id: 'poziom-' + Date.now(), typ: 'poziom', x: zoneMinX, y: mouseY - (th / 2), w: zoneMaxX - zoneMinX, h: th, isStructural: false }); menu.remove(); renderEditor2D(); update3D(); updateSidebar(); };
+    const btnShelf = createMenuOption('Półka (w miejscu myszki)', '➖', () => {
+      mod.elements.push({ id: 'poziom-' + Date.now(), typ: 'poziom', x: zoneMinX, y: mouseY - (th / 2), w: zoneMaxX - zoneMinX, h: th, isStructural: false });
+    });
+    menu.appendChild(btnShelf);
 
-    const btnShelfHalf = createMenuOption('Półka (dokładnie w połowie)', '➗');
-    btnShelfHalf.onclick = (event) => { event.stopPropagation(); const halfY = zoneMinY + (zoneMaxY - zoneMinY) / 2; mod.elements.push({ id: 'poziom-' + Date.now(), typ: 'poziom', x: zoneMinX, y: halfY - (th / 2), w: zoneMaxX - zoneMinX, h: th, isStructural: false }); menu.remove(); renderEditor2D(); update3D(); updateSidebar(); };
+    const btnShelfHalf = createMenuOption('Półka (dokładnie w połowie)', '➗', () => {
+      const halfY = zoneMinY + (zoneMaxY - zoneMinY) / 2;
+      mod.elements.push({ id: 'poziom-' + Date.now(), typ: 'poziom', x: zoneMinX, y: halfY - (th / 2), w: zoneMaxX - zoneMinX, h: th, isStructural: false });
+    });
+    menu.appendChild(btnShelfHalf);
 
-    // --- ZMIENIONY PRZYCISK PÓŁEK ---
-    const btnAutoShelves = createMenuOption('Półki (rozmieść równomiernie)', '📚');
+    // Przycisk półek z zabezpieczeniem, zostawiamy ręczne onlcick (brak callbacka) bo zmienia widok wewnatrz menu
+    const btnAutoShelves = createMenuOption('Półki (rozmieść równomiernie)', '📚', null);
     btnAutoShelves.onclick = (event) => {
       event.stopPropagation();
       
-      // Przebudowujemy menu na własny formularz ilości półek
       menu.innerHTML = ''; 
       menu.style.padding = '12px'; 
       menu.style.width = '240px';
@@ -643,8 +697,12 @@ export function renderEditor2D() {
         genEvent.stopPropagation();
         const shelfCount = parseInt(inp.value, 10);
         
-        // Zabezpieczenie przed błędną wartością (ignoruje, bez blokującego alerta)
-        if (isNaN(shelfCount) || shelfCount <= 0) return; 
+        // --- ZABEZPIECZENIE WARTOŚCI ---
+        if (isNaN(shelfCount) || shelfCount <= 0) {
+            alert("Wprowadź poprawną, dodatnią liczbę półek.");
+            inp.focus(); 
+            return;
+        }
         
         const internalHeight = zoneMaxY - zoneMinY;
         const newShelvesBase = autoDistributeShelves(internalHeight, th, shelfCount);
@@ -653,30 +711,28 @@ export function renderEditor2D() {
           id: 'poziom-auto-' + Date.now() + '-' + idx,
           typ: 'poziom',
           x: zoneMinX,
-          y: zoneMinY + s.y, // Od dołu obecnej strefy
+          y: zoneMinY + s.y,
           w: zoneMaxX - zoneMinX,
           h: th,
           isStructural: false
         }));
         
         mod.elements.push(...newShelves);
-        menu.remove(); renderEditor2D(); update3D(); updateSidebar();
+        applyChangesAndClose(menu);
       };
       
       menu.appendChild(title); 
       menu.appendChild(wrap); 
       menu.appendChild(applyBtn);
       
-      // Aktywacja pola tekstowego
       setTimeout(() => inp.focus(), 10);
     };
+    menu.appendChild(btnAutoShelves);
 
-    const btnPartHalf = createMenuOption('Przegroda (w połowie)', '➕');
-    btnPartHalf.onclick = (event) => { event.stopPropagation(); const halfX = zoneMinX + (zoneMaxX - zoneMinX) / 2; mod.elements.push({ id: 'pion-' + Date.now(), typ: 'pion', x: halfX - (th / 2), y: zoneMinY, w: th, h: zoneMaxY - zoneMinY }); menu.remove(); renderEditor2D(); update3D(); updateSidebar(); };
-
-    menu.appendChild(btnShelf); 
-    menu.appendChild(btnShelfHalf); 
-    menu.appendChild(btnAutoShelves); 
+    const btnPartHalf = createMenuOption('Przegroda (w połowie)', '➕', () => {
+      const halfX = zoneMinX + (zoneMaxX - zoneMinX) / 2;
+      mod.elements.push({ id: 'pion-' + Date.now(), typ: 'pion', x: halfX - (th / 2), y: zoneMinY, w: th, h: zoneMaxY - zoneMinY });
+    });
     menu.appendChild(btnPartHalf);
 
     const showDrawerMenu = (event, targetBaseZone, subtypeName, titleTxt) => {
@@ -724,7 +780,7 @@ export function renderEditor2D() {
                 forceVariant: 'auto'
             }); 
         }
-        menu.remove(); renderEditor2D(); update3D(); updateSidebar();
+        applyChangesAndClose(menu);
       };
       
       menu.appendChild(title); 
@@ -736,29 +792,35 @@ export function renderEditor2D() {
 
     menu.appendChild(createHeader('Zabuduj wnękę (między półkami)'));
 
-    const btnDoor = createMenuOption('Drzwi pojedyncze', '🚪');
-    btnDoor.onclick = (event) => { event.stopPropagation(); mod.elements.push({ id: 'front-' + Date.now(), typ: 'front', subtype: 'drzwi', baseZone: localBaseZone, openingSide: 'left', frontCount: 1, frontIndex: 0, gap: 3 }); menu.remove(); renderEditor2D(); update3D(); updateSidebar(); };
+    const btnDoor = createMenuOption('Drzwi pojedyncze', '🚪', () => {
+      mod.elements.push({ id: 'front-' + Date.now(), typ: 'front', subtype: 'drzwi', baseZone: localBaseZone, openingSide: 'left', frontCount: 1, frontIndex: 0, gap: 3 });
+    });
     menu.appendChild(btnDoor);
 
-    const btnDrawers = createMenuOption('Szuflady (zewnętrzne)', '📦');
+    const btnDrawers = createMenuOption('Szuflady (zewnętrzne)', '📦', null);
     btnDrawers.onclick = (event) => showDrawerMenu(event, localBaseZone, 'szuflada', 'Szuflady w tej wnęce');
     menu.appendChild(btnDrawers);
 
-    const btnInternalDrawers = createMenuOption('Szuflady wewnętrzne', '📥', '#d97706');
+    const btnInternalDrawers = createMenuOption('Szuflady wewnętrzne', '📥', null, '#d97706');
     btnInternalDrawers.onclick = (event) => showDrawerMenu(event, localBaseZone, 'szuflada-wewnetrzna', 'Wewnętrzne szuflady');
     menu.appendChild(btnInternalDrawers);
 
     menu.appendChild(createHeader('Zabuduj resztę (ignoruje półki)', '#2563eb'));
 
-    const btnDoorCol = createMenuOption('Drzwi na całą wysokość', '🚪', '#1e40af');
-    btnDoorCol.onclick = (event) => { event.stopPropagation(); mod.elements.push({ id: 'front-' + Date.now(), typ: 'front', subtype: 'drzwi', baseZone: colBaseZone, openingSide: 'left', frontCount: 1, frontIndex: 0, gap: 3 }); menu.remove(); renderEditor2D(); update3D(); updateSidebar(); };
+    const btnDoorCol = createMenuOption('Drzwi na całą wysokość', '🚪', () => {
+      mod.elements.push({ id: 'front-' + Date.now(), typ: 'front', subtype: 'drzwi', baseZone: colBaseZone, openingSide: 'left', frontCount: 1, frontIndex: 0, gap: 3 });
+    }, '#1e40af');
     menu.appendChild(btnDoorCol);
 
-    const btnDoorLP = createMenuOption('Drzwi L/P na całą wysokość', '🚪', '#1e40af');
-    btnDoorLP.onclick = (event) => { event.stopPropagation(); const ts = Date.now(); const gapLp = parseFloat(state.project.front?.gap) || 3; mod.elements.push({ id: 'front-' + ts + '-L', typ: 'front', subtype: 'drzwi-lp', baseZone: colBaseZone, frontCount: 2, frontIndex: 0, gap: gapLp }); mod.elements.push({ id: 'front-' + ts + '-P', typ: 'front', subtype: 'drzwi-lp', baseZone: colBaseZone, frontCount: 2, frontIndex: 1, gap: gapLp }); menu.remove(); renderEditor2D(); update3D(); updateSidebar(); };
+    const btnDoorLP = createMenuOption('Drzwi L/P na całą wysokość', '🚪', () => {
+      const ts = Date.now();
+      const gapLp = parseFloat(state.project.front?.gap) || 3;
+      mod.elements.push({ id: 'front-' + ts + '-L', typ: 'front', subtype: 'drzwi-lp', baseZone: colBaseZone, frontCount: 2, frontIndex: 0, gap: gapLp });
+      mod.elements.push({ id: 'front-' + ts + '-P', typ: 'front', subtype: 'drzwi-lp', baseZone: colBaseZone, frontCount: 2, frontIndex: 1, gap: gapLp });
+    }, '#1e40af');
     menu.appendChild(btnDoorLP);
 
-    const btnDrawersCol = createMenuOption('Szuflady na całą wysokość', '📦', '#1e40af');
+    const btnDrawersCol = createMenuOption('Szuflady na całą wysokość', '📦', null, '#1e40af');
     btnDrawersCol.onclick = (event) => showDrawerMenu(event, colBaseZone, 'szuflada', 'Szuflady w całym pionie');
     menu.appendChild(btnDrawersCol);
 

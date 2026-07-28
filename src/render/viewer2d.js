@@ -1,10 +1,10 @@
 // src/render/viewer2d.js
 import { calculateShelfHoles } from '../core/shelfMath.js';
 import { calculateDrawerHoles } from '../core/drawerMath.js';
-import { state } from '../core/state.js';
+import { state, getActiveModule } from '../core/state.js';
 
 export function generateSidePanelSVG(height, depth, mountingData) {
-  const mod = state.project.modules[0];
+  const mod = getActiveModule();
   const config = state.project;
   const cabWidth = parseFloat(mod?.dimensions?.width) || 600;
   const th = parseFloat(config.materials?.boardThickness) || 18;
@@ -13,15 +13,17 @@ export function generateSidePanelSVG(height, depth, mountingData) {
   const isTopBottomFullWidth = cons.joinType === 'wience_przelotowe';
   const sideH = isTopBottomFullWidth ? height - (th * 2) : height;
 
+  // UKŁAD 4 RZUTÓW
   const cabX = 80;                 
-  const gapBetween = 180;          
-  const bokX = cabX + cabWidth + gapBetween; 
+  const gapBetween = 250;          
+  const bokLewyX = cabX + cabWidth + gapBetween; 
+  const bokPrawyX = bokLewyX + depth + gapBetween; 
   
-  // ZWIĘKSZONY ODSTĘP - zapobiega ucinaniu tekstów prowadników
-  const gapBetween2 = 400;
-  const frontX = bokX + depth + gapBetween2;
-  const marginRight = 150; 
-  const marginY = 80;
+  const gapBetweenFront = Math.max(450, depth * 0.4); 
+  const frontX = bokPrawyX + depth + gapBetweenFront;
+  
+  const marginRight = 350; 
+  const marginY = 120;
   
   const svgWidth = frontX + cabWidth + marginRight;
   const svgHeight = sideH + marginY * 2;
@@ -43,10 +45,13 @@ export function generateSidePanelSVG(height, depth, mountingData) {
             viewBox.x = svgP.x - (svgP.x - viewBox.x) * zoom; viewBox.y = svgP.y - (svgP.y - viewBox.y) * zoom;
             viewBox.width *= zoom; viewBox.height *= zoom;
           }, { passive: false });
+          
           svg.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return; // Tylko lewy przycisk myszy
             isPanning = true; const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
             startPoint = pt.matrixTransform(svg.getScreenCTM().inverse()); svg.style.cursor = 'grabbing';
           });
+          
           window.addEventListener('mousemove', (e) => {
             if (!isPanning) return; const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
             const currentPoint = pt.matrixTransform(svg.getScreenCTM().inverse());
@@ -69,7 +74,7 @@ export function generateSidePanelSVG(height, depth, mountingData) {
   `;
 
   // ==========================================
-  // CZĘŚĆ LEWA: KORPUS WNĘTRZE
+  // RZUT 1: KORPUS WNĘTRZE
   // ==========================================
   svg += `<text x="${cabX + cabWidth/2}" y="-25" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">KORPUS WNĘTRZE</text>`;
 
@@ -132,39 +137,59 @@ export function generateSidePanelSVG(height, depth, mountingData) {
     }
   }
 
-  // ==========================================
-  // CZĘŚĆ ŚRODKOWA: BOK SZAFY (NAWIERTY)
-  // ==========================================
-  svg += `<text x="${bokX + depth/2}" y="-25" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">BOK SZAFY</text>`;
-  svg += `<rect x="${bokX}" y="0" width="${depth}" height="${sideH}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
-
-  svg += `<text x="${bokX + 15}" y="${sideH / 2}" font-size="11" fill="#94a3b8" font-weight="bold" transform="rotate(-90, ${bokX + 15}, ${sideH / 2})" text-anchor="middle" letter-spacing="1">TYŁ BOKU</text>`;
-  svg += `<text x="${bokX + depth - 15}" y="${sideH / 2}" font-size="11" fill="#94a3b8" font-weight="bold" transform="rotate(-90, ${bokX + depth - 15}, ${sideH / 2})" text-anchor="middle" letter-spacing="1">PRZÓD BOKU</text>`;
-
+  // GLOBALNA LINIA BAZOWA 0 mm
   svg += `<line x1="${cabX - 20}" y1="${sideH}" x2="${frontX + cabWidth + 20}" y2="${sideH}" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,4" />`;
   svg += `<text x="${frontX + cabWidth + 30}" y="${sideH + 4}" font-size="12" fill="#1e293b" font-weight="bold">0 mm (Baza modułu)</text>`;
 
-  const topSetbackY = -10;
-  svg += `<line x1="${bokX}" y1="${topSetbackY}" x2="${bokX + 37}" y2="${topSetbackY}" stroke="#dc2626" stroke-width="1" marker-start="url(#arrow-red)" marker-end="url(#arrow-red)" />`;
-  svg += `<text x="${bokX + 18.5}" y="${topSetbackY - 6}" font-size="10" fill="#dc2626" text-anchor="middle" font-weight="bold">37</text>`;
 
-  svg += `<line x1="${bokX + depth - 37}" y1="${topSetbackY}" x2="${bokX + depth}" y2="${topSetbackY}" stroke="#dc2626" stroke-width="1" marker-start="url(#arrow-red)" marker-end="url(#arrow-red)" />`;
-  svg += `<text x="${bokX + depth - 18.5}" y="${topSetbackY - 6}" font-size="10" fill="#dc2626" text-anchor="middle" font-weight="bold">37</text>`;
-
-  const shelfHoles = calculateShelfHoles();
+  // ==========================================
+  // RZUT 2: BOK LEWY (Przód po LEWEJ)
+  // ==========================================
+  svg += `<text x="${bokLewyX + depth/2}" y="-25" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">BOK LEWY (Wewnętrzna strona)</text>`;
+  svg += `<rect x="${bokLewyX}" y="0" width="${depth}" height="${sideH}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
   
+  // Opisy krawędzi
+  svg += `<text x="${bokLewyX + 15}" y="${sideH / 2}" font-size="11" fill="#94a3b8" font-weight="bold" transform="rotate(-90, ${bokLewyX + 15}, ${sideH / 2})" text-anchor="middle" letter-spacing="1">PRZÓD BOKU</text>`;
+  svg += `<text x="${bokLewyX + depth - 15}" y="${sideH / 2}" font-size="11" fill="#94a3b8" font-weight="bold" transform="rotate(-90, ${bokLewyX + depth - 15}, ${sideH / 2})" text-anchor="middle" letter-spacing="1">TYŁ BOKU</text>`;
+  
+  // Znacznik 37mm od lewej krawędzi
+  const topSetbackY = -10;
+  svg += `<line x1="${bokLewyX}" y1="${topSetbackY}" x2="${bokLewyX + 37}" y2="${topSetbackY}" stroke="#dc2626" stroke-width="1" marker-start="url(#arrow-red)" marker-end="url(#arrow-red)" />`;
+  svg += `<text x="${bokLewyX + 18.5}" y="${topSetbackY - 6}" font-size="10" fill="#dc2626" text-anchor="middle" font-weight="bold">37</text>`;
+
+
+  // ==========================================
+  // RZUT 3: BOK PRAWY (Przód po PRAWEJ)
+  // ==========================================
+  svg += `<text x="${bokPrawyX + depth/2}" y="-25" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">BOK PRAWY (Wewnętrzna strona)</text>`;
+  svg += `<rect x="${bokPrawyX}" y="0" width="${depth}" height="${sideH}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+  
+  // Opisy krawędzi
+  svg += `<text x="${bokPrawyX + 15}" y="${sideH / 2}" font-size="11" fill="#94a3b8" font-weight="bold" transform="rotate(-90, ${bokPrawyX + 15}, ${sideH / 2})" text-anchor="middle" letter-spacing="1">TYŁ BOKU</text>`;
+  svg += `<text x="${bokPrawyX + depth - 15}" y="${sideH / 2}" font-size="11" fill="#94a3b8" font-weight="bold" transform="rotate(-90, ${bokPrawyX + depth - 15}, ${sideH / 2})" text-anchor="middle" letter-spacing="1">PRZÓD BOKU</text>`;
+
+  // Znacznik 37mm od prawej krawędzi
+  svg += `<line x1="${bokPrawyX + depth - 37}" y1="${topSetbackY}" x2="${bokPrawyX + depth}" y2="${topSetbackY}" stroke="#dc2626" stroke-width="1" marker-start="url(#arrow-red)" marker-end="url(#arrow-red)" />`;
+  svg += `<text x="${bokPrawyX + depth - 18.5}" y="${topSetbackY - 6}" font-size="10" fill="#dc2626" text-anchor="middle" font-weight="bold">37</text>`;
+
+
+  // ==========================================
+  // NAWIERTY PÓŁEK (Oba boki)
+  // ==========================================
+  const shelfHoles = calculateShelfHoles();
   if (shelfHoles && shelfHoles.length > 0) {
     shelfHoles.forEach(hole => {
       let calcY = hole.y;
       if (isTopBottomFullWidth) calcY -= th;
-
-      const svgX = bokX + depth - hole.x; 
       const svgY = sideH - calcY;
-      
       const radius = hole.diameter ? (hole.diameter / 2) : (hole.isCenter ? 3 : 2);
       const color = hole.color || (hole.isCenter ? '#d97706' : '#fcd34d');
       
-      svg += `<circle cx="${svgX}" cy="${svgY}" r="${radius}" fill="${color}" />`;
+      // Lewy bok: liczymy X od lewej krawędzi (od przodu)
+      svg += `<circle cx="${bokLewyX + hole.x}" cy="${svgY}" r="${radius}" fill="${color}" />`;
+      
+      // Prawy bok: liczymy X od prawej krawędzi (od przodu w lewo)
+      svg += `<circle cx="${bokPrawyX + depth - hole.x}" cy="${svgY}" r="${radius}" fill="${color}" />`;
     });
 
     const uniqueYs = [...new Set(shelfHoles.map(h => h.y))].sort((a, b) => b - a);
@@ -186,62 +211,52 @@ export function generateSidePanelSVG(height, depth, mountingData) {
       const fontSize = isStructural ? 12 : 10;
       const fontWeight = isStructural ? 'bold' : 'normal';
 
-      const lineEndX = bokX + depth + (isStructural ? 60 : 40);
-      svg += `<line x1="${bokX + depth}" y1="${svgY}" x2="${lineEndX}" y2="${svgY}" stroke="${color}" stroke-width="1" stroke-dasharray="2,2" />`;
-      svg += `<text x="${lineEndX + 8}" y="${svgY + (isStructural ? 4 : 3)}" font-size="${fontSize}" font-weight="${fontWeight}" fill="${color}">${label}</text>`;
+      // Opis osi dla LEWEGO boku
+      const lineEndX_L = bokLewyX + depth + (isStructural ? 60 : 40);
+      svg += `<line x1="${bokLewyX + depth}" y1="${svgY}" x2="${lineEndX_L}" y2="${svgY}" stroke="${color}" stroke-width="1" stroke-dasharray="2,2" />`;
+      svg += `<text x="${lineEndX_L + 8}" y="${svgY + (isStructural ? 4 : 3)}" font-size="${fontSize}" font-weight="${fontWeight}" fill="${color}">${label}</text>`;
 
-      if (isStructural) {
-        svg += `<line x1="${cabX + cabWidth}" y1="${svgY}" x2="${bokX}" y2="${svgY}" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4,4" />`;
-        svg += `<text x="${cabX + cabWidth + gapBetween/2}" y="${svgY - 6}" font-size="12" font-weight="bold" fill="#1e3a8a" text-anchor="middle">Oś: ${yBottom}</text>`;
-      }
+      // Opis osi dla PRAWEGO boku
+      const lineEndX_R = bokPrawyX + depth + (isStructural ? 60 : 40);
+      svg += `<line x1="${bokPrawyX + depth}" y1="${svgY}" x2="${lineEndX_R}" y2="${svgY}" stroke="${color}" stroke-width="1" stroke-dasharray="2,2" />`;
+      svg += `<text x="${lineEndX_R + 8}" y="${svgY + (isStructural ? 4 : 3)}" font-size="${fontSize}" font-weight="${fontWeight}" fill="${color}">${label}</text>`;
     });
-
-    const centerYs = [...new Set(shelfHoles.filter(h => h.isCenter && h.isStructural).map(h => h.y))].sort((a, b) => b - a);
-    if (centerYs.length > 1) {
-      const dimX = bokX + depth / 2; 
-      for (let i = 0; i < centerYs.length - 1; i++) {
-        const y1 = centerYs[i];
-        const y2 = centerYs[i + 1];
-        
-        let calcY1 = y1; let calcY2 = y2;
-        if (isTopBottomFullWidth) { calcY1 -= th; calcY2 -= th; }
-
-        const svgY1 = sideH - calcY1;
-        const svgY2 = sideH - calcY2;
-        const dist = formatVal(y1 - y2);
-
-        svg += `<line x1="${dimX}" y1="${svgY1}" x2="${dimX}" y2="${svgY2}" stroke="#ea580c" stroke-width="0.75" />`;
-        
-        const midY = (svgY1 + svgY2) / 2;
-        const boxWidth = 36;
-        const boxHeight = 16;
-        svg += `<rect x="${dimX - boxWidth/2}" y="${midY - boxHeight/2}" width="${boxWidth}" height="${boxHeight}" fill="#ffffff" stroke="#ea580c" stroke-width="1" rx="2" />`;
-        svg += `<text x="${dimX}" y="${midY + 3.5}" font-size="10" fill="#ea580c" font-weight="bold" text-anchor="middle">${dist}</text>`;
-      }
-    }
   }
 
-  // --- NAWIERTY BOKU DLA SZUFLAD I ZAWIASÓW ---
+  // ==========================================
+  // NAWIERTY ZAWIASÓW I SZUFLAD
+  // ==========================================
   if (mountingData) {
     mountingData.forEach((data) => {
+      
       // 1. ZAWIASY NA BOKU
       if (data.type === 'door') {
         data.hinges.forEach(hinge => {
           let calcY = hinge.y;
           if (isTopBottomFullWidth) calcY -= th;
           const svgY = sideH - calcY;
-          const svgX = bokX + depth - 37;
-
-          // Dwa punkty mocowania prowadnika (System 32)
-          svg += `<circle cx="${svgX}" cy="${svgY - 16}" r="2.5" fill="#16a34a" />`;
-          svg += `<circle cx="${svgX}" cy="${svgY + 16}" r="2.5" fill="#16a34a" />`;
-          
-          svg += `<line x1="${svgX - 10}" y1="${svgY}" x2="${bokX + depth + 140}" y2="${svgY}" stroke="#bbf7d0" stroke-width="1" stroke-dasharray="4,4" />`;
           const yFromTop = formatVal(height - hinge.y);
-          svg += `<text x="${bokX + depth + 148}" y="${svgY + 4}" font-size="12" font-weight="bold" fill="#16a34a">Zawias (${data.side === 'left' ? 'L' : 'P'}): ${formatVal(hinge.y)} (${yFromTop})</text>`;
+          
+          if (data.side === 'left') {
+              // Rysujemy tylko na LEWYM boku (od lewej krawędzi)
+              const svgX = bokLewyX + 37;
+              svg += `<circle cx="${svgX}" cy="${svgY - 16}" r="2.5" fill="#16a34a" />`;
+              svg += `<circle cx="${svgX}" cy="${svgY + 16}" r="2.5" fill="#16a34a" />`;
+              svg += `<line x1="${svgX}" y1="${svgY}" x2="${bokLewyX + depth + 140}" y2="${svgY}" stroke="#bbf7d0" stroke-width="1" stroke-dasharray="4,4" />`;
+              svg += `<text x="${bokLewyX + depth + 148}" y="${svgY + 4}" font-size="12" font-weight="bold" fill="#16a34a">Zawias (L): ${formatVal(hinge.y)} (${yFromTop})</text>`;
+          } 
+          else if (data.side === 'right') {
+              // Rysujemy tylko na PRAWYM boku (od prawej krawędzi)
+              const svgX = bokPrawyX + depth - 37;
+              svg += `<circle cx="${svgX}" cy="${svgY - 16}" r="2.5" fill="#16a34a" />`;
+              svg += `<circle cx="${svgX}" cy="${svgY + 16}" r="2.5" fill="#16a34a" />`;
+              svg += `<line x1="${svgX}" y1="${svgY}" x2="${bokPrawyX + depth + 140}" y2="${svgY}" stroke="#bbf7d0" stroke-width="1" stroke-dasharray="4,4" />`;
+              svg += `<text x="${bokPrawyX + depth + 148}" y="${svgY + 4}" font-size="12" font-weight="bold" fill="#16a34a">Zawias (P): ${formatVal(hinge.y)} (${yFromTop})</text>`;
+          }
         });
       } 
-      // 2. PROWADNICE SZUFLAD NA BOKU
+      
+      // 2. PROWADNICE SZUFLAD (Na obu bokach)
       else if (data.type === 'drawer' && data.slideSideHoles && data.slideSideHoles.length > 0) {
         const baseHoleY = data.slideSideHoles[0].y;
         let calcY = baseHoleY;
@@ -250,28 +265,43 @@ export function generateSidePanelSVG(height, depth, mountingData) {
         const axisYFromBottom = formatVal(baseHoleY);
         const svgY = sideH - calcY;
         const yFromTop = formatVal(height - baseHoleY);
+        const label = `Prowadnik: ${axisYFromBottom} (${yFromTop})`;
 
-        const maxHoleX = Math.max(...data.slideSideHoles.map(h => h.x));
-        const rearHoleSvgX = bokX + depth - maxHoleX;
-        const lineEndX = bokX + depth + 140;
-
-        svg += `<line x1="${rearHoleSvgX}" y1="${svgY}" x2="${lineEndX}" y2="${svgY}" stroke="#bae6fd" stroke-width="1" stroke-dasharray="4,4" />`;
+        // Render na LEWYM Boku (od lewej krawędzi)
+        const maxHoleX_L = Math.max(...data.slideSideHoles.map(h => h.x));
+        const rearHoleSvgX_L = bokLewyX + maxHoleX_L;
+        const lineEndX_L = bokLewyX + depth + 140;
+        
+        svg += `<line x1="${rearHoleSvgX_L}" y1="${svgY}" x2="${lineEndX_L}" y2="${svgY}" stroke="#bae6fd" stroke-width="1" stroke-dasharray="4,4" />`;
 
         data.slideSideHoles.forEach(hole => {
-          const svgX = bokX + depth - hole.x;
+          const svgX = bokLewyX + hole.x;
           svg += `<circle cx="${svgX}" cy="${svgY}" r="3" fill="#0284c7" />`;
           svg += `<line x1="${svgX}" y1="${svgY + 5}" x2="${svgX}" y2="${svgY + 18}" stroke="#7dd3fc" stroke-width="1" />`;
           svg += `<text x="${svgX}" y="${svgY + 28}" font-size="10" font-weight="bold" fill="#0284c7" text-anchor="middle">${formatVal(hole.x)}</text>`;
         });
+        svg += `<text x="${lineEndX_L + 8}" y="${svgY + 4}" font-size="12" font-weight="bold" fill="#0284c7">${label}</text>`;
 
-        const label = `Prowadnik: ${axisYFromBottom} (${yFromTop})`;
-        svg += `<text x="${lineEndX + 8}" y="${svgY + 4}" font-size="12" font-weight="bold" fill="#0284c7">${label}</text>`;
+        // Render na PRAWYM Boku (od prawej krawędzi w lewo)
+        const maxHoleX_R = Math.max(...data.slideSideHoles.map(h => h.x));
+        const rearHoleSvgX_R = bokPrawyX + depth - maxHoleX_R;
+        const lineEndX_R = bokPrawyX + depth + 140;
+        
+        svg += `<line x1="${rearHoleSvgX_R}" y1="${svgY}" x2="${lineEndX_R}" y2="${svgY}" stroke="#bae6fd" stroke-width="1" stroke-dasharray="4,4" />`;
+
+        data.slideSideHoles.forEach(hole => {
+          const svgX = bokPrawyX + depth - hole.x;
+          svg += `<circle cx="${svgX}" cy="${svgY}" r="3" fill="#0284c7" />`;
+          svg += `<line x1="${svgX}" y1="${svgY + 5}" x2="${svgX}" y2="${svgY + 18}" stroke="#7dd3fc" stroke-width="1" />`;
+          svg += `<text x="${svgX}" y="${svgY + 28}" font-size="10" font-weight="bold" fill="#0284c7" text-anchor="middle">${formatVal(hole.x)}</text>`;
+        });
+        svg += `<text x="${lineEndX_R + 8}" y="${svgY + 4}" font-size="12" font-weight="bold" fill="#0284c7">${label}</text>`;
       }
     });
   }
 
   // ==========================================
-  // CZĘŚĆ PRAWA: FRONTY (MOCOWANIA I PODZIAŁY)
+  // RZUT 4: FRONTY (MOCOWANIA I PODZIAŁY)
   // ==========================================
   svg += `<text x="${frontX + cabWidth/2}" y="-25" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">FRONT (Podział zewnętrzny)</text>`;
 
@@ -288,11 +318,11 @@ export function generateSidePanelSVG(height, depth, mountingData) {
       const isDrawer = front.subtype === 'szuflada';
       const isDoor = front.subtype.includes('drzwi');
       
-      let fillColor = '#f0fdf4'; // Drzwi (Zielony wpadający w biel)
+      let fillColor = '#f0fdf4'; 
       let strokeColor = '#22c55e';
       
       if (isDrawer) {
-          fillColor = '#eff6ff'; // Szuflada (Niebieski)
+          fillColor = '#eff6ff'; 
           strokeColor = '#3b82f6';
       }
 
@@ -324,27 +354,22 @@ export function generateSidePanelSVG(height, depth, mountingData) {
              if (isTopBottomFullWidth) drawHoleY -= th;
              const holeSvgY = viewH - drawHoleY;
 
-             // Obrys puszki 35mm (r=17.5) i punkt nawiertu
              svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="17.5" fill="#fcfdfd" stroke="#16a34a" stroke-width="1.5" />`;
              svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="2" fill="#16a34a" />`;
 
-             // Klasyczne wymiarowanie: Od dołu (Od góry)
              const yBottom = Number(hinge.relY).toFixed(1);
              const yTop = Number(front.h - hinge.relY).toFixed(1);
              const yLabel = `${yBottom} (${yTop})`;
 
              svg += `<text x="${cupX + (isLeft ? 22 : -22)}" y="${holeSvgY + 4}" font-size="10" fill="#16a34a" font-weight="bold" text-anchor="${isLeft ? 'start' : 'end'}">${yLabel}</text>`;
 
-             // Kropkowana linia łącząca kolejne puszki
              if (idx > 0) {
                let drawPrevHoleY = front.y + doorData.hinges[idx-1].relY;
                if (isTopBottomFullWidth) drawPrevHoleY -= th;
                const prevHoleSvgY = viewH - drawPrevHoleY;
-               
                svg += `<line x1="${cupX}" y1="${prevHoleSvgY - 20}" x2="${cupX}" y2="${holeSvgY + 20}" stroke="#16a34a" stroke-width="0.75" stroke-dasharray="2,2" />`;
              }
 
-             // Wymiar X od krawędzi (tylko na pierwszym zawiasie, żeby zachować czytelność)
              if (idx === 0) {
                const edgeX = isLeft ? fSvgX : fSvgX + fWidth;
                svg += `<line x1="${edgeX}" y1="${holeSvgY}" x2="${cupX + (isLeft ? -20 : 20)}" y2="${holeSvgY}" stroke="#16a34a" stroke-width="0.75" stroke-dasharray="2,2" />`;

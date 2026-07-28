@@ -1,12 +1,12 @@
 // src/ui/properties.js
-import { state } from "../core/state.js";
+import { state, getActiveModule, recalculatePositions } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
 import { renderEditor2D } from "../render/editor2d.js"; 
 
 export function initPropertiesPanel() {
   const rightSidebar = document.querySelector(".sidebar-right");
-  const activeModule = state.project.modules[0];
+  const activeModule = getActiveModule(); 
   const cons = state.project.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
 
   rightSidebar.innerHTML = `
@@ -149,6 +149,14 @@ function setupEventListeners() {
     updateSidebar(); 
   };
   
+  let typingTimer;
+  const debouncedUpdateAll = () => {
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => {
+      updateAll();
+    }, 200); 
+  };
+  
   const joinTypeInput = document.getElementById('input-join-type');
   if (joinTypeInput) {
     joinTypeInput.addEventListener('change', (e) => {
@@ -198,17 +206,23 @@ function setupEventListeners() {
     if(el) {
       el.addEventListener('input', (e) => {
         const val = Number(e.target.value);
-        const mod = state.project.modules[0]; 
+        
+        // ZABEZPIECZENIE: Pobieramy faktyczny aktywny moduł!
+        const mod = getActiveModule(); 
 
         if (id === 'traverse-width') state.project.construction.traverseWidth = val;
-        
         if (id === 'board-thick') state.project.materials.boardThickness = val;
-        if (id === 'width') mod.dimensions.width = val;
+        
+        // FAZA 4: Aktualizacja wymiaru i przesunięcie wszystkich szafek po prawo!
+        if (id === 'width') {
+            mod.dimensions.width = val;
+            recalculatePositions(); 
+        }
+        
         if (id === 'height') mod.dimensions.height = val;
         if (id === 'depth') mod.dimensions.depth = val;
         
         if (id === 'front-gap') state.project.front.gap = val;
-        // Mapowanie osobnych luzów na stan aplikacji
         if (id === 'front-left') state.project.front.clearance.left = val;
         if (id === 'front-right') state.project.front.clearance.right = val;
         if (id === 'front-top') state.project.front.clearance.top = val;
@@ -217,7 +231,7 @@ function setupEventListeners() {
         if (id === 'back-offset') state.project.backPanel.offset = val;
         if (id === 'back-groove') state.project.backPanel.grooveDepth = val;
         
-        updateAll();
+        debouncedUpdateAll();
       });
     }
   });

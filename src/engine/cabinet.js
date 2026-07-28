@@ -1,5 +1,5 @@
 // src/engine/cabinet.js
-import { state } from "../core/state.js";
+import { state, getActiveModule } from "../core/state.js";
 import { calculateDrawerHoles, getDrawerComponents } from "../core/drawerMath.js";
 import { calculateHinges } from "../core/hingeMath.js"; // NOWY IMPORT
 
@@ -8,7 +8,7 @@ export function calculateParts() {
     return { parts: [], mountingData: [] };
   }
 
-  const mod = state.project.modules[0];
+  const mod = getActiveModule();
   const config = state.project;
 
   let parts = [];
