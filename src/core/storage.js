@@ -6,12 +6,12 @@ import { state } from "./state.js";
 
 // ⚠️ UWAGA: WKLEJ TUTAJ Z POWROTEM SWOJE KLUCZE FIREBASE! ⚠️
 const firebaseConfig = {
-  apiKey: "TWOJ_API_KEY",
-  authDomain: "twoj-projekt.firebaseapp.com",
-  projectId: "twoj-projekt",
-  storageBucket: "twoj-projekt.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef"
+  apiKey: "AIzaSyDnv-wvIpfM7Idlsiqaj8LTDLw9Zmtm3cg",
+  authDomain: "generator-stolarski-next.firebaseapp.com",
+  projectId: "generator-stolarski-next",
+  storageBucket: "generator-stolarski-next.firebasestorage.app",
+  messagingSenderId: "230164946690",
+  appId: "1:230164946690:web:23c3c7a37c33e7e921ac1b"
 };
 
 const app = initializeApp(firebaseConfig);
