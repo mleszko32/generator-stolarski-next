@@ -31,10 +31,20 @@ export function renderEditor2D() {
   
   container.innerHTML = '';
 
-  const mod = getActiveModule();
+  const mod = getActiveModule(); // Korzysta ze zaktualizowanego state.js
+  if (!mod) {
+    container.innerHTML = `
+      <div style="display:flex; height:100%; align-items:center; justify-content:center; flex-direction:column; color:#94a3b8;">
+        <div style="font-size: 50px; margin-bottom: 15px;">📦</div>
+        <div style="font-size: 18px; font-weight: bold; color: #475569;">Puste płótno</div>
+        <div style="font-size: 13px; margin-top: 5px;">Rozpocznij projektowanie używając zielonego przycisku po lewej.</div>
+      </div>`;
+    return;
+  }
+
   const config = state.project;
-  
   const th = parseFloat(config.materials.boardThickness) || 18;
+// ... (i tu zostaje reszta Twojego dotychczasowego kodu)
   const width = parseFloat(mod.dimensions.width) || 600;
   const height = parseFloat(mod.dimensions.height) || 720;
   

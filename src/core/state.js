@@ -1,56 +1,60 @@
 // src/core/state.js
 export const state = {
-  activeModuleId: "mod-1", // Śledzi, którą szafkę aktualnie edytujemy
+  activeModuleId: null, // Na start nie ma aktywnej szafki
   project: {
     name: "Zabudowa Wielomodułowa",
     materials: { boardThickness: 18, backThickness: 3 },
     construction: { joinType: "boki_przelotowe", topType: "pelny", traverseWidth: 100 },
-    backPanel: { type: "nakladane", offset: 20, grooveDepth: 7, clearance: 2 },
+    // Globalne plecy usunięte - teraz to parametr indywidualny szafki!
     front: { active: true, distribution: "1:1:1", drawerSystem: "merivobox", gap: 3, clearance: { sides: 1.5, top: 5, bottom: 0 } },
-    modules: [
-      {
-        id: "mod-1",
-        name: "Szafka dolna 1",
-        type: "base_cabinet",
-        dimensions: { width: 600, height: 720, depth: 513 },
-        position: { x: 0, y: 0, z: 0 },
-        elements: [] 
-      }
-    ]
+    modules: [] // Pusta tablica na start
   }
 };
 
-// Funkcja zwracająca szafkę, którą obecnie edytujemy
 export function getActiveModule() {
-  return state.project.modules.find(m => m.id === state.activeModuleId) || state.project.modules[0];
+  return state.project.modules.find(m => m.id === state.activeModuleId) || null;
 }
 
-// --- FAZA 4: Menedżer Pozycji ---
-// Układa szafki w rzędzie (jedna obok drugiej)
-export function recalculatePositions() {
-  let currentX = 0;
-  state.project.modules.forEach(mod => {
-    mod.position.x = currentX;
-    currentX += parseFloat(mod.dimensions.width); 
-  });
-}
-
-// Funkcja dodająca nową szafkę do projektu
-export function addModule(name = "Szafka") {
+export function addModule(type = "base_cabinet") {
   const newId = 'mod-' + Date.now();
+  const isUpper = type === 'upper_cabinet';
+  const isTall = type === 'tall_cabinet';
+
+  let name = "Szafka dolna";
+  let height = 720;
+  let depth = 513;
+  let posY = 0;
+
+  if (isUpper) {
+    name = "Szafka wisząca";
+    height = 720;
+    depth = 320;
+    posY = 1450;
+  } else if (isTall) {
+    name = "Słupek";
+    height = 2070;
+    depth = 513;
+    posY = 0;
+  }
+
+  // Szuka prawej krawędzi całej zabudowy, aby nowa szafka nie najechała na inne
+  let nextX = 0;
+  if (state.project.modules.length > 0) {
+    nextX = Math.max(...state.project.modules.map(m => m.position.x + parseFloat(m.dimensions.width)));
+  }
   
   const newModule = {
     id: newId,
     name: name + ' ' + (state.project.modules.length + 1),
-    type: "base_cabinet",
-    dimensions: { width: 600, height: 720, depth: 513 }, 
-    position: { x: 0, y: 0, z: 0 }, // Pozycja zostanie ustalona za moment
+    type: type,
+    dimensions: { width: 600, height: height, depth: depth }, 
+    position: { x: nextX, y: posY, z: 0 }, 
+    backPanel: { type: "nakladane", offset: 20, grooveDepth: 7, nutBuild: "all", clearance: 2 }, // PLECY PER MODUŁ
     elements: []
   };
   
   state.project.modules.push(newModule);
   state.activeModuleId = newId; 
-  recalculatePositions(); // Przeliczamy od nowa pozycję wszystkich szafek
   
   return newModule;
 }

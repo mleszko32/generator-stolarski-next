@@ -1,16 +1,14 @@
 // src/engine/cabinet.js
-import { state, getActiveModule } from "../core/state.js";
+import { state } from "../core/state.js";
 import { calculateDrawerHoles, getDrawerComponents } from "../core/drawerMath.js";
-import { calculateHinges } from "../core/hingeMath.js"; // NOWY IMPORT
+import { calculateHinges } from "../core/hingeMath.js"; 
 
 export function calculateParts() {
-  if (!state.project.modules || state.project.modules.length === 0) {
-    return { parts: [], mountingData: [] };
-  }
+  const activeModuleId = state.activeModuleId;
+  const mod = state.project.modules.find(m => m.id === activeModuleId);
+  if (!mod) return { parts: [], mountingData: [] };
 
-  const mod = getActiveModule();
   const config = state.project;
-
   let parts = [];
   let mountingData = [];
 
@@ -30,7 +28,7 @@ function getCorpusParts(mod, config) {
   const { width, height, depth } = mod.dimensions;
   const board = config.materials.boardThickness;
   const backThick = config.materials.backThickness;
-  const { type, offset } = config.backPanel;
+  const { type, offset } = mod.backPanel; // ODCZYT Z MODUŁU
   
   const construction = config.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
   const isTopBottomFullWidth = construction.joinType === 'wience_przelotowe';
@@ -70,7 +68,7 @@ function getCorpusParts(mod, config) {
 function getBackPanelParts(mod, config) {
   const { width, height } = mod.dimensions;
   const board = config.materials.boardThickness;
-  const { type, grooveDepth, clearance, nutBuild } = config.backPanel;
+  const { type, grooveDepth, clearance, nutBuild } = mod.backPanel; // ODCZYT Z MODUŁU
   
   let hdfWidth, hdfHeight;
   const totalClearance = clearance !== undefined ? clearance * 2 : 4; 
@@ -99,7 +97,7 @@ function getInteriorParts(mod, config) {
   const { depth } = mod.dimensions;
   const board = config.materials.boardThickness;
   const backThick = config.materials.backThickness;
-  const { type, offset } = config.backPanel;
+  const { type, offset } = mod.backPanel; // ODCZYT Z MODUŁU
   
   const frontType = config.front && config.front.type ? config.front.type : 'nakladane';
   const isInset = frontType === 'wpuszczane';
@@ -128,7 +126,6 @@ function getFrontsAndDrawers(mod, config) {
   const mountingData = [];
   const fronts = mod.elements ? mod.elements.filter(el => el.typ === 'front') : [];
   
-  // Pobieramy obiekty, które mogą kolidować z zawiasami
   const obstacles = mod.elements ? mod.elements.filter(el => el.typ === 'poziom' || el.subtype === 'szuflada-wewnetrzna') : [];
 
   if (fronts.length === 0) return { parts, mountingData };
@@ -137,9 +134,8 @@ function getFrontsAndDrawers(mod, config) {
 
   const { width, depth } = mod.dimensions;
   const board = config.materials.boardThickness;
-  const topBottomDepth = config.backPanel.type === 'nut' 
-    ? depth - config.backPanel.offset - config.materials.backThickness 
-    : depth - config.materials.backThickness;
+  const backP = mod.backPanel; // ODCZYT Z MODUŁU
+  const topBottomDepth = backP.type === 'nut' ? depth - backP.offset - config.materials.backThickness : depth - config.materials.backThickness;
 
   let drawerCount = 0;
   let doorCount = 0;
@@ -157,52 +153,30 @@ function getFrontsAndDrawers(mod, config) {
       partName = `Drzwi ${side}`;
     }
 
-    parts.push({
-      name: partName,
-      length: parseFloat(front.h.toFixed(1)),
-      width: parseFloat(front.w.toFixed(1)),
-      qty: 1
-    });
+    parts.push({ name: partName, length: parseFloat(front.h.toFixed(1)), width: parseFloat(front.w.toFixed(1)), qty: 1 });
 
-    // LOGIKA SZUFLAD
     if (front.subtype === 'szuflada') {
       const isBottomInZone = front.frontIndex === 0;
       const isTopInZone = index === fronts.length - 1;
       
       if (typeof calculateDrawerHoles === 'function') {
         const drawerHoles = calculateDrawerHoles(config.front.drawerSystem, front.y, front.h, board, drawerCount - 1, isBottomInZone);
-        if (drawerHoles) {
-            drawerHoles.frontId = front.id; // Dodane powiązanie dla SVG
-            drawerHoles.type = 'drawer';
-            mountingData.push(drawerHoles);
-        }
+        if (drawerHoles) { drawerHoles.frontId = front.id; drawerHoles.type = 'drawer'; mountingData.push(drawerHoles); }
       }
 
       if (typeof getDrawerComponents === 'function') {
         let availableSpace = front.h;
         if (isBottomInZone) availableSpace -= (board - (config.front.clearance.bottom || 0));
         if (isTopInZone) availableSpace -= (board - (config.front.clearance.top || 0));
-
         const userForcedVariant = front.forceVariant || 'auto';
         const drawerComps = getDrawerComponents(config.front.drawerSystem, width - (board * 2), topBottomDepth, availableSpace, userForcedVariant);
         
         if (drawerComps) {
-          parts.push({
-            name: `Dno szuflady ${drawerCount} (NL: ${drawerComps.nominalLength})`,
-            length: parseFloat(drawerComps.bottom.length.toFixed(1)),
-            width: parseFloat(drawerComps.bottom.width.toFixed(1)),
-            qty: 1
-          });
-          parts.push({
-            name: `Tył szuflady ${drawerCount} (Wariant ${drawerComps.back.variantType})`,
-            length: parseFloat(drawerComps.back.width.toFixed(1)),
-            width: parseFloat(drawerComps.back.height.toFixed(1)),
-            qty: 1
-          });
+          parts.push({ name: `Dno szuflady ${drawerCount} (NL: ${drawerComps.nominalLength})`, length: parseFloat(drawerComps.bottom.length.toFixed(1)), width: parseFloat(drawerComps.bottom.width.toFixed(1)), qty: 1 });
+          parts.push({ name: `Tył szuflady ${drawerCount} (Wariant ${drawerComps.back.variantType})`, length: parseFloat(drawerComps.back.width.toFixed(1)), width: parseFloat(drawerComps.back.height.toFixed(1)), qty: 1 });
         }
       }
     } 
-    // LOGIKA ZAWIASÓW
     else if (front.subtype.includes('drzwi')) {
       const side = front.subtype === 'drzwi-lp' ? (front.id.endsWith('-L') ? 'left' : 'right') : (front.openingSide || 'left');
       const hinges = calculateHinges(front, board, obstacles, side);

@@ -142,11 +142,11 @@ export function update3D() {
     };
 
     // --- LOGIKA PLECÓW I KORPUSU (Dla pojedynczego modułu) ---
-    const backType = config.backPanel?.type || 'nakladane';
-    const nutBuild = config.backPanel?.nutBuild || 'all';
-    const offset = config.backPanel?.offset !== undefined ? parseFloat(config.backPanel.offset) : 16;
-    const groove = config.backPanel?.grooveDepth !== undefined ? parseFloat(config.backPanel.grooveDepth) : 6;
-    const hdfThick = 3; 
+    const backType = mod.backPanel?.type || 'nakladane';
+    const nutBuild = mod.backPanel?.nutBuild || 'all';
+    const offset = mod.backPanel?.offset !== undefined ? parseFloat(mod.backPanel.offset) : 16;
+    const groove = mod.backPanel?.grooveDepth !== undefined ? parseFloat(mod.backPanel.grooveDepth) : 6;
+    const hdfThick = 3;
 
     const cons = config.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
     const isTopBottomFullWidth = cons.joinType === 'wience_przelotowe';
