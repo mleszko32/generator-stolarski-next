@@ -121,7 +121,6 @@ export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick
   const config = state.project;
   const bottomGap = Number(config.front.clearance.bottom ?? 0);
   
-  // Zaktualizowany pobór luzów (osobno dla lewej i prawej strony)
   const leftGap = Number(config.front.clearance.left ?? config.front.clearance.sides ?? 1.5);
   const rightGap = Number(config.front.clearance.right ?? config.front.clearance.sides ?? 1.5);
 
@@ -139,7 +138,8 @@ export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick
 
   let slideY;
   if (isBottom) {
-    slideY = boardThick + systemParams.railOffset;
+    // NAPRAWA BŁĘDU: Dodano currentY! Wcześniej szuflada lądowała na 0.
+    slideY = currentY + boardThick + systemParams.railOffset;
   } else {
     slideY = currentY + systemParams.railOffset;
   }
@@ -150,7 +150,6 @@ export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick
     localFrontHolesBase += bottomOverlap;
   }
 
-  // Osobne przesunięcia otworów dla lewej i prawej strony frontu
   const localFrontHolesX_Left = systemParams.frontHolesXBase + (boardThick - leftGap);
   const localFrontHolesX_Right = systemParams.frontHolesXBase + (boardThick - rightGap);
 
@@ -159,7 +158,7 @@ export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick
     { y: localFrontHolesBase + 32, xOffsetLeft: localFrontHolesX_Left, xOffsetRight: localFrontHolesX_Right, diameter: 3 }
   ];
 
-  if (frontHeight >= 280) {
+  if (frontHeight >= 200) {
     frontHoles.push({
       y: localFrontHolesBase + 160, 
       xOffsetLeft: localFrontHolesX_Left, 

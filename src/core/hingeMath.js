@@ -40,36 +40,55 @@ export function calculateHinges(front, boardThick, obstacles, side) {
     
     while (collision && attempts < 15) {
       collision = false;
-      let testAbsY = y + currentRelY + shift;
+      let testRelY = relY + shift;
+      let testAbsY = y + testRelY;
       
-      for (const obs of obstacles) {
-        if (obs.typ === 'poziom') {
-          const sCenter = obs.y + boardThick / 2;
-          if (testAbsY > sCenter - 65 && testAbsY < sCenter + 65) {
-            collision = true;
-            break;
+      // BLOKADA: Zawias nie może uciec poza formatkę drzwi (min 30mm od krawędzi)
+      if (testRelY < 30 || testRelY > h - 30) {
+          collision = true;
+      } else {
+          for (const obs of obstacles) {
+            if (obs.typ === 'poziom') {
+              const sCenter = Number(obs.y) + Number(boardThick) / 2;
+              
+              // ROZWIĄZANIE: Półki ruchome mają strefę +/- 32mm na podpórki!
+              // Zwiększamy strefę bezpieczeństwa wokół półek ruchomych do 60mm.
+              const isStructural = obs.isStructural === true;
+              const safeZone = isStructural ? 35 : 60; 
+              
+              if (testAbsY > sCenter - safeZone && testAbsY < sCenter + safeZone) {
+                collision = true;
+                break;
+              }
+            } else {
+              // Kolizja z innymi przeszkodami (np. szuflady wewnętrzne)
+              let obsMin = Number(obs.y);
+              let obsMax = Number(obs.y) + Number(obs.h);
+              if (testAbsY + 35 > obsMin && testAbsY - 35 < obsMax) {
+                collision = true;
+                break;
+              }
+            }
           }
-        } else {
-          let obsMin = obs.y;
-          let obsMax = obs.y + obs.h;
-          if (testAbsY + 35 > obsMin && testAbsY - 35 < obsMax) {
-            collision = true;
-            break;
-          }
-        }
       }
       
       if (collision) {
         attempts++;
+        // Przeskakujemy co 32 mm na przemian w górę i w dół (System 32)
         shift = 32 * Math.ceil(attempts / 2) * (attempts % 2 !== 0 ? 1 : -1); 
       } else {
         absY = testAbsY;
-        currentRelY = currentRelY + shift; 
+        currentRelY = testRelY; 
       }
     }
 
+    // Ostateczne zabezpieczenie: jeśli nie udało się znaleźć miejsca po 15 próbach
+    if (collision) {
+       currentRelY = relY;
+       absY = y + relY;
+    }
+
     return {
-      // Zwracamy czyste, zaokrąglone wartości do rysowania
       y: Math.round(absY),             
       relY: Math.round(currentRelY),   
       side: side,

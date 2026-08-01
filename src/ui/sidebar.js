@@ -157,7 +157,6 @@ export function updateSidebar() {
       
       const svgContent = generateSidePanelSVG(drawHeight, drawDepth, mountingData);
       
-      // DODANY KOD OBSŁUGI PAN & ZOOM W PRZEGLĄDARCE SVG
       const htmlContent = `
         <!DOCTYPE html>
         <html lang="pl">
@@ -174,7 +173,6 @@ export function updateSidebar() {
                 .controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
                 .controls input { cursor: pointer; width: 16px; height: 16px; }
 
-                /* Wrapper z kursorem 'chwytaka' */
                 .svg-container { flex-grow: 1; width: 100%; height: 100%; overflow: hidden; background-color: #f8fafc; cursor: grab; } 
                 .svg-container:active { cursor: grabbing; }
                 
@@ -192,11 +190,12 @@ export function updateSidebar() {
                     <p>Wymiary liczone od krawędzi i bazy. <b>Przeciągaj LKM</b> (przesunięcie) | <b>Kółko myszy</b> (Zoom).</p>
                 </div>
                 <div class="controls">
-                    <label><input type="checkbox" checked onchange="toggleLayer('layer-dim-gaps', this)"> Prześwity szafki</label>
-                    <label><input type="checkbox" checked onchange="toggleLayer('layer-holes-corpus', this)"> Konstrukcja (Wkręt/Kołek)</label>
-                    <label><input type="checkbox" checked onchange="toggleLayer('layer-holes-hinge', this)"> Prowadniki (Zawiasy)</label>
-                    <label><input type="checkbox" checked onchange="toggleLayer('layer-holes-drawer', this)"> Prowadnice</label>
-                    <label><input type="checkbox" checked onchange="toggleLayer('layer-front-holes', this)"> Otwory Frontów</label>
+                    <label style="color:#475569;"><input type="checkbox" checked onchange="toggleLayer('layer-dim-gaps', this)"> Prześwity szafki</label>
+                    <label style="color:#9333ea;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-corpus', this)"> Konstrukcja (Wieńce/Stałe)</label>
+                    <label style="color:#f59e0b;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-shelf', this)"> Podpórki (Ruchome)</label>
+                    <label style="color:#16a34a;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-hinge', this)"> Zawiasy i Prowadniki</label>
+                    <label style="color:#0284c7;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-drawer', this)"> Prowadnice Szuflad</label>
+                    <label style="color:#dc2626;"><input type="checkbox" checked onchange="toggleLayer('layer-front-holes', this)"> Mocowania Frontów</label>
                 </div>
             </div>
             <div class="svg-container" id="svg-viewport">
@@ -208,57 +207,32 @@ export function updateSidebar() {
                     elements.forEach(el => { el.style.display = checkbox.checked ? '' : 'none'; });
                 }
 
-                // --- OBSŁUGA PAN & ZOOM DLA SVG ---
+                // --- OBSŁUGA PAN & ZOOM ---
                 const viewport = document.getElementById('svg-viewport');
-                const svg = document.getElementById('main-svg');
+                const svg = document.getElementById('side-panel-svg');
                 
-                let scale = 1;
-                let panning = false;
-                let pointX = 0;
-                let pointY = 0;
-                let start = { x: 0, y: 0 };
+                let scale = 1; let panning = false; let pointX = 0; let pointY = 0; let start = { x: 0, y: 0 };
 
-                function setTransform() {
-                    svg.style.transform = \`translate(\${pointX}px, \${pointY}px) scale(\${scale})\`;
-                }
+                function setTransform() { svg.style.transform = \`translate(\${pointX}px, \${pointY}px) scale(\${scale})\`; }
 
                 viewport.onmousedown = function (e) {
-                    e.preventDefault();
-                    start = { x: e.clientX - pointX, y: e.clientY - pointY };
-                    panning = true;
+                    e.preventDefault(); start = { x: e.clientX - pointX, y: e.clientY - pointY }; panning = true;
                 };
 
-                viewport.onmouseup = function (e) {
-                    panning = false;
-                };
-                
-                viewport.onmouseleave = function (e) {
-                    panning = false;
-                };
+                viewport.onmouseup = function () { panning = false; };
+                viewport.onmouseleave = function () { panning = false; };
 
                 viewport.onmousemove = function (e) {
-                    e.preventDefault();
-                    if (!panning) return;
-                    pointX = (e.clientX - start.x);
-                    pointY = (e.clientY - start.y);
-                    setTransform();
+                    e.preventDefault(); if (!panning) return;
+                    pointX = (e.clientX - start.x); pointY = (e.clientY - start.y); setTransform();
                 };
 
                 viewport.onwheel = function (e) {
                     e.preventDefault();
-                    // Obliczenie współrzędnych myszy względem obrazka
-                    const xs = (e.clientX - pointX) / scale;
-                    const ys = (e.clientY - pointY) / scale;
-                    
+                    const xs = (e.clientX - pointX) / scale; const ys = (e.clientY - pointY) / scale;
                     const delta = (e.wheelDelta ? e.wheelDelta : -e.deltaY);
-                    
-                    // Współczynnik przybliżania
                     if (delta > 0) { scale *= 1.2; } else { scale /= 1.2; }
-                    
-                    // Przesunięcie punktu 0,0 aby zoom środkował się na kursorze
-                    pointX = e.clientX - xs * scale;
-                    pointY = e.clientY - ys * scale;
-                    
+                    pointX = e.clientX - xs * scale; pointY = e.clientY - ys * scale;
                     setTransform();
                 };
             </script>
@@ -295,11 +269,8 @@ export function updateSidebar() {
         alert("Brak okuć do wygenerowania.");
         return;
       }
-      let csvContent = "\uFEFF";
-      csvContent += "Nazwa akcesorium;Ilosc;Jednostka\n";
-      hardware.forEach(item => {
-          csvContent += `"${item.name}";${item.qty};"${item.unit}"\n`;
-      });
+      let csvContent = "\uFEFFNazwa akcesorium;Ilosc;Jednostka\n";
+      hardware.forEach(item => { csvContent += `"${item.name}";${item.qty};"${item.unit}"\n`; });
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement("a");
       link.setAttribute("href", URL.createObjectURL(blob));
