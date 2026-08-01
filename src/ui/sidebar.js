@@ -11,7 +11,6 @@ export function updateSidebar() {
   const { parts, mountingData } = calculateParts(); 
   const activeMod = getActiveModule();
   
-  // Pobieramy okucia dla CAŁEGO projektu, żeby od razu widzieć pełne zestawienie
   const projectHardware = calculateProjectHardware();
   
   let html = `
@@ -61,7 +60,6 @@ export function updateSidebar() {
     <hr style="margin: 15px 0; border: 0; border-top: 1px dashed #cbd5e1;">
   `;
 
-  // --- PRZYCISKI EKSPORTU DO PLIKU ---
   if (state.project.modules.length > 0) {
     html += `
       <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 15px;">
@@ -83,7 +81,6 @@ export function updateSidebar() {
     }
   }
 
-  // --- SEKCJA AKTYWNEJ SZAFKI (FORMATKI I NAWIERTY) ---
   if (activeMod) {
     html += `<details open style="margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">`;
     html += `<summary style="font-weight: bold; cursor: pointer; outline: none;">Lista formatek (Aktywna)</summary>`;
@@ -102,7 +99,7 @@ export function updateSidebar() {
         } else if (item.type === 'drawer') {
           let slideY = item.slideSideHoles && item.slideSideHoles.length > 0 ? item.slideSideHoles[0].y : "Brak";
           let frontHolesHtml = item.frontHoles ? item.frontHoles.map(h => `Y: <b>${Number(h.y).toFixed(1)} mm</b>`).join('<br>') : "";
-          html += `<li style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #cbd5e1;"><strong>Szuflada ${currentDrawerIndex}</strong><br><div style="margin-top: 4px; color: #1e293b;">Oś prowadnicy (bok): <b>${slideY !== "Brak" ? slideY + ' mm' : 'Brak'}</b></div><div style="margin-top: 6px; font-size: 0.9em; padding-left: 10px; border-left: 3px solid #cbd5e1;"><b>Front (od dołu):</b><br>${frontHolesHtml}</div></li>`;
+          html += `<li style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #cbd5e1;"><strong>Szuflada ${currentDrawerIndex}</strong><br><div style="margin-top: 4px; color: #1e293b;">Oś prowadnicy: <b>${slideY !== "Brak" ? slideY + ' mm' : 'Brak'}</b></div><div style="margin-top: 6px; font-size: 0.9em; padding-left: 10px; border-left: 3px solid #cbd5e1;"><b>Front (od dołu):</b><br>${frontHolesHtml}</div></li>`;
           currentDrawerIndex++;
         }
       });
@@ -110,7 +107,6 @@ export function updateSidebar() {
     }
   }
 
-  // --- NOWOŚĆ: ZBIORCZA LISTA ZAKUPÓW (OKUCIA) NA BIEŻĄCO W PANELU ---
   if (state.project.modules.length > 0) {
     html += `<details style="background: #fffbeb; padding: 10px; border-radius: 6px; border: 1px solid #fcd34d;">`;
     html += `<summary style="font-weight: bold; cursor: pointer; outline: none; color: #92400e;">🛒 Lista zakupów (Okucia - Całość)</summary>`;
@@ -159,8 +155,63 @@ export function updateSidebar() {
       const sidePanel = parts.find(p => p.name.toLowerCase().includes('bok'));
       let drawHeight = sidePanel ? sidePanel.length : (parseFloat(activeMod.dimensions.height) || 720);
       let drawDepth = sidePanel ? sidePanel.width : (parseFloat(activeMod.dimensions.depth) || 510);
+      
       const svgContent = generateSidePanelSVG(drawHeight, drawDepth, mountingData);
-      const htmlContent = `<!DOCTYPE html><html lang="pl"><head><meta charset="UTF-8"><title>Wydruk na produkcję</title><style>body { margin: 0; padding: 0; background-color: #f1f5f9; display: flex; flex-direction: column; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; } .header { background-color: #ffffff; padding: 16px 24px; border-bottom: 1px solid #cbd5e1; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); z-index: 10; } .header h1 { margin: 0 0 6px 0; font-size: 20px; color: #0f172a; } .header p { margin: 0; font-size: 13px; color: #64748b; } .svg-container { flex-grow: 1; width: 100%; height: 100%; overflow: hidden; display: flex; justify-content: center; align-items: center; background-color: #f8fafc; } @media print { body { height: auto; overflow: visible; display: block; background: white; } .header { display: none; } .svg-container { display: block; overflow: visible; background: white; } }</style></head><body><div class="header"><h1>Rysunek techniczny (Nawierty)</h1><p>Wymiary od krawędzi (X, Y). Użyj kółka myszy, aby przybliżać/oddalać. Przeciągaj LKM.</p></div><div class="svg-container">${svgContent}</div></body></html>`;
+      
+      // WSTRZYKNIĘCIE PANELU STEROWANIA WARSTWAMI DO OKNA WYDRUKU
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html lang="pl">
+        <head>
+            <meta charset="UTF-8">
+            <title>Wydruk na produkcję</title>
+            <style>
+                body { margin: 0; padding: 0; background-color: #f1f5f9; display: flex; flex-direction: column; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; } 
+                .header { background-color: #ffffff; padding: 16px 24px; border-bottom: 1px solid #cbd5e1; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); z-index: 10; display: flex; justify-content: space-between; align-items: center; } 
+                .header-text h1 { margin: 0 0 6px 0; font-size: 20px; color: #0f172a; } 
+                .header-text p { margin: 0; font-size: 13px; color: #64748b; } 
+                
+                .controls { display: flex; gap: 15px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; font-weight: bold; color: #334155; }
+                .controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+                .controls input { cursor: pointer; width: 16px; height: 16px; }
+
+                .svg-container { flex-grow: 1; width: 100%; height: 100%; overflow: hidden; display: flex; justify-content: center; align-items: center; background-color: #f8fafc; } 
+                
+                @media print { 
+                    body { height: auto; overflow: visible; display: block; background: white; } 
+                    .header { display: none; } 
+                    .svg-container { display: block; overflow: visible; background: white; } 
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div class="header-text">
+                    <h1>Rysunek techniczny (Nawierty)</h1>
+                    <p>Wymiary [X, Y] liczone od przedniej krawędzi i bazy. Przeciągaj LKM, aby przesuwać. Kółko myszy = Zoom.</p>
+                </div>
+                <div class="controls">
+                    <label><input type="checkbox" checked onchange="toggleLayer('layer-dim-gaps', this)"> Prześwity szafki</label>
+                    <label><input type="checkbox" checked onchange="toggleLayer('layer-holes-corpus', this)"> Konstrukcja (Wkręt/Kołek)</label>
+                    <label><input type="checkbox" checked onchange="toggleLayer('layer-holes-hinge', this)"> Prowadniki (Zawiasy)</label>
+                    <label><input type="checkbox" checked onchange="toggleLayer('layer-holes-drawer', this)"> Prowadnice</label>
+                </div>
+            </div>
+            <div class="svg-container">
+                ${svgContent}
+            </div>
+            <script>
+                // Skrypt do ukrywania wybranych warstw SVG
+                function toggleLayer(layerName, checkbox) {
+                    const elements = document.querySelectorAll('.' + layerName);
+                    elements.forEach(el => {
+                        el.style.display = checkbox.checked ? '' : 'none';
+                    });
+                }
+            </script>
+        </body>
+        </html>`;
+
       const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
       window.open(URL.createObjectURL(blob), '_blank');
     });
@@ -191,14 +242,11 @@ export function updateSidebar() {
         alert("Brak okuć do wygenerowania.");
         return;
       }
-
       let csvContent = "\uFEFF";
       csvContent += "Nazwa akcesorium;Ilosc;Jednostka\n";
-      
       hardware.forEach(item => {
           csvContent += `"${item.name}";${item.qty};"${item.unit}"\n`;
       });
-
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement("a");
       link.setAttribute("href", URL.createObjectURL(blob));

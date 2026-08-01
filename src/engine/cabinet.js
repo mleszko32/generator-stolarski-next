@@ -18,7 +18,9 @@ export function calculateParts() {
 
   const frontsAndDrawers = getFrontsAndDrawers(mod, config);
   parts.push(...frontsAndDrawers.parts);
+  
   mountingData.push(...frontsAndDrawers.mountingData);
+  mountingData.push(...getCorpusHoles(mod, config)); 
 
   return { parts, mountingData };
 }
@@ -98,7 +100,6 @@ export function calculateAllProjectParts() {
   return Object.values(aggregated);
 }
 
-// AGREGATOR OKUĆ Z UWZGLĘDNIENIEM WARIANTÓW WYSOKOŚCI (N, M, K, E)
 export function calculateProjectHardware() {
   const config = state.project;
   const hardwareList = {};
@@ -117,6 +118,10 @@ export function calculateProjectHardware() {
       if (!hardwareList[legKey]) hardwareList[legKey] = { name: legKey, qty: 0, unit: 'szt.' };
       hardwareList[legKey].qty += 4; 
     }
+
+    const joinKey = `Złącze korpusowe (Kołek 8x30 + Konfirmat)`;
+    if (!hardwareList[joinKey]) hardwareList[joinKey] = { name: joinKey, qty: 0, unit: 'kpl.' };
+    hardwareList[joinKey].qty += 8; 
 
     if (!mod.elements) return;
 
@@ -142,7 +147,6 @@ export function calculateProjectHardware() {
         if (drawerComps) {
           const sysName = config.front.drawerSystem || 'merivobox';
           const nl = drawerComps.nominalLength;
-          // Pobieramy wariant wysokości (np. 'M', 'K', 'E', 'N') z obliczeń prowadnic
           const variantType = drawerComps.back.variantType ? drawerComps.back.variantType.toUpperCase() : 'M';
           
           const hwKey = `Komplet szuflady (${sysName.toUpperCase()} - H:${variantType} L-${nl})`;
@@ -164,6 +168,58 @@ export function calculateProjectHardware() {
   });
 
   return Object.values(hardwareList);
+}
+
+// ZAKTUALIZOWANE WARTOŚCI NAWIERTÓW (37 mm oraz 37+32 mm)
+function getCorpusHoles(mod, config) {
+  const { width, height, depth } = mod.dimensions;
+  const th = config.materials.boardThickness || 18;
+  const cons = config.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
+  
+  const holes = [];
+
+  const addJoint = (y, distFromFront, reverse = false) => {
+     const screwDist = distFromFront;
+     const dowelDist = reverse ? distFromFront - 32 : distFromFront + 32;
+     holes.push({ y: y, xFromFront: screwDist, holeType: 'screw' });
+     holes.push({ y: y, xFromFront: dowelDist, holeType: 'dowel' });
+  };
+
+  if (cons.joinType === 'boki_przelotowe') {
+     const bottomY = th / 2;
+     addJoint(bottomY, 37); // Startujemy od 37 mm
+     addJoint(bottomY, depth - 37, true); 
+     
+     const topY = height - th / 2;
+     if (cons.topType === 'pelny') {
+        addJoint(topY, 37);
+        addJoint(topY, depth - 37, true);
+     } else if (cons.topType === 'trawersy_poziom') {
+        addJoint(topY, 37); 
+        addJoint(topY, depth - 37, true);
+     } else if (cons.topType === 'trawersy_pion') {
+        holes.push({ y: height - 37, xFromFront: th / 2, holeType: 'screw' });
+        holes.push({ y: height - 69, xFromFront: th / 2, holeType: 'dowel' });
+        
+        holes.push({ y: height - 37, xFromFront: depth - th / 2, holeType: 'screw' });
+        holes.push({ y: height - 69, xFromFront: depth - th / 2, holeType: 'dowel' });
+     }
+  } else {
+     const bottomY = 0;
+     const topY = height;
+     addJoint(bottomY, 37); 
+     addJoint(bottomY, depth - 37, true);
+     
+     if (cons.topType === 'pelny') {
+        addJoint(topY, 37);
+        addJoint(topY, depth - 37, true);
+     } else if (cons.topType === 'trawersy_poziom') {
+        addJoint(topY, 37);
+        addJoint(topY, depth - 37, true);
+     }
+  }
+
+  return holes.length > 0 ? [{ type: 'corpus', holes: holes }] : [];
 }
 
 function getCorpusParts(mod, config) {
