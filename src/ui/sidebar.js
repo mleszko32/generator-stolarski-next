@@ -10,7 +10,6 @@ export function updateSidebar() {
   const leftSidebar = document.querySelector(".sidebar-left");
   const { parts, mountingData } = calculateParts(); 
   const activeMod = getActiveModule();
-  
   const projectHardware = calculateProjectHardware();
   
   let html = `
@@ -158,7 +157,7 @@ export function updateSidebar() {
       
       const svgContent = generateSidePanelSVG(drawHeight, drawDepth, mountingData);
       
-      // WSTRZYKNIĘCIE PANELU STEROWANIA WARSTWAMI DO OKNA WYDRUKU
+      // DODANY KOD OBSŁUGI PAN & ZOOM W PRZEGLĄDARCE SVG
       const htmlContent = `
         <!DOCTYPE html>
         <html lang="pl">
@@ -171,11 +170,13 @@ export function updateSidebar() {
                 .header-text h1 { margin: 0 0 6px 0; font-size: 20px; color: #0f172a; } 
                 .header-text p { margin: 0; font-size: 13px; color: #64748b; } 
                 
-                .controls { display: flex; gap: 15px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; font-weight: bold; color: #334155; }
+                .controls { display: flex; flex-wrap: wrap; gap: 12px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; font-weight: bold; color: #334155; }
                 .controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
                 .controls input { cursor: pointer; width: 16px; height: 16px; }
 
-                .svg-container { flex-grow: 1; width: 100%; height: 100%; overflow: hidden; display: flex; justify-content: center; align-items: center; background-color: #f8fafc; } 
+                /* Wrapper z kursorem 'chwytaka' */
+                .svg-container { flex-grow: 1; width: 100%; height: 100%; overflow: hidden; background-color: #f8fafc; cursor: grab; } 
+                .svg-container:active { cursor: grabbing; }
                 
                 @media print { 
                     body { height: auto; overflow: visible; display: block; background: white; } 
@@ -188,26 +189,78 @@ export function updateSidebar() {
             <div class="header">
                 <div class="header-text">
                     <h1>Rysunek techniczny (Nawierty)</h1>
-                    <p>Wymiary [X, Y] liczone od przedniej krawędzi i bazy. Przeciągaj LKM, aby przesuwać. Kółko myszy = Zoom.</p>
+                    <p>Wymiary liczone od krawędzi i bazy. <b>Przeciągaj LKM</b> (przesunięcie) | <b>Kółko myszy</b> (Zoom).</p>
                 </div>
                 <div class="controls">
                     <label><input type="checkbox" checked onchange="toggleLayer('layer-dim-gaps', this)"> Prześwity szafki</label>
                     <label><input type="checkbox" checked onchange="toggleLayer('layer-holes-corpus', this)"> Konstrukcja (Wkręt/Kołek)</label>
                     <label><input type="checkbox" checked onchange="toggleLayer('layer-holes-hinge', this)"> Prowadniki (Zawiasy)</label>
                     <label><input type="checkbox" checked onchange="toggleLayer('layer-holes-drawer', this)"> Prowadnice</label>
+                    <label><input type="checkbox" checked onchange="toggleLayer('layer-front-holes', this)"> Otwory Frontów</label>
                 </div>
             </div>
-            <div class="svg-container">
+            <div class="svg-container" id="svg-viewport">
                 ${svgContent}
             </div>
             <script>
-                // Skrypt do ukrywania wybranych warstw SVG
                 function toggleLayer(layerName, checkbox) {
                     const elements = document.querySelectorAll('.' + layerName);
-                    elements.forEach(el => {
-                        el.style.display = checkbox.checked ? '' : 'none';
-                    });
+                    elements.forEach(el => { el.style.display = checkbox.checked ? '' : 'none'; });
                 }
+
+                // --- OBSŁUGA PAN & ZOOM DLA SVG ---
+                const viewport = document.getElementById('svg-viewport');
+                const svg = document.getElementById('main-svg');
+                
+                let scale = 1;
+                let panning = false;
+                let pointX = 0;
+                let pointY = 0;
+                let start = { x: 0, y: 0 };
+
+                function setTransform() {
+                    svg.style.transform = \`translate(\${pointX}px, \${pointY}px) scale(\${scale})\`;
+                }
+
+                viewport.onmousedown = function (e) {
+                    e.preventDefault();
+                    start = { x: e.clientX - pointX, y: e.clientY - pointY };
+                    panning = true;
+                };
+
+                viewport.onmouseup = function (e) {
+                    panning = false;
+                };
+                
+                viewport.onmouseleave = function (e) {
+                    panning = false;
+                };
+
+                viewport.onmousemove = function (e) {
+                    e.preventDefault();
+                    if (!panning) return;
+                    pointX = (e.clientX - start.x);
+                    pointY = (e.clientY - start.y);
+                    setTransform();
+                };
+
+                viewport.onwheel = function (e) {
+                    e.preventDefault();
+                    // Obliczenie współrzędnych myszy względem obrazka
+                    const xs = (e.clientX - pointX) / scale;
+                    const ys = (e.clientY - pointY) / scale;
+                    
+                    const delta = (e.wheelDelta ? e.wheelDelta : -e.deltaY);
+                    
+                    // Współczynnik przybliżania
+                    if (delta > 0) { scale *= 1.2; } else { scale /= 1.2; }
+                    
+                    // Przesunięcie punktu 0,0 aby zoom środkował się na kursorze
+                    pointX = e.clientX - xs * scale;
+                    pointY = e.clientY - ys * scale;
+                    
+                    setTransform();
+                };
             </script>
         </body>
         </html>`;
