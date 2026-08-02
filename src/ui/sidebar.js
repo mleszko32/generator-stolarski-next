@@ -60,16 +60,16 @@ export function updateSidebar() {
   `;
 
   if (state.project.modules.length > 0) {
-    // --- NOWY DROPDOWN DO WYBORU WIDOKU WYDRUKU ---
     html += `
       <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 15px;">
         <div style="display: flex; gap: 6px;">
             <select id="print-view-mode" ${!activeMod ? 'disabled' : ''} style="flex: 1; padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 11px; background: white; outline: none; cursor: pointer;">
                 <option value="all">Wszystko razem</option>
+                <option value="korpus">Tylko Korpus</option>
+                <option value="boki">Tylko Boki (L+P)</option>
                 <option value="bokL">Tylko Bok Lewy</option>
                 <option value="bokR">Tylko Bok Prawy</option>
                 <option value="front">Tylko Fronty</option>
-                <option value="korpus">Tylko Korpus</option>
             </select>
             <button id="btn-print-2d" ${!activeMod ? 'disabled style="opacity: 0.5;"' : ''} style="flex: 1; padding: 8px; background-color: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px;">
               📄 Drukuj
@@ -84,7 +84,7 @@ export function updateSidebar() {
       </div>
     `;
     if (!activeMod) {
-      html += `<div style="font-size: 11px; color: #ef4444; margin-top: -10px; margin-bottom: 15px; text-align: center;">Wybierz szafkę, aby wygenerować rysunek 2D.</div>`;
+      html += `<div style="font-size: 11px; color: #ef4444; margin-top: -10px; margin-bottom: 15px; text-align: center;">Wybierz szafkę, aby wygenerować rysunek.</div>`;
     }
   }
 
@@ -101,7 +101,7 @@ export function updateSidebar() {
       mountingData.forEach((item) => {
         if (item.type === 'door') {
           const sidePl = item.side === 'left' ? 'Lewe' : 'Prawe';
-          const holesHtml = item.hinges.map(h => `Oś Y: <b>${h.y.toFixed(1)} mm</b> (Od dołu: ${h.relY.toFixed(1)} mm)`).join('<br>');
+          const holesHtml = item.hinges.map(h => `Oś Y: <b>${h.y.toFixed(1)} mm</b>`).join('<br>');
           html += `<li style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #cbd5e1;"><strong>${item.name} (${sidePl})</strong><br><div style="margin-top: 4px; color: #1e293b;">Liczba zawiasów: <b>${item.hinges.length} szt.</b></div><div style="margin-top: 6px; font-size: 0.9em; padding-left: 10px; border-left: 3px solid #cbd5e1;"><b>Prowadniki:</b><br>${holesHtml}</div></li>`;
         } else if (item.type === 'drawer') {
           let slideY = item.slideSideHoles && item.slideSideHoles.length > 0 ? item.slideSideHoles[0].y : "Brak";
@@ -159,113 +159,115 @@ export function updateSidebar() {
   const printBtn = document.getElementById('btn-print-2d');
   if (printBtn && activeMod) {
     printBtn.addEventListener('click', () => {
-      const sidePanel = parts.find(p => p.name.toLowerCase().includes('bok'));
-      let drawHeight = sidePanel ? sidePanel.length : (parseFloat(activeMod.dimensions.height) || 720);
-      let drawDepth = sidePanel ? sidePanel.width : (parseFloat(activeMod.dimensions.depth) || 510);
-      
-      // Odczytujemy wybrany widok
-      const viewModeSelect = document.getElementById('print-view-mode');
-      const viewMode = viewModeSelect ? viewModeSelect.value : 'all';
+      try {
+          const sidePanel = parts.find(p => p.name.toLowerCase().includes('bok'));
+          let drawHeight = sidePanel ? sidePanel.length : (parseFloat(activeMod.dimensions.height) || 720);
+          let drawDepth = sidePanel ? sidePanel.width : (parseFloat(activeMod.dimensions.depth) || 510);
+          
+          const viewModeSelect = document.getElementById('print-view-mode');
+          const viewMode = viewModeSelect ? viewModeSelect.value : 'all';
 
-      // Przesyłamy viewMode do funkcji
-      const svgContent = generateSidePanelSVG(drawHeight, drawDepth, mountingData, viewMode);
-      
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html lang="pl">
-        <head>
-            <meta charset="UTF-8">
-            <title>Wydruk na produkcję</title>
-            <style>
-                body { margin: 0; padding: 0; background-color: #f1f5f9; display: flex; flex-direction: column; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; } 
-                .header { background-color: #ffffff; padding: 16px 24px; border-bottom: 1px solid #cbd5e1; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); z-index: 10; display: flex; justify-content: space-between; align-items: center; } 
-                .header-text h1 { margin: 0 0 6px 0; font-size: 20px; color: #0f172a; } 
-                .header-text p { margin: 0; font-size: 13px; color: #64748b; } 
-                
-                .controls { display: flex; flex-wrap: wrap; gap: 12px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; font-weight: bold; color: #334155; }
-                .controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
-                .controls input { cursor: pointer; width: 16px; height: 16px; }
-
-                .svg-container { flex-grow: 1; width: 100%; height: 100%; overflow: hidden; background-color: #f8fafc; cursor: grab; } 
-                .svg-container:active { cursor: grabbing; }
-                
-                @media print { 
-                    body { height: auto; overflow: visible; display: block; background: white; } 
-                    .header { display: none; } 
-                    .svg-container { display: block; overflow: visible; background: white; } 
-                }
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <div class="header-text">
-                    <h1>Rysunek techniczny (Nawierty)</h1>
-                    <p>Wymiary liczone od krawędzi i bazy. <b>Przeciągaj LKM</b> (przesunięcie) | <b>Kółko myszy</b> (Zoom).</p>
-                </div>
-                <div class="controls">
-                    <label style="color:#9333ea;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-corpus', this)"> Konstrukcja (Wieńce/Stałe)</label>
-                    <label style="color:#f59e0b;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-shelf', this)"> Podpórki (Ruchome)</label>
-                    <label style="color:#16a34a;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-hinge', this)"> Zawiasy i Prowadniki</label>
-                    <label style="color:#0284c7;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-drawer', this)"> Prowadnice Szuflad</label>
-                    <label style="color:#dc2626;"><input type="checkbox" checked onchange="toggleLayer('layer-front-holes', this)"> Mocowania Frontów</label>
-                </div>
-            </div>
-            <div class="svg-container" id="svg-viewport">
-                ${svgContent}
-            </div>
-            <script>
-                function toggleLayer(layerName, checkbox) {
-                    const elements = document.querySelectorAll('.' + layerName);
-                    elements.forEach(el => { el.style.display = checkbox.checked ? '' : 'none'; });
-                }
-
-                // --- SILNIK PAN & ZOOM ---
-                const svg = document.getElementById('side-panel-svg');
-                let isPanning = false;
-                let startPoint = { x: 0, y: 0 };
-                let startViewBox = { x: 0, y: 0 };
-                
-                document.body.style.userSelect = 'none';
-                
-                svg.addEventListener('mousedown', (e) => {
-                    isPanning = true;
-                    startPoint = { x: e.clientX, y: e.clientY };
-                    startViewBox = { x: svg.viewBox.baseVal.x, y: svg.viewBox.baseVal.y };
-                    svg.style.cursor = 'grabbing';
-                });
-
-                window.addEventListener('mousemove', (e) => {
-                    if (!isPanning) return;
-                    const CTM = svg.getScreenCTM();
-                    const dx = (e.clientX - startPoint.x) / CTM.a;
-                    const dy = (e.clientY - startPoint.y) / CTM.d;
-                    svg.viewBox.baseVal.x = startViewBox.x - dx;
-                    svg.viewBox.baseVal.y = startViewBox.y - dy;
-                });
-
-                window.addEventListener('mouseup', () => { isPanning = false; svg.style.cursor = 'grab'; });
-                window.addEventListener('mouseleave', () => { isPanning = false; svg.style.cursor = 'grab'; });
-
-                svg.addEventListener('wheel', (e) => {
-                    e.preventDefault();
-                    const zoom = e.deltaY > 0 ? 1.1 : 0.9;
-                    const pt = svg.createSVGPoint();
-                    pt.x = e.clientX;
-                    pt.y = e.clientY;
+          const svgContent = generateSidePanelSVG(drawHeight, drawDepth, mountingData || [], viewMode);
+          
+          const htmlContent = `
+            <!DOCTYPE html>
+            <html lang="pl">
+            <head>
+                <meta charset="UTF-8">
+                <title>Wydruk na produkcję</title>
+                <style>
+                    body { margin: 0; padding: 0; background-color: #f1f5f9; display: flex; flex-direction: column; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; } 
+                    .header { background-color: #ffffff; padding: 16px 24px; border-bottom: 1px solid #cbd5e1; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); z-index: 10; display: flex; justify-content: space-between; align-items: center; } 
+                    .header-text h1 { margin: 0 0 6px 0; font-size: 20px; color: #0f172a; } 
+                    .header-text p { margin: 0; font-size: 13px; color: #64748b; } 
                     
-                    const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
-                    
-                    svg.viewBox.baseVal.x = svgP.x - (svgP.x - svg.viewBox.baseVal.x) * zoom;
-                    svg.viewBox.baseVal.y = svgP.y - (svgP.y - svg.viewBox.baseVal.y) * zoom;
-                    svg.viewBox.baseVal.width *= zoom;
-                    svg.viewBox.baseVal.height *= zoom;
-                }, { passive: false });
-            </script>
-        </body>
-        </html>`;
+                    .controls { display: flex; flex-wrap: wrap; gap: 12px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; font-weight: bold; color: #334155; }
+                    .controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+                    .controls input { cursor: pointer; width: 16px; height: 16px; }
 
-      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-      window.open(URL.createObjectURL(blob), '_blank');
+                    .svg-container { flex-grow: 1; width: 100%; height: 100%; overflow: hidden; background-color: #f8fafc; cursor: grab; } 
+                    .svg-container:active { cursor: grabbing; }
+                    
+                    @media print { 
+                        body { height: auto; overflow: visible; display: block; background: white; } 
+                        .header { display: none; } 
+                        .svg-container { display: block; overflow: visible; background: white; } 
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div class="header-text">
+                        <h1>Rysunek techniczny (Nawierty)</h1>
+                        <p>Wymiary liczone od krawędzi i bazy. <b>Przeciągaj LKM</b> (przesunięcie) | <b>Kółko myszy</b> (Zoom).</p>
+                    </div>
+                    <div class="controls">
+                        <label style="color:#9333ea;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-corpus', this)"> Konstrukcja (Wieńce/Stałe)</label>
+                        <label style="color:#f59e0b;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-shelf', this)"> Podpórki (Ruchome)</label>
+                        <label style="color:#16a34a;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-hinge', this)"> Zawiasy i Prowadniki</label>
+                        <label style="color:#0284c7;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-drawer', this)"> Prowadnice Szuflad</label>
+                        <label style="color:#dc2626;"><input type="checkbox" checked onchange="toggleLayer('layer-front-holes', this)"> Mocowania Frontów</label>
+                    </div>
+                </div>
+                <div class="svg-container" id="svg-viewport">
+                    ${svgContent}
+                </div>
+                <script>
+                    function toggleLayer(layerName, checkbox) {
+                        const elements = document.querySelectorAll('.' + layerName);
+                        elements.forEach(el => { el.style.display = checkbox.checked ? '' : 'none'; });
+                    }
+
+                    const svg = document.getElementById('side-panel-svg');
+                    let isPanning = false;
+                    let startPoint = { x: 0, y: 0 };
+                    let startViewBox = { x: 0, y: 0 };
+                    
+                    document.body.style.userSelect = 'none';
+                    
+                    svg.addEventListener('mousedown', (e) => {
+                        isPanning = true;
+                        startPoint = { x: e.clientX, y: e.clientY };
+                        startViewBox = { x: svg.viewBox.baseVal.x, y: svg.viewBox.baseVal.y };
+                        svg.style.cursor = 'grabbing';
+                    });
+
+                    window.addEventListener('mousemove', (e) => {
+                        if (!isPanning) return;
+                        const CTM = svg.getScreenCTM();
+                        const dx = (e.clientX - startPoint.x) / CTM.a;
+                        const dy = (e.clientY - startPoint.y) / CTM.d;
+                        svg.viewBox.baseVal.x = startViewBox.x - dx;
+                        svg.viewBox.baseVal.y = startViewBox.y - dy;
+                    });
+
+                    window.addEventListener('mouseup', () => { isPanning = false; svg.style.cursor = 'grab'; });
+                    window.addEventListener('mouseleave', () => { isPanning = false; svg.style.cursor = 'grab'; });
+
+                    svg.addEventListener('wheel', (e) => {
+                        e.preventDefault();
+                        const zoom = e.deltaY > 0 ? 1.1 : 0.9;
+                        const pt = svg.createSVGPoint();
+                        pt.x = e.clientX;
+                        pt.y = e.clientY;
+                        
+                        const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+                        
+                        svg.viewBox.baseVal.x = svgP.x - (svgP.x - svg.viewBox.baseVal.x) * zoom;
+                        svg.viewBox.baseVal.y = svgP.y - (svgP.y - svg.viewBox.baseVal.y) * zoom;
+                        svg.viewBox.baseVal.width *= zoom;
+                        svg.viewBox.baseVal.height *= zoom;
+                    }, { passive: false });
+                </script>
+            </body>
+            </html>`;
+
+          const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+          window.open(URL.createObjectURL(blob), '_blank');
+      } catch (err) {
+          console.error("Błąd generowania rysunku:", err);
+          alert("Wystąpił błąd podczas generowania SVG: " + err.message);
+      }
     });
   }
 
@@ -280,27 +282,6 @@ export function updateSidebar() {
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
       link.download = `Formatki_${state.project.name.replace(/\s+/g, '_')}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    });
-  }
-
-  const exportHardwareBtn = document.getElementById('btn-export-hardware');
-  if (exportHardwareBtn) {
-    exportHardwareBtn.addEventListener('click', () => {
-      const hardware = calculateProjectHardware();
-      if(hardware.length === 0) {
-        alert("Brak okuć do wygenerowania.");
-        return;
-      }
-      let csvContent = "\uFEFFNazwa akcesorium;Ilosc;Jednostka\n";
-      hardware.forEach(item => { csvContent += `"${item.name}";${item.qty};"${item.unit}"\n`; });
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement("a");
-      link.setAttribute("href", URL.createObjectURL(blob));
-      link.setAttribute("download", `Lista_Zakupow_Okucia_${state.project.name.replace(/\s+/g, '_')}.csv`);
-      link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

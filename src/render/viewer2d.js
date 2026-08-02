@@ -3,7 +3,7 @@ import { calculateShelfHoles } from '../core/shelfMath.js';
 import { calculateDrawerHoles } from '../core/drawerMath.js';
 import { state } from '../core/state.js';
 
-export function generateSidePanelSVG(height, depth, mountingData, viewMode = 'all') {
+export function generateSidePanelSVG(height, depth, mountingData = [], viewMode = 'all') {
   const mod = state.project.modules.find(m => m.id === state.activeModuleId) || state.project.modules[0];
   if (!mod) return '<svg></svg>';
 
@@ -14,24 +14,30 @@ export function generateSidePanelSVG(height, depth, mountingData, viewMode = 'al
   const cons = config.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
   const isTopBottomFullWidth = cons.joinType === 'wience_przelotowe';
   const sideH = isTopBottomFullWidth ? height - (th * 2) : height;
+  const viewH = sideH; 
 
-  // --- UKŁAD POZIOMY DOPASOWANY DO WIDOKU ---
+  // --- DYNAMICZNY UKŁAD (Rysujemy tylko wybrane) ---
   let currentX = 80;
   const gapBetween = 400; 
   
-  let cabX = -9999;
-  let bokLX = -9999;
-  let bokRX = -9999;
-  let frontX = -9999;
+  let cabX = -9999, bokLX = -9999, bokRX = -9999, frontX = -9999;
 
-  if (viewMode === 'all' || viewMode === 'korpus') { cabX = currentX; currentX += cabWidth + gapBetween; }
-  if (viewMode === 'all' || viewMode === 'bokL') { bokLX = currentX; currentX += depth + gapBetween; }
-  if (viewMode === 'all' || viewMode === 'bokR') { bokRX = currentX; currentX += depth + gapBetween; }
-  if (viewMode === 'all' || viewMode === 'front') { frontX = currentX; currentX += cabWidth + gapBetween; }
+  if (viewMode === 'all' || viewMode === 'korpus') { 
+      cabX = currentX; currentX += cabWidth + gapBetween; 
+  }
+  if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') { 
+      bokLX = currentX; currentX += depth + gapBetween; 
+  }
+  if (viewMode === 'all' || viewMode === 'bokR' || viewMode === 'boki') { 
+      bokRX = currentX; currentX += depth + gapBetween; 
+  }
+  if (viewMode === 'all' || viewMode === 'front') { 
+      frontX = currentX; currentX += cabWidth + gapBetween; 
+  }
 
-  const marginRight = 300; 
+  const marginRight = 400; 
   const marginY = 180; 
-  const svgWidth = currentX - gapBetween + marginRight;
+  const svgWidth = Math.max(800, currentX - gapBetween + marginRight);
   const svgHeight = sideH + marginY * 2;
 
   const formatVal = (val) => Number(Number(val).toFixed(1));
@@ -82,30 +88,23 @@ export function generateSidePanelSVG(height, depth, mountingData, viewMode = 'al
     <g transform="translate(0, ${marginY})">
   `;
 
-  // --- LEGENDA NAWIERTÓW (ZAWSZE PO LEWEJ) ---
+  // --- LEGENDA NAWIERTÓW (Rysowana zawsze u góry) ---
   svg += `
     <g transform="translate(80, -150)">
         <text x="0" y="0" font-size="14" fill="#1e293b" font-weight="bold">LEGENDA NAWIERTÓW I WYMIARÓW:</text>
-        
-        <circle cx="0" cy="20" r="4" fill="#9333ea"/>
-        <circle cx="12" cy="20" r="1.5" fill="#9333ea"/>
+        <circle cx="0" cy="20" r="4" fill="#9333ea"/><circle cx="12" cy="20" r="1.5" fill="#9333ea"/>
         <text x="22" y="24" font-size="12" fill="#9333ea">Konstrukcja: Wieńce / Półki stałe (Kołki + Wkręty)</text>
-        
         <circle cx="0" cy="45" r="2.5" fill="#f59e0b"/>
         <text x="22" y="49" font-size="12" fill="#f59e0b">Podpórki półek ruchomych (5mm)</text>
-        
         <circle cx="340" cy="20" r="2.5" fill="#0284c7"/>
         <text x="352" y="24" font-size="12" fill="#0284c7">Prowadnice szuflad (5mm)</text>
-        
         <circle cx="340" cy="45" r="2.5" fill="#dc2626"/>
         <text x="352" y="49" font-size="12" fill="#dc2626">Mocowania frontu szuflady</text>
-
         <circle cx="560" cy="20" r="2.5" fill="#16a34a"/>
         <text x="572" y="24" font-size="12" fill="#16a34a">Zawiasy i prowadniki zawiasów</text>
     </g>
   `;
 
-  // Linia Bazy
   svg += `<line x1="60" y1="${sideH}" x2="${svgWidth - 100}" y2="${sideH}" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,4" />`;
   svg += `<text x="${svgWidth - 90}" y="${sideH + 4}" font-size="12" fill="#1e293b" font-weight="bold">0 mm (Baza modułu)</text>`;
 
@@ -114,8 +113,7 @@ export function generateSidePanelSVG(height, depth, mountingData, viewMode = 'al
   // ==========================================
   if (viewMode === 'all' || viewMode === 'korpus') {
       svg += `<text x="${cabX + cabWidth/2}" y="-25" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">KORPUS WNĘTRZE</text>`;
-
-      const viewH = sideH;
+      
       if (isTopBottomFullWidth) {
         svg += `<rect x="${cabX}" y="0" width="${cabWidth}" height="${th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`; 
         svg += `<rect x="${cabX}" y="${viewH - th}" width="${cabWidth}" height="${th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`; 
@@ -140,12 +138,9 @@ export function generateSidePanelSVG(height, depth, mountingData, viewMode = 'al
         mod.elements.forEach(el => {
           if (el.typ === 'front') return;
           const elSvgX = cabX + el.x;
-          let drawY = el.y;
-          if (isTopBottomFullWidth) drawY = el.y - th;
-          
+          let drawY = isTopBottomFullWidth ? el.y - th : el.y;
           const elSvgY = viewH - drawY - el.h; 
-          let fillColor = '#cbd5e1'; 
-          if (el.typ === 'poziom' && el.isStructural) fillColor = '#a7f3d0'; 
+          let fillColor = (el.typ === 'poziom' && el.isStructural) ? '#a7f3d0' : '#cbd5e1'; 
           svg += `<rect x="${elSvgX}" y="${elSvgY}" width="${el.w}" height="${el.h}" fill="${fillColor}" stroke="#475569" stroke-width="1.5" />`;
         });
 
@@ -177,23 +172,23 @@ export function generateSidePanelSVG(height, depth, mountingData, viewMode = 'al
   }
 
   // ==========================================
-  // CZĘŚĆ 2 i 3: BOKI (Rysowanie płyt)
+  // CZĘŚĆ 2 i 3: BOKI (Rysowanie obrysów)
   // ==========================================
-  if (viewMode === 'all' || viewMode === 'bokL') {
+  if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') {
       svg += `<text x="${bokLX + depth/2}" y="-25" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">BOK LEWY</text>`;
       svg += `<rect x="${bokLX}" y="0" width="${depth}" height="${sideH}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
       svg += `<text x="${bokLX + 15}" y="${sideH / 2}" font-size="11" fill="#94a3b8" font-weight="bold" transform="rotate(-90, ${bokLX + 15}, ${sideH / 2})" text-anchor="middle" letter-spacing="1">PRZÓD BOKU</text>`;
       svg += `<text x="${bokLX + depth - 15}" y="${sideH / 2}" font-size="11" fill="#94a3b8" font-weight="bold" transform="rotate(-90, ${bokLX + depth - 15}, ${sideH / 2})" text-anchor="middle" letter-spacing="1">TYŁ BOKU</text>`;
   }
 
-  if (viewMode === 'all' || viewMode === 'bokR') {
+  if (viewMode === 'all' || viewMode === 'bokR' || viewMode === 'boki') {
       svg += `<text x="${bokRX + depth/2}" y="-25" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">BOK PRAWY</text>`;
       svg += `<rect x="${bokRX}" y="0" width="${depth}" height="${sideH}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
       svg += `<text x="${bokRX + 15}" y="${sideH / 2}" font-size="11" fill="#94a3b8" font-weight="bold" transform="rotate(-90, ${bokRX + 15}, ${sideH / 2})" text-anchor="middle" letter-spacing="1">TYŁ BOKU</text>`;
       svg += `<text x="${bokRX + depth - 15}" y="${sideH / 2}" font-size="11" fill="#94a3b8" font-weight="bold" transform="rotate(-90, ${bokRX + depth - 15}, ${sideH / 2})" text-anchor="middle" letter-spacing="1">PRZÓD BOKU</text>`;
   }
 
-  // --- ZBIERANIE OSI Y DLA BOKÓW ORAZ RYSOWANIE NAWIERTÓW ---
+  // --- ZBIERANIE OSI Y DLA BOKÓW I RYSOWANIE KROPEK ---
   let drawerYs = new Set();
   let corpusYs = new Set(); 
   let shelfYs = new Set(); 
@@ -201,8 +196,7 @@ export function generateSidePanelSVG(height, depth, mountingData, viewMode = 'al
   const shelfHoles = calculateShelfHoles();
   if (shelfHoles && shelfHoles.length > 0) {
     shelfHoles.forEach(hole => {
-      let calcY = hole.y;
-      if (isTopBottomFullWidth) calcY -= th;
+      let calcY = isTopBottomFullWidth ? hole.y - th : hole.y;
       const svgY = sideH - calcY;
       
       const isStruct = hole.isStructural === true || hole.type === 'konstrukcyjna';
@@ -211,19 +205,16 @@ export function generateSidePanelSVG(height, depth, mountingData, viewMode = 'al
       const layerClass = isStruct ? 'layer-holes-corpus' : 'layer-holes-shelf';
       
       svg += `<g class="${layerClass}">`;
-      if (viewMode === 'all' || viewMode === 'bokL') {
+      if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') {
           svg += `<circle cx="${bokLX + hole.x}" cy="${svgY}" r="${radius}" fill="${color}" />`;
       }
-      if (viewMode === 'all' || viewMode === 'bokR') {
+      if (viewMode === 'all' || viewMode === 'bokR' || viewMode === 'boki') {
           svg += `<circle cx="${bokRX + depth - hole.x}" cy="${svgY}" r="${radius}" fill="${color}" />`;
       }
       svg += `</g>`;
 
-      if (isStruct && hole.isCenter) {
-         corpusYs.add(calcY);
-      } else if (!isStruct && hole.isCenter) {
-         shelfYs.add(calcY);
-      }
+      if (isStruct && hole.isCenter) corpusYs.add(calcY);
+      else if (!isStruct && hole.isCenter) shelfYs.add(calcY);
     });
   }
 
@@ -231,25 +222,20 @@ export function generateSidePanelSVG(height, depth, mountingData, viewMode = 'al
     mountingData.forEach((data) => {
       if (data.type === 'door') {
         data.hinges.forEach(hinge => {
-          let calcY = hinge.y;
-          if (isTopBottomFullWidth) calcY -= th;
+          let calcY = isTopBottomFullWidth ? hinge.y - th : hinge.y;
           const svgY = sideH - calcY;
           
           svg += `<g class="layer-holes-hinge">`;
-          if (data.side === 'left') {
-            if (viewMode === 'all' || viewMode === 'bokL') {
-                const svgX = bokLX + 37;
-                svg += `<circle cx="${svgX}" cy="${svgY - 16}" r="2.5" fill="#16a34a" />`;
-                svg += `<circle cx="${svgX}" cy="${svgY + 16}" r="2.5" fill="#16a34a" />`;
-                svg += `<text x="${svgX + 8}" y="${svgY + 4}" font-size="10" font-weight="bold" fill="#16a34a">Y: ${formatVal(hinge.y)}</text>`;
-            }
-          } else {
-            if (viewMode === 'all' || viewMode === 'bokR') {
-                const svgX = bokRX + depth - 37;
-                svg += `<circle cx="${svgX}" cy="${svgY - 16}" r="2.5" fill="#16a34a" />`;
-                svg += `<circle cx="${svgX}" cy="${svgY + 16}" r="2.5" fill="#16a34a" />`;
-                svg += `<text x="${svgX - 8}" y="${svgY + 4}" font-size="10" font-weight="bold" fill="#16a34a" text-anchor="end">Y: ${formatVal(hinge.y)}</text>`;
-            }
+          if (data.side === 'left' && (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki')) {
+            const svgX = bokLX + 37;
+            svg += `<circle cx="${svgX}" cy="${svgY - 16}" r="2.5" fill="#16a34a" />`;
+            svg += `<circle cx="${svgX}" cy="${svgY + 16}" r="2.5" fill="#16a34a" />`;
+            svg += `<text x="${svgX + 8}" y="${svgY + 4}" font-size="10" font-weight="bold" fill="#16a34a">Y: ${formatVal(hinge.y)}</text>`;
+          } else if (data.side === 'right' && (viewMode === 'all' || viewMode === 'bokR' || viewMode === 'boki')) {
+            const svgX = bokRX + depth - 37;
+            svg += `<circle cx="${svgX}" cy="${svgY - 16}" r="2.5" fill="#16a34a" />`;
+            svg += `<circle cx="${svgX}" cy="${svgY + 16}" r="2.5" fill="#16a34a" />`;
+            svg += `<text x="${svgX - 8}" y="${svgY + 4}" font-size="10" font-weight="bold" fill="#16a34a" text-anchor="end">Y: ${formatVal(hinge.y)}</text>`;
           }
           svg += `</g>`;
         });
@@ -261,10 +247,10 @@ export function generateSidePanelSVG(height, depth, mountingData, viewMode = 'al
         
         svg += `<g class="layer-holes-drawer">`;
         data.slideSideHoles.forEach(hole => {
-          if (viewMode === 'all' || viewMode === 'bokL') {
+          if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') {
               svg += `<circle cx="${bokLX + hole.x}" cy="${svgY}" r="2.5" fill="#0284c7" />`;
           }
-          if (viewMode === 'all' || viewMode === 'bokR') {
+          if (viewMode === 'all' || viewMode === 'bokR' || viewMode === 'boki') {
               svg += `<circle cx="${bokRX + depth - hole.x}" cy="${svgY}" r="2.5" fill="#0284c7" />`;
           }
         });
@@ -280,10 +266,10 @@ export function generateSidePanelSVG(height, depth, mountingData, viewMode = 'al
           const radius = h.holeType === 'screw' ? 1.5 : 4; 
           const color = '#9333ea';
 
-          if (viewMode === 'all' || viewMode === 'bokL') {
+          if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') {
               svg += `<circle cx="${bokLX + h.xFromFront}" cy="${svgY}" r="${radius}" fill="${color}" />`;
           }
-          if (viewMode === 'all' || viewMode === 'bokR') {
+          if (viewMode === 'all' || viewMode === 'bokR' || viewMode === 'boki') {
               svg += `<circle cx="${bokRX + depth - h.xFromFront}" cy="${svgY}" r="${radius}" fill="${color}" />`;
           }
         });
@@ -292,12 +278,12 @@ export function generateSidePanelSVG(height, depth, mountingData, viewMode = 'al
     });
   }
 
-  // --- RYSOWANIE ZEWNĘTRZNYCH STRZAŁK WYMIAROWYCH (Od Bazy Y=0) DLA BOKÓW ---
+  // --- RYSOWANIE STRZAŁK WYMIAROWYCH (DLA WYBRANYCH BOKÓW) ---
   const sortedDrawerYs = Array.from(drawerYs).sort((a,b) => a - b);
   const sortedCorpusYs = Array.from(corpusYs).sort((a,b) => a - b);
   const sortedShelfYs = Array.from(shelfYs).sort((a,b) => a - b);
 
-  if (viewMode === 'all' || viewMode === 'bokL') {
+  if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') {
       let currentDimX_L = bokLX - 25;
       
       if (sortedDrawerYs.length > 0) {
@@ -333,49 +319,40 @@ export function generateSidePanelSVG(height, depth, mountingData, viewMode = 'al
         svg += `</g>`;
       }
 
-      // WEWNĘTRZNE WYMIAROWANIE MIĘDZY PÓŁKAMI RUCHOMYMI (Bok L)
       if (sortedShelfYs.length > 1) {
           svg += `<g class="layer-holes-shelf">`;
           for (let i = 0; i < sortedShelfYs.length - 1; i++) {
-              let y1 = sortedShelfYs[i];
-              let y2 = sortedShelfYs[i+1];
-              let svgY1 = sideH - y1;
-              let svgY2 = sideH - y2;
-              let val = formatVal(y2 - y1);
-              
+              let svgY1 = sideH - sortedShelfYs[i];
+              let svgY2 = sideH - sortedShelfYs[i+1];
+              let val = formatVal(sortedShelfYs[i+1] - sortedShelfYs[i]);
               let dimXL = bokLX + 37 + 20; 
               svg += dimV(dimXL, svgY1, svgY2, val, "#f59e0b", "arrow-amber");
           }
           svg += `</g>`;
       }
 
-      // POZIOME WYMIARY PROWADNIC
       if (mountingData) {
           const drawerMounts = mountingData.filter(d => d.type === 'drawer' && d.slideSideHoles && d.slideSideHoles.length > 0);
           if (drawerMounts.length > 0) {
               drawerMounts.sort((a, b) => a.slideSideHoles[0].y - b.slideSideHoles[0].y);
               const highestDrawer = drawerMounts[drawerMounts.length - 1];
-              
-              let lastCalcY = highestDrawer.slideSideHoles[0].y;
-              if (isTopBottomFullWidth) lastCalcY -= th;
+              let lastCalcY = isTopBottomFullWidth ? highestDrawer.slideSideHoles[0].y - th : highestDrawer.slideSideHoles[0].y;
               let highestHoleSvgY = sideH - lastCalcY;
 
               svg += `<g class="layer-holes-drawer">`;
               highestDrawer.slideSideHoles.forEach((hole, idx) => {
                   let dimY = highestHoleSvgY - 40 - (idx * 20); 
                   let holeX = bokLX + hole.x;
-                  let edgeX = bokLX; 
-
                   svg += `<line x1="${holeX}" y1="${highestHoleSvgY + 20}" x2="${holeX}" y2="${dimY}" stroke="#0284c7" stroke-width="0.5" stroke-dasharray="2,2" />`;
-                  svg += `<line x1="${edgeX}" y1="${highestHoleSvgY + 20}" x2="${edgeX}" y2="${dimY}" stroke="#0284c7" stroke-width="0.5" stroke-dasharray="2,2" />`;
-                  svg += dimH(edgeX, holeX, dimY, formatVal(hole.x), "#0284c7", "arrow-blue");
+                  svg += `<line x1="${bokLX}" y1="${highestHoleSvgY + 20}" x2="${bokLX}" y2="${dimY}" stroke="#0284c7" stroke-width="0.5" stroke-dasharray="2,2" />`;
+                  svg += dimH(bokLX, holeX, dimY, formatVal(hole.x), "#0284c7", "arrow-blue");
               });
               svg += `</g>`;
           }
       }
   }
 
-  if (viewMode === 'all' || viewMode === 'bokR') {
+  if (viewMode === 'all' || viewMode === 'bokR' || viewMode === 'boki') {
       let currentDimX_R = bokRX + depth + 25;
       
       if (sortedDrawerYs.length > 0) {
@@ -411,20 +388,39 @@ export function generateSidePanelSVG(height, depth, mountingData, viewMode = 'al
         svg += `</g>`;
       }
 
-      // WEWNĘTRZNE WYMIAROWANIE MIĘDZY PÓŁKAMI RUCHOMYMI (Bok R)
       if (sortedShelfYs.length > 1) {
           svg += `<g class="layer-holes-shelf">`;
           for (let i = 0; i < sortedShelfYs.length - 1; i++) {
-              let y1 = sortedShelfYs[i];
-              let y2 = sortedShelfYs[i+1];
-              let svgY1 = sideH - y1;
-              let svgY2 = sideH - y2;
-              let val = formatVal(y2 - y1);
-              
+              let svgY1 = sideH - sortedShelfYs[i];
+              let svgY2 = sideH - sortedShelfYs[i+1];
+              let val = formatVal(sortedShelfYs[i+1] - sortedShelfYs[i]);
               let dimXR = bokRX + depth - 37 - 20;
               svg += dimV(dimXR, svgY1, svgY2, val, "#f59e0b", "arrow-amber");
           }
           svg += `</g>`;
+      }
+
+      // --- PRAWY BOK: Poziome wymiary od przedniej krawędzi ---
+      if (mountingData) {
+          const drawerMounts = mountingData.filter(d => d.type === 'drawer' && d.slideSideHoles && d.slideSideHoles.length > 0);
+          if (drawerMounts.length > 0) {
+              drawerMounts.sort((a, b) => a.slideSideHoles[0].y - b.slideSideHoles[0].y);
+              const highestDrawer = drawerMounts[drawerMounts.length - 1];
+              let lastCalcY = isTopBottomFullWidth ? highestDrawer.slideSideHoles[0].y - th : highestDrawer.slideSideHoles[0].y;
+              let highestHoleSvgY = sideH - lastCalcY;
+
+              svg += `<g class="layer-holes-drawer">`;
+              highestDrawer.slideSideHoles.forEach((hole, idx) => {
+                  let dimY = highestHoleSvgY - 40 - (idx * 20); 
+                  let holeX = bokRX + depth - hole.x; // Od przedniej krawędzi prawego boku
+                  let edgeX = bokRX + depth;
+
+                  svg += `<line x1="${holeX}" y1="${highestHoleSvgY + 20}" x2="${holeX}" y2="${dimY}" stroke="#0284c7" stroke-width="0.5" stroke-dasharray="2,2" />`;
+                  svg += `<line x1="${edgeX}" y1="${highestHoleSvgY + 20}" x2="${edgeX}" y2="${dimY}" stroke="#0284c7" stroke-width="0.5" stroke-dasharray="2,2" />`;
+                  svg += dimH(edgeX, holeX, dimY, formatVal(hole.x), "#0284c7", "arrow-blue");
+              });
+              svg += `</g>`;
+          }
       }
   }
 
@@ -436,42 +432,25 @@ export function generateSidePanelSVG(height, depth, mountingData, viewMode = 'al
 
       if (mod && mod.elements) {
         const fronts = mod.elements.filter(el => el.typ === 'front').sort((a, b) => a.y - b.y);
-        let drawerCount = 0;
-        let doorCount = 0;
         
         fronts.forEach(front => {
-          let drawY = front.y;
-          if (isTopBottomFullWidth) drawY = front.y - th;
-          
+          let drawY = isTopBottomFullWidth ? front.y - th : front.y;
           const elSvgY = viewH - drawY - front.h; 
           const isDrawer = front.subtype === 'szuflada';
           const isDoor = front.subtype.includes('drzwi');
           
-          let fillColor = '#f0fdf4'; 
-          let strokeColor = '#22c55e';
+          let fillColor = isDrawer ? '#eff6ff' : '#f0fdf4'; 
+          let strokeColor = isDrawer ? '#3b82f6' : '#22c55e';
           
-          if (isDrawer) {
-              fillColor = '#eff6ff';
-              strokeColor = '#3b82f6';
-          }
-
           const fWidth = front.w || cabWidth;
           const fSvgX = frontX + (front.x || 0);
 
           svg += `<rect x="${fSvgX}" y="${elSvgY}" width="${fWidth}" height="${front.h}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5" />`;
 
-          let labelText = `Front`;
-          if (isDrawer) {
-              drawerCount++;
-              labelText = `Szuf. ${drawerCount}`;
-          } else if (isDoor) {
-              doorCount++;
-              labelText = `Drzwi ${doorCount}`;
-          }
-          
+          let labelText = isDrawer ? `Szuflada` : `Drzwi`;
           svg += `<text x="${fSvgX + fWidth/2}" y="${elSvgY + front.h/2}" font-size="12" fill="#1e293b" font-weight="bold" text-anchor="middle">${labelText}</text>`;
 
-          if (isDoor) {
+          if (isDoor && mountingData) {
             svg += `<g class="layer-holes-hinge">`;
             const doorData = mountingData.find(m => m.type === 'door' && m.frontId === front.id);
             if (doorData && doorData.hinges) {
@@ -479,8 +458,7 @@ export function generateSidePanelSVG(height, depth, mountingData, viewMode = 'al
                  const isLeft = doorData.side === 'left';
                  const cupX = isLeft ? fSvgX + hinge.cupXOffset : fSvgX + fWidth - hinge.cupXOffset;
                  
-                 let drawHoleY = front.y + hinge.relY;
-                 if (isTopBottomFullWidth) drawHoleY -= th;
+                 let drawHoleY = isTopBottomFullWidth ? front.y + hinge.relY - th : front.y + hinge.relY;
                  const holeSvgY = viewH - drawHoleY;
 
                  svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="17.5" fill="#fcfdfd" stroke="#16a34a" stroke-width="1.5" />`;
@@ -493,7 +471,7 @@ export function generateSidePanelSVG(height, depth, mountingData, viewMode = 'al
             svg += `</g>`;
           }
           
-          if (isDrawer) {
+          if (isDrawer && mountingData) {
             svg += `<g class="layer-front-holes">`;
             const drawerData = mountingData.find(m => m.type === 'drawer' && m.frontId === front.id);
             if (drawerData && drawerData.frontHoles) {
@@ -504,8 +482,7 @@ export function generateSidePanelSVG(height, depth, mountingData, viewMode = 'al
                  const holeX_Left = fSvgX + xL;
                  const holeX_Right = fSvgX + fWidth - xR;
                  
-                 let drawHoleY = front.y + hole.y;
-                 if (isTopBottomFullWidth) drawHoleY -= th;
+                 let drawHoleY = isTopBottomFullWidth ? front.y + hole.y - th : front.y + hole.y;
                  const holeSvgY = viewH - drawHoleY;
 
                  svg += `<circle cx="${holeX_Left}" cy="${holeSvgY}" r="2.5" fill="#dc2626" />`;
