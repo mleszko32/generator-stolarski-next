@@ -25,13 +25,17 @@ if (!window.contextMenuListenerAdded) {
   window.contextMenuListenerAdded = true;
 }
 
+const generateUID = (prefix) => {
+    return prefix + '-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
+};
+
 export function renderEditor2D() {
   const container = document.getElementById('editor-2d-container');
   if (!container) return;
   
   container.innerHTML = '';
 
-  const mod = getActiveModule(); // Korzysta ze zaktualizowanego state.js
+  const mod = getActiveModule(); 
   if (!mod) {
     container.innerHTML = `
       <div style="display:flex; height:100%; align-items:center; justify-content:center; flex-direction:column; color:#94a3b8;">
@@ -44,7 +48,6 @@ export function renderEditor2D() {
 
   const config = state.project;
   const th = parseFloat(config.materials.boardThickness) || 18;
-// ... (i tu zostaje reszta Twojego dotychczasowego kodu)
   const width = parseFloat(mod.dimensions.width) || 600;
   const height = parseFloat(mod.dimensions.height) || 720;
   
@@ -317,7 +320,6 @@ export function renderEditor2D() {
       menu.style.position = 'fixed'; menu.style.left = `${e.clientX}px`; menu.style.top = `${e.clientY}px`;
       menu.style.backgroundColor = '#ffffff'; menu.style.border = '1px solid #cbd5e1'; menu.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; menu.style.borderRadius = '6px'; menu.style.padding = '4px'; menu.style.zIndex = '1000'; menu.style.minWidth = '240px'; menu.style.fontFamily = 'sans-serif';
 
-      // --- ZREFAKTORYZOWANE FUNKCJE ---
       const createHeader = (text, color = '#64748b') => {
         const hdr = document.createElement('div');
         hdr.innerText = text;
@@ -490,14 +492,19 @@ export function renderEditor2D() {
 
       menu.appendChild(createHeader('Akcje'));
       
-      const btnDelete = createMenuOption(isFront ? 'Usuń fronty z tej wnęki' : 'Usuń element', '🗑️', () => {
-        if (isFront && plyta.baseZone) {
-            mod.elements = mod.elements.filter(el => !(el.typ === 'front' && el.baseZone.boundTop === plyta.baseZone.boundTop && el.baseZone.boundBottom === plyta.baseZone.boundBottom));
-        } else {
-            mod.elements = mod.elements.filter(el => el.id !== plyta.id); 
-        }
+      // ZMIANA: Naciśnięcie usuwa tylko jeden kliknięty element
+      const btnDeleteSingle = createMenuOption('Usuń ten element', '🗑️', () => {
+        mod.elements = mod.elements.filter(el => el.id !== plyta.id);
       }, '#dc2626');
-      menu.appendChild(btnDelete); 
+      menu.appendChild(btnDeleteSingle); 
+
+      // ZMIANA: Możliwość szybkiego wyczyszczenia wnęki
+      if (isFront && plyta.baseZone) {
+        const btnDeleteZone = createMenuOption('Wyczyść całą wnękę', '🧹', () => {
+            mod.elements = mod.elements.filter(el => !(el.typ === 'front' && el.baseZone.boundTop === plyta.baseZone.boundTop && el.baseZone.boundBottom === plyta.baseZone.boundBottom));
+        }, '#991b1b');
+        menu.appendChild(btnDeleteZone);
+      }
 
       document.body.appendChild(menu);
     };
@@ -610,7 +617,6 @@ export function renderEditor2D() {
     menu.style.position = 'fixed'; menu.style.left = `${e.clientX}px`; menu.style.top = `${e.clientY}px`;
     menu.style.backgroundColor = '#ffffff'; menu.style.border = '1px solid #cbd5e1'; menu.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; menu.style.borderRadius = '6px'; menu.style.padding = '4px'; menu.style.zIndex = '1000'; menu.style.minWidth = '220px'; menu.style.fontFamily = 'sans-serif';
 
-    // --- ZREFAKTORYZOWANE FUNKCJE ---
     const createHeader = (text, color = '#64748b') => {
       const hdr = document.createElement('div');
       hdr.innerText = text;
@@ -644,18 +650,18 @@ export function renderEditor2D() {
 
     menu.appendChild(createHeader('Elementy konstrukcyjne'));
     
+    // ZMIANA: Użycie generateUID aby zapewnić unikalność
     const btnShelf = createMenuOption('Półka (w miejscu myszki)', '➖', () => {
-      mod.elements.push({ id: 'poziom-' + Date.now(), typ: 'poziom', x: zoneMinX, y: mouseY - (th / 2), w: zoneMaxX - zoneMinX, h: th, isStructural: false });
+      mod.elements.push({ id: generateUID('poziom'), typ: 'poziom', x: zoneMinX, y: mouseY - (th / 2), w: zoneMaxX - zoneMinX, h: th, isStructural: false });
     });
     menu.appendChild(btnShelf);
 
     const btnShelfHalf = createMenuOption('Półka (dokładnie w połowie)', '➗', () => {
       const halfY = zoneMinY + (zoneMaxY - zoneMinY) / 2;
-      mod.elements.push({ id: 'poziom-' + Date.now(), typ: 'poziom', x: zoneMinX, y: halfY - (th / 2), w: zoneMaxX - zoneMinX, h: th, isStructural: false });
+      mod.elements.push({ id: generateUID('poziom'), typ: 'poziom', x: zoneMinX, y: halfY - (th / 2), w: zoneMaxX - zoneMinX, h: th, isStructural: false });
     });
     menu.appendChild(btnShelfHalf);
 
-    // Przycisk półek z zabezpieczeniem, zostawiamy ręczne onlcick (brak callbacka) bo zmienia widok wewnatrz menu
     const btnAutoShelves = createMenuOption('Półki (rozmieść równomiernie)', '📚', null);
     btnAutoShelves.onclick = (event) => {
       event.stopPropagation();
@@ -707,7 +713,6 @@ export function renderEditor2D() {
         genEvent.stopPropagation();
         const shelfCount = parseInt(inp.value, 10);
         
-        // --- ZABEZPIECZENIE WARTOŚCI ---
         if (isNaN(shelfCount) || shelfCount <= 0) {
             alert("Wprowadź poprawną, dodatnią liczbę półek.");
             inp.focus(); 
@@ -718,7 +723,7 @@ export function renderEditor2D() {
         const newShelvesBase = autoDistributeShelves(internalHeight, th, shelfCount);
         
         const newShelves = newShelvesBase.map((s, idx) => ({
-          id: 'poziom-auto-' + Date.now() + '-' + idx,
+          id: generateUID('poziom-auto'),
           typ: 'poziom',
           x: zoneMinX,
           y: zoneMinY + s.y,
@@ -741,7 +746,7 @@ export function renderEditor2D() {
 
     const btnPartHalf = createMenuOption('Przegroda (w połowie)', '➕', () => {
       const halfX = zoneMinX + (zoneMaxX - zoneMinX) / 2;
-      mod.elements.push({ id: 'pion-' + Date.now(), typ: 'pion', x: halfX - (th / 2), y: zoneMinY, w: th, h: zoneMaxY - zoneMinY });
+      mod.elements.push({ id: generateUID('pion'), typ: 'pion', x: halfX - (th / 2), y: zoneMinY, w: th, h: zoneMaxY - zoneMinY });
     });
     menu.appendChild(btnPartHalf);
 
@@ -766,7 +771,6 @@ export function renderEditor2D() {
         genEvent.stopPropagation();
         const distStr = inpDist.inp.value.trim() || "1"; 
         const gapValInput = parseFloat(inpGap.inp.value) || 0; 
-        const ts = Date.now();
         
         let genCount = 1;
         if (!distStr.includes(':') && !distStr.includes(',') && !isNaN(distStr)) genCount = parseInt(distStr, 10) || 1;
@@ -777,7 +781,8 @@ export function renderEditor2D() {
 
         for(let i = 0; i < genCount; i++) { 
             mod.elements.push({ 
-                id: 'front-' + ts + '-' + i, 
+                // ZMIANA: Całkowicie unikalne ID dla każdego nowo wygenerowanego frontu/szuflady w pętli
+                id: generateUID('front'), 
                 typ: 'front', 
                 subtype: subtypeName, 
                 baseZone: targetBaseZone, 
@@ -803,7 +808,7 @@ export function renderEditor2D() {
     menu.appendChild(createHeader('Zabuduj wnękę (między półkami)'));
 
     const btnDoor = createMenuOption('Drzwi pojedyncze', '🚪', () => {
-      mod.elements.push({ id: 'front-' + Date.now(), typ: 'front', subtype: 'drzwi', baseZone: localBaseZone, openingSide: 'left', frontCount: 1, frontIndex: 0, gap: 3 });
+      mod.elements.push({ id: generateUID('front'), typ: 'front', subtype: 'drzwi', baseZone: localBaseZone, openingSide: 'left', frontCount: 1, frontIndex: 0, gap: 3 });
     });
     menu.appendChild(btnDoor);
 
@@ -818,15 +823,14 @@ export function renderEditor2D() {
     menu.appendChild(createHeader('Zabuduj resztę (ignoruje półki)', '#2563eb'));
 
     const btnDoorCol = createMenuOption('Drzwi na całą wysokość', '🚪', () => {
-      mod.elements.push({ id: 'front-' + Date.now(), typ: 'front', subtype: 'drzwi', baseZone: colBaseZone, openingSide: 'left', frontCount: 1, frontIndex: 0, gap: 3 });
+      mod.elements.push({ id: generateUID('front'), typ: 'front', subtype: 'drzwi', baseZone: colBaseZone, openingSide: 'left', frontCount: 1, frontIndex: 0, gap: 3 });
     }, '#1e40af');
     menu.appendChild(btnDoorCol);
 
     const btnDoorLP = createMenuOption('Drzwi L/P na całą wysokość', '🚪', () => {
-      const ts = Date.now();
       const gapLp = parseFloat(state.project.front?.gap) || 3;
-      mod.elements.push({ id: 'front-' + ts + '-L', typ: 'front', subtype: 'drzwi-lp', baseZone: colBaseZone, frontCount: 2, frontIndex: 0, gap: gapLp });
-      mod.elements.push({ id: 'front-' + ts + '-P', typ: 'front', subtype: 'drzwi-lp', baseZone: colBaseZone, frontCount: 2, frontIndex: 1, gap: gapLp });
+      mod.elements.push({ id: generateUID('front-L'), typ: 'front', subtype: 'drzwi-lp', baseZone: colBaseZone, frontCount: 2, frontIndex: 0, gap: gapLp });
+      mod.elements.push({ id: generateUID('front-P'), typ: 'front', subtype: 'drzwi-lp', baseZone: colBaseZone, frontCount: 2, frontIndex: 1, gap: gapLp });
     }, '#1e40af');
     menu.appendChild(btnDoorLP);
 

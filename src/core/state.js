@@ -1,16 +1,16 @@
 // src/core/state.js
 export const state = {
   activeModuleId: null, 
+  loadedProjectId: null, 
   project: {
     name: "Zabudowa Wielomodułowa",
     materials: { boardThickness: 18, backThickness: 3 },
     construction: { joinType: "boki_przelotowe", topType: "pelny", traverseWidth: 100 },
     front: { active: true, distribution: "1:1:1", drawerSystem: "merivobox", gap: 3, clearance: { sides: 1.5, top: 5, bottom: 0 } },
-    // --- NOWE: PARAMETRY POMIESZCZENIA (ŚCIANY) ---
     room: {
-      width: 3500,  // Szerokość ściany od lewej do prawej (mm)
-      height: 2600, // Wysokość pomieszczenia (mm)
-      depth: 600    // Głębokość podłogi (mm)
+      width: 3500,  
+      height: 2600, 
+      depth: 600    
     },
     modules: [] 
   }
@@ -65,4 +65,42 @@ export function addModule(type = "base_cabinet") {
   state.activeModuleId = newId; 
   
   return newModule;
+}
+
+// NOWOŚĆ: Usuwanie szafki
+export function deleteModule(moduleId) {
+  state.project.modules = state.project.modules.filter(m => m.id !== moduleId);
+  if (state.activeModuleId === moduleId) {
+    state.activeModuleId = state.project.modules.length > 0 ? state.project.modules[0].id : null;
+  }
+}
+
+// NOWOŚĆ: Kopiowanie szafki wraz z zawartością
+export function duplicateModule(moduleId) {
+  const target = state.project.modules.find(m => m.id === moduleId);
+  if (!target) return null;
+  
+  const newMod = JSON.parse(JSON.stringify(target));
+  
+  // Zapewniamy całkowicie unikalne ID dla nowej szafki
+  newMod.id = 'mod-' + Date.now() + Math.random().toString(36).substring(2, 6);
+  newMod.name = newMod.name + " (Kopia)";
+  
+  let nextX = 0;
+  if (state.project.modules.length > 0) {
+    nextX = Math.max(...state.project.modules.map(m => m.position.x + parseFloat(m.dimensions.width))) + 50; 
+  }
+  newMod.position.x = nextX;
+  
+  // KLUCZOWE ZABEZPIECZENIE: Wszystkie elementy (półki/szuflady) sklonowanej szafki 
+  // otrzymują absolutnie unikalne ID. Rozwiązuje to problem usunięcia np. wszystkich na raz!
+  if (newMod.elements) {
+    newMod.elements.forEach(el => {
+      el.id = 'el-' + Date.now() + Math.random().toString(36).substring(2, 9);
+    });
+  }
+  
+  state.project.modules.push(newMod);
+  state.activeModuleId = newMod.id;
+  return newMod;
 }

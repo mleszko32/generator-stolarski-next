@@ -1,7 +1,7 @@
 // src/ui/sidebar.js
 import { calculateParts, calculateAllProjectParts, calculateProjectHardware } from "../engine/cabinet.js";
 import { generateSidePanelSVG } from "../render/viewer2d.js"; 
-import { state, getActiveModule, addModule } from "../core/state.js";
+import { state, getActiveModule, addModule, deleteModule, duplicateModule } from "../core/state.js";
 import { renderEditor2D } from "../render/editor2d.js";
 import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel } from "./properties.js";
@@ -41,9 +41,16 @@ export function updateSidebar() {
       if (m.type === 'upper_cabinet') icon = '☁️';
       if (m.type === 'tall_cabinet') icon = '🚪';
 
+      // --- DODANE IKONY KOPIUJ I USUŃ ---
       html += `
-        <div class="module-item" data-id="${m.id}" style="padding: 8px; margin-bottom: 6px; background-color: ${bg}; color: ${color}; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; border: 1px solid ${border}; transition: all 0.2s;">
-          ${icon} ${m.name} <span style="font-weight: normal; font-size: 11px; opacity: 0.8;">(${m.dimensions.width}x${m.dimensions.height})</span>
+        <div class="module-item" data-id="${m.id}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; margin-bottom: 6px; background-color: ${bg}; color: ${color}; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; border: 1px solid ${border}; transition: all 0.2s;">
+          <div style="flex-grow: 1; pointer-events: none;">
+            ${icon} ${m.name} <span style="font-weight: normal; font-size: 11px; opacity: 0.8;">(${m.dimensions.width}x${m.dimensions.height})</span>
+          </div>
+          <div style="display: flex; gap: 4px;">
+            <button class="btn-mod-action btn-mod-dup" data-id="${m.id}" title="Kopiuj szafkę" style="background: none; border: none; cursor: pointer; padding: 2px 4px; font-size: 14px; opacity: ${isActive ? 1 : 0.6}; transition: opacity 0.2s;">📋</button>
+            <button class="btn-mod-action btn-mod-del" data-id="${m.id}" title="Usuń szafkę" style="background: none; border: none; cursor: pointer; padding: 2px 4px; font-size: 14px; opacity: ${isActive ? 1 : 0.6}; transition: opacity 0.2s;">🗑️</button>
+          </div>
         </div>
       `;
     });
@@ -116,7 +123,7 @@ export function updateSidebar() {
 
   if (state.project.modules.length > 0) {
     html += `<details style="background: #fffbeb; padding: 10px; border-radius: 6px; border: 1px solid #fcd34d;">`;
-    html += `<summary style="font-weight: bold; cursor: pointer; outline: none; color: #92400e;">🛒 Lista zakupów (Okucia - Całość)</summary>`;
+    html += `<summary style="font-weight: bold; cursor: pointer; outline: none; color: #92400e;">🛒 Lista zakupów (Okucia)</summary>`;
     html += `<ul class="parts-list" style="margin-top: 10px; padding-left: 20px;">`;
     
     if (projectHardware.length === 0) {
@@ -126,7 +133,6 @@ export function updateSidebar() {
         html += `<li style="margin-bottom: 6px; font-size: 12px; color: #78350f;"><strong>${hw.name}</strong><br><span style="color: #92400e;">Ilość: <b>${hw.qty} ${hw.unit}</b></span></li>`;
       });
     }
-    
     html += `</ul></details>`;
   }
 
@@ -136,12 +142,26 @@ export function updateSidebar() {
   if (btnShowAll) {
     btnShowAll.addEventListener('click', () => {
       state.activeModuleId = null; 
-      initPropertiesPanel(); 
-      renderEditor2D(); 
-      update3D(); 
-      updateSidebar();
+      initPropertiesPanel(); renderEditor2D(); update3D(); updateSidebar();
     });
   }
+
+  // --- PODPIĘCIE ZDARZEŃ USUWANIA / KOPIOWANIA ---
+  document.querySelectorAll('.btn-mod-dup').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation(); // Blokuje "zaznaczenie" klikanej szafki pod przyciskiem
+      duplicateModule(e.currentTarget.getAttribute('data-id'));
+      initPropertiesPanel(); renderEditor2D(); update3D(); updateSidebar();
+    });
+  });
+
+  document.querySelectorAll('.btn-mod-del').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation(); 
+      deleteModule(e.currentTarget.getAttribute('data-id'));
+      initPropertiesPanel(); renderEditor2D(); update3D(); updateSidebar();
+    });
+  });
 
   document.querySelectorAll('.module-item').forEach(el => {
     el.addEventListener('click', (e) => {
@@ -180,14 +200,11 @@ export function updateSidebar() {
                     .header { background-color: #ffffff; padding: 16px 24px; border-bottom: 1px solid #cbd5e1; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); z-index: 10; display: flex; justify-content: space-between; align-items: center; } 
                     .header-text h1 { margin: 0 0 6px 0; font-size: 20px; color: #0f172a; } 
                     .header-text p { margin: 0; font-size: 13px; color: #64748b; } 
-                    
                     .controls { display: flex; flex-wrap: wrap; gap: 12px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; font-weight: bold; color: #334155; }
                     .controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
                     .controls input { cursor: pointer; width: 16px; height: 16px; }
-
                     .svg-container { flex-grow: 1; width: 100%; height: 100%; overflow: hidden; background-color: #f8fafc; cursor: grab; } 
                     .svg-container:active { cursor: grabbing; }
-                    
                     @media print { 
                         body { height: auto; overflow: visible; display: block; background: white; } 
                         .header { display: none; } 
@@ -217,46 +234,26 @@ export function updateSidebar() {
                         const elements = document.querySelectorAll('.' + layerName);
                         elements.forEach(el => { el.style.display = checkbox.checked ? '' : 'none'; });
                     }
-
                     const svg = document.getElementById('side-panel-svg');
-                    let isPanning = false;
-                    let startPoint = { x: 0, y: 0 };
-                    let startViewBox = { x: 0, y: 0 };
-                    
+                    let isPanning = false; let startPoint = { x: 0, y: 0 }; let startViewBox = { x: 0, y: 0 };
                     document.body.style.userSelect = 'none';
-                    
                     svg.addEventListener('mousedown', (e) => {
-                        isPanning = true;
-                        startPoint = { x: e.clientX, y: e.clientY };
-                        startViewBox = { x: svg.viewBox.baseVal.x, y: svg.viewBox.baseVal.y };
-                        svg.style.cursor = 'grabbing';
+                        isPanning = true; startPoint = { x: e.clientX, y: e.clientY };
+                        startViewBox = { x: svg.viewBox.baseVal.x, y: svg.viewBox.baseVal.y }; svg.style.cursor = 'grabbing';
                     });
-
                     window.addEventListener('mousemove', (e) => {
-                        if (!isPanning) return;
-                        const CTM = svg.getScreenCTM();
-                        const dx = (e.clientX - startPoint.x) / CTM.a;
-                        const dy = (e.clientY - startPoint.y) / CTM.d;
-                        svg.viewBox.baseVal.x = startViewBox.x - dx;
-                        svg.viewBox.baseVal.y = startViewBox.y - dy;
+                        if (!isPanning) return; const CTM = svg.getScreenCTM();
+                        const dx = (e.clientX - startPoint.x) / CTM.a; const dy = (e.clientY - startPoint.y) / CTM.d;
+                        svg.viewBox.baseVal.x = startViewBox.x - dx; svg.viewBox.baseVal.y = startViewBox.y - dy;
                     });
-
                     window.addEventListener('mouseup', () => { isPanning = false; svg.style.cursor = 'grab'; });
                     window.addEventListener('mouseleave', () => { isPanning = false; svg.style.cursor = 'grab'; });
-
                     svg.addEventListener('wheel', (e) => {
-                        e.preventDefault();
-                        const zoom = e.deltaY > 0 ? 1.1 : 0.9;
-                        const pt = svg.createSVGPoint();
-                        pt.x = e.clientX;
-                        pt.y = e.clientY;
-                        
-                        const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
-                        
+                        e.preventDefault(); const zoom = e.deltaY > 0 ? 1.1 : 0.9; const pt = svg.createSVGPoint();
+                        pt.x = e.clientX; pt.y = e.clientY; const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
                         svg.viewBox.baseVal.x = svgP.x - (svgP.x - svg.viewBox.baseVal.x) * zoom;
                         svg.viewBox.baseVal.y = svgP.y - (svgP.y - svg.viewBox.baseVal.y) * zoom;
-                        svg.viewBox.baseVal.width *= zoom;
-                        svg.viewBox.baseVal.height *= zoom;
+                        svg.viewBox.baseVal.width *= zoom; svg.viewBox.baseVal.height *= zoom;
                     }, { passive: false });
                 </script>
             </body>
