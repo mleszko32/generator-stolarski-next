@@ -60,16 +60,24 @@ export function updateSidebar() {
   `;
 
   if (state.project.modules.length > 0) {
+    // --- NOWY DROPDOWN DO WYBORU WIDOKU WYDRUKU ---
     html += `
       <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 15px;">
         <div style="display: flex; gap: 6px;">
+            <select id="print-view-mode" ${!activeMod ? 'disabled' : ''} style="flex: 1; padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 11px; background: white; outline: none; cursor: pointer;">
+                <option value="all">Wszystko razem</option>
+                <option value="bokL">Tylko Bok Lewy</option>
+                <option value="bokR">Tylko Bok Prawy</option>
+                <option value="front">Tylko Fronty</option>
+                <option value="korpus">Tylko Korpus</option>
+            </select>
             <button id="btn-print-2d" ${!activeMod ? 'disabled style="opacity: 0.5;"' : ''} style="flex: 1; padding: 8px; background-color: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px;">
-              📄 Rysunek
-            </button>
-            <button id="btn-export-csv" style="flex: 1; padding: 8px; background-color: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px;">
-              📊 Formatki CSV
+              📄 Drukuj
             </button>
         </div>
+        <button id="btn-export-csv" style="width: 100%; padding: 8px; background-color: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px;">
+          📊 Formatki CSV
+        </button>
         <button id="btn-export-hardware" style="width: 100%; padding: 9px; background-color: #d97706; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           🛒 Pobierz listę zakupów (CSV)
         </button>
@@ -155,7 +163,12 @@ export function updateSidebar() {
       let drawHeight = sidePanel ? sidePanel.length : (parseFloat(activeMod.dimensions.height) || 720);
       let drawDepth = sidePanel ? sidePanel.width : (parseFloat(activeMod.dimensions.depth) || 510);
       
-      const svgContent = generateSidePanelSVG(drawHeight, drawDepth, mountingData);
+      // Odczytujemy wybrany widok
+      const viewModeSelect = document.getElementById('print-view-mode');
+      const viewMode = viewModeSelect ? viewModeSelect.value : 'all';
+
+      // Przesyłamy viewMode do funkcji
+      const svgContent = generateSidePanelSVG(drawHeight, drawDepth, mountingData, viewMode);
       
       const htmlContent = `
         <!DOCTYPE html>
@@ -190,7 +203,6 @@ export function updateSidebar() {
                     <p>Wymiary liczone od krawędzi i bazy. <b>Przeciągaj LKM</b> (przesunięcie) | <b>Kółko myszy</b> (Zoom).</p>
                 </div>
                 <div class="controls">
-                    <label style="color:#475569;"><input type="checkbox" checked onchange="toggleLayer('layer-dim-gaps', this)"> Prześwity szafki</label>
                     <label style="color:#9333ea;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-corpus', this)"> Konstrukcja (Wieńce/Stałe)</label>
                     <label style="color:#f59e0b;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-shelf', this)"> Podpórki (Ruchome)</label>
                     <label style="color:#16a34a;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-hinge', this)"> Zawiasy i Prowadniki</label>
@@ -207,34 +219,47 @@ export function updateSidebar() {
                     elements.forEach(el => { el.style.display = checkbox.checked ? '' : 'none'; });
                 }
 
-                // --- OBSŁUGA PAN & ZOOM ---
-                const viewport = document.getElementById('svg-viewport');
+                // --- SILNIK PAN & ZOOM ---
                 const svg = document.getElementById('side-panel-svg');
+                let isPanning = false;
+                let startPoint = { x: 0, y: 0 };
+                let startViewBox = { x: 0, y: 0 };
                 
-                let scale = 1; let panning = false; let pointX = 0; let pointY = 0; let start = { x: 0, y: 0 };
+                document.body.style.userSelect = 'none';
+                
+                svg.addEventListener('mousedown', (e) => {
+                    isPanning = true;
+                    startPoint = { x: e.clientX, y: e.clientY };
+                    startViewBox = { x: svg.viewBox.baseVal.x, y: svg.viewBox.baseVal.y };
+                    svg.style.cursor = 'grabbing';
+                });
 
-                function setTransform() { svg.style.transform = \`translate(\${pointX}px, \${pointY}px) scale(\${scale})\`; }
+                window.addEventListener('mousemove', (e) => {
+                    if (!isPanning) return;
+                    const CTM = svg.getScreenCTM();
+                    const dx = (e.clientX - startPoint.x) / CTM.a;
+                    const dy = (e.clientY - startPoint.y) / CTM.d;
+                    svg.viewBox.baseVal.x = startViewBox.x - dx;
+                    svg.viewBox.baseVal.y = startViewBox.y - dy;
+                });
 
-                viewport.onmousedown = function (e) {
-                    e.preventDefault(); start = { x: e.clientX - pointX, y: e.clientY - pointY }; panning = true;
-                };
+                window.addEventListener('mouseup', () => { isPanning = false; svg.style.cursor = 'grab'; });
+                window.addEventListener('mouseleave', () => { isPanning = false; svg.style.cursor = 'grab'; });
 
-                viewport.onmouseup = function () { panning = false; };
-                viewport.onmouseleave = function () { panning = false; };
-
-                viewport.onmousemove = function (e) {
-                    e.preventDefault(); if (!panning) return;
-                    pointX = (e.clientX - start.x); pointY = (e.clientY - start.y); setTransform();
-                };
-
-                viewport.onwheel = function (e) {
+                svg.addEventListener('wheel', (e) => {
                     e.preventDefault();
-                    const xs = (e.clientX - pointX) / scale; const ys = (e.clientY - pointY) / scale;
-                    const delta = (e.wheelDelta ? e.wheelDelta : -e.deltaY);
-                    if (delta > 0) { scale *= 1.2; } else { scale /= 1.2; }
-                    pointX = e.clientX - xs * scale; pointY = e.clientY - ys * scale;
-                    setTransform();
-                };
+                    const zoom = e.deltaY > 0 ? 1.1 : 0.9;
+                    const pt = svg.createSVGPoint();
+                    pt.x = e.clientX;
+                    pt.y = e.clientY;
+                    
+                    const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+                    
+                    svg.viewBox.baseVal.x = svgP.x - (svgP.x - svg.viewBox.baseVal.x) * zoom;
+                    svg.viewBox.baseVal.y = svgP.y - (svgP.y - svg.viewBox.baseVal.y) * zoom;
+                    svg.viewBox.baseVal.width *= zoom;
+                    svg.viewBox.baseVal.height *= zoom;
+                }, { passive: false });
             </script>
         </body>
         </html>`;
