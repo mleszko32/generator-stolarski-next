@@ -4,7 +4,7 @@ import { initLayout } from "./ui/layout.js";
 import { initPropertiesPanel } from "./ui/properties.js";
 import { updateSidebar } from "./ui/sidebar.js";
 import { init3DViewer, update3D } from "./render/viewer3d.js"; 
-import { renderEditor2D } from "./render/editor2d.js"; 
+
 
 // ZMIANA: Importujemy funkcję do usuwania projektów oraz customowy dialog
 import { saveProjectToCloud, loadProjectFromCloud, getSavedProjectsList, deleteProjectFromCloud, showCustomDialog } from "./core/storage.js";
@@ -15,7 +15,7 @@ initLayout();
 initPropertiesPanel();
 updateSidebar();
 init3DViewer(); 
-renderEditor2D(); 
+ 
 
 // --- OBSŁUGA PRZYCISKÓW CHMURY ---
 const btnSave = document.getElementById('btn-save-cloud');
@@ -93,7 +93,6 @@ if (btnLoad) {
         if (success) {
           initPropertiesPanel(); 
           updateSidebar();       
-          renderEditor2D();      
           update3D();            
         }
         btnLoad.innerText = "📥 Wczytaj projekt";

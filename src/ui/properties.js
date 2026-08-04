@@ -2,7 +2,7 @@
 import { state, getActiveModule } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
-import { renderEditor2D } from "../render/editor2d.js"; 
+
 
 export function initPropertiesPanel() {
   const rightSidebar = document.querySelector(".sidebar-right");
@@ -136,7 +136,7 @@ function setupEventListeners() {
     'legs-height', 'plinth-offset' // Nowe ID
   ];
 
-  const updateAll = () => { renderEditor2D(); update3D(); updateSidebar(); };
+  const updateAll = () => { update3D(); updateSidebar(); };
   let typingTimer;
   const debouncedUpdateAll = () => { clearTimeout(typingTimer); typingTimer = setTimeout(() => { updateAll(); }, 200); };
 

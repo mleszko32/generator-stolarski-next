@@ -1,48 +1,31 @@
-// src/core/layout.js
+// src/ui/layout.js
 export function initLayout() {
-  const app = document.getElementById("app");
-
+  const app = document.getElementById('app');
   app.innerHTML = `
-    <div class="app-container" style="display: flex; flex-direction: column; height: 100vh;">
+    <div class="top-nav">
+      <div class="logo">Generator Stolarski Next</div>
+      <div class="nav-actions">
+          <button id="btn-save-cloud" class="btn-primary" style="background: #f59e0b; color: white;">☁️ Zapisz projekt</button>
+          <button id="btn-load-cloud" class="btn-primary" style="background: #10b981; color: white;">📥 Wczytaj projekt</button>
+      </div>
+    </div>
+    
+    <!-- WYMUSZAMY POPRAWNY UKŁAD 3-KOLUMNOWY -->
+    <div class="main-content" style="display: flex; flex-direction: row; height: calc(100vh - 80px); width: 100%; overflow: hidden;">
       
-      <!-- ZMODYFIKOWANY NAGŁÓWEK Z PRZYCISKAMI -->
-      <header class="topbar" style="display: flex; justify-content: space-between; align-items: center; padding-right: 20px;">
-        <h1>Generator Stolarski Next</h1>
-        
-        <!-- NOWE PRZYCISKI DO OBSŁUGI CHMURY -->
-        <div style="display: flex; gap: 10px;">
-            <button id="btn-save-cloud" style="padding: 8px 16px; background-color: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-               ☁️ Zapisz projekt
-            </button>
-            <button id="btn-load-cloud" style="padding: 8px 16px; background-color: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-               📥 Wczytaj projekt
-            </button>
-        </div>
-      </header>
+      <!-- Lewy panel (Lista Modułów) -->
+      <div class="sidebar-left" style="width: 320px; min-width: 320px; overflow-y: auto; background: #fff; border-right: 1px solid #cbd5e1;"></div>
       
-      <div class="main-workspace" style="display: flex; flex: 1; overflow: hidden;">
-        <aside class="sidebar-left" style="width: 300px; overflow-y: auto;">
-          <h2>Drzewo projektu</h2>
-        </aside>
-        
-        <!-- NOWY KONTENER NA EDYTOR 2D -->
-        <section class="viewport-2d" id="editor-2d-container" style="flex: 1; background: #f8fafc; border-right: 2px solid #e2e8f0; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
-          <!-- Divy 2D polecą tutaj -->
-        </section>
-        
-        <!-- NAPRAWIONY KONTENER 3D Z ID -->
-        <section id="viewer-3d-container" class="viewport-3d" style="flex: 1; position: relative;">
-          <!-- Three.js Canvas wpadnie tutaj -->
-        </section>
-        
-        <aside class="sidebar-right" style="width: 350px; overflow-y: auto;">
-          <h2>Parametry</h2>
-        </aside>
+      <!-- Środkowy panel (Wielka Scena 3D) -->
+      <div class="center-panel" style="flex: 1; position: relative; overflow: hidden; background: #f1f5f9;">
+          <div id="editor-3d-container" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></div>
       </div>
       
-      <footer class="statusbar">
-        <p>Status: Płaska struktura (Flat Data) aktywna | Baza danych podpięta</p>
-      </footer>
+      <!-- Prawy panel (Właściwości) -->
+      <div class="sidebar-right" style="width: 320px; min-width: 320px; overflow-y: auto; background: #fff; border-left: 1px solid #cbd5e1;"></div>
+      
     </div>
+    
+    <div class="status-bar">Status: Pełny tryb 3D aktywny | Baza danych podpięta</div>
   `;
 }

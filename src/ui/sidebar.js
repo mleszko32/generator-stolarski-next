@@ -2,7 +2,6 @@
 import { calculateParts, calculateAllProjectParts, calculateProjectHardware } from "../engine/cabinet.js";
 import { generateSidePanelSVG } from "../render/viewer2d.js"; 
 import { state, getActiveModule, addModule, deleteModule, duplicateModule } from "../core/state.js";
-import { renderEditor2D } from "../render/editor2d.js";
 import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel } from "./properties.js";
 
@@ -142,7 +141,7 @@ export function updateSidebar() {
   if (btnShowAll) {
     btnShowAll.addEventListener('click', () => {
       state.activeModuleId = null; 
-      initPropertiesPanel(); renderEditor2D(); update3D(); updateSidebar();
+      initPropertiesPanel(); update3D(); updateSidebar();
     });
   }
 
@@ -151,7 +150,7 @@ export function updateSidebar() {
     el.addEventListener('click', (e) => {
       e.stopPropagation(); // Blokuje "zaznaczenie" klikanej szafki pod przyciskiem
       duplicateModule(e.currentTarget.getAttribute('data-id'));
-      initPropertiesPanel(); renderEditor2D(); update3D(); updateSidebar();
+      initPropertiesPanel(); update3D(); updateSidebar();
     });
   });
 
@@ -159,20 +158,20 @@ export function updateSidebar() {
     el.addEventListener('click', (e) => {
       e.stopPropagation(); 
       deleteModule(e.currentTarget.getAttribute('data-id'));
-      initPropertiesPanel(); renderEditor2D(); update3D(); updateSidebar();
+      initPropertiesPanel();  update3D(); updateSidebar();
     });
   });
 
   document.querySelectorAll('.module-item').forEach(el => {
     el.addEventListener('click', (e) => {
       state.activeModuleId = e.currentTarget.getAttribute('data-id');
-      initPropertiesPanel(); renderEditor2D(); update3D(); updateSidebar();       
+      initPropertiesPanel();  update3D(); updateSidebar();       
     });
   });
 
   const setupAddBtn = (id, type) => {
     const btn = document.getElementById(id);
-    if (btn) btn.addEventListener('click', () => { addModule(type); initPropertiesPanel(); renderEditor2D(); update3D(); updateSidebar(); });
+    if (btn) btn.addEventListener('click', () => { addModule(type); initPropertiesPanel();  update3D(); updateSidebar(); });
   };
   setupAddBtn('btn-add-base', 'base_cabinet'); setupAddBtn('btn-add-upper', 'upper_cabinet'); setupAddBtn('btn-add-tall', 'tall_cabinet');
 

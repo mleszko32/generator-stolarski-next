@@ -319,7 +319,7 @@ function getFrontsAndDrawers(mod, config) {
   if (fronts.length === 0) return { parts, mountingData };
   fronts.sort((a, b) => a.y - b.y);
 
-  const { width, depth } = mod.dimensions;
+  const { width, depth, height } = mod.dimensions;
   const board = config.materials.boardThickness;
   const backP = mod.backPanel || { type: 'nakladane', offset: 16 };
   const topBottomDepth = backP.type === 'nut' ? depth - backP.offset - config.materials.backThickness : depth - config.materials.backThickness;
@@ -330,6 +330,7 @@ function getFrontsAndDrawers(mod, config) {
   fronts.forEach((front, index) => {
     let partName = "Front";
     if (front.subtype === 'szuflada') { drawerCount++; partName = `Front szuflady ${drawerCount}`; } 
+    else if (front.subtype === 'szuflada-wewnetrzna') { drawerCount++; partName = `Front szuflady wewn. ${drawerCount}`; } 
     else if (front.subtype === 'drzwi') { doorCount++; partName = `Drzwi ${doorCount}`; } 
     else if (front.subtype === 'drzwi-lp') {
       const side = front.id.endsWith('-L') ? 'Lewe' : 'Prawe';
@@ -338,21 +339,48 @@ function getFrontsAndDrawers(mod, config) {
 
     parts.push({ name: partName, length: parseFloat(front.h.toFixed(1)), width: parseFloat(front.w.toFixed(1)), qty: 1 });
 
-    if (front.subtype === 'szuflada') {
-      const isBottomInZone = front.frontIndex === 0;
-      const isTopInZone = index === fronts.length - 1;
-      
+    if (front.subtype.includes('szuflada')) {
+      let innerThick = 18;
+      let innerSetback = 0;
+      if (front.subtype === 'szuflada-wewnetrzna') {
+          innerThick = parseFloat(front.innerFrontThickness ?? 18);
+          innerSetback = parseFloat(front.innerSetback ?? 2);
+      }
+
       if (typeof calculateDrawerHoles === 'function') {
-        const drawerHoles = calculateDrawerHoles(config.front.drawerSystem, front.y, front.h, board, drawerCount - 1, isBottomInZone);
-        if (drawerHoles) { drawerHoles.frontId = front.id; drawerHoles.type = 'drawer'; mountingData.push(drawerHoles); }
+        // ZMIANA: Zawsze wyłączamy 'isBottomInZone' by usunąć błąd nierównych przerw między prowadnicami
+        const drawerHoles = calculateDrawerHoles(config.front.drawerSystem, front.y, front.h, board, drawerCount - 1, false);
+        if (drawerHoles) { 
+          const adjustedHoles = JSON.parse(JSON.stringify(drawerHoles));
+          
+          if (front.subtype === 'szuflada-wewnetrzna') {
+              const totalSetback = innerThick + innerSetback; 
+              if (adjustedHoles.slideSideHoles) {
+                  adjustedHoles.slideSideHoles.forEach(h => {
+                      h.x += totalSetback; 
+                  });
+              }
+          }
+
+          adjustedHoles.frontId = front.id; 
+          adjustedHoles.type = 'drawer'; 
+          mountingData.push(adjustedHoles); 
+        }
       }
 
       if (typeof getDrawerComponents === 'function') {
         let availableSpace = front.h;
-        if (isBottomInZone) availableSpace -= (board - (config.front.clearance.bottom || 0));
-        if (isTopInZone) availableSpace -= (board - (config.front.clearance.top || 0));
+        // ZMIANA: Inteligentne odejmowanie grubości płyt od dostępnego miejsca wewnątrz
+        if (front.y < board) availableSpace -= board; 
+        if (front.y + front.h > height - board) availableSpace -= board; 
+
+        let availableDepth = topBottomDepth;
+        if (front.subtype === 'szuflada-wewnetrzna') {
+            availableDepth -= (innerThick + innerSetback);
+        }
+
         const userForcedVariant = front.forceVariant || 'auto';
-        const drawerComps = getDrawerComponents(config.front.drawerSystem, width - (board * 2), topBottomDepth, availableSpace, userForcedVariant);
+        const drawerComps = getDrawerComponents(config.front.drawerSystem, width - (board * 2), availableDepth, availableSpace, userForcedVariant);
         
         if (drawerComps) {
           parts.push({ name: `Dno szuflady (NL: ${drawerComps.nominalLength})`, length: parseFloat(drawerComps.bottom.length.toFixed(1)), width: parseFloat(drawerComps.bottom.width.toFixed(1)), qty: 1 });
@@ -369,3 +397,4 @@ function getFrontsAndDrawers(mod, config) {
 
   return { parts, mountingData };
 }
+  

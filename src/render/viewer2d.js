@@ -16,11 +16,10 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
   const sideH = isTopBottomFullWidth ? height - (th * 2) : height;
   const viewH = sideH; 
 
-  // --- DYNAMICZNY UKŁAD (Rysujemy tylko wybrane) ---
   let currentX = 80;
   const gapBetween = 400; 
   
-  let cabX = -9999, bokLX = -9999, bokRX = -9999, frontX = -9999;
+  let cabX = -9999, bokLX = -9999, bokRX = -9999, frontX = -9999, innerFrontX = -9999;
 
   if (viewMode === 'all' || viewMode === 'korpus') { 
       cabX = currentX; currentX += cabWidth + gapBetween; 
@@ -33,6 +32,9 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
   }
   if (viewMode === 'all' || viewMode === 'front') { 
       frontX = currentX; currentX += cabWidth + gapBetween; 
+  }
+  if (viewMode === 'all' || viewMode === 'frontInner') { 
+      innerFrontX = currentX; currentX += cabWidth + gapBetween; 
   }
 
   const marginRight = 400; 
@@ -88,7 +90,6 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
     <g transform="translate(0, ${marginY})">
   `;
 
-  // --- LEGENDA NAWIERTÓW (Rysowana zawsze u góry) ---
   svg += `
     <g transform="translate(80, -150)">
         <text x="0" y="0" font-size="14" fill="#1e293b" font-weight="bold">LEGENDA NAWIERTÓW I WYMIARÓW:</text>
@@ -108,9 +109,6 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
   svg += `<line x1="60" y1="${sideH}" x2="${svgWidth - 100}" y2="${sideH}" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,4" />`;
   svg += `<text x="${svgWidth - 90}" y="${sideH + 4}" font-size="12" fill="#1e293b" font-weight="bold">0 mm (Baza modułu)</text>`;
 
-  // ==========================================
-  // CZĘŚĆ 1: KORPUS WNĘTRZE
-  // ==========================================
   if (viewMode === 'all' || viewMode === 'korpus') {
       svg += `<text x="${cabX + cabWidth/2}" y="-25" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">KORPUS WNĘTRZE</text>`;
       
@@ -171,9 +169,6 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
       }
   }
 
-  // ==========================================
-  // CZĘŚĆ 2 i 3: BOKI (Rysowanie obrysów)
-  // ==========================================
   if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') {
       svg += `<text x="${bokLX + depth/2}" y="-25" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">BOK LEWY</text>`;
       svg += `<rect x="${bokLX}" y="0" width="${depth}" height="${sideH}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
@@ -188,7 +183,6 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
       svg += `<text x="${bokRX + depth - 15}" y="${sideH / 2}" font-size="11" fill="#94a3b8" font-weight="bold" transform="rotate(-90, ${bokRX + depth - 15}, ${sideH / 2})" text-anchor="middle" letter-spacing="1">PRZÓD BOKU</text>`;
   }
 
-  // --- ZBIERANIE OSI Y DLA BOKÓW I RYSOWANIE KROPEK ---
   let drawerYs = new Set();
   let corpusYs = new Set(); 
   let shelfYs = new Set(); 
@@ -278,7 +272,6 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
     });
   }
 
-  // --- RYSOWANIE STRZAŁK WYMIAROWYCH (DLA WYBRANYCH BOKÓW) ---
   const sortedDrawerYs = Array.from(drawerYs).sort((a,b) => a - b);
   const sortedCorpusYs = Array.from(corpusYs).sort((a,b) => a - b);
   const sortedShelfYs = Array.from(shelfYs).sort((a,b) => a - b);
@@ -400,7 +393,6 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
           svg += `</g>`;
       }
 
-      // --- PRAWY BOK: Poziome wymiary od przedniej krawędzi ---
       if (mountingData) {
           const drawerMounts = mountingData.filter(d => d.type === 'drawer' && d.slideSideHoles && d.slideSideHoles.length > 0);
           if (drawerMounts.length > 0) {
@@ -412,7 +404,7 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
               svg += `<g class="layer-holes-drawer">`;
               highestDrawer.slideSideHoles.forEach((hole, idx) => {
                   let dimY = highestHoleSvgY - 40 - (idx * 20); 
-                  let holeX = bokRX + depth - hole.x; // Od przedniej krawędzi prawego boku
+                  let holeX = bokRX + depth - hole.x; 
                   let edgeX = bokRX + depth;
 
                   svg += `<line x1="${holeX}" y1="${highestHoleSvgY + 20}" x2="${holeX}" y2="${dimY}" stroke="#0284c7" stroke-width="0.5" stroke-dasharray="2,2" />`;
@@ -425,15 +417,15 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
   }
 
   // ==========================================
-  // CZĘŚĆ 4: FRONTY (MOCOWANIA I PODZIAŁY)
+  // CZĘŚĆ 4: FRONTY ZEWNĘTRZNE I DRZWI
   // ==========================================
   if (viewMode === 'all' || viewMode === 'front') {
       svg += `<text x="${frontX + cabWidth/2}" y="-25" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">FRONT (Podział zewnętrzny)</text>`;
 
       if (mod && mod.elements) {
-        const fronts = mod.elements.filter(el => el.typ === 'front').sort((a, b) => a.y - b.y);
+        const outerFronts = mod.elements.filter(el => el.typ === 'front' && el.subtype !== 'szuflada-wewnetrzna').sort((a, b) => a.y - b.y);
         
-        fronts.forEach(front => {
+        outerFronts.forEach(front => {
           let drawY = isTopBottomFullWidth ? front.y - th : front.y;
           const elSvgY = viewH - drawY - front.h; 
           const isDrawer = front.subtype === 'szuflada';
@@ -472,6 +464,73 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
           }
           
           if (isDrawer && mountingData) {
+            svg += `<g class="layer-front-holes">`;
+            const drawerData = mountingData.find(m => m.type === 'drawer' && m.frontId === front.id);
+            if (drawerData && drawerData.frontHoles) {
+              drawerData.frontHoles.forEach((hole, idx) => {
+                 const xL = Number(hole.xOffsetLeft ?? hole.xOffset ?? 20.5);
+                 const xR = Number(hole.xOffsetRight ?? hole.xOffset ?? 20.5);
+
+                 const holeX_Left = fSvgX + xL;
+                 const holeX_Right = fSvgX + fWidth - xR;
+                 
+                 let drawHoleY = isTopBottomFullWidth ? front.y + hole.y - th : front.y + hole.y;
+                 const holeSvgY = viewH - drawHoleY;
+
+                 svg += `<circle cx="${holeX_Left}" cy="${holeSvgY}" r="2.5" fill="#dc2626" />`;
+                 svg += `<circle cx="${holeX_Right}" cy="${holeSvgY}" r="2.5" fill="#dc2626" />`;
+
+                 const frontBottomY = elSvgY + front.h;
+                 
+                 let dimXLeft = holeX_Left - 18 - (idx * 20);
+                 svg += `<line x1="${holeX_Left}" y1="${holeSvgY}" x2="${dimXLeft}" y2="${holeSvgY}" stroke="#dc2626" stroke-width="0.5" stroke-dasharray="2,2" />`;
+                 svg += dimV(dimXLeft, frontBottomY, holeSvgY, hole.y.toFixed(1), "#dc2626", "arrow-red");
+
+                 if (idx === 0) {
+                     let dimY = holeSvgY - 20; 
+                     svg += `<line x1="${fSvgX}" y1="${holeSvgY}" x2="${fSvgX}" y2="${dimY}" stroke="#dc2626" stroke-width="0.5" stroke-dasharray="2,2" />`;
+                     svg += `<line x1="${holeX_Left}" y1="${holeSvgY}" x2="${holeX_Left}" y2="${dimY}" stroke="#dc2626" stroke-width="0.5" stroke-dasharray="2,2" />`;
+                     svg += dimH(fSvgX, holeX_Left, dimY, xL.toFixed(1), "#dc2626", "arrow-red");
+
+                     svg += `<line x1="${holeX_Right}" y1="${holeSvgY}" x2="${holeX_Right}" y2="${dimY}" stroke="#dc2626" stroke-width="0.5" stroke-dasharray="2,2" />`;
+                     svg += `<line x1="${fSvgX + fWidth}" y1="${holeSvgY}" x2="${fSvgX + fWidth}" y2="${dimY}" stroke="#dc2626" stroke-width="0.5" stroke-dasharray="2,2" />`;
+                     svg += dimH(holeX_Right, fSvgX + fWidth, dimY, xR.toFixed(1), "#dc2626", "arrow-red");
+                 }
+              });
+            }
+            svg += `</g>`;
+          }
+        });
+      }
+  }
+
+  // ==========================================
+  // CZĘŚĆ 5: FRONTY WEWNĘTRZNE
+  // ==========================================
+  if (viewMode === 'all' || viewMode === 'frontInner') {
+      svg += `<text x="${innerFrontX + cabWidth/2}" y="-25" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">FRONTY (Szuflady wewn.)</text>`;
+
+      if (mod && mod.elements) {
+        const innerFronts = mod.elements.filter(el => el.typ === 'front' && el.subtype === 'szuflada-wewnetrzna').sort((a, b) => a.y - b.y);
+        
+        svg += `<rect x="${innerFrontX}" y="0" width="${cabWidth}" height="${sideH}" fill="none" stroke="#94a3b8" stroke-dasharray="4,4" stroke-width="1" />`;
+
+        innerFronts.forEach(front => {
+          let drawY = isTopBottomFullWidth ? front.y - th : front.y;
+          const elSvgY = viewH - drawY - front.h; 
+          
+          let fillColor = '#fff7ed'; 
+          let strokeColor = '#ea580c';
+          
+          const fWidth = front.w || cabWidth;
+          const fSvgX = innerFrontX + (front.x || 0);
+
+          svg += `<rect x="${fSvgX}" y="${elSvgY}" width="${fWidth}" height="${front.h}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5" />`;
+
+          let labelText = `Szuflada Wewn.`;
+          svg += `<text x="${fSvgX + fWidth/2}" y="${elSvgY + front.h/2}" font-size="12" fill="#1e293b" font-weight="bold" text-anchor="middle">${labelText}</text>`;
+          
+          if (mountingData) {
             svg += `<g class="layer-front-holes">`;
             const drawerData = mountingData.find(m => m.type === 'drawer' && m.frontId === front.id);
             if (drawerData && drawerData.frontHoles) {

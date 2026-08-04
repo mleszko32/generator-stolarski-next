@@ -2,458 +2,1175 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { state } from '../core/state.js';
-import { getDrawerComponents } from '../core/drawerMath.js';
-import { initPropertiesPanel } from '../ui/properties.js';
+
+import { getDrawerComponents, calculateDrawerHoles } from '../core/drawerMath.js';
+import { calculateHinges } from '../core/hingeMath.js';
+import { autoDistributeShelves } from '../core/shelfMath.js';
+
 import { updateSidebar } from '../ui/sidebar.js';
-import { renderEditor2D } from './editor2d.js';
+import { initPropertiesPanel } from '../ui/properties.js';
+
+let alignMode = {
+    active: false,
+    sourceMod: null,
+    sourceEl: null,
+    banner: null
+};
+
+let isXrayMode = true; 
+let isFrontsVisible = true; 
+
+function recalculateLayout(mod) {
+  if (!mod || !mod.elements) return;
+  const config = state.project;
+  const th = parseFloat(config.materials.boardThickness) || 18;
+  const width = parseFloat(mod.dimensions.width) || 600;
+  const height = parseFloat(mod.dimensions.height) || 720;
+  
+  const f = config.front || {};
+  const fc = f.clearance || {};
+  const isInset = f.type === 'wpuszczane';
+
+  const cLeft = parseFloat(fc.left ?? fc.sides ?? 1.5) || 0;
+  const cRight = parseFloat(fc.right ?? fc.sides ?? 1.5) || 0;
+  const cTop = parseFloat(fc.top ?? fc.gora ?? 2) || 0;
+  const cBottom = parseFloat(fc.bottom ?? fc.dol ?? 2) || 0;
+
+  const cons = config.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
+  const hasTraverses = cons.topType.includes('trawersy');
+  const isVerticalTraverse = cons.topType === 'trawersy_pion';
+  const traverseWidth = cons.traverseWidth || 100;
+
+  mod.elements.forEach(el => {
+      if (el.typ === 'front' && el.baseZone) {
+          if (el.baseZone.boundBottom) {
+              const getBound = (id, type, fallback) => {
+                  if (id === 'cab-left') return th;
+                  if (id === 'cab-right') return width - th;
+                  if (id === 'cab-bottom') return th;
+                  if (id === 'cab-top') {
+                      if (hasTraverses) return isVerticalTraverse ? height - traverseWidth : height - th;
+                      return height - th;
+                  }
+                  const found = mod.elements.find(e => e.id === id);
+                  if (found) {
+                      if (type === 'minX') return found.x + found.w;
+                      if (type === 'maxX') return found.x;
+                      if (type === 'minY') return found.y + found.h;
+                      if (type === 'maxY') return found.y;
+                  }
+                  return parseFloat(fallback) || 0;
+              };
+              el.baseZone.minX = getBound(el.baseZone.boundLeft, 'minX', el.baseZone.minX);
+              el.baseZone.maxX = getBound(el.baseZone.boundRight, 'maxX', el.baseZone.maxX);
+              el.baseZone.minY = getBound(el.baseZone.boundBottom, 'minY', el.baseZone.minY);
+              el.baseZone.maxY = getBound(el.baseZone.boundTop, 'maxY', el.baseZone.maxY);
+          }
+
+          const minX = parseFloat(el.baseZone.minX) || 0;
+          const maxX = parseFloat(el.baseZone.maxX) || width;
+          const minY = (parseFloat(el.baseZone.minY) || 0) + (parseFloat(el.baseZone.offsetBottom) || 0);
+          const maxY = (parseFloat(el.baseZone.maxY) || height) - (parseFloat(el.baseZone.offsetTop) || 0);
+          
+          const gapVal = parseFloat(el.gap ?? f.gap ?? 3) || 0;
+
+          let startX, totalW, startY, totalH;
+
+          if (el.subtype === 'szuflada-wewnetrzna') {
+              const gX = el.intGapX !== undefined ? parseFloat(el.intGapX) : 15;
+              const gY = el.intGapY !== undefined ? parseFloat(el.intGapY) : 5;
+              startX = minX + gX;
+              totalW = (maxX - minX) - (gX * 2);
+              startY = minY + gY;
+              totalH = (maxY - minY) - (gY * 2);
+          } else {
+              const isBoundLeftFront = el.baseZone.boundLeft && el.baseZone.boundLeft.startsWith('front');
+              const isBoundRightFront = el.baseZone.boundRight && el.baseZone.boundRight.startsWith('front');
+              const isBoundBottomFront = el.baseZone.boundBottom && el.baseZone.boundBottom.startsWith('front');
+              const isBoundTopFront = el.baseZone.boundTop && el.baseZone.boundTop.startsWith('front');
+
+              const isLeftOuter = minX <= th + 1; 
+              const isRightOuter = maxX >= width - th - 1;
+              const isBottomOuter = minY <= th + 1;
+              const isTopOuter = maxY >= (hasTraverses && isVerticalTraverse ? height - traverseWidth - 1 : height - th - 1);
+
+              const overLeft = isLeftOuter ? (isInset ? -cLeft : th - cLeft) : (isBoundLeftFront ? -gapVal : ((th / 2) - (gapVal / 2)));
+              const overRight = isRightOuter ? (isInset ? -cRight : th - cRight) : (isBoundRightFront ? -gapVal : ((th / 2) - (gapVal / 2)));
+              
+              // ZMIANA: Usunięto literówkę (isBottomOuter -> isInset)
+              const overBottom = isBottomOuter ? (isInset ? -cBottom : th - cBottom) : (isBoundBottomFront ? -gapVal : ((th / 2) - (gapVal / 2)));
+              const overTop = isTopOuter ? (isInset ? -cTop : th - cTop) : (isBoundTopFront ? -gapVal : ((th / 2) - (gapVal / 2)));
+
+              startX = minX - overLeft;
+              totalW = (maxX - minX) + overLeft + overRight;
+              startY = minY - overBottom;
+              totalH = (maxY - minY) + overBottom + overTop;
+          }
+
+          if (el.subtype === 'szuflada' || el.subtype === 'szuflada-wewnetrzna') {
+              const distributionStr = String(el.distribution || el.frontCount || "1").trim();
+              let parsedZones = [];
+              if (!distributionStr.includes(':') && !distributionStr.includes(',') && !isNaN(distributionStr)) {
+                  const count = parseInt(distributionStr, 10) || 1;
+                  for (let i = 0; i < count; i++) parsedZones.push({ type: 'fr', value: 1 });
+              } else {
+                  const separator = distributionStr.includes(':') ? ':' : ',';
+                  parsedZones = distributionStr.split(separator).map(s => {
+                      let zone = s.trim();
+                      if (zone.toLowerCase().endsWith('fr')) return { type: 'fr', value: parseFloat(zone) || 1 };
+                      const val = parseFloat(zone) || 1;
+                      return (val <= 10) ? { type: 'fr', value: val } : { type: 'fixed', value: val };
+                  });
+              }
+
+              const count = parsedZones.length;
+              const totalGaps = gapVal * (count - 1);
+              let availableHeight = totalH - totalGaps;
+
+              let fixedTotal = 0; let frTotal = 0;
+              parsedZones.forEach(z => { if (z.type === 'fixed') fixedTotal += z.value; if (z.type === 'fr') frTotal += z.value; });
+              availableHeight -= fixedTotal;
+              const singleFrValue = frTotal > 0 ? availableHeight / frTotal : 0;
+
+              let currentY = startY;
+              for (let i = 0; i < el.frontIndex; i++) {
+                  const z = parsedZones[i] || { type: 'fr', value: 1 };
+                  const h = z.type === 'fixed' ? z.value : z.value * singleFrValue;
+                  currentY += h + gapVal;
+              }
+
+              const myZone = parsedZones[el.frontIndex] || { type: 'fr', value: 1 };
+              const myHeight = myZone.type === 'fixed' ? myZone.value : myZone.value * singleFrValue;
+
+              el.x = isNaN(startX) ? 0 : startX; 
+              el.w = isNaN(totalW) ? 100 : totalW;
+              el.y = isNaN(currentY) ? 0 : currentY; 
+              el.h = isNaN(myHeight) ? 100 : myHeight;
+
+          } else if (el.subtype === 'drzwi') {
+              el.x = isNaN(startX) ? 0 : startX; el.w = isNaN(totalW) ? 100 : totalW;
+              el.y = isNaN(startY) ? 0 : startY; el.h = isNaN(totalH) ? 100 : totalH;
+          } else if (el.subtype === 'drzwi-lp') {
+              const singleW = (totalW - gapVal) / 2;
+              el.w = isNaN(singleW) ? 50 : singleW; el.h = isNaN(totalH) ? 100 : totalH; el.y = isNaN(startY) ? 0 : startY;
+              let myX = el.frontIndex === 0 ? startX : startX + singleW + gapVal; 
+              el.x = isNaN(myX) ? 0 : myX;
+          }
+      }
+  });
+}
 
 let scene, camera, renderer, controls;
+let container;
 let cabinetGroup;
-let roomGroup; // Grupa przechowująca ściany i podłogę
-let isInitialized = false;
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
-let isDragging = false;
-let draggedModuleId = null;
-let dragOffset = 0;
-const dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0); 
-let dragIntersection = new THREE.Vector3();
+let pointerDownPos = new THREE.Vector2();
 
 export function init3DViewer() {
-  const checkExist = setInterval(() => {
-    const container = document.getElementById('viewer-3d-container') || document.querySelector('.viewport-3d');
-    if (container) {
-      clearInterval(checkExist); 
-      if (isInitialized) return;
-      container.innerHTML = ''; 
+  container = document.getElementById('viewer-3d-container') || document.getElementById('editor-3d-container') || document.querySelector('.viewer-3d');
+  if (!container) return;
 
-      scene = new THREE.Scene();
-      scene.background = new THREE.Color(0xf1f5f9); 
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xf4f4f5); 
 
-      camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 10000);
-      camera.position.set(1500, 1200, 2200);
+  camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 10, 15000);
+  camera.position.set(2500, 1500, 3500);
 
-      renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(container.clientWidth, container.clientHeight);
-      container.appendChild(renderer.domElement);
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(container.clientWidth, container.clientHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  
+  container.innerHTML = ''; 
+  container.style.position = 'relative'; 
+  container.appendChild(renderer.domElement);
 
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
-      scene.add(ambientLight);
-      
-      const dirLight = new THREE.DirectionalLight(0xffffff, 0.4);
-      dirLight.position.set(1000, 2000, 1000);
-      scene.add(dirLight);
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.05;
+  controls.target.set(500, 500, 0);
 
-      // Grupy sceny
-      roomGroup = new THREE.Group();
-      scene.add(roomGroup);
+  const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.5);
+  scene.add(hemiLight);
 
-      cabinetGroup = new THREE.Group();
-      scene.add(cabinetGroup);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+  dirLight.position.set(2000, 3000, 2500);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.width = 2048; 
+  dirLight.shadow.mapSize.height = 2048;
+  scene.add(dirLight);
 
-      controls = new OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.05;
-      controls.target.set(1000, 500, 0);
+  const backLight = new THREE.DirectionalLight(0xffffff, 0.3);
+  backLight.position.set(-1500, 1000, -2000);
+  scene.add(backLight);
 
-      // --- OBSŁUGA MYSZY (DRAG & DROP + ŚCIANY) ---
-      const canvas = renderer.domElement;
+  cabinetGroup = new THREE.Group();
+  scene.add(cabinetGroup);
 
-      canvas.addEventListener('pointerdown', (event) => {
-          if (event.button !== 0) return; 
+  const floorGeo = new THREE.PlaneGeometry(15000, 15000);
+  const floorMat = new THREE.ShadowMaterial({ opacity: 0.12 });
+  const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = 0;
+  floor.receiveShadow = true;
+  scene.add(floor);
 
-          const rect = canvas.getBoundingClientRect();
-          mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-          mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  renderer.domElement.addEventListener('pointerdown', (e) => {
+      pointerDownPos.set(e.clientX, e.clientY);
+  });
 
-          raycaster.setFromCamera(mouse, camera);
-          const intersects = raycaster.intersectObjects(cabinetGroup.children, true);
+  renderer.domElement.addEventListener('pointerup', (e) => {
+      if (Math.abs(e.clientX - pointerDownPos.x) < 5 && Math.abs(e.clientY - pointerDownPos.y) < 5) {
+          handle3DClick(e);
+      }
+  });
 
-          if (intersects.length > 0) {
-              let object = intersects[0].object;
-              while (object && !object.userData.moduleId) {
-                  object = object.parent;
-              }
-              
-              if (object && object.userData.moduleId) {
-                  draggedModuleId = object.userData.moduleId;
-                  isDragging = true;
-                  controls.enabled = false; 
+  window.addEventListener('pointerdown', (e) => {
+      const existingMenu = document.getElementById('context-menu-3d');
+      if (existingMenu && !existingMenu.contains(e.target) && e.target !== renderer.domElement) {
+          existingMenu.remove();
+      }
+  });
 
-                  if (state.activeModuleId !== draggedModuleId) {
-                      state.activeModuleId = draggedModuleId;
-                      initPropertiesPanel();
-                      updateSidebar();
-                      renderEditor2D();
-                      update3D();
-                  }
-
-                  raycaster.ray.intersectPlane(dragPlane, dragIntersection);
-                  const mod = state.project.modules.find(m => m.id === draggedModuleId);
-                  if (mod) dragOffset = dragIntersection.x - (mod.position.x || 0);
-              }
-          }
-      });
-
-      canvas.addEventListener('pointermove', (event) => {
-          if (!isDragging || !draggedModuleId) return;
-
-          const rect = canvas.getBoundingClientRect();
-          mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-          mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-          raycaster.setFromCamera(mouse, camera);
-          if (raycaster.ray.intersectPlane(dragPlane, dragIntersection)) {
-              let newX = dragIntersection.x - dragOffset;
-              const mod = state.project.modules.find(m => m.id === draggedModuleId);
-              if (!mod) return;
-
-              const roomW = state.project.room?.width || 3500;
-              const draggedW = parseFloat(mod.dimensions.width) || 600;
-
-              // --- LOGIKA MAGNESU I ŚCIAN ---
-              let snapX = newX;
-              const snapDistance = 40; // mm
-
-              // 1. Przyciąganie do ścian granicznych
-              if (Math.abs(snapX - 0) < snapDistance) {
-                  snapX = 0; // Lewa ściana
-              } else if (Math.abs((snapX + draggedW) - roomW) < snapDistance) {
-                  snapX = roomW - draggedW; // Prawa ściana
-              }
-
-              // 2. Przyciąganie do innych szafek
-              state.project.modules.forEach(otherMod => {
-                  if (otherMod.id !== draggedModuleId) {
-                      const otherX = parseFloat(otherMod.position.x) || 0;
-                      const otherW = parseFloat(otherMod.dimensions.width);
-                      
-                      if (Math.abs(snapX - (otherX + otherW)) < snapDistance) {
-                          snapX = otherX + otherW;
-                      } else if (Math.abs((snapX + draggedW) - otherX) < snapDistance) {
-                          snapX = otherX - draggedW;
-                      } else if (Math.abs(snapX - otherX) < snapDistance) {
-                          snapX = otherX;
-                      }
-                  }
-              });
-
-              // Twarde ograniczenie fizyczne (nie pozwól wyjechać poza ściany pomieszczenia)
-              if (snapX < 0) snapX = 0;
-              if (snapX + draggedW > roomW) snapX = roomW - draggedW;
-
-              const targetGroup = cabinetGroup.children.find(g => g.userData.moduleId === draggedModuleId);
-              if (targetGroup) targetGroup.position.x = snapX;
-              
-              mod.position.x = snapX; 
-          }
-      });
-
-      window.addEventListener('pointerup', () => {
-          if (isDragging) {
-              isDragging = false;
-              draggedModuleId = null;
-              controls.enabled = true; 
-              
-              update3D(); 
-              initPropertiesPanel(); 
-              window.dispatchEvent(new CustomEvent('cabinetMoved')); 
-          }
-      });
-
-      isInitialized = true;
-
-      const animate = function () {
-        requestAnimationFrame(animate);
-        controls.update();
-        renderer.render(scene, camera);
-      };
-      animate();
-
+  const uiOverlay = document.createElement('div');
+  uiOverlay.style.position = 'absolute';
+  uiOverlay.style.top = '15px';
+  uiOverlay.style.right = '15px';
+  uiOverlay.style.zIndex = '100';
+  uiOverlay.style.display = 'flex';
+  uiOverlay.style.gap = '10px';
+  
+  const toggleBtn = document.createElement('button');
+  toggleBtn.innerText = '🔄 Przezroczysty (Szkic)';
+  Object.assign(toggleBtn.style, {
+      padding: '10px 16px', background: '#3b82f6', color: '#fff', border: 'none',
+      borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px',
+      boxShadow: '0 4px 6px rgba(0,0,0,0.1)', transition: 'background 0.2s'
+  });
+  
+  toggleBtn.onclick = () => {
+      isXrayMode = !isXrayMode;
+      toggleBtn.innerText = isXrayMode ? '🔄 Przezroczysty (Szkic)' : '🔄 Realistyczny (Bryły)';
+      toggleBtn.style.background = isXrayMode ? '#3b82f6' : '#10b981';
       update3D();
+  };
+  
+  const toggleFrontsBtn = document.createElement('button');
+  toggleFrontsBtn.innerText = '🚪 Ukryj fronty zewn.';
+  Object.assign(toggleFrontsBtn.style, {
+      padding: '10px 16px', background: '#8b5cf6', color: '#fff', border: 'none',
+      borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px',
+      boxShadow: '0 4px 6px rgba(0,0,0,0.1)', transition: 'background 0.2s'
+  });
+  
+  toggleFrontsBtn.onclick = () => {
+      isFrontsVisible = !isFrontsVisible;
+      toggleFrontsBtn.innerText = isFrontsVisible ? '🚪 Ukryj fronty zewn.' : '🚪 Pokaż fronty zewn.';
+      toggleFrontsBtn.style.background = isFrontsVisible ? '#8b5cf6' : '#64748b';
+      update3D();
+  };
 
-      window.addEventListener('resize', () => {
-         if (container) {
-            camera.aspect = container.clientWidth / container.clientHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(container.clientWidth, container.clientHeight);
-         }
-      });
-    }
-  }, 50); 
+  uiOverlay.appendChild(toggleBtn);
+  uiOverlay.appendChild(toggleFrontsBtn);
+  container.appendChild(uiOverlay);
+
+  window.addEventListener('resize', () => {
+      if (!container) return;
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+  });
+
+  update3D();
+  animate();
 }
 
-function clearGroupMemory(group) {
-  while (group.children.length > 0) {
-    const child = group.children[0];
-    group.remove(child);
-    if (child.children && child.children.length > 0) clearGroupMemory(child);
-    if (child.geometry) child.geometry.dispose();
-    if (child.material) {
-      if (Array.isArray(child.material)) child.material.forEach(mat => mat.dispose());
-      else child.material.dispose();
-    }
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+function enterAlignMode(mod, el) {
+  alignMode.active = true;
+  alignMode.sourceMod = mod;
+  alignMode.sourceEl = el;
+
+  const banner = document.createElement('div');
+  Object.assign(banner.style, {
+      position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)',
+      background: '#0ea5e9', color: 'white', padding: '12px 24px', borderRadius: '8px',
+      fontWeight: 'bold', zIndex: '2000', boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+      display: 'flex', alignItems: 'center', gap: '15px'
+  });
+  
+  banner.innerHTML = `
+      <span>🧲 Kliknij na scenie wieniec lub półkę innej szafki, do której chcesz wyrównać...</span>
+      <button style="background:white; color:#0ea5e9; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold;">Anuluj</button>
+  `;
+
+  banner.querySelector('button').onclick = (e) => {
+      e.stopPropagation();
+      exitAlignMode();
+  };
+
+  document.getElementById('viewer-3d-container').appendChild(banner);
+  alignMode.banner = banner;
+}
+
+function exitAlignMode() {
+  alignMode.active = false;
+  alignMode.sourceMod = null;
+  alignMode.sourceEl = null;
+  if (alignMode.banner) {
+      alignMode.banner.remove();
+      alignMode.banner = null;
   }
 }
 
-export function update3D() {
-  if (!cabinetGroup || !roomGroup) return; 
-  
-  // Czyszczenie pamięci
-  clearGroupMemory(cabinetGroup);
-  clearGroupMemory(roomGroup);
+function handle3DClick(event) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-  const config = state.project;
-  const room = config.room || { width: 3500, height: 2600, depth: 600 };
-  
-  // --- RYSOWANIE POMIESZCZENIA (ŚCIANY I PODŁOGA) ---
-  const matFloor = new THREE.MeshLambertMaterial({ color: 0xe2e8f0, side: THREE.DoubleSide });
-  const matWall = new THREE.MeshLambertMaterial({ color: 0xf8fafc, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
-  const lineMatWall = new THREE.LineBasicMaterial({ color: 0xcbd5e1 });
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(cabinetGroup.children, true);
 
-  // 1. Podłoga
-  const floorGeo = new THREE.BoxGeometry(room.width, 20, 1500);
-  const floorMesh = new THREE.Mesh(floorGeo, matFloor);
-  floorMesh.position.set(room.width / 2, -10, 1500 / 2 - 300);
-  roomGroup.add(floorMesh);
+  let validHit = null;
+  let data = null;
 
-  // 2. Ściana tylna
-  const backWallGeo = new THREE.BoxGeometry(room.width, room.height, 20);
-  const backWallMesh = new THREE.Mesh(backWallGeo, matWall);
-  backWallMesh.position.set(room.width / 2, room.height / 2, -10);
-  roomGroup.add(backWallMesh);
-  
-  const backEdges = new THREE.EdgesGeometry(backWallGeo);
-  const backLine = new THREE.LineSegments(backEdges, lineMatWall);
-  backWallMesh.add(backLine);
-
-  // 3. Ściana lewa
-  const leftWallGeo = new THREE.BoxGeometry(20, room.height, 1200);
-  const leftWallMesh = new THREE.Mesh(leftWallGeo, matWall);
-  leftWallMesh.position.set(-10, room.height / 2, 400);
-  roomGroup.add(leftWallMesh);
-
-  // --- RYSOWANIE SZAFEK ---
-  const th = parseFloat(config.materials.boardThickness) || 18;
-  const activeModuleId = state.activeModuleId;
-  const isAnyModuleActive = activeModuleId !== null;
-
-  state.project.modules.forEach(mod => {
-    const isThisModuleActive = mod.id === activeModuleId;
-    const renderAsActive = !isAnyModuleActive || isThisModuleActive;
-    
-    const opacityMesh = renderAsActive ? 0.5 : 0.15;
-    const opacityLine = renderAsActive ? 0.9 : 0.2;
-    
-    const cBody = renderAsActive ? 0x93c5fd : 0x94a3b8;
-    const cBodyLine = renderAsActive ? 0x1e3a8a : 0x475569;
-    
-    const cFront = renderAsActive ? 0x6ee7b7 : 0x94a3b8;
-    const cFrontLine = renderAsActive ? 0x064e3b : 0x475569;
-
-    const matBody = new THREE.MeshLambertMaterial({ color: cBody, transparent: true, opacity: opacityMesh, side: THREE.DoubleSide }); 
-    const lineMatBody = new THREE.LineBasicMaterial({ color: cBodyLine, opacity: opacityLine, transparent: true });
-
-    const matFront = new THREE.MeshLambertMaterial({ color: cFront, transparent: true, opacity: opacityMesh, side: THREE.DoubleSide }); 
-    const lineMatFront = new THREE.LineBasicMaterial({ color: cFrontLine, opacity: opacityLine, transparent: true });
-
-    const matFrontInternal = new THREE.MeshLambertMaterial({ color: 0xfde047, transparent: true, opacity: opacityMesh, side: THREE.DoubleSide }); 
-    const lineMatFrontInternal = new THREE.LineBasicMaterial({ color: 0xb45309, opacity: opacityLine, transparent: true });
-
-    const matDrawer = new THREE.MeshLambertMaterial({ color: 0xe2e8f0, transparent: true, opacity: opacityMesh, side: THREE.DoubleSide }); 
-    const lineMatDrawer = new THREE.LineBasicMaterial({ color: 0x475569, opacity: opacityLine, transparent: true });
-
-    const matHDF = new THREE.MeshLambertMaterial({ color: renderAsActive ? 0xf97316 : 0x94a3b8, transparent: true, opacity: renderAsActive ? 0.55 : 0.15, side: THREE.DoubleSide }); 
-    const lineMatHDF = new THREE.LineBasicMaterial({ color: renderAsActive ? 0x9a3412 : 0x475569, opacity: opacityLine, transparent: true });
-
-    const matLegs = new THREE.MeshLambertMaterial({ color: 0x333333, transparent: true, opacity: renderAsActive ? 1.0 : 0.3 }); 
-
-    const moduleGroup = new THREE.Group();
-    moduleGroup.userData = { moduleId: mod.id }; 
-    moduleGroup.position.set(mod.position.x || 0, mod.position.y || 0, mod.position.z || 0);
-    cabinetGroup.add(moduleGroup);
-
-    const W = parseFloat(mod.dimensions.width) || 600;
-    const H = parseFloat(mod.dimensions.height) || 720;
-    const D = parseFloat(mod.dimensions.depth) || 513;
-
-    const legsActive = mod.legs && mod.legs.active;
-    const legHeight = legsActive ? (parseFloat(mod.legs.height) || 100) : 0;
-
-    const createBoard = (w, h, d, x, y, z, material, lineMaterial) => {
-      const geo = new THREE.BoxGeometry(w, h, d);
-      const mesh = new THREE.Mesh(geo, material);
-      mesh.position.set(x + w/2, y + legHeight + h/2, z + d/2);
-      moduleGroup.add(mesh); 
-      
-      const edges = new THREE.EdgesGeometry(geo);
-      const line = new THREE.LineSegments(edges, lineMaterial);
-      mesh.add(line);
-    };
-
-    if (legsActive && legHeight > 0) {
-      const legGeo = new THREE.CylinderGeometry(15, 15, legHeight, 16);
-      const insetX = Math.min(50, W / 4);
-      const plinthOffset = mod.legs?.plinthOffset !== undefined ? parseFloat(mod.legs.plinthOffset) : 40;
-      const insetZFront = plinthOffset + 25; 
-      const insetZBack = 50;
-
-      const legPositions = [
-          [insetX, legHeight/2, D - insetZFront], 
-          [W - insetX, legHeight/2, D - insetZFront], 
-          [insetX, legHeight/2, insetZBack], 
-          [W - insetX, legHeight/2, insetZBack], 
-      ];
-
-      legPositions.forEach(pos => {
-          const leg = new THREE.Mesh(legGeo, matLegs);
-          leg.position.set(pos[0], pos[1], pos[2]);
-          moduleGroup.add(leg);
-      });
-    }
-
-    const backType = mod.backPanel?.type || 'nakladane';
-    const nutBuild = mod.backPanel?.nutBuild || 'all';
-    const offset = mod.backPanel?.offset !== undefined ? parseFloat(mod.backPanel.offset) : 16;
-    const groove = mod.backPanel?.grooveDepth !== undefined ? parseFloat(mod.backPanel.grooveDepth) : 6;
-    const hdfThick = 3; 
-
-    const cons = config.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
-    const isTopBottomFullWidth = cons.joinType === 'wience_przelotowe';
-    const hasTraverses = cons.topType.includes('trawersy');
-    const isVerticalTraverse = cons.topType === 'trawersy_pion';
-    const traverseWidth = cons.traverseWidth || 100;
-
-    let sidesD = D, sidesZ = 0, tbD = D, tbZ = 0;
-    let bpW = W, bpH = H, bpX = 0, bpY = 0, bpZ = -hdfThick;
-
-    if (backType === 'nakladane') {
-      bpW = W; bpH = H; bpX = 0; bpY = 0; bpZ = -hdfThick;
-    } else if (backType === 'nut') {
-      bpZ = offset;
-      if (nutBuild === 'all') {
-        bpW = (W - 2*th) + (2 * groove); bpX = th - groove; bpH = (H - 2*th) + (2 * groove); bpY = th - groove;
-      } else if (nutBuild === 'sides') {
-        bpW = (W - 2*th) + (2 * groove); bpX = th - groove; bpH = H; bpY = 0; tbZ = offset + hdfThick; tbD = D - tbZ;           
-      } else if (nutBuild === 'top_bottom') {
-        bpW = W; bpX = 0; bpH = (H - 2*th) + (2 * groove); bpY = th - groove; sidesZ = offset + hdfThick; sidesD = D - sidesZ;
+  for (let i = 0; i < intersects.length; i++) {
+      const obj = intersects[i].object;
+      if (obj.userData && obj.userData.moduleId) {
+          validHit = intersects[i];
+          data = obj.userData;
+          break;
       }
-    }
+  }
 
-    const sideH = isTopBottomFullWidth ? H - (th * 2) : H;
-    const sideY = isTopBottomFullWidth ? th : 0;
-    createBoard(th, sideH, sidesD, 0, sideY, sidesZ, matBody, lineMatBody); 
-    createBoard(th, sideH, sidesD, W - th, sideY, sidesZ, matBody, lineMatBody); 
-    
-    const tbW = isTopBottomFullWidth ? W : W - (th * 2);
-    const tbX = isTopBottomFullWidth ? 0 : th;
-    createBoard(tbW, th, tbD, tbX, 0, tbZ, matBody, lineMatBody); 
-    
-    if (cons.topType === 'pelny') {
-      createBoard(tbW, th, tbD, tbX, H - th, tbZ, matBody, lineMatBody); 
-    } else if (cons.topType === 'trawersy_poziom') {
-      createBoard(tbW, th, traverseWidth, tbX, H - th, tbZ, matBody, lineMatBody); 
-      createBoard(tbW, th, traverseWidth, tbX, H - th, tbD + tbZ - traverseWidth, matBody, lineMatBody); 
-    } else if (cons.topType === 'trawersy_pion') {
-      createBoard(tbW, traverseWidth, th, tbX, H - traverseWidth, tbZ, matBody, lineMatBody); 
-      createBoard(tbW, traverseWidth, th, tbX, H - traverseWidth, tbD + tbZ - th, matBody, lineMatBody); 
-    }
-    createBoard(bpW, bpH, hdfThick, bpX, bpY, bpZ, matHDF, lineMatHDF);
+  const existingMenu = document.getElementById('context-menu-3d');
+  if (existingMenu) existingMenu.remove();
 
-    if (mod.elements) {
-      mod.elements.forEach(el => {
-        if (isNaN(el.x) || isNaN(el.y) || isNaN(el.w) || isNaN(el.h)) return;
-
-        if (el.typ === 'poziom' || el.typ === 'pion') {
-          let elZ = backType === 'nut' ? offset + hdfThick : 0;
-          let baseD = D - elZ; 
-          let elD = el.typ === 'poziom' && !el.isStructural ? baseD - 5 : baseD; 
-          createBoard(el.w, el.h, elD, el.x, el.y, elZ, matBody, lineMatBody);
-        }
-        else if (el.typ === 'front') {
-          const isInternalDrawer = el.subtype === 'szuflada-wewnetrzna';
-          const isInset = config.front?.type === 'wpuszczane';
-          const frontZ = isInternalDrawer ? (D - th - 15) : (isInset ? D - th : D + 2);
-          const currentMatFront = isInternalDrawer ? matFrontInternal : matFront;
-          const currentLineMat = isInternalDrawer ? lineMatFrontInternal : lineMatFront;
-
-          createBoard(el.w, el.h, th, el.x, el.y, frontZ, currentMatFront, currentLineMat);
-
-          if (el.subtype === 'szuflada' || isInternalDrawer) {
-              const innerWidth = el.baseZone ? (el.baseZone.maxX - el.baseZone.minX) : el.w;
-              let availableSpace = el.h;
-              if (el.frontIndex === 0) availableSpace -= th;
-              const isTopInZone = (el.baseZone && el.y + el.h >= el.baseZone.maxY - 1);
-              if (isTopInZone) {
-                  if (hasTraverses && isVerticalTraverse) availableSpace -= traverseWidth;
-                  else availableSpace -= th;
-              }
-              
-              const userForcedVariant = el.forceVariant || 'auto';
-              const drawerComps = getDrawerComponents(config.front.drawerSystem, innerWidth, tbD, availableSpace, userForcedVariant);
-
-              let boxW = innerWidth - 30, boxH = Math.min(el.h * 0.75, 180), boxD = Math.min(D - 35, 500); 
-              if (drawerComps) { boxD = drawerComps.nominalLength; boxH = drawerComps.back.height + 16; boxW = innerWidth - 25; }
-              
-              const centerX = el.baseZone ? (el.baseZone.minX + el.baseZone.maxX) / 2 : el.x + el.w / 2;
-              const boxX = centerX - boxW / 2, boxY = el.y + 15, boxZ = frontZ - boxD; 
-              
-              createBoard(boxW, boxH, boxD, boxX, boxY, boxZ, matDrawer, lineMatDrawer);
+  if (alignMode.active) {
+      if (validHit && data) {
+          const objHeight = validHit.object.geometry.parameters.height;
+          
+          if (objHeight > 50) {
+              alert("Kliknij w element poziomy (wieniec lub półkę), a nie w pionowy bok!");
+              return;
           }
-        }
-      });
-    }
 
-    if (isAnyModuleActive && isThisModuleActive) {
-        moduleGroup.updateMatrixWorld(true);
-        const boxHelper = new THREE.BoxHelper(moduleGroup, 0xea580c); 
-        cabinetGroup.add(boxHelper);
-    }
-  }); 
+          const objCenterY = validHit.object.position.y;
+          const targetAbsoluteBottomY = objCenterY - (objHeight / 2);
 
-  // --- ŁĄCZENIE COKOŁU ---
-  const baseCabinets = state.project.modules.filter(m => m.legs && m.legs.active && m.legs.plinth);
-  baseCabinets.sort((a, b) => a.position.x - b.position.x); 
+          const sourceMod = alignMode.sourceMod;
+          const sourceLegH = (sourceMod.legs && sourceMod.legs.active) ? (parseFloat(sourceMod.legs.height) || 0) : 0;
+          const sourceModAbsoluteY = (parseFloat(sourceMod.position.y) || 0) + sourceLegH;
 
-  let plinthRuns = [];
-  baseCabinets.forEach(mod => {
-      const x = parseFloat(mod.position.x) || 0;
-      const y = parseFloat(mod.position.y) || 0;
-      const z = parseFloat(mod.position.z) || 0;
-      const w = parseFloat(mod.dimensions.width);
-      const d = parseFloat(mod.dimensions.depth);
-      const h = parseFloat(mod.legs.height);
-      const offset = parseFloat(mod.legs.plinthOffset !== undefined ? mod.legs.plinthOffset : 40);
-      const frontZ = z + d; 
+          const newLocalY = targetAbsoluteBottomY - sourceModAbsoluteY;
 
-      let joined = false;
-      if (plinthRuns.length > 0) {
-          let last = plinthRuns[plinthRuns.length - 1];
-          if (Math.abs((last.x + last.w) - x) <= 1 && last.y === y && last.h === h && last.offset === offset && last.frontZ === frontZ) {
-              last.w += w + (x - (last.x + last.w)); 
-              joined = true;
+          if (newLocalY > 0 && newLocalY < parseFloat(sourceMod.dimensions.height)) {
+              alignMode.sourceEl.y = newLocalY;
+              update3D();
+              updateSidebar();
+          } else {
+              alert("Wybrany punkt znajduje się poza zakresem wysokości tej szafki!");
           }
       }
-      if (!joined) plinthRuns.push({ x: x, y: y, z: z, w: w, d: d, h: h, offset: offset, frontZ: frontZ });
+      exitAlignMode();
+      return; 
+  }
+
+  if (validHit && data) {
+      let needsRefresh = false;
+
+      if (state.activeModuleId !== data.moduleId) {
+          state.activeModuleId = data.moduleId;
+          needsRefresh = true;
+      }
+
+      if (needsRefresh) {
+          updateSidebar();
+          initPropertiesPanel();
+          update3D(); 
+      }
+
+      show3DContextMenu(event, validHit, data);
+  }
+}
+
+function show3DContextMenu(event, hit, data) {
+  if (data.type === 'corpus' && data.part !== 'back') return;
+
+  const menu = document.createElement('div');
+  menu.id = 'context-menu-3d';
+  Object.assign(menu.style, {
+      position: 'fixed', left: `${event.clientX}px`, top: `${event.clientY}px`,
+      backgroundColor: '#ffffff', border: '1px solid #cbd5e1', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      borderRadius: '6px', padding: '4px', zIndex: '1000', minWidth: '220px', fontFamily: 'sans-serif'
   });
 
-  const plinthMat = new THREE.MeshLambertMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.5, side: THREE.DoubleSide }); 
-  const plinthLineMat = new THREE.LineBasicMaterial({ color: 0x475569, opacity: 0.5, transparent: true });
+  const createOption = (text, icon, callback, color = '#1e293b') => {
+      const btn = document.createElement('div');
+      btn.innerHTML = `${icon} <span style="margin-left: 6px;">${text}</span>`;
+      Object.assign(btn.style, {
+          padding: '8px 12px', cursor: 'pointer', fontSize: '13px', color: color,
+          borderRadius: '4px', transition: 'background 0.1s', fontWeight: 'bold'
+      });
+      btn.onmouseenter = () => btn.style.backgroundColor = color === '#dc2626' ? '#fee2e2' : '#f1f5f9';
+      btn.onmouseleave = () => btn.style.backgroundColor = 'transparent';
+      
+      if (callback) {
+          btn.onclick = (e) => {
+              e.stopPropagation();
+              callback();
+              menu.remove();
+              update3D(); 
+              updateSidebar();
+          };
+      }
+      return btn;
+  };
 
-  plinthRuns.forEach(run => {
-      const pThick = 18; 
-      const pZ = run.frontZ - run.offset - pThick/2;
-      const pX = run.x + run.w/2;
-      const pY = run.y + run.h/2;
+  const createHeader = (text) => {
+      const hdr = document.createElement('div');
+      hdr.innerText = text;
+      Object.assign(hdr.style, {
+        fontSize: '11px', color: '#64748b', textTransform: 'uppercase',
+        margin: '8px 8px 4px 8px', fontWeight: 'bold'
+      });
+      return hdr;
+  };
 
-      const geo = new THREE.BoxGeometry(run.w, run.h, pThick);
-      const mesh = new THREE.Mesh(geo, plinthMat); 
-      mesh.position.set(pX, pY, pZ);
-      cabinetGroup.add(mesh);
+  const createInputRow = (labelTxt, val) => {
+      const row = document.createElement('div');
+      row.style.display = 'flex'; row.style.justifyContent = 'space-between'; row.style.alignItems = 'center'; row.style.marginBottom = '6px';
+      const lbl = document.createElement('span'); lbl.innerText = labelTxt; lbl.style.fontSize = '12px'; lbl.style.color = '#475569';
+      const inp = document.createElement('input'); inp.type = 'number'; inp.value = val;
+      Object.assign(inp.style, { width: '60px', padding: '4px', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold' });
+      row.appendChild(lbl); row.appendChild(inp); return { row, inp };
+  };
 
-      const edges = new THREE.EdgesGeometry(geo);
-      const line = new THREE.LineSegments(edges, plinthLineMat);
-      mesh.add(line);
+  const mod = state.project.modules.find(m => m.id === data.moduleId);
+  if (!mod) return;
+
+  if (data.type === 'shelf') {
+      const el = mod.elements.find(e => e.id === data.elementId);
+      if (el) {
+          const isStruct = el.isStructural;
+          const isPoziom = el.typ === 'poziom';
+
+          const th = parseFloat(state.project.materials.boardThickness) || 18;
+          const H = parseFloat(mod.dimensions.height);
+          const W = parseFloat(mod.dimensions.width);
+          const cons = state.project.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
+          const hasTraverses = cons.topType.includes('trawersy');
+          const isVerticalTraverse = cons.topType === 'trawersy_pion';
+          const traverseWidth = cons.traverseWidth || 100;
+          const topZoneY = (hasTraverses && isVerticalTraverse) ? H - traverseWidth : H - th;
+          const topZoneH = (hasTraverses && isVerticalTraverse) ? traverseWidth : th;
+
+          const obstacles = [
+              ...mod.elements.filter(e => e.typ === 'poziom' && e.id !== el.id),
+              { id: 'cab-left', x: 0, y: 0, w: th, h: H },
+              { id: 'cab-right', x: W - th, y: 0, w: th, h: H },
+              { id: 'cab-bottom', x: 0, y: 0, w: W, h: th },
+              { id: 'cab-top', x: 0, y: topZoneY, w: W, h: topZoneH }
+          ];
+
+          let boundMin = 0; let boundMax = isPoziom ? H : W;
+
+          if (isPoziom) {
+              obstacles.forEach(obs => {
+                  if (obs.x < el.x + el.w && obs.x + obs.w > el.x) {
+                      if (obs.y + (obs.h||th) <= el.y && obs.y + (obs.h||th) > boundMin) boundMin = obs.y + (obs.h||th);
+                      if (obs.y >= el.y + el.h && obs.y < boundMax) boundMax = obs.y;
+                  }
+              });
+          } else {
+              obstacles.forEach(obs => {
+                  if (obs.y < el.y + el.h && obs.y + obs.h > el.y) {
+                      if (obs.x + obs.w <= el.x && obs.x + obs.w > boundMin) boundMin = obs.x + obs.w;
+                      if (obs.x >= el.x + el.w && obs.x < boundMax) boundMax = obs.x;
+                  }
+              });
+          }
+
+          const currentSpace1 = Math.round((isPoziom ? el.y : el.x) - boundMin);
+          const currentSpace2 = Math.round(boundMax - ((isPoziom ? el.y : el.x) + (isPoziom ? el.h : el.w)));
+          const maxSpace = currentSpace1 + currentSpace2;
+
+          const moveWrap = document.createElement('div');
+          Object.assign(moveWrap.style, {
+              padding: '10px', borderBottom: '1px solid #e2e8f0', marginBottom: '4px',
+              backgroundColor: '#f8fafc', borderRadius: '4px 4px 0 0'
+          });
+          moveWrap.innerHTML = `<div style="font-size:11px; font-weight:bold; color:#334155; margin-bottom:10px; text-transform: uppercase;">Regulacja światła [mm]</div>`;
+
+          const inp1Data = createInputRow(isPoziom ? '↕️ Światło pod:' : '↔️ Światło z lewej:', currentSpace1);
+          const inp2Data = createInputRow(isPoziom ? '↕️ Światło nad:' : '↔️ Światło z prawej:', currentSpace2);
+          
+          const inp1 = inp1Data.inp; const inp2 = inp2Data.inp;
+          inp1.oninput = () => { const v = parseFloat(inp1.value); if(!isNaN(v)) inp2.value = maxSpace - v; };
+          inp2.oninput = () => { const v = parseFloat(inp2.value); if(!isNaN(v)) inp1.value = maxSpace - v; };
+
+          const applyBtn = document.createElement('button'); applyBtn.innerText = 'Zatwierdź pozycję';
+          Object.assign(applyBtn.style, { width: '100%', padding: '6px', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginTop: '4px' });
+
+          const applyPosition = (evt) => {
+              evt.stopPropagation(); 
+              const newVal1 = parseFloat(inp1.value);
+              if (!isNaN(newVal1) && newVal1 >= 0 && newVal1 <= maxSpace) { 
+                  if (isPoziom) el.y = boundMin + newVal1; else el.x = boundMin + newVal1; 
+                  menu.remove();
+                  update3D();
+                  updateSidebar();
+              } else {
+                  alert('Wartość wykracza poza wnękę!');
+              }
+          };
+
+          applyBtn.onclick = applyPosition; 
+          inp1.onkeydown = (evt) => { if (evt.key === 'Enter') applyPosition(evt); }; 
+          inp2.onkeydown = (evt) => { if (evt.key === 'Enter') applyPosition(evt); };
+
+          moveWrap.appendChild(inp2Data.row); moveWrap.appendChild(inp1Data.row); moveWrap.appendChild(applyBtn); 
+          menu.appendChild(moveWrap);
+
+          menu.appendChild(createHeader('Narzędzia precyzyjne'));
+          if (isPoziom) {
+              menu.appendChild(createOption('Wyrównaj do innego elementu', '🧲', () => {
+                  enterAlignMode(mod, el);
+              }, '#0284c7'));
+          }
+
+          menu.appendChild(createHeader('Parametry elementu'));
+          if (isPoziom) {
+              menu.appendChild(createOption(isStruct ? 'Zmień na ruchomą' : 'Zmień na konstrukcyjną', '🔩', () => { el.isStructural = !isStruct; }, isStruct ? '#059669' : '#1e293b'));
+          }
+          menu.appendChild(createOption('Usuń element', '🗑️', () => { mod.elements = mod.elements.filter(e => e.id !== el.id); }, '#dc2626'));
+          
+          setTimeout(() => inp1.focus(), 50);
+      }
+  }
+  else if (data.type === 'front') {
+      const el = mod.elements.find(e => e.id === data.elementId);
+      if (el) {
+          if (el.subtype === 'szuflada-wewnetrzna') {
+              menu.appendChild(createHeader('Front wewn. i prowadnice'));
+              const pWrap = document.createElement('div');
+              Object.assign(pWrap.style, {
+                  padding: '10px', borderBottom: '1px solid #e2e8f0', marginBottom: '4px',
+                  backgroundColor: '#f8fafc', borderRadius: '4px 4px 0 0'
+              });
+
+              const inpThickData = createInputRow('Grubość frontu [mm]:', el.innerFrontThickness ?? 18);
+              const inpSetbackData = createInputRow('Luz do krawędzi [mm]:', el.innerSetback ?? 2);
+              
+              const applyBtn2 = document.createElement('button'); applyBtn2.innerText = 'Zapisz parametry frontu';
+              Object.assign(applyBtn2.style, { width: '100%', padding: '6px', backgroundColor: '#d97706', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginTop: '4px' });
+
+              applyBtn2.onclick = (evt) => {
+                  evt.stopPropagation(); 
+                  el.innerFrontThickness = parseFloat(inpThickData.inp.value) || 18; 
+                  el.innerSetback = parseFloat(inpSetbackData.inp.value) || 0; 
+                  menu.remove();
+                  update3D();
+                  updateSidebar();
+              };
+
+              pWrap.appendChild(inpThickData.row); pWrap.appendChild(inpSetbackData.row); pWrap.appendChild(applyBtn2); 
+              menu.appendChild(pWrap);
+              
+              if (el.baseZone) {
+                  menu.appendChild(createHeader('Marginesy Bloku (np. na zawias)'));
+                  const bWrap = document.createElement('div');
+                  Object.assign(bWrap.style, {
+                      padding: '10px', borderBottom: '1px solid #e2e8f0', marginBottom: '4px', backgroundColor: '#f8fafc'
+                  });
+
+                  const inpBotData = createInputRow('Wolne miejsce od dołu:', el.baseZone.offsetBottom || 0);
+                  const inpTopData = createInputRow('Wolne miejsce od góry:', el.baseZone.offsetTop || 0);
+
+                  const applyMargBtn = document.createElement('button'); applyMargBtn.innerText = 'Zapisz omijanie';
+                  Object.assign(applyMargBtn.style, { width: '100%', padding: '6px', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginTop: '4px' });
+
+                  applyMargBtn.onclick = (evt) => {
+                      evt.stopPropagation();
+                      mod.elements.forEach(sibling => {
+                          if (sibling.typ === 'front' && sibling.baseZone && sibling.baseZone.minY === el.baseZone.minY && sibling.baseZone.maxY === el.baseZone.maxY) {
+                              sibling.baseZone.offsetBottom = parseFloat(inpBotData.inp.value) || 0;
+                              sibling.baseZone.offsetTop = parseFloat(inpTopData.inp.value) || 0;
+                          }
+                      });
+                      menu.remove();
+                      update3D();
+                      updateSidebar();
+                  };
+
+                  bWrap.appendChild(inpBotData.row); bWrap.appendChild(inpTopData.row); bWrap.appendChild(applyMargBtn);
+                  menu.appendChild(bWrap);
+              }
+          }
+
+          menu.appendChild(createHeader('Zarządzanie blokiem'));
+          menu.appendChild(createOption('Usuń ten front/szufladę', '🗑️', () => { mod.elements = mod.elements.filter(e => e.id !== el.id); }, '#dc2626'));
+          
+          if (el.baseZone) {
+              menu.appendChild(createOption('Wyczyść całą wnękę', '🧹', () => {
+                  mod.elements = mod.elements.filter(e => !(e.typ === 'front' && e.baseZone && e.baseZone.minY === el.baseZone.minY && e.baseZone.maxY === el.baseZone.maxY));
+              }, '#991b1b'));
+          }
+      }
+  }
+  else if (data.type === 'corpus' && data.part === 'back') {
+      const th = parseFloat(state.project.materials.boardThickness) || 18;
+      const legHeight = mod.legs && mod.legs.active ? (parseFloat(mod.legs.height) || 0) : 0;
+      const localY = hit.point.y - (parseFloat(mod.position.y) || 0) - legHeight;
+      const H = parseFloat(mod.dimensions.height);
+      const W = parseFloat(mod.dimensions.width);
+      
+      if (localY > 0 && localY < H) {
+          let zoneMinY = th;
+          let zoneMaxY = H - th;
+          let boundBottomId = 'cab-bottom';
+          let boundTopId = 'cab-top';
+
+          if (mod.elements) {
+              mod.elements.forEach(el => {
+                  if (el.typ === 'poziom') {
+                      let topEdge = el.y + el.h;
+                      let bottomEdge = el.y;
+
+                      if (topEdge <= localY && topEdge >= zoneMinY) {
+                          zoneMinY = topEdge;
+                          boundBottomId = el.id;
+                      }
+                      if (bottomEdge >= localY && bottomEdge <= zoneMaxY) {
+                          zoneMaxY = bottomEdge;
+                          boundTopId = el.id;
+                      }
+                  }
+              });
+          }
+
+          const targetBaseZone = { 
+              minX: th, maxX: W - th, minY: zoneMinY, maxY: zoneMaxY,
+              boundBottom: boundBottomId, boundTop: boundTopId, boundLeft: 'cab-left', boundRight: 'cab-right',
+              offsetBottom: 0, offsetTop: 0 
+          };
+
+          menu.appendChild(createHeader('Dodaj elementy konstrukcyjne'));
+          
+          menu.appendChild(createOption(`Wstaw półkę (Wys: ${Math.round(localY)} mm)`, '➕', () => {
+              mod.elements.push({
+                  id: 'poziom-' + Date.now() + Math.random().toString(36).substring(2, 6),
+                  typ: 'poziom', x: th, y: localY - (th/2), w: W - (th*2), h: th, isStructural: false 
+              });
+          }, '#2563eb'));
+
+          const halfY = zoneMinY + (zoneMaxY - zoneMinY) / 2;
+          menu.appendChild(createOption('Półka (dokładnie w połowie)', '➗', () => {
+              mod.elements.push({
+                  id: 'poziom-half-' + Date.now() + Math.random().toString(36).substring(2, 6),
+                  typ: 'poziom', x: th, y: halfY - (th/2), w: W - (th*2), h: th, isStructural: false
+              });
+          }, '#2563eb'));
+
+          const btnAutoShelves = createOption('Półki (rozmieść równomiernie)', '📚', null, '#2563eb');
+          btnAutoShelves.onclick = (e) => {
+              e.stopPropagation();
+              menu.innerHTML = '';
+              menu.style.width = '240px';
+              menu.style.padding = '12px';
+
+              const title = document.createElement('div');
+              title.innerText = 'Równomierne półki';
+              title.style.fontWeight = 'bold'; title.style.marginBottom = '10px';
+
+              const wrap = document.createElement('div');
+              wrap.innerHTML = `<label style="font-size:11px;">Podaj ilość półek:</label><br><input type="number" id="inp-shelves" value="2" min="1" style="width:100%; padding:6px; margin-top:4px; border:1px solid #ccc; border-radius:4px;">`;
+
+              const btnApply = document.createElement('button');
+              btnApply.innerText = 'Wstaw półki';
+              Object.assign(btnApply.style, { width: '100%', marginTop: '12px', padding: '8px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' });
+
+              btnApply.onclick = (ev) => {
+                  ev.stopPropagation();
+                  const shelfCount = parseInt(document.getElementById('inp-shelves').value, 10);
+                  if (isNaN(shelfCount) || shelfCount <= 0) return;
+
+                  const internalHeight = zoneMaxY - zoneMinY;
+                  const newShelvesBase = autoDistributeShelves(internalHeight, th, shelfCount);
+
+                  const ts = Date.now();
+                  newShelvesBase.forEach((s, idx) => {
+                      mod.elements.push({
+                          id: 'poziom-auto-' + ts + '-' + idx,
+                          typ: 'poziom', x: th, y: zoneMinY + s.y, w: W - (th*2), h: th, isStructural: false
+                      });
+                  });
+
+                  menu.remove();
+                  update3D();
+                  updateSidebar();
+              };
+
+              menu.appendChild(title);
+              menu.appendChild(wrap);
+              menu.appendChild(btnApply);
+              
+              setTimeout(() => {
+                  const inp = document.getElementById('inp-shelves');
+                  if (inp) inp.focus();
+              }, 50);
+          };
+          menu.appendChild(btnAutoShelves);
+
+          const halfX = th + (W - 2*th) / 2;
+          menu.appendChild(createOption('Przegroda pionowa (w połowie)', '➕', () => {
+              mod.elements.push({
+                  id: 'pion-half-' + Date.now() + Math.random().toString(36).substring(2, 6),
+                  typ: 'pion', x: halfX - (th/2), y: zoneMinY, w: th, h: zoneMaxY - zoneMinY
+              });
+          }, '#059669'));
+
+          menu.appendChild(createHeader('Zabuduj pustą przestrzeń'));
+
+          const showDrawerMenu = (e, subtype, titleTxt) => {
+              e.stopPropagation();
+              menu.innerHTML = '';
+              menu.style.width = '260px';
+              menu.style.padding = '12px';
+
+              const title = document.createElement('div');
+              title.innerText = titleTxt;
+              title.style.fontWeight = 'bold'; title.style.marginBottom = '10px';
+
+              const wrapDist = document.createElement('div');
+              wrapDist.innerHTML = `<label style="font-size:11px;">Podział (np. 3 lub 200:200):</label><br><input type="text" id="inp-dist" value="3" style="width:100%; padding:6px; margin-top:4px; border:1px solid #ccc; border-radius:4px;">`;
+
+              const wrapGap = document.createElement('div');
+              wrapGap.innerHTML = `<label style="font-size:11px;">Szczelina między frontami [mm]:</label><br><input type="number" id="inp-gap" value="${state.project.front?.gap || 3}" style="width:100%; padding:6px; margin-top:4px; border:1px solid #ccc; border-radius:4px;">`;
+
+              const wrapOffsets = document.createElement('div');
+              if (subtype === 'szuflada-wewnetrzna') {
+                  wrapOffsets.innerHTML = `
+                      <div style="display:flex; gap:10px; margin-top:8px;">
+                          <div style="flex:1;">
+                              <label style="font-size:10px;">Odsunięcie od Dołu (np. zawias):</label>
+                              <input type="number" id="inp-bot" value="0" style="width:100%; padding:4px; margin-top:2px; border:1px solid #ccc; border-radius:4px;">
+                          </div>
+                          <div style="flex:1;">
+                              <label style="font-size:10px;">Odsunięcie od Góry (np. zawias):</label>
+                              <input type="number" id="inp-top" value="0" style="width:100%; padding:4px; margin-top:2px; border:1px solid #ccc; border-radius:4px;">
+                          </div>
+                      </div>
+                  `;
+              }
+
+              const btnApply = document.createElement('button');
+              btnApply.innerText = 'Zastosuj i dodaj';
+              Object.assign(btnApply.style, { width: '100%', marginTop: '12px', padding: '8px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' });
+
+              btnApply.onclick = (ev) => {
+                  ev.stopPropagation();
+                  const distStr = document.getElementById('inp-dist').value.trim() || "1";
+                  const gapValInput = parseFloat(document.getElementById('inp-gap').value) || 0;
+                  
+                  const botOffset = document.getElementById('inp-bot') ? (parseFloat(document.getElementById('inp-bot').value) || 0) : 0;
+                  const topOffset = document.getElementById('inp-top') ? (parseFloat(document.getElementById('inp-top').value) || 0) : 0;
+
+                  let genCount = 1;
+                  if (!distStr.includes(':') && !distStr.includes(',') && !isNaN(distStr)) {
+                      genCount = parseInt(distStr, 10) || 1;
+                  } else {
+                      genCount = distStr.split(distStr.includes(':') ? ':' : ',').length;
+                  }
+
+                  const ts = Date.now();
+                  for(let i = 0; i < genCount; i++) {
+                      mod.elements.push({
+                          id: 'front-' + ts + '-' + Math.random().toString(36).substring(2, 6),
+                          typ: 'front', subtype: subtype, 
+                          baseZone: { ...targetBaseZone, offsetBottom: botOffset, offsetTop: topOffset },
+                          frontCount: genCount, distribution: distStr, frontIndex: i, gap: gapValInput,
+                          intGapX: subtype === 'szuflada-wewnetrzna' ? 15 : 0, intGapY: subtype === 'szuflada-wewnetrzna' ? 5 : 0,
+                          forceVariant: 'auto'
+                      });
+                  }
+                  menu.remove();
+                  update3D();       
+                  updateSidebar();
+              };
+
+              menu.appendChild(title);
+              menu.appendChild(wrapDist);
+              menu.appendChild(wrapGap);
+              if (subtype === 'szuflada-wewnetrzna') menu.appendChild(wrapOffsets);
+              menu.appendChild(btnApply);
+          };
+
+          const btnDrawers = createOption('Szuflady zewnętrzne', '📦', null, '#d97706');
+          btnDrawers.onclick = (e) => showDrawerMenu(e, 'szuflada', 'Szuflady zewnętrzne');
+          menu.appendChild(btnDrawers);
+
+          const btnIntDrawers = createOption('Szuflady wewnętrzne', '📥', null, '#d97706');
+          btnIntDrawers.onclick = (e) => showDrawerMenu(e, 'szuflada-wewnetrzna', 'Szuflady wewnętrzne');
+          menu.appendChild(btnIntDrawers);
+
+          const btnDoor = createOption('Drzwi pojedyncze', '🚪', () => {
+              mod.elements.push({
+                  id: 'front-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+                  typ: 'front', subtype: 'drzwi', baseZone: targetBaseZone, openingSide: 'left', 
+                  frontCount: 1, frontIndex: 0, gap: parseFloat(state.project.front?.gap) || 3
+              });
+          }, '#1e40af');
+          menu.appendChild(btnDoor);
+          
+          const btnDoorLP = createOption('Drzwi podwójne (L/P)', '🚪', () => {
+              const gapLp = parseFloat(state.project.front?.gap) || 3;
+              mod.elements.push({ id: 'front-L-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi-lp', baseZone: targetBaseZone, frontCount: 2, frontIndex: 0, gap: gapLp });
+              mod.elements.push({ id: 'front-P-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi-lp', baseZone: targetBaseZone, frontCount: 2, frontIndex: 1, gap: gapLp });
+          }, '#1e40af');
+          menu.appendChild(btnDoorLP);
+      }
+  }
+
+  if (menu.children.length > 0) document.body.appendChild(menu);
+}
+
+const mats = {
+  solid: {
+      corpus: new THREE.MeshStandardMaterial({ color: 0xfdfbf7, roughness: 0.7, metalness: 0.05 }), 
+      front: new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.15 }),  
+      shelf: new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.8, metalness: 0.0 }),   
+      drawerBox: new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.8, metalness: 0.0 }),
+      hdf: new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.9, metalness: 0.0 })
+  },
+  xray: {
+      corpus: new THREE.MeshStandardMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.15, depthWrite: false }),
+      front: new THREE.MeshStandardMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.15, depthWrite: false }),
+      shelf: new THREE.MeshStandardMaterial({ color: 0x64748b, transparent: true, opacity: 0.3, depthWrite: false }),
+      drawerBox: new THREE.MeshStandardMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.4, depthWrite: false }),
+      hdf: new THREE.MeshStandardMaterial({ color: 0x475569, transparent: true, opacity: 0.3, depthWrite: false })
+  }
+};
+const holeMat = new THREE.MeshBasicMaterial({ color: 0xdc2626 }); 
+
+function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null) {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  let matObj = isXrayMode ? mats.xray : mats.solid;
+  let mat = matObj.corpus;
+  if (type === 'front') mat = matObj.front;
+  if (type === 'shelf') mat = matObj.shelf;
+  if (type === 'drawerBox') mat = matObj.drawerBox;
+  if (type === 'hdf') mat = matObj.hdf; 
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x + w/2, y + h/2, z + d/2);
+  
+  if (userData) mesh.userData = userData;
+  mesh.castShadow = !isXrayMode; mesh.receiveShadow = !isXrayMode;
+
+  const edges = new THREE.EdgesGeometry(geo);
+  let edgeColor = isXrayMode ? (type === 'drawerBox' ? 0xd97706 : 0x64748b) : 0x475569;
+  if (isActiveModule) edgeColor = isXrayMode ? 0x2563eb : 0x1d4ed8;
+  
+  const lineMat = new THREE.LineBasicMaterial({ color: edgeColor, linewidth: 1 });
+  const line = new THREE.LineSegments(edges, lineMat);
+  if (userData) line.userData = userData; 
+
+  mesh.add(line);
+  cabinetGroup.add(mesh);
+}
+
+function addHole(radius, depth, x, y, z, rotationAxis) {
+  if (!isXrayMode) return; 
+  const geo = new THREE.CylinderGeometry(radius, radius, depth, 16);
+  const mesh = new THREE.Mesh(geo, holeMat);
+  if (rotationAxis === 'x') mesh.rotation.z = Math.PI / 2; 
+  if (rotationAxis === 'y') mesh.rotation.x = 0;           
+  if (rotationAxis === 'z') mesh.rotation.x = Math.PI / 2; 
+  mesh.position.set(x, y, z);
+  cabinetGroup.add(mesh);
+}
+
+function addHardware(type, x, y, z, axis) {
+  if (!isXrayMode) return; 
+  let geo, mat;
+  if (type === 'support') {
+      geo = new THREE.CylinderGeometry(2.5, 2.5, 12, 16);
+      mat = new THREE.MeshStandardMaterial({color: 0x94a3b8, metalness: 0.9, roughness: 0.2}); 
+  } else if (type === 'dowel') {
+      geo = new THREE.CylinderGeometry(4, 4, 30, 16);
+      mat = new THREE.MeshStandardMaterial({color: 0xb45309, roughness: 0.9}); 
+  } else if (type === 'screw') {
+      geo = new THREE.CylinderGeometry(3.5, 3.5, 45, 16);
+      mat = new THREE.MeshStandardMaterial({color: 0x334155, metalness: 0.6, roughness: 0.4}); 
+  }
+  const mesh = new THREE.Mesh(geo, mat);
+  if (axis === 'x') mesh.rotation.z = Math.PI / 2;
+  else if (axis === 'z') mesh.rotation.x = Math.PI / 2;
+  mesh.position.set(x, y, z);
+  cabinetGroup.add(mesh);
+}
+
+export function update3D() {
+  if (!cabinetGroup) return;
+  while(cabinetGroup.children.length > 0){ cabinetGroup.remove(cabinetGroup.children[0]); }
+
+  const th = parseFloat(state.project.materials.boardThickness) || 18;
+
+  state.project.modules.forEach(mod => {
+      recalculateLayout(mod);
+
+      const isActive = mod.id === state.activeModuleId;
+      const W = parseFloat(mod.dimensions.width);
+      const H = parseFloat(mod.dimensions.height);
+      const D = parseFloat(mod.dimensions.depth);
+      const posX = parseFloat(mod.position.x) || 0;
+      
+      let baseOffsetY = 0;
+      if (mod.legs && mod.legs.active) baseOffsetY = parseFloat(mod.legs.height) || 100;
+      const posY = (parseFloat(mod.position.y) || 0) + baseOffsetY;
+      const posZ = parseFloat(mod.position.z) || 0;
+
+      const cons = state.project.construction || { joinType: 'boki_przelotowe', topType: 'pelny' };
+      const isTopBottomFull = cons.joinType === 'wience_przelotowe';
+
+      const udCorp = { moduleId: mod.id, type: 'corpus' };
+      const udBack = { moduleId: mod.id, type: 'corpus', part: 'back' }; 
+
+      const backP = mod.backPanel || { type: 'nakladane', offset: 16 };
+      const backThick = 3; 
+      
+      let sideD, tbD, backZ;
+      if (backP.type === 'nut') {
+          sideD = D;
+          tbD = D - backP.offset - backThick; 
+          backZ = posZ + backP.offset;
+      } else { 
+          sideD = D - backThick;
+          tbD = D - backThick;
+          backZ = posZ;
+      }
+
+      const sideStartZ = posZ + D - sideD;
+      const tbStartZ = posZ + D - tbD;
+
+      if (isTopBottomFull) {
+          addBox(W, th, tbD, posX, posY, tbStartZ, 'corpus', isActive, udCorp); 
+          addBox(W, th, tbD, posX, posY + H - th, tbStartZ, 'corpus', isActive, udCorp); 
+          addBox(th, H - 2*th, sideD, posX, posY + th, sideStartZ, 'corpus', isActive, udCorp); 
+          addBox(th, H - 2*th, sideD, posX + W - th, posY + th, sideStartZ, 'corpus', isActive, udCorp); 
+      } else {
+          addBox(th, H, sideD, posX, posY, sideStartZ, 'corpus', isActive, udCorp); 
+          addBox(th, H, sideD, posX + W - th, posY, sideStartZ, 'corpus', isActive, udCorp); 
+          addBox(W - 2*th, th, tbD, posX + th, posY, tbStartZ, 'corpus', isActive, udCorp); 
+          
+          if (cons.topType === 'pelny') {
+              addBox(W - 2*th, th, tbD, posX + th, posY + H - th, tbStartZ, 'corpus', isActive, udCorp); 
+          } else if (cons.topType === 'trawersy_poziom') {
+              const trW = parseFloat(cons.traverseWidth) || 100;
+              addBox(W - 2*th, th, trW, posX + th, posY + H - th, posZ + D - trW, 'corpus', isActive, udCorp); 
+              addBox(W - 2*th, th, trW, posX + th, posY + H - th, tbStartZ, 'corpus', isActive, udCorp); 
+          } else if (cons.topType === 'trawersy_pion') {
+              const trW = parseFloat(cons.traverseWidth) || 100;
+              addBox(W - 2*th, trW, th, posX + th, posY + H - trW, posZ + D - th, 'corpus', isActive, udCorp); 
+              addBox(W - 2*th, trW, th, posX + th, posY + H - trW, tbStartZ, 'corpus', isActive, udCorp); 
+          }
+      }
+
+      addBox(W - 4, H - 4, backThick, posX + 2, posY + 2, backZ, 'hdf', isActive, udBack);
+
+      const hwAxis = isTopBottomFull ? 'y' : 'x';
+      const jointXs = [posX + th/2, posX + W - th/2];
+      
+      jointXs.forEach(jx => {
+          const bottomY = posY + th/2;
+          const rearZ = tbStartZ + 37;
+          const rearDowelZ = tbStartZ + 69;
+          
+          addHardware('screw', jx, bottomY, posZ + D - 37, hwAxis);
+          addHardware('dowel', jx, bottomY, posZ + D - 69, hwAxis);
+          addHardware('screw', jx, bottomY, rearZ, hwAxis);
+          addHardware('dowel', jx, bottomY, rearDowelZ, hwAxis);
+          
+          if (cons.topType === 'pelny' || cons.topType === 'trawersy_poziom') {
+              const topY = posY + H - th/2;
+              addHardware('screw', jx, topY, posZ + D - 37, hwAxis);
+              addHardware('dowel', jx, topY, posZ + D - 69, hwAxis);
+              addHardware('screw', jx, topY, rearZ, hwAxis);
+              addHardware('dowel', jx, topY, rearDowelZ, hwAxis);
+          } else if (cons.topType === 'trawersy_pion') {
+              const topY = posY + H - 37;
+              const topDowelY = posY + H - 69;
+              addHardware('screw', jx, topY, posZ + D - th/2, 'x');
+              addHardware('dowel', jx, topDowelY, posZ + D - th/2, 'x');
+              addHardware('screw', jx, topY, tbStartZ + th/2, 'x');
+              addHardware('dowel', jx, topDowelY, tbStartZ + th/2, 'x');
+          }
+      });
+
+      const innerZ = backP.type === 'nut' ? backZ + backThick : posZ + backThick;
+      const shelfDepth = (posZ + D - 2) - innerZ; 
+
+      if (mod.elements) {
+          mod.elements.forEach((el) => {
+              const udElement = { moduleId: mod.id, type: el.typ === 'front' ? 'front' : 'shelf', elementId: el.id };
+
+              if (el.typ === 'poziom') {
+                  addBox(el.w, el.h, shelfDepth, posX + el.x, posY + el.y, innerZ, 'shelf', isActive, udElement);
+
+                  if (isXrayMode) {
+                      const isStruct = el.isStructural;
+                      const frontHoleZ = (posZ + D - 2) - 37;
+                      const rearHoleZ = innerZ + 37;
+                      const holeZs = [frontHoleZ, rearHoleZ]; 
+                      
+                      holeZs.forEach(hz => {
+                          if (isStruct) {
+                              const holeY = posY + el.y + el.h / 2; 
+                              const dowelZ = hz === frontHoleZ ? hz - 32 : hz + 32;
+                              addHole(2.5, th, posX + th/2, holeY, hz, 'x'); 
+                              addHole(2.5, th, posX + W - th/2, holeY, hz, 'x'); 
+                              addHardware('screw', posX + th/2, holeY, hz, 'x'); 
+                              addHardware('screw', posX + W - th/2, holeY, hz, 'x'); 
+                              addHardware('dowel', posX + th/2, holeY, dowelZ, 'x'); 
+                              addHardware('dowel', posX + W - th/2, holeY, dowelZ, 'x'); 
+                          } else {
+                              const supportY = posY + el.y - 2.5; 
+                              addHole(2.5, th, posX + th/2, supportY, hz, 'x'); 
+                              addHole(2.5, th, posX + W - th/2, supportY, hz, 'x'); 
+                              addHardware('support', posX + th + 4, supportY, hz, 'x'); 
+                              addHardware('support', posX + W - th - 4, supportY, hz, 'x'); 
+                          }
+                      });
+                  }
+              } 
+              else if (el.typ === 'pion') {
+                  addBox(el.w, el.h, shelfDepth, posX + el.x, posY + el.y, innerZ, 'shelf', isActive, udElement);
+              }
+              else if (el.typ === 'front') {
+                  const isInternal = el.subtype === 'szuflada-wewnetrzna';
+                  
+                  if (!isFrontsVisible && !isInternal) {
+                      return; 
+                  }
+
+                  let innerFrontThick = 18;
+                  let innerSetback = 0;
+                  let zForFront;
+                  
+                  if (isInternal) {
+                      innerFrontThick = parseFloat(el.innerFrontThickness ?? 18);
+                      innerSetback = parseFloat(el.innerSetback ?? 2);
+                      zForFront = posZ + D - innerSetback - innerFrontThick; 
+                  } else {
+                      zForFront = posZ + D + 2; 
+                  }
+                  
+                  addBox(el.w, el.h, isInternal ? innerFrontThick : 18, posX + el.x, posY + el.y, zForFront, 'front', isActive, udElement);
+
+                  if (el.subtype.includes('szuflada')) {
+                      if (isXrayMode) {
+                          const dHoles = calculateDrawerHoles(state.project.front.drawerSystem, el.y, el.h, th, el.frontIndex, false);
+                          
+                          const innerWidth = W - (th * 2);
+                          const sysName = state.project.front.drawerSystem || 'merivobox';
+                          
+                          let availableDepth = D - 19; 
+                          if (isInternal) {
+                              availableDepth -= (innerFrontThick + innerSetback);
+                          }
+                          
+                          let availableSpace = el.h;
+                          if (el.y < th) availableSpace -= th; 
+                          if (el.y + el.h > H - th) availableSpace -= th; 
+
+                          const drawerComps = getDrawerComponents(sysName, innerWidth, availableDepth, availableSpace, el.forceVariant || 'auto');
+
+                          if (drawerComps) {
+                              const NL = drawerComps.nominalLength;
+                              const dw = drawerComps.bottom.width;
+                              const dl = drawerComps.bottom.length;
+                              const dh = drawerComps.back.height;
+
+                              const dX = posX + th + (innerWidth - dw) / 2; 
+                              
+                              let slideAbsY = el.y + 33.5; 
+                              if (dHoles && dHoles.slideSideHoles && dHoles.slideSideHoles.length > 0) {
+                                  slideAbsY = dHoles.slideSideHoles[0].y;
+                              }
+                              const dY = posY + slideAbsY - 33.5; 
+                              
+                              const boxStartZ = zForFront - NL;
+
+                              addBox(dw, 16, NL, dX, dY, boxStartZ, 'drawerBox', isActive, udElement); 
+                              addBox(drawerComps.back.width, dh, 16, dX + (dw - drawerComps.back.width)/2, dY + 16, boxStartZ, 'drawerBox', isActive, udElement); 
+                              addBox(16, dh, NL, dX - 16, dY + 16, boxStartZ, 'drawerBox', isActive, udElement); 
+                              addBox(16, dh, NL, dX + dw, dY + 16, boxStartZ, 'drawerBox', isActive, udElement); 
+                          }
+
+                          if (dHoles && dHoles.slideSideHoles) {
+                              const slideZOffset = isInternal ? (innerFrontThick + innerSetback) : 0; 
+                              
+                              dHoles.slideSideHoles.forEach(h => {
+                                  let calcY = isTopBottomFull ? h.y - th : h.y;
+                                  addHole(2.5, th, posX + th/2, posY + calcY, posZ + D - h.x - slideZOffset, 'x'); 
+                                  addHole(2.5, th, posX + W - th/2, posY + calcY, posZ + D - h.x - slideZOffset, 'x'); 
+                              });
+                          }
+                          if (dHoles && dHoles.frontHoles) {
+                              dHoles.frontHoles.forEach(h => {
+                                  let calcY = isTopBottomFull ? el.y + h.y - th : el.y + h.y;
+                                  addHole(2.5, 12, posX + el.x + (h.xOffsetLeft || 20.5), posY + calcY, zForFront + (isInternal ? innerFrontThick/2 : 9), 'z'); 
+                                  addHole(2.5, 12, posX + el.x + el.w - (h.xOffsetRight || 20.5), posY + calcY, zForFront + (isInternal ? innerFrontThick/2 : 9), 'z'); 
+                              });
+                          }
+                      }
+                  }
+                  
+                  else if (el.subtype.includes('drzwi')) {
+                      if (isXrayMode) {
+                          const obstacles = mod.elements.filter(e => e.typ === 'poziom' || e.subtype === 'szuflada-wewnetrzna');
+                          const side = el.subtype === 'drzwi-lp' ? (el.id.endsWith('-L') ? 'left' : 'right') : (el.openingSide || 'left');
+                          const hinges = calculateHinges(el, th, obstacles, side);
+                          
+                          hinges.forEach(h => {
+                              let calcY = isTopBottomFull ? el.y + h.relY - th : el.y + h.relY;
+                              const isLeft = side === 'left';
+                              const cupX = isLeft ? el.x + h.cupXOffset : el.x + el.w - h.cupXOffset;
+
+                              addHole(17.5, 13, posX + cupX, posY + calcY, zForFront + 6.5, 'z');
+
+                              const plateX = isLeft ? posX + th/2 : posX + W - th/2;
+                              addHole(2.5, th, plateX, posY + calcY - 16, posZ + D - 37, 'x');
+                              addHole(2.5, th, plateX, posY + calcY + 16, posZ + D - 37, 'x');
+                          });
+                      }
+                  }
+              }
+          });
+      }
+
+      if (mod.legs && mod.legs.active) {
+          const legH = mod.legs.height || 100;
+          const rootY = parseFloat(mod.position.y) || 0;
+          
+          addBox(30, legH, 30, posX + 50, rootY, posZ + 50, 'corpus', false);
+          addBox(30, legH, 30, posX + W - 80, rootY, posZ + 50, 'corpus', false);
+          addBox(30, legH, 30, posX + 50, rootY, posZ + D - 80, 'corpus', false);
+          addBox(30, legH, 30, posX + W - 80, rootY, posZ + D - 80, 'corpus', false);
+          
+          if (mod.legs.plinth) {
+              const offset = mod.legs.plinthOffset || 40;
+              addBox(W, legH, 18, posX, rootY, posZ + D - offset - 18, 'corpus', false);
+          }
+      }
   });
 }
