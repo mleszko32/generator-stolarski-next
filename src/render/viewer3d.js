@@ -96,8 +96,6 @@ function recalculateLayout(mod) {
 
               const overLeft = isLeftOuter ? (isInset ? -cLeft : th - cLeft) : (isBoundLeftFront ? -gapVal : ((th / 2) - (gapVal / 2)));
               const overRight = isRightOuter ? (isInset ? -cRight : th - cRight) : (isBoundRightFront ? -gapVal : ((th / 2) - (gapVal / 2)));
-              
-              // ZMIANA: Usunięto literówkę (isBottomOuter -> isInset)
               const overBottom = isBottomOuter ? (isInset ? -cBottom : th - cBottom) : (isBoundBottomFront ? -gapVal : ((th / 2) - (gapVal / 2)));
               const overTop = isTopOuter ? (isInset ? -cTop : th - cTop) : (isBoundTopFront ? -gapVal : ((th / 2) - (gapVal / 2)));
 
@@ -1078,7 +1076,9 @@ export function update3D() {
 
                   if (el.subtype.includes('szuflada')) {
                       if (isXrayMode) {
-                          const dHoles = calculateDrawerHoles(state.project.front.drawerSystem, el.y, el.h, th, el.frontIndex, false);
+                          // ZMIANA: Przywrócono wykrywanie pierwszej szuflady w 3D, by pudło zostało narysowane wyżej
+                          const isBottomInZone = el.frontIndex === 0;
+                          const dHoles = calculateDrawerHoles(state.project.front.drawerSystem, el.y, el.h, th, el.frontIndex, isBottomInZone);
                           
                           const innerWidth = W - (th * 2);
                           const sysName = state.project.front.drawerSystem || 'merivobox';

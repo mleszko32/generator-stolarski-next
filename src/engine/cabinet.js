@@ -309,7 +309,6 @@ function getInteriorParts(mod, config) {
 
   return parts;
 }
-
 function getFrontsAndDrawers(mod, config) {
   const parts = [];
   const mountingData = [];
@@ -340,6 +339,10 @@ function getFrontsAndDrawers(mod, config) {
     parts.push({ name: partName, length: parseFloat(front.h.toFixed(1)), width: parseFloat(front.w.toFixed(1)), qty: 1 });
 
     if (front.subtype.includes('szuflada')) {
+      // ZMIANA: Przywracamy wiedzę o tym, że pierwsza prowadnica leży na dolnym wieńcu
+      const isBottomInZone = front.frontIndex === 0;
+      const isTopInZone = index === fronts.length - 1;
+      
       let innerThick = 18;
       let innerSetback = 0;
       if (front.subtype === 'szuflada-wewnetrzna') {
@@ -348,8 +351,7 @@ function getFrontsAndDrawers(mod, config) {
       }
 
       if (typeof calculateDrawerHoles === 'function') {
-        // ZMIANA: Zawsze wyłączamy 'isBottomInZone' by usunąć błąd nierównych przerw między prowadnicami
-        const drawerHoles = calculateDrawerHoles(config.front.drawerSystem, front.y, front.h, board, drawerCount - 1, false);
+        const drawerHoles = calculateDrawerHoles(config.front.drawerSystem, front.y, front.h, board, drawerCount - 1, isBottomInZone);
         if (drawerHoles) { 
           const adjustedHoles = JSON.parse(JSON.stringify(drawerHoles));
           
@@ -370,7 +372,6 @@ function getFrontsAndDrawers(mod, config) {
 
       if (typeof getDrawerComponents === 'function') {
         let availableSpace = front.h;
-        // ZMIANA: Inteligentne odejmowanie grubości płyt od dostępnego miejsca wewnątrz
         if (front.y < board) availableSpace -= board; 
         if (front.y + front.h > height - board) availableSpace -= board; 
 
