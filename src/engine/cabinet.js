@@ -339,9 +339,7 @@ function getFrontsAndDrawers(mod, config) {
     parts.push({ name: partName, length: parseFloat(front.h.toFixed(1)), width: parseFloat(front.w.toFixed(1)), qty: 1 });
 
     if (front.subtype.includes('szuflada')) {
-      // ZMIANA: Przywracamy wiedzę o tym, że pierwsza prowadnica leży na dolnym wieńcu
       const isBottomInZone = front.frontIndex === 0;
-      const isTopInZone = index === fronts.length - 1;
       
       let innerThick = 18;
       let innerSetback = 0;
@@ -350,8 +348,24 @@ function getFrontsAndDrawers(mod, config) {
           innerSetback = parseFloat(front.innerSetback ?? 2);
       }
 
+      let availableSpace = front.h;
+      if (front.y < board) availableSpace -= board; 
+      if (front.y + front.h > height - board) availableSpace -= board; 
+
+      // ZMIANA: Sztuczne obcinanie przestrzeni, by zmusić silnik do mniejszego wariantu
+      let simulatedSpace = availableSpace;
+      if (front.forceVariant && front.forceVariant !== 'auto') {
+          const v = front.forceVariant.toUpperCase();
+          if (v === 'N') simulatedSpace = 85;
+          else if (v === 'M') simulatedSpace = 115;
+          else if (v === 'K') simulatedSpace = 150;
+          else if (v === 'C') simulatedSpace = 195;
+          else if (v === 'E') simulatedSpace = 240;
+          simulatedSpace = Math.min(simulatedSpace, availableSpace); // Zabezpieczenie przed wyjściem za obrys
+      }
+
       if (typeof calculateDrawerHoles === 'function') {
-        const drawerHoles = calculateDrawerHoles(config.front.drawerSystem, front.y, front.h, board, drawerCount - 1, isBottomInZone);
+        const drawerHoles = calculateDrawerHoles(config.front.drawerSystem, front.y, simulatedSpace, board, drawerCount - 1, isBottomInZone);
         if (drawerHoles) { 
           const adjustedHoles = JSON.parse(JSON.stringify(drawerHoles));
           
@@ -371,17 +385,17 @@ function getFrontsAndDrawers(mod, config) {
       }
 
       if (typeof getDrawerComponents === 'function') {
-        let availableSpace = front.h;
-        if (front.y < board) availableSpace -= board; 
-        if (front.y + front.h > height - board) availableSpace -= board; 
-
         let availableDepth = topBottomDepth;
         if (front.subtype === 'szuflada-wewnetrzna') {
             availableDepth -= (innerThick + innerSetback);
         }
 
+        if (front.forceNL && !isNaN(parseFloat(front.forceNL))) {
+            availableDepth = parseFloat(front.forceNL) + 10;
+        }
+
         const userForcedVariant = front.forceVariant || 'auto';
-        const drawerComps = getDrawerComponents(config.front.drawerSystem, width - (board * 2), availableDepth, availableSpace, userForcedVariant);
+        const drawerComps = getDrawerComponents(config.front.drawerSystem, width - (board * 2), availableDepth, simulatedSpace, userForcedVariant);
         
         if (drawerComps) {
           parts.push({ name: `Dno szuflady (NL: ${drawerComps.nominalLength})`, length: parseFloat(drawerComps.bottom.length.toFixed(1)), width: parseFloat(drawerComps.bottom.width.toFixed(1)), qty: 1 });

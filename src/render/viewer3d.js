@@ -557,6 +557,95 @@ function show3DContextMenu(event, hit, data) {
   else if (data.type === 'front') {
       const el = mod.elements.find(e => e.id === data.elementId);
       if (el) {
+          
+          if (el.subtype.includes('szuflada')) {
+              menu.appendChild(createHeader('Opcje pudła szuflady'));
+              const boxWrap = document.createElement('div');
+              Object.assign(boxWrap.style, {
+                  padding: '10px', borderBottom: '1px solid #e2e8f0', marginBottom: '4px', backgroundColor: '#f8fafc', borderRadius: '4px'
+              });
+
+              const rowVar = document.createElement('div');
+              rowVar.style.display = 'flex'; rowVar.style.justifyContent = 'space-between'; rowVar.style.alignItems = 'center'; rowVar.style.marginBottom = '6px';
+              rowVar.innerHTML = `<label style="font-size:11px; color:#475569;">Wariant boku:</label>
+                  <select id="inp-var" style="padding:4px; border:1px solid #cbd5e1; border-radius:4px; font-size:11px; width:110px;">
+                      <option value="auto" ${(!el.forceVariant || el.forceVariant === 'auto') ? 'selected' : ''}>Auto (Maks.)</option>
+                      <option value="N" ${el.forceVariant === 'N' ? 'selected' : ''}>Wariant N</option>
+                      <option value="M" ${el.forceVariant === 'M' ? 'selected' : ''}>Wariant M</option>
+                      <option value="K" ${el.forceVariant === 'K' ? 'selected' : ''}>Wariant K</option>
+                      <option value="E" ${el.forceVariant === 'E' ? 'selected' : ''}>Wariant E</option>
+                      <option value="C" ${el.forceVariant === 'C' ? 'selected' : ''}>Wariant C</option>
+                  </select>`;
+              
+              const rowNL = document.createElement('div');
+              rowNL.style.display = 'flex'; rowNL.style.justifyContent = 'space-between'; rowNL.style.alignItems = 'center'; rowNL.style.marginBottom = '6px';
+              rowNL.innerHTML = `<label style="font-size:11px; color:#475569;">Wymuś głębokość (NL):</label>
+                  <input type="number" id="inp-nl" placeholder="Auto" value="${el.forceNL || ''}" style="width:100px; padding:4px; border:1px solid #cbd5e1; border-radius:4px; font-size:11px; text-align:center;">`;
+
+              const applyBoxBtn = document.createElement('button'); applyBoxBtn.innerText = 'Zastosuj do szuflady';
+              Object.assign(applyBoxBtn.style, { width: '100%', padding: '6px', backgroundColor: '#d97706', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' });
+
+              applyBoxBtn.onclick = (evt) => {
+                  evt.stopPropagation();
+                  el.forceVariant = document.getElementById('inp-var').value;
+                  const nlVal = document.getElementById('inp-nl').value;
+                  el.forceNL = nlVal ? parseFloat(nlVal) : null;
+                  menu.remove();
+                  update3D();
+                  updateSidebar();
+              };
+
+              boxWrap.appendChild(rowVar);
+              boxWrap.appendChild(rowNL);
+              boxWrap.appendChild(applyBoxBtn);
+              menu.appendChild(boxWrap);
+              
+              // ZMIANA: Dodano automatyczny przycisk budowania szuflad wewnętrznych nad obecną
+              menu.appendChild(createOption('➕ Dodaj szufladę wewn. nad tą', '📥', () => {
+                  let boxHeight = el.h;
+                  if (el.forceVariant && el.forceVariant !== 'auto') {
+                      const v = el.forceVariant.toUpperCase();
+                      if (v === 'N') boxHeight = 85;
+                      else if (v === 'M') boxHeight = 115;
+                      else if (v === 'K') boxHeight = 150;
+                      else if (v === 'C') boxHeight = 195;
+                      else if (v === 'E') boxHeight = 240;
+                  }
+                  
+                  const newInnerBottomY = el.y + boxHeight + 5;
+                  const newInnerTopY = el.y + el.h;
+                  
+                  if (newInnerBottomY + 40 > newInnerTopY) {
+                      alert("Za mało miejsca nad pudłem! Zmniejsz wariant boku tej szuflady (np. na M lub K) i zapisz, aby zrobić miejsce.");
+                      return;
+                  }
+
+                  const baseMinY = parseFloat(el.baseZone.minY) || 18;
+                  const baseMaxY = parseFloat(el.baseZone.maxY) || parseFloat(mod.dimensions.height);
+                  
+                  const newOffsetBottom = newInnerBottomY - baseMinY;
+                  const newOffsetTop = baseMaxY - newInnerTopY;
+
+                  mod.elements.push({
+                      id: 'front-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+                      typ: 'front', 
+                      subtype: 'szuflada-wewnetrzna', 
+                      baseZone: { 
+                          ...el.baseZone, 
+                          offsetBottom: Math.max(0, newOffsetBottom), 
+                          offsetTop: Math.max(0, newOffsetTop) 
+                      },
+                      frontCount: 1, distribution: "1", frontIndex: 0, gap: parseFloat(state.project.front?.gap || 3),
+                      intGapX: 15, intGapY: 5, forceVariant: 'auto', forceNL: null,
+                      innerFrontThickness: 18, innerSetback: 2
+                  });
+
+                  menu.remove();
+                  update3D();
+                  updateSidebar();
+              }, '#059669'));
+          }
+
           if (el.subtype === 'szuflada-wewnetrzna') {
               menu.appendChild(createHeader('Front wewn. i prowadnice'));
               const pWrap = document.createElement('div');
@@ -797,7 +886,8 @@ function show3DContextMenu(event, hit, data) {
                           baseZone: { ...targetBaseZone, offsetBottom: botOffset, offsetTop: topOffset },
                           frontCount: genCount, distribution: distStr, frontIndex: i, gap: gapValInput,
                           intGapX: subtype === 'szuflada-wewnetrzna' ? 15 : 0, intGapY: subtype === 'szuflada-wewnetrzna' ? 5 : 0,
-                          forceVariant: 'auto'
+                          forceVariant: 'auto',
+                          forceNL: null
                       });
                   }
                   menu.remove();
@@ -890,7 +980,7 @@ function addHole(radius, depth, x, y, z, rotationAxis) {
   if (!isXrayMode) return; 
   const geo = new THREE.CylinderGeometry(radius, radius, depth, 16);
   const mesh = new THREE.Mesh(geo, holeMat);
-  if (rotationAxis === 'x') mesh.rotation.z = Math.PI / 2; 
+  if (rotationAxis === 'x') Math.PI / 2; mesh.rotation.z = Math.PI / 2; 
   if (rotationAxis === 'y') mesh.rotation.x = 0;           
   if (rotationAxis === 'z') mesh.rotation.x = Math.PI / 2; 
   mesh.position.set(x, y, z);
@@ -1076,9 +1166,24 @@ export function update3D() {
 
                   if (el.subtype.includes('szuflada')) {
                       if (isXrayMode) {
-                          // ZMIANA: Przywrócono wykrywanie pierwszej szuflady w 3D, by pudło zostało narysowane wyżej
                           const isBottomInZone = el.frontIndex === 0;
-                          const dHoles = calculateDrawerHoles(state.project.front.drawerSystem, el.y, el.h, th, el.frontIndex, isBottomInZone);
+                          
+                          let availableSpace = el.h;
+                          if (el.y < th) availableSpace -= th; 
+                          if (el.y + el.h > H - th) availableSpace -= th; 
+
+                          let simulatedSpace = availableSpace;
+                          if (el.forceVariant && el.forceVariant !== 'auto') {
+                              const v = el.forceVariant.toUpperCase();
+                              if (v === 'N') simulatedSpace = 85;
+                              else if (v === 'M') simulatedSpace = 115;
+                              else if (v === 'K') simulatedSpace = 150;
+                              else if (v === 'C') simulatedSpace = 195;
+                              else if (v === 'E') simulatedSpace = 240;
+                              simulatedSpace = Math.min(simulatedSpace, availableSpace);
+                          }
+
+                          const dHoles = calculateDrawerHoles(state.project.front.drawerSystem, el.y, simulatedSpace, th, el.frontIndex, isBottomInZone);
                           
                           const innerWidth = W - (th * 2);
                           const sysName = state.project.front.drawerSystem || 'merivobox';
@@ -1088,11 +1193,11 @@ export function update3D() {
                               availableDepth -= (innerFrontThick + innerSetback);
                           }
                           
-                          let availableSpace = el.h;
-                          if (el.y < th) availableSpace -= th; 
-                          if (el.y + el.h > H - th) availableSpace -= th; 
+                          if (el.forceNL && !isNaN(parseFloat(el.forceNL))) {
+                              availableDepth = parseFloat(el.forceNL) + 10;
+                          }
 
-                          const drawerComps = getDrawerComponents(sysName, innerWidth, availableDepth, availableSpace, el.forceVariant || 'auto');
+                          const drawerComps = getDrawerComponents(sysName, innerWidth, availableDepth, simulatedSpace, el.forceVariant || 'auto');
 
                           if (drawerComps) {
                               const NL = drawerComps.nominalLength;
