@@ -5,6 +5,29 @@ import { state, getActiveModule, addModule, deleteModule, duplicateModule } from
 import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel } from "./properties.js";
 
+// Funkcje pomocnicze do ładowania
+function showLoading(msg) {
+    let l = document.getElementById('ai-loader');
+    if(!l) {
+        l = document.createElement('div');
+        l.id = 'ai-loader';
+        Object.assign(l.style, {
+            position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
+            backgroundColor: 'rgba(15, 23, 42, 0.9)', color: '#10b981', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', zIndex: '9999',
+            fontSize: '24px', fontWeight: 'bold', flexDirection: 'column'
+        });
+        document.body.appendChild(l);
+    }
+    l.innerHTML = `<div>🪄 ${msg}</div><div style="font-size:14px; margin-top:15px; color:#94a3b8;">To potrwa kilkanaście sekund. Twój układ jest w drodze!</div>`;
+    l.style.display = 'flex';
+}
+
+function hideLoading() {
+    const l = document.getElementById('ai-loader');
+    if(l) l.style.display = 'none';
+}
+
 export function updateSidebar() {
   const leftSidebar = document.querySelector(".sidebar-left");
   const { parts, mountingData } = calculateParts(); 
@@ -16,8 +39,18 @@ export function updateSidebar() {
     <div style="margin-bottom: 15px;">
   `;
 
+  // NOWY PRZYCISK AI W GŁÓWNYM MENU
+  html += `
+      <div style="margin-bottom: 15px;">
+          <button id="btn-import-ai" style="width: 100%; padding: 12px; background: linear-gradient(135deg, #9333ea, #6366f1); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.15); transition: transform 0.1s;">
+              🪄 Zbuduj projekt ze zdjęcia (AI)
+          </button>
+          <input type="file" id="input-ai-image" accept="image/png, image/jpeg" style="display: none;" />
+      </div>
+  `;
+
   if (state.project.modules.length === 0) {
-     html += `<div style="font-size: 11px; color: #64748b; margin-bottom: 10px; text-align: center;">Brak szafek. Dodaj pierwszą poniżej.</div>`;
+     html += `<div style="font-size: 11px; color: #64748b; margin-bottom: 10px; text-align: center;">Brak szafek. Dodaj pierwszą ręcznie lub wczytaj szkic!</div>`;
   } else {
     const isAllActive = state.activeModuleId === null;
     const bgAll = isAllActive ? '#3b82f6' : '#f8fafc';
@@ -40,7 +73,6 @@ export function updateSidebar() {
       if (m.type === 'upper_cabinet') icon = '☁️';
       if (m.type === 'tall_cabinet') icon = '🚪';
 
-      // --- DODANE IKONY KOPIUJ I USUŃ ---
       html += `
         <div class="module-item" data-id="${m.id}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; margin-bottom: 6px; background-color: ${bg}; color: ${color}; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; border: 1px solid ${border}; transition: all 0.2s;">
           <div style="flex-grow: 1; pointer-events: none;">
@@ -75,7 +107,8 @@ export function updateSidebar() {
                 <option value="boki">Tylko Boki (L+P)</option>
                 <option value="bokL">Tylko Bok Lewy</option>
                 <option value="bokR">Tylko Bok Prawy</option>
-                <option value="front">Tylko Fronty</option>
+                <option value="front">Tylko Fronty Zewn.</option>
+                <option value="frontInner">Tylko Fronty Wewn.</option>
             </select>
             <button id="btn-print-2d" ${!activeMod ? 'disabled style="opacity: 0.5;"' : ''} style="flex: 1; padding: 8px; background-color: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px;">
               📄 Drukuj
@@ -145,10 +178,9 @@ export function updateSidebar() {
     });
   }
 
-  // --- PODPIĘCIE ZDARZEŃ USUWANIA / KOPIOWANIA ---
   document.querySelectorAll('.btn-mod-dup').forEach(el => {
     el.addEventListener('click', (e) => {
-      e.stopPropagation(); // Blokuje "zaznaczenie" klikanej szafki pod przyciskiem
+      e.stopPropagation(); 
       duplicateModule(e.currentTarget.getAttribute('data-id'));
       initPropertiesPanel(); update3D(); updateSidebar();
     });
@@ -174,6 +206,143 @@ export function updateSidebar() {
     if (btn) btn.addEventListener('click', () => { addModule(type); initPropertiesPanel();  update3D(); updateSidebar(); });
   };
   setupAddBtn('btn-add-base', 'base_cabinet'); setupAddBtn('btn-add-upper', 'upper_cabinet'); setupAddBtn('btn-add-tall', 'tall_cabinet');
+
+  // --- LOGIKA AI (Import ze zdjęcia) ---
+  const btnAi = document.getElementById('btn-import-ai');
+  const inputAi = document.getElementById('input-ai-image');
+
+  if (btnAi && inputAi) {
+      btnAi.addEventListener('click', () => {
+          // Używamy zdiagnozowanego modelu 1.5 Pro
+          let key = localStorage.getItem('gemini_api_key');
+          if (!key) {
+              key = window.prompt("Podaj klucz API Google Gemini (AIza...):");
+              if (!key) return;
+              localStorage.setItem('gemini_api_key', key.trim());
+          }
+          inputAi.click();
+      });
+
+      inputAi.addEventListener('change', async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+
+          const key = localStorage.getItem('gemini_api_key');
+          const mimeType = file.type;
+
+          showLoading("Rozszyfrowuję Twój projekt...");
+
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+              const base64Image = ev.target.result.split(',')[1];
+
+              try {
+                  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${key}`;
+                  
+                  const promptText = `
+                  Jesteś ekspertem stolarstwa. Przeanalizuj odręczny szkic szafek/modułów.
+                  Zwróć WYŁĄCZNIE tablicę JSON, gdzie każdy obiekt to osobny moduł (szafka), czytając szkic od LEWEJ do PRAWEJ.
+                  
+                  Wymagany format wyjściowy:
+                  [
+                    {
+                      "name": "Nazwa szafki",
+                      "type": "base_cabinet", // Opcje: "base_cabinet", "upper_cabinet", "tall_cabinet"
+                      "width": 600, // Zgadnij jeśli nie ma cyfr.
+                      "height": 720, // Baza to zazwyczaj 720, słupek 2000, wisząca 720
+                      "drawers": 0, // Ile ma szuflad od frontu? Podaj liczbę.
+                      "doors": 2 // Ile ma drzwi na froncie? (1 lub 2). Daj 0 jeśli to same szuflady.
+                    }
+                  ]
+                  
+                  Nie dodawaj żadnego innego tekstu, żadnych znaczników. Tylko surowy JSON zaczynający się od znaku '['.
+                  `;
+
+                  const payload = {
+                      contents: [{ parts: [
+                          { text: promptText }, 
+                          { inline_data: { mime_type: mimeType, data: base64Image } }
+                      ]}]
+                  };
+
+                  const response = await fetch(apiUrl, { 
+                      method: "POST", 
+                      headers: { "Content-Type": "application/json" }, 
+                      body: JSON.stringify(payload) 
+                  });
+                  const data = await response.json();
+                  
+                  if (data.error) throw new Error(data.error.message);
+                  
+                  const rawJson = data.candidates[0].content.parts[0].text.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
+                  const aiModules = JSON.parse(rawJson);
+                  
+                  // Budujemy szafki w State na podstawie JSONa
+                  let currentX = 0;
+                  if (state.project.modules.length > 0) {
+                      const lastMod = state.project.modules[state.project.modules.length - 1];
+                      currentX = lastMod.position.x + parseFloat(lastMod.dimensions.width);
+                  }
+
+                  const generatedModules = aiModules.map(aiMod => {
+                      const w = parseFloat(aiMod.width) || 600;
+                      const h = parseFloat(aiMod.height) || (aiMod.type === 'tall_cabinet' ? 2000 : 720);
+                      const d = aiMod.type === 'upper_cabinet' ? 300 : 510;
+                      const posY = aiMod.type === 'upper_cabinet' ? 1400 : 0;
+                      
+                      const mod = {
+                          id: 'mod-' + Date.now() + Math.random().toString(36).substr(2,5),
+                          name: aiMod.name || 'Moduł AI',
+                          type: aiMod.type || 'base_cabinet',
+                          dimensions: { width: w, height: h, depth: d },
+                          position: { x: currentX, y: posY, z: 0 },
+                          legs: { active: aiMod.type !== 'upper_cabinet', height: 100, plinth: true, plinthOffset: 40 },
+                          backPanel: { type: 'nakladane', offset: 16 },
+                          elements: []
+                      };
+                      
+                      currentX += w + 50; // Dodajemy 5 cm przerwy dla czytelności po wrzuceniu
+
+                      const baseMinY = 18;
+                      const baseMaxY = h - 18;
+                      const bZone = { minX: 18, maxX: w - 18, minY: baseMinY, maxY: baseMaxY, offsetBottom: 0, offsetTop: 0 };
+
+                      // Wrzucamy elementy na bazie rozpoznania AI
+                      if (aiMod.drawers && aiMod.drawers > 0) {
+                          for(let i = 0; i < aiMod.drawers; i++) {
+                              mod.elements.push({
+                                  id: 'front-' + Date.now() + Math.random().toString(36).substr(2,5),
+                                  typ: 'front', subtype: 'szuflada',
+                                  baseZone: { ...bZone },
+                                  frontCount: aiMod.drawers, distribution: "1", frontIndex: i, gap: parseFloat(state.project.front?.gap) || 3, forceVariant: 'auto', forceNL: null
+                              });
+                          }
+                      } else if (aiMod.doors && aiMod.doors > 1) {
+                          mod.elements.push({ id: 'front-L-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi-lp', baseZone: { ...bZone }, frontCount: 2, frontIndex: 0, gap: parseFloat(state.project.front?.gap) || 3 });
+                          mod.elements.push({ id: 'front-P-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi-lp', baseZone: { ...bZone }, frontCount: 2, frontIndex: 1, gap: parseFloat(state.project.front?.gap) || 3 });
+                      } else {
+                          mod.elements.push({ id: 'front-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi', baseZone: { ...bZone }, frontCount: 1, frontIndex: 0, gap: parseFloat(state.project.front?.gap) || 3, openingSide: 'left' });
+                      }
+                      return mod;
+                  });
+
+                  // Zapis do systemu
+                  state.project.modules.push(...generatedModules);
+                  hideLoading();
+                  initPropertiesPanel();
+                  updateSidebar();
+                  update3D();
+                  
+              } catch(err) {
+                  hideLoading();
+                  alert("⚠️ Sztuczna Inteligencja napotkała problem: " + err.message);
+              }
+              // Resetujemy input żeby można było wybrać ten sam plik drugi raz
+              inputAi.value = "";
+          };
+          reader.readAsDataURL(file);
+      });
+  }
 
   const printBtn = document.getElementById('btn-print-2d');
   if (printBtn && activeMod) {
