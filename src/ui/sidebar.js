@@ -236,25 +236,32 @@ export function updateSidebar() {
               try {
                   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${key}`;
                   
-                  // NOWY ZAAWANSOWANY PROMPT: Zmusza model do budowy półek
+                  // ZMIANA: Twardy nakaz grupowania szuflad dla sztucznej inteligencji
                   const promptText = `
                   Jesteś wybitnym ekspertem stolarstwa i CAD. Przeanalizuj szkic mebli od LEWEJ do PRAWEJ.
                   Zwróć WYŁĄCZNIE tablicę JSON, gdzie każdy obiekt to osobny moduł szafki.
-                  Uważnie podziel każdy moduł na pionowe strefy (od DOŁU do GÓRY) na podstawie półek!
+                  Podziel każdy moduł na pionowe strefy (od DOŁU do GÓRY).
                   
-                  Wymagany format wyjściowy (bez markdowna, sam czysty JSON z klamrą '['):
+                  BARDZO WAŻNE: Jeśli szafka zawiera blok szuflad jedna pod drugą, ZGRUPUJ je jako jedną strefę (section) z typem "szuflady" i ustaw "count" na łączną liczbę tych szuflad! Nigdy nie rób osobnej strefy dla każdej pojedynczej szuflady!
+                  
+                  Wymagany format wyjściowy (sam czysty JSON z klamrą '['):
                   [
                     {
+                      "name": "Szafka dolna szuflady",
+                      "type": "base_cabinet", // base_cabinet, upper_cabinet, tall_cabinet
+                      "width": 800,
+                      "height": 768,
+                      "sections": [
+                        { "type": "szuflady", "count": 3, "height": 768 } // Przykład zgrupowania!
+                      ]
+                    },
+                    {
                       "name": "Lewy słupek",
-                      "type": "tall_cabinet", // base_cabinet, upper_cabinet, tall_cabinet
+                      "type": "tall_cabinet",
                       "width": 600,
                       "height": 2303,
-                      "sections": [ // Strefy fizyczne wewnątrz modułu OD DOŁU DO GÓRY
-                        {
-                          "type": "drzwi", // szuflady, drzwi, drzwi_lp, wneka_otwarta
-                          "count": 1, // ile sztuk frontu w tej strefie?
-                          "height": 768 // szacowana fizyczna wysokość tej wnęki w mm
-                        },
+                      "sections": [
+                        { "type": "drzwi", "count": 1, "height": 768 },
                         { "type": "wneka_otwarta", "count": 0, "height": 384 },
                         { "type": "drzwi", "count": 1, "height": 768 }
                       ]
@@ -304,7 +311,6 @@ export function updateSidebar() {
                           elements: []
                       };
                       
-                      // Szafki stoją na styk - usunięto sztuczne przerwy 50mm
                       currentX += w; 
 
                       const th = parseFloat(state.project.materials?.boardThickness) || 18;
@@ -334,7 +340,8 @@ export function updateSidebar() {
                                           id: 'front-' + Date.now() + Math.random().toString(36).substr(2,5),
                                           typ: 'front', subtype: 'szuflada',
                                           baseZone: { ...bZone },
-                                          frontCount: count, distribution: "1", frontIndex: i, gap: gapFront, forceVariant: 'auto', forceNL: null
+                                          // ZMIANA: Przypisanie prawidłowej, dynamicznej ilości rozkładu frontów w jednej wnęce
+                                          frontCount: count, distribution: count.toString(), frontIndex: i, gap: gapFront, forceVariant: 'auto', forceNL: null
                                       });
                                   }
                               } else if (sType === 'drzwi_lp') {
@@ -344,7 +351,6 @@ export function updateSidebar() {
                                   mod.elements.push({ id: 'front-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi', baseZone: { ...bZone }, frontCount: 1, frontIndex: 0, gap: gapFront, openingSide: 'left' });
                               }
                               
-                              // Wstrzykiwanie prawdziwej półki konstrukcyjnej nad każdą strefą (poza najwyższą)
                               if (idx < aiMod.sections.length - 1) {
                                   mod.elements.push({
                                       id: 'poziom-' + Date.now() + Math.random().toString(36).substring(2, 6),
