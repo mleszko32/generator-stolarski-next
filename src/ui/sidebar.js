@@ -18,7 +18,7 @@ function showLoading(msg) {
         });
         document.body.appendChild(l);
     }
-    l.innerHTML = `<div>🪄 ${msg}</div><div style="font-size:14px; margin-top:15px; color:#94a3b8;">To potrwa kilkanaście sekund. Twój układ jest w drodze!</div>`;
+    l.innerHTML = `<div>🪄 ${msg}</div><div style="font-size:14px; margin-top:15px; color:#94a3b8;">Sztuczna Inteligencja rozrysowuje wnęki i półki. Cierpliwości...</div>`;
     l.style.display = 'flex';
 }
 
@@ -205,7 +205,7 @@ export function updateSidebar() {
   };
   setupAddBtn('btn-add-base', 'base_cabinet'); setupAddBtn('btn-add-upper', 'upper_cabinet'); setupAddBtn('btn-add-tall', 'tall_cabinet');
 
-  // --- LOGIKA AI (Import ze zdjęcia) ---
+  // --- ZAAWANSOWANA LOGIKA AI (Import ze zdjęcia) ---
   const btnAi = document.getElementById('btn-import-ai');
   const inputAi = document.getElementById('input-ai-image');
 
@@ -227,33 +227,39 @@ export function updateSidebar() {
           const key = localStorage.getItem('gemini_api_key');
           const mimeType = file.type;
 
-          showLoading("Rozszyfrowuję Twój projekt...");
+          showLoading("Rozszyfrowuję strukturę wnęk i półek...");
 
           const reader = new FileReader();
           reader.onload = async (ev) => {
               const base64Image = ev.target.result.split(',')[1];
 
               try {
-                  // ZMIANA: Adres uderza teraz we Flash Latest, do którego masz dostęp
                   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${key}`;
                   
+                  // NOWY ZAAWANSOWANY PROMPT: Zmusza model do budowy półek
                   const promptText = `
-                  Jesteś ekspertem stolarstwa. Przeanalizuj odręczny szkic szafek/modułów.
-                  Zwróć WYŁĄCZNIE tablicę JSON, gdzie każdy obiekt to osobny moduł (szafka), czytając szkic od LEWEJ do PRAWEJ.
+                  Jesteś wybitnym ekspertem stolarstwa i CAD. Przeanalizuj szkic mebli od LEWEJ do PRAWEJ.
+                  Zwróć WYŁĄCZNIE tablicę JSON, gdzie każdy obiekt to osobny moduł szafki.
+                  Uważnie podziel każdy moduł na pionowe strefy (od DOŁU do GÓRY) na podstawie półek!
                   
-                  Wymagany format wyjściowy:
+                  Wymagany format wyjściowy (bez markdowna, sam czysty JSON z klamrą '['):
                   [
                     {
-                      "name": "Nazwa szafki",
-                      "type": "base_cabinet", // Opcje: "base_cabinet", "upper_cabinet", "tall_cabinet"
-                      "width": 600, // Zgadnij jeśli nie ma cyfr.
-                      "height": 720, // Baza to zazwyczaj 720, słupek 2000, wisząca 720
-                      "drawers": 0, // Ile ma szuflad od frontu? Podaj liczbę.
-                      "doors": 2 // Ile ma drzwi na froncie? (1 lub 2). Daj 0 jeśli to same szuflady.
+                      "name": "Lewy słupek",
+                      "type": "tall_cabinet", // base_cabinet, upper_cabinet, tall_cabinet
+                      "width": 600,
+                      "height": 2303,
+                      "sections": [ // Strefy fizyczne wewnątrz modułu OD DOŁU DO GÓRY
+                        {
+                          "type": "drzwi", // szuflady, drzwi, drzwi_lp, wneka_otwarta
+                          "count": 1, // ile sztuk frontu w tej strefie?
+                          "height": 768 // szacowana fizyczna wysokość tej wnęki w mm
+                        },
+                        { "type": "wneka_otwarta", "count": 0, "height": 384 },
+                        { "type": "drzwi", "count": 1, "height": 768 }
+                      ]
                     }
                   ]
-                  
-                  Nie dodawaj żadnego innego tekstu, żadnych znaczników. Tylko surowy JSON zaczynający się od znaku '['.
                   `;
 
                   const payload = {
@@ -298,27 +304,60 @@ export function updateSidebar() {
                           elements: []
                       };
                       
-                      currentX += w + 50; 
+                      // Szafki stoją na styk - usunięto sztuczne przerwy 50mm
+                      currentX += w; 
 
-                      const baseMinY = 18;
-                      const baseMaxY = h - 18;
-                      const bZone = { minX: 18, maxX: w - 18, minY: baseMinY, maxY: baseMaxY, offsetBottom: 0, offsetTop: 0 };
+                      const th = parseFloat(state.project.materials?.boardThickness) || 18;
+                      const internalH = h - (th * 2);
+                      const gapFront = parseFloat(state.project.front?.gap) || 3;
 
-                      if (aiMod.drawers && aiMod.drawers > 0) {
-                          for(let i = 0; i < aiMod.drawers; i++) {
-                              mod.elements.push({
-                                  id: 'front-' + Date.now() + Math.random().toString(36).substr(2,5),
-                                  typ: 'front', subtype: 'szuflada',
-                                  baseZone: { ...bZone },
-                                  frontCount: aiMod.drawers, distribution: "1", frontIndex: i, gap: parseFloat(state.project.front?.gap) || 3, forceVariant: 'auto', forceNL: null
-                              });
-                          }
-                      } else if (aiMod.doors && aiMod.doors > 1) {
-                          mod.elements.push({ id: 'front-L-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi-lp', baseZone: { ...bZone }, frontCount: 2, frontIndex: 0, gap: parseFloat(state.project.front?.gap) || 3 });
-                          mod.elements.push({ id: 'front-P-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi-lp', baseZone: { ...bZone }, frontCount: 2, frontIndex: 1, gap: parseFloat(state.project.front?.gap) || 3 });
+                      if (aiMod.sections && aiMod.sections.length > 0) {
+                          let currentY = th;
+                          const totalSectionsHeight = aiMod.sections.reduce((sum, sec) => sum + (parseFloat(sec.height) || 0), 0);
+                          const scale = totalSectionsHeight > 0 ? internalH / totalSectionsHeight : 1;
+
+                          aiMod.sections.forEach((sec, idx) => {
+                              const secH = (parseFloat(sec.height) || (internalH / aiMod.sections.length)) * scale;
+                              let zoneMinY = currentY;
+                              let zoneMaxY = currentY + secH;
+                              
+                              if (idx === aiMod.sections.length - 1) zoneMaxY = h - th; 
+
+                              const bZone = { minX: th, maxX: w - th, minY: zoneMinY, maxY: zoneMaxY, offsetBottom: 0, offsetTop: 0 };
+                              
+                              const sType = sec.type || 'drzwi';
+                              const count = parseInt(sec.count) || 1;
+
+                              if (sType === 'szuflady') {
+                                  for(let i = 0; i < count; i++) {
+                                      mod.elements.push({
+                                          id: 'front-' + Date.now() + Math.random().toString(36).substr(2,5),
+                                          typ: 'front', subtype: 'szuflada',
+                                          baseZone: { ...bZone },
+                                          frontCount: count, distribution: "1", frontIndex: i, gap: gapFront, forceVariant: 'auto', forceNL: null
+                                      });
+                                  }
+                              } else if (sType === 'drzwi_lp') {
+                                  mod.elements.push({ id: 'front-L-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi-lp', baseZone: { ...bZone }, frontCount: 2, frontIndex: 0, gap: gapFront });
+                                  mod.elements.push({ id: 'front-P-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi-lp', baseZone: { ...bZone }, frontCount: 2, frontIndex: 1, gap: gapFront });
+                              } else if (sType === 'drzwi') {
+                                  mod.elements.push({ id: 'front-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi', baseZone: { ...bZone }, frontCount: 1, frontIndex: 0, gap: gapFront, openingSide: 'left' });
+                              }
+                              
+                              // Wstrzykiwanie prawdziwej półki konstrukcyjnej nad każdą strefą (poza najwyższą)
+                              if (idx < aiMod.sections.length - 1) {
+                                  mod.elements.push({
+                                      id: 'poziom-' + Date.now() + Math.random().toString(36).substring(2, 6),
+                                      typ: 'poziom', x: th, y: zoneMaxY, w: w - (th * 2), h: th, isStructural: true 
+                                  });
+                                  currentY = zoneMaxY + th;
+                              }
+                          });
                       } else {
-                          mod.elements.push({ id: 'front-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi', baseZone: { ...bZone }, frontCount: 1, frontIndex: 0, gap: parseFloat(state.project.front?.gap) || 3, openingSide: 'left' });
+                          const bZone = { minX: th, maxX: w - th, minY: th, maxY: h - th, offsetBottom: 0, offsetTop: 0 };
+                          mod.elements.push({ id: 'front-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi', baseZone: { ...bZone }, frontCount: 1, frontIndex: 0, gap: gapFront, openingSide: 'left' });
                       }
+
                       return mod;
                   });
 
