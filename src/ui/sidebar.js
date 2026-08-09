@@ -211,12 +211,7 @@ export function updateSidebar() {
 
   if (btnAi && inputAi) {
       btnAi.addEventListener('click', () => {
-          let key = localStorage.getItem('gemini_api_key');
-          if (!key) {
-              key = window.prompt("Podaj klucz API Google Gemini (AIza...):");
-              if (!key) return;
-              localStorage.setItem('gemini_api_key', key.trim());
-          }
+          // Usuwamy wyskakujące okienko i logikę zapamiętywania klucza w przeglądarce
           inputAi.click();
       });
 
@@ -224,9 +219,7 @@ export function updateSidebar() {
           const file = e.target.files[0];
           if (!file) return;
 
-          const key = localStorage.getItem('gemini_api_key');
           const mimeType = file.type;
-
           showLoading("Rozszyfrowuję strukturę wnęk i półek...");
 
           const reader = new FileReader();
@@ -234,56 +227,16 @@ export function updateSidebar() {
               const base64Image = ev.target.result.split(',')[1];
 
               try {
-                  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${key}`;
-                  
-                  // ZMIANA: Twardy nakaz grupowania szuflad dla sztucznej inteligencji
-                  const promptText = `
-                  Jesteś wybitnym ekspertem stolarstwa i CAD. Przeanalizuj szkic mebli od LEWEJ do PRAWEJ.
-                  Zwróć WYŁĄCZNIE tablicę JSON, gdzie każdy obiekt to osobny moduł szafki.
-                  Podziel każdy moduł na pionowe strefy (od DOŁU do GÓRY).
-                  
-                  BARDZO WAŻNE: Jeśli szafka zawiera blok szuflad jedna pod drugą, ZGRUPUJ je jako jedną strefę (section) z typem "szuflady" i ustaw "count" na łączną liczbę tych szuflad! Nigdy nie rób osobnej strefy dla każdej pojedynczej szuflady!
-                  
-                  Wymagany format wyjściowy (sam czysty JSON z klamrą '['):
-                  [
-                    {
-                      "name": "Szafka dolna szuflady",
-                      "type": "base_cabinet", // base_cabinet, upper_cabinet, tall_cabinet
-                      "width": 800,
-                      "height": 768,
-                      "sections": [
-                        { "type": "szuflady", "count": 3, "height": 768 } // Przykład zgrupowania!
-                      ]
-                    },
-                    {
-                      "name": "Lewy słupek",
-                      "type": "tall_cabinet",
-                      "width": 600,
-                      "height": 2303,
-                      "sections": [
-                        { "type": "drzwi", "count": 1, "height": 768 },
-                        { "type": "wneka_otwarta", "count": 0, "height": 384 },
-                        { "type": "drzwi", "count": 1, "height": 768 }
-                      ]
-                    }
-                  ]
-                  `;
-
-                  const payload = {
-                      contents: [{ parts: [
-                          { text: promptText }, 
-                          { inline_data: { mime_type: mimeType, data: base64Image } }
-                      ]}]
-                  };
-
-                  const response = await fetch(apiUrl, { 
+                  // Aplikacja łączy się teraz z Twoim w pełni bezpiecznym, wirtualnym serwerem Vercel
+                  const response = await fetch('/api/gemini', { 
                       method: "POST", 
                       headers: { "Content-Type": "application/json" }, 
-                      body: JSON.stringify(payload) 
+                      body: JSON.stringify({ base64Image, mimeType }) 
                   });
+                  
                   const data = await response.json();
                   
-                  if (data.error) throw new Error(data.error.message);
+                  if (data.error) throw new Error(data.error.message || data.error);
                   
                   const rawJson = data.candidates[0].content.parts[0].text.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
                   const aiModules = JSON.parse(rawJson);
@@ -340,7 +293,6 @@ export function updateSidebar() {
                                           id: 'front-' + Date.now() + Math.random().toString(36).substr(2,5),
                                           typ: 'front', subtype: 'szuflada',
                                           baseZone: { ...bZone },
-                                          // ZMIANA: Przypisanie prawidłowej, dynamicznej ilości rozkładu frontów w jednej wnęce
                                           frontCount: count, distribution: count.toString(), frontIndex: i, gap: gapFront, forceVariant: 'auto', forceNL: null
                                       });
                                   }
