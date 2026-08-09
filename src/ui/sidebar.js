@@ -5,7 +5,6 @@ import { state, getActiveModule, addModule, deleteModule, duplicateModule } from
 import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel } from "./properties.js";
 
-// Funkcje pomocnicze do ładowania
 function showLoading(msg) {
     let l = document.getElementById('ai-loader');
     if(!l) {
@@ -39,7 +38,6 @@ export function updateSidebar() {
     <div style="margin-bottom: 15px;">
   `;
 
-  // NOWY PRZYCISK AI W GŁÓWNYM MENU
   html += `
       <div style="margin-bottom: 15px;">
           <button id="btn-import-ai" style="width: 100%; padding: 12px; background: linear-gradient(135deg, #9333ea, #6366f1); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.15); transition: transform 0.1s;">
@@ -213,7 +211,6 @@ export function updateSidebar() {
 
   if (btnAi && inputAi) {
       btnAi.addEventListener('click', () => {
-          // Używamy zdiagnozowanego modelu 1.5 Pro
           let key = localStorage.getItem('gemini_api_key');
           if (!key) {
               key = window.prompt("Podaj klucz API Google Gemini (AIza...):");
@@ -237,7 +234,8 @@ export function updateSidebar() {
               const base64Image = ev.target.result.split(',')[1];
 
               try {
-                  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${key}`;
+                  // ZMIANA: Adres uderza teraz we Flash Latest, do którego masz dostęp
+                  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${key}`;
                   
                   const promptText = `
                   Jesteś ekspertem stolarstwa. Przeanalizuj odręczny szkic szafek/modułów.
@@ -277,7 +275,6 @@ export function updateSidebar() {
                   const rawJson = data.candidates[0].content.parts[0].text.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
                   const aiModules = JSON.parse(rawJson);
                   
-                  // Budujemy szafki w State na podstawie JSONa
                   let currentX = 0;
                   if (state.project.modules.length > 0) {
                       const lastMod = state.project.modules[state.project.modules.length - 1];
@@ -301,13 +298,12 @@ export function updateSidebar() {
                           elements: []
                       };
                       
-                      currentX += w + 50; // Dodajemy 5 cm przerwy dla czytelności po wrzuceniu
+                      currentX += w + 50; 
 
                       const baseMinY = 18;
                       const baseMaxY = h - 18;
                       const bZone = { minX: 18, maxX: w - 18, minY: baseMinY, maxY: baseMaxY, offsetBottom: 0, offsetTop: 0 };
 
-                      // Wrzucamy elementy na bazie rozpoznania AI
                       if (aiMod.drawers && aiMod.drawers > 0) {
                           for(let i = 0; i < aiMod.drawers; i++) {
                               mod.elements.push({
@@ -326,7 +322,6 @@ export function updateSidebar() {
                       return mod;
                   });
 
-                  // Zapis do systemu
                   state.project.modules.push(...generatedModules);
                   hideLoading();
                   initPropertiesPanel();
@@ -337,7 +332,6 @@ export function updateSidebar() {
                   hideLoading();
                   alert("⚠️ Sztuczna Inteligencja napotkała problem: " + err.message);
               }
-              // Resetujemy input żeby można było wybrać ten sam plik drugi raz
               inputAi.value = "";
           };
           reader.readAsDataURL(file);
