@@ -170,7 +170,6 @@ export function calculateProjectHardware() {
   return Object.values(hardwareList);
 }
 
-// ZAKTUALIZOWANE WARTOŚCI NAWIERTÓW (37 mm oraz 37+32 mm)
 function getCorpusHoles(mod, config) {
   const { width, height, depth } = mod.dimensions;
   const th = config.materials.boardThickness || 18;
@@ -187,7 +186,7 @@ function getCorpusHoles(mod, config) {
 
   if (cons.joinType === 'boki_przelotowe') {
      const bottomY = th / 2;
-     addJoint(bottomY, 37); // Startujemy od 37 mm
+     addJoint(bottomY, 37); 
      addJoint(bottomY, depth - 37, true); 
      
      const topY = height - th / 2;
@@ -239,10 +238,10 @@ function getCorpusParts(mod, config) {
   const tbDepth = backP.type === 'nut' ? depth - backP.offset - backThick : depth - backThick;
   const tbWidth = isTopBottomFullWidth ? width : width - (board * 2);
 
-  parts.push({ name: "Wieniec", length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1 });
+  parts.push({ name: `W${width}`, length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1 });
 
   if (construction.topType === 'pelny') {
-    parts.push({ name: "Wieniec", length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1 });
+    parts.push({ name: `W${width}`, length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1 });
   } else if (construction.topType.includes('trawersy')) {
     const isVertical = construction.topType === 'trawersy_pion';
     const trWidth = construction.traverseWidth || 100;
@@ -309,6 +308,7 @@ function getInteriorParts(mod, config) {
 
   return parts;
 }
+
 function getFrontsAndDrawers(mod, config) {
   const parts = [];
   const mountingData = [];
@@ -352,7 +352,6 @@ function getFrontsAndDrawers(mod, config) {
       if (front.y < board) availableSpace -= board; 
       if (front.y + front.h > height - board) availableSpace -= board; 
 
-      // ZMIANA: Sztuczne obcinanie przestrzeni, by zmusić silnik do mniejszego wariantu
       let simulatedSpace = availableSpace;
       if (front.forceVariant && front.forceVariant !== 'auto') {
           const v = front.forceVariant.toUpperCase();
@@ -361,7 +360,7 @@ function getFrontsAndDrawers(mod, config) {
           else if (v === 'K') simulatedSpace = 150;
           else if (v === 'C') simulatedSpace = 195;
           else if (v === 'E') simulatedSpace = 240;
-          simulatedSpace = Math.min(simulatedSpace, availableSpace); // Zabezpieczenie przed wyjściem za obrys
+          simulatedSpace = Math.min(simulatedSpace, availableSpace); 
       }
 
       if (typeof calculateDrawerHoles === 'function') {
@@ -412,4 +411,3 @@ function getFrontsAndDrawers(mod, config) {
 
   return { parts, mountingData };
 }
-  
