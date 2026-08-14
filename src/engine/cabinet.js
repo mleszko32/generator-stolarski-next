@@ -239,10 +239,10 @@ function getCorpusParts(mod, config) {
   const tbDepth = backP.type === 'nut' ? depth - backP.offset - backThick : depth - backThick;
   const tbWidth = isTopBottomFullWidth ? width : width - (board * 2);
 
-  parts.push({ name: "Wieniec dolny", length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1 });
+  parts.push({ name: "Wieniec", length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1 });
 
   if (construction.topType === 'pelny') {
-    parts.push({ name: "Wieniec górny", length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1 });
+    parts.push({ name: "Wieniec", length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1 });
   } else if (construction.topType.includes('trawersy')) {
     const isVertical = construction.topType === 'trawersy_pion';
     const trWidth = construction.traverseWidth || 100;
