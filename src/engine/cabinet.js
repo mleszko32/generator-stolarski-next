@@ -251,7 +251,8 @@ function getCorpusParts(mod, config) {
   const structuralShelvesCount = mod.elements ? mod.elements.filter(el => el.typ === 'poziom' && el.isStructural).length : 0;
   if (structuralShelvesCount > 0) {
     const shelfWidth = width - (board * 2);
-    parts.push({ name: "Półka konstrukcyjna", length: parseFloat(shelfWidth.toFixed(1)), width: tbDepth, qty: structuralShelvesCount });
+    // Zmieniono nazwę półki konstrukcyjnej na W(szerokość)
+    parts.push({ name: `W${width}`, length: parseFloat(shelfWidth.toFixed(1)), width: tbDepth, qty: structuralShelvesCount });
   }
 
   return parts;
@@ -282,7 +283,7 @@ function getInteriorParts(mod, config) {
   const parts = [];
   if (!mod.elements || mod.elements.length === 0) return parts;
 
-  const { depth } = mod.dimensions;
+  const { depth, width } = mod.dimensions;
   const board = config.materials.boardThickness;
   const backThick = config.materials.backThickness;
   const backP = mod.backPanel || { type: 'nakladane', offset: 16 };
@@ -293,7 +294,6 @@ function getInteriorParts(mod, config) {
   const topBottomDepth = backP.type === 'nut' ? depth - backP.offset - backThick : depth - backThick;
   const innerPartDepth = topBottomDepth - (isInset ? board : 0);
 
-  let shelfCount = 0;
   let partitionCount = 0;
 
   mod.elements.forEach(el => {
@@ -301,8 +301,7 @@ function getInteriorParts(mod, config) {
       partitionCount++;
       parts.push({ name: `Przegroda pionowa ${partitionCount}`, length: parseFloat(el.h.toFixed(1)), width: innerPartDepth, qty: 1 });
     } else if (el.typ === 'poziom' && !el.isStructural) {
-      shelfCount++;
-      parts.push({ name: `Półka ${shelfCount}`, length: parseFloat(el.w.toFixed(1)), width: innerPartDepth - 5, qty: 1 });
+      parts.push({ name: `P${width}`, length: parseFloat(el.w.toFixed(1)), width: innerPartDepth - 5, qty: 1 });
     }
   });
 
