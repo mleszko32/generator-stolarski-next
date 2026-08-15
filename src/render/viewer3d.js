@@ -175,7 +175,7 @@ export function init3DViewer() {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0xf4f4f5); 
 
-  camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 10, 15000);
+  camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 10, 100000);
   camera.position.set(2500, 1500, 3500);
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
