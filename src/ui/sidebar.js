@@ -27,9 +27,7 @@ function hideLoading() {
     if(l) l.style.display = 'none';
 }
 
-// Funkcja odpowiedzialna za okno edycji CSV
 function openCsvEditorModal(partsList) {
-    // Sortowanie listami, żeby szły kategoriami
     const catOrder = { 'Korpus': 1, 'Front': 2, 'Szuflada': 3, 'Plecy': 4, 'Inne': 5 };
     partsList.sort((a, b) => (catOrder[a.category] || 99) - (catOrder[b.category] || 99));
 
@@ -93,13 +91,20 @@ function openCsvEditorModal(partsList) {
     tableContainer.innerHTML = tableHtml;
 
     const footer = document.createElement('div');
-    Object.assign(footer.style, { display: 'flex', justifyContent: 'space-between', gap: '10px' });
+    Object.assign(footer.style, { display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' });
     
     footer.innerHTML = `
         <button id="csv-btn-add" style="background:#3b82f6; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">➕ Dodaj pusty wiersz</button>
-        <div style="display: flex; gap: 10px;">
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <select id="csv-export-filter" style="padding: 9px; border-radius: 5px; border: 1px solid #cbd5e1; font-weight: bold; color: #1e293b; cursor: pointer; background: #f8fafc; outline: none;">
+                <option value="all">Zapisz wszystko (Całość)</option>
+                <option value="Korpus">Tylko Korpusy</option>
+                <option value="Front">Tylko Fronty</option>
+                <option value="Szuflada">Tylko Szuflady</option>
+                <option value="Plecy">Tylko Plecy (HDF)</option>
+            </select>
             <button id="csv-btn-cancel" style="background:#94a3b8; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">Anuluj</button>
-            <button id="csv-btn-save" style="background:#10b981; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold; box-shadow:0 2px 4px rgba(0,0,0,0.1);">💾 Pobierz gotowy plik CSV</button>
+            <button id="csv-btn-save" style="background:#10b981; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold; box-shadow:0 2px 4px rgba(0,0,0,0.1);">💾 Pobierz plik CSV</button>
         </div>
     `;
 
@@ -109,13 +114,12 @@ function openCsvEditorModal(partsList) {
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
 
-    // Obsługa dodawania nowego wiersza
     document.getElementById('csv-btn-add').addEventListener('click', () => {
         const tbody = document.getElementById('csv-editor-tbody');
         const tr = document.createElement('tr');
         tr.style.borderBottom = "1px solid #e2e8f0";
         tr.innerHTML = `
-            <td style="padding: 6px;"><input type="text" value="Dodatkowe" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px; font-weight:bold; color:#ef4444;"></td>
+            <td style="padding: 6px;"><input type="text" value="Inne" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px; font-weight:bold; color:#ef4444;"></td>
             <td style="padding: 6px;"><input type="text" value="Nowa formatka" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
             <td style="padding: 6px;"><input type="number" value="0" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
             <td style="padding: 6px;"><input type="number" value="0" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
@@ -127,7 +131,6 @@ function openCsvEditorModal(partsList) {
         attachDeleteEvents();
     });
 
-    // Usuwanie wierszy
     function attachDeleteEvents() {
         document.querySelectorAll('.btn-del-row').forEach(btn => {
             btn.onclick = function() { this.closest('tr').remove(); };
@@ -135,17 +138,21 @@ function openCsvEditorModal(partsList) {
     }
     attachDeleteEvents();
 
-    // Zamykanie
     document.getElementById('csv-btn-cancel').addEventListener('click', () => { document.body.removeChild(overlay); });
 
-    // Zapis do CSV
     document.getElementById('csv-btn-save').addEventListener('click', () => {
+        const filterMode = document.getElementById('csv-export-filter').value;
         let csvContent = "\uFEFFKategoria;Nazwa;Dlugosc(mm);Szerokosc(mm);Ilosc;Zrodlo\n";
         
         const rows = document.querySelectorAll('#csv-editor-tbody tr');
         rows.forEach(tr => {
             const inputs = tr.querySelectorAll('input');
             const cat = inputs[0].value.replace(/"/g, '""');
+            
+            if (filterMode !== 'all' && cat !== filterMode) {
+                return; // Pomiń wiersz, jeśli nie pasuje do wybranego filtra
+            }
+
             const name = inputs[1].value.replace(/"/g, '""');
             const len = inputs[2].value;
             const wid = inputs[3].value;
@@ -158,12 +165,16 @@ function openCsvEditorModal(partsList) {
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = `Formatki_${state.project.name.replace(/\s+/g, '_')}.csv`;
+        
+        const projName = state.project.name.replace(/\s+/g, '_');
+        const fileNameSuffix = filterMode === 'all' ? 'Cale_Zlecenie' : filterMode;
+        link.download = `Formatki_${fileNameSuffix}_${projName}.csv`;
+        
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         
-        document.body.removeChild(overlay); // Zamknij modal po pobraniu
+        document.body.removeChild(overlay);
     });
 }
 
@@ -345,7 +356,6 @@ export function updateSidebar() {
   };
   setupAddBtn('btn-add-base', 'base_cabinet'); setupAddBtn('btn-add-upper', 'upper_cabinet'); setupAddBtn('btn-add-tall', 'tall_cabinet');
 
-  // Logika AI
   const btnAi = document.getElementById('btn-import-ai');
   const inputAi = document.getElementById('input-ai-image');
 
@@ -565,7 +575,6 @@ export function updateSidebar() {
     });
   }
 
-  // ZMIANA: Obsługa nowego modalnego edytora formatek zamiast wymuszania pobierania CSV
   const exportBtn = document.getElementById('btn-export-csv');
   if (exportBtn) {
     exportBtn.addEventListener('click', () => {
