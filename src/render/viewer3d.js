@@ -21,6 +21,7 @@ let alignMode = {
 let isXrayMode = true; 
 let isFrontsVisible = true; 
 let isDraggingTransform = false;
+let justFinishedDragging = false; // Flaga zapobiegająca odznaczaniu szafki po puszczeniu strzałki
 
 function recalculateLayout(mod) {
   if (!mod || !mod.elements) return;
@@ -175,6 +176,7 @@ export function init3DViewer() {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0xf4f4f5); 
 
+  // --- POPRAWKA: Znacznie wydłużony zasięg kamery (100 metrów) ---
   camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 10, 100000);
   camera.position.set(2500, 1500, 3500);
 
@@ -196,18 +198,26 @@ export function init3DViewer() {
   // --- Narzędzie przesuwania i łapania (TransformControls) ---
   tControls = new TransformControls(camera, renderer.domElement);
   tControls.setTranslationSnap(1); 
+  tControls.setSize(1.2); // Nieco większe strzałki dla wygody
+  
   tControls.addEventListener('dragging-changed', function (event) {
       controls.enabled = !event.value;
       isDraggingTransform = event.value;
       
-      if (!event.value && state.activeModuleId && tControls.object) {
-          const mod = state.project.modules.find(m => m.id === state.activeModuleId);
-          if (mod) {
-              mod.position.x = Math.round(tControls.object.position.x);
-              mod.position.y = Math.round(tControls.object.position.y);
-              mod.position.z = Math.round(tControls.object.position.z);
-              updateSidebar();
-              initPropertiesPanel();
+      if (!event.value) {
+          // Gdy użytkownik puszcza strzałkę, dodajemy opóźnienie blokujące "puste" kliknięcia
+          justFinishedDragging = true;
+          setTimeout(() => { justFinishedDragging = false; }, 150);
+
+          if (state.activeModuleId && tControls.object) {
+              const mod = state.project.modules.find(m => m.id === state.activeModuleId);
+              if (mod) {
+                  mod.position.x = Math.round(tControls.object.position.x);
+                  mod.position.y = Math.round(tControls.object.position.y);
+                  mod.position.z = Math.round(tControls.object.position.z);
+                  updateSidebar();
+                  initPropertiesPanel();
+              }
           }
       }
   });
@@ -231,7 +241,7 @@ export function init3DViewer() {
   const roomGroup = new THREE.Group();
   scene.add(roomGroup);
 
-  const floorGeo = new THREE.PlaneGeometry(15000, 15000);
+  const floorGeo = new THREE.PlaneGeometry(25000, 25000);
   const floorMat = new THREE.ShadowMaterial({ opacity: 0.12 });
   const floor = new THREE.Mesh(floorGeo, floorMat);
   floor.rotation.x = -Math.PI / 2;
@@ -239,7 +249,7 @@ export function init3DViewer() {
   floor.receiveShadow = true;
   roomGroup.add(floor);
 
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 1 });
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 1 });
   
   const backWall = new THREE.Mesh(new THREE.BoxGeometry(10000, 3000, 20), wallMat);
   backWall.position.set(4000, 1500, -10); 
@@ -259,7 +269,8 @@ export function init3DViewer() {
   });
 
   renderer.domElement.addEventListener('pointerup', (e) => {
-      if (isDraggingTransform || (tControls && tControls.axis !== null)) return;
+      // Zabezpieczenie przed utratą zaznaczenia szafki zaraz po zakończeniu przeciągania
+      if (isDraggingTransform || justFinishedDragging || (tControls && tControls.axis !== null)) return;
 
       if (Math.abs(e.clientX - pointerDownPos.x) < 5 && Math.abs(e.clientY - pointerDownPos.y) < 5) {
           handle3DClick(e);
