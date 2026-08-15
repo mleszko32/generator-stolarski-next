@@ -30,8 +30,10 @@ function recalculateLayout(mod) {
   const width = parseFloat(mod.dimensions.width) || 600;
   const height = parseFloat(mod.dimensions.height) || 720;
   
-  const f = config.front || {};
-  const fc = f.clearance || {};
+  // Wczytywanie lokalnych ustawień frontów szafki!
+  const f = { ...(config.front || {}), ...(mod.front || {}) };
+  const fc = { ...(config.front?.clearance || {}), ...(mod.front?.clearance || {}) };
+  
   const isInset = f.type === 'wpuszczane';
 
   const cLeft = parseFloat(fc.left ?? fc.sides ?? 1.5) || 0;
@@ -174,7 +176,7 @@ export function init3DViewer() {
   if (!container) return;
 
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xf1f5f9); // Jasne tło aplikacji
+  scene.background = new THREE.Color(0xf1f5f9);
 
   camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 10, 100000);
   camera.position.set(2500, 1500, 3500);
@@ -194,43 +196,36 @@ export function init3DViewer() {
   controls.dampingFactor = 0.05;
   controls.target.set(500, 500, 0);
 
-  // --- ZOPTYMALIZOWANE OŚWIETLENIE STUDYJNE ---
-  const hemiLight = new THREE.HemisphereLight(0xffffff, 0x94a3b8, 0.6); // Jasne oświetlenie ambientowe z chłodnym cieniem
+  const hemiLight = new THREE.HemisphereLight(0xffffff, 0x94a3b8, 0.6); 
   scene.add(hemiLight);
 
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.85); // Mocne główne światło
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.85); 
   dirLight.position.set(4000, 5000, 6000);
   dirLight.castShadow = true;
   dirLight.shadow.mapSize.width = 2048; 
   dirLight.shadow.mapSize.height = 2048;
-  
-  // POPRAWKA CIENI: Ogromny zasięg kamery cienia, aby ściany nie były sztucznie ciemne
   const d = 8000;
-  dirLight.shadow.camera.left = -d;
-  dirLight.shadow.camera.right = d;
-  dirLight.shadow.camera.top = d;
-  dirLight.shadow.camera.bottom = -d;
+  dirLight.shadow.camera.left = -d; dirLight.shadow.camera.right = d;
+  dirLight.shadow.camera.top = d; dirLight.shadow.camera.bottom = -d;
   dirLight.shadow.camera.far = 20000;
-  dirLight.shadow.bias = -0.0005; // Usuwa "brud" z płyt
+  dirLight.shadow.bias = -0.0005; 
   scene.add(dirLight);
 
-  const backLight = new THREE.DirectionalLight(0xffffff, 0.4); // Dodatkowe doświetlenie tyłu
+  const backLight = new THREE.DirectionalLight(0xffffff, 0.4); 
   backLight.position.set(-2000, 2000, -3000);
   scene.add(backLight);
 
-  // --- JASNE ŚCIANY (Styl Studyjny) ---
   const roomGroup = new THREE.Group();
   scene.add(roomGroup);
 
   const floorGeo = new THREE.PlaneGeometry(25000, 25000);
-  const floorMat = new THREE.ShadowMaterial({ opacity: 0.07 }); // Bardzo delikatny cień na podłodze
+  const floorMat = new THREE.ShadowMaterial({ opacity: 0.07 }); 
   const floor = new THREE.Mesh(floorGeo, floorMat);
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = 0;
   floor.receiveShadow = true;
   roomGroup.add(floor);
 
-  // LambertMaterial odbija światło miękko, nie robi się czarny pod kątem
   const wallMat = new THREE.MeshLambertMaterial({ color: 0xffffff }); 
   
   const backWall = new THREE.Mesh(new THREE.BoxGeometry(10000, 3500, 20), wallMat);
@@ -249,7 +244,6 @@ export function init3DViewer() {
   // --- ZDARZENIA MYSZY DLA WŁASNEGO PRZECIĄGANIA ---
   renderer.domElement.addEventListener('pointerdown', (e) => {
       pointerDownPos.set(e.clientX, e.clientY);
-      
       if (alignMode.active) return;
 
       const rect = renderer.domElement.getBoundingClientRect();
@@ -260,9 +254,8 @@ export function init3DViewer() {
       const intersects = raycaster.intersectObjects(cabinetGroup.children, true);
       if (intersects.length > 0) {
           let group = intersects[0].object;
-          while(group.parent && group.parent !== cabinetGroup) {
-              group = group.parent;
-          }
+          while(group.parent && group.parent !== cabinetGroup) { group = group.parent; }
+          
           if (group.userData && group.userData.moduleId) {
               isDragging = true;
               dragTarget = group;
@@ -274,13 +267,24 @@ export function init3DViewer() {
               dragPlane.setFromNormalAndCoplanarPoint(normal, intersects[0].point);
               dragOffset.copy(dragTarget.position).sub(intersects[0].point);
               
-              if (state.activeModuleId !== dragModule.id) {
+              // ZMIANA: Obsługa multiselecta z klawiszem SHIFT podczas przeciągania w 3D
+              if (e.shiftKey) {
+                  if (!state.selectedModules) state.selectedModules = new Set();
+                  if (!state.selectedModules.has(dragModule.id)) {
+                      state.selectedModules.add(dragModule.id);
+                  }
                   state.activeModuleId = dragModule.id;
-                  updateSidebar();
-                  initPropertiesPanel();
-                  update3D(); 
-                  dragTarget = cabinetGroup.children.find(g => g.userData.moduleId === dragModule.id);
+              } else {
+                  if (!state.selectedModules || !state.selectedModules.has(dragModule.id)) {
+                      state.selectedModules = new Set([dragModule.id]);
+                  }
+                  state.activeModuleId = dragModule.id;
               }
+
+              updateSidebar();
+              initPropertiesPanel();
+              update3D(); 
+              dragTarget = cabinetGroup.children.find(g => g.userData.moduleId === dragModule.id);
           }
       }
   });
@@ -308,7 +312,6 @@ export function init3DViewer() {
           let snapY = newGroupPos.y - H/2 - baseOffsetY;
           let snapZ = newGroupPos.z - D/2;
 
-          // LOGIKA MAGNESU (Snapping)
           if (Math.abs(snapX) < SNAP_DIST) snapX = 0;
           if (Math.abs(snapY) < SNAP_DIST) snapY = 0;
           if (Math.abs(snapZ) < SNAP_DIST) snapZ = 0;
@@ -500,10 +503,14 @@ function handle3DClick(event) {
   if (existingMenu) existingMenu.remove();
 
   if (!validHit) {
-      state.activeModuleId = null;
-      updateSidebar();
-      initPropertiesPanel();
-      update3D();
+      // Jeśli kliknięto w puste tło i NIE trzymamy SHIFTA, odznaczamy wszystko
+      if (!event.shiftKey) {
+          state.activeModuleId = null;
+          if (state.selectedModules) state.selectedModules.clear();
+          updateSidebar();
+          initPropertiesPanel();
+          update3D();
+      }
       return;
   }
 
@@ -540,19 +547,26 @@ function handle3DClick(event) {
   }
 
   if (validHit && data) {
-      let needsRefresh = false;
-
-      if (state.activeModuleId !== data.moduleId) {
+      // ZMIANA: Obsługa multiselecta z klawiszem SHIFT przy kliknięciu bez przeciągania
+      if (event.shiftKey) {
+          if (!state.selectedModules) state.selectedModules = new Set();
+          if (state.selectedModules.has(data.moduleId)) {
+              state.selectedModules.delete(data.moduleId);
+              if (state.activeModuleId === data.moduleId) {
+                  state.activeModuleId = Array.from(state.selectedModules).pop() || null;
+              }
+          } else {
+              state.selectedModules.add(data.moduleId);
+              state.activeModuleId = data.moduleId;
+          }
+      } else {
+          state.selectedModules = new Set([data.moduleId]);
           state.activeModuleId = data.moduleId;
-          needsRefresh = true;
       }
 
-      if (needsRefresh) {
-          updateSidebar();
-          initPropertiesPanel();
-          update3D(); 
-      }
-
+      updateSidebar();
+      initPropertiesPanel();
+      update3D(); 
       show3DContextMenu(event, validHit, data);
   }
 }
@@ -1136,11 +1150,10 @@ function show3DContextMenu(event, hit, data) {
   if (menu.children.length > 0) document.body.appendChild(menu);
 }
 
-// --- ZAKTUALIZOWANE JASNE MATERIAŁY ---
 const mats = {
   solid: {
       corpus: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, metalness: 0.1 }), 
-      front: new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.5, metalness: 0.1 }),  // Stalowy/Jasnoszary front
+      front: new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.5, metalness: 0.1 }),  
       shelf: new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.7, metalness: 0.0 }),   
       drawerBox: new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.8, metalness: 0.0 }),
       hdf: new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.9, metalness: 0.0 })
@@ -1171,11 +1184,12 @@ function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, parentG
   mesh.castShadow = !isXrayMode; mesh.receiveShadow = !isXrayMode;
 
   const edges = new THREE.EdgesGeometry(geo);
-  // ZMIANA: Ciemny, mocny obrys dla pełnej czytelności na białych szafkach
+  // ZMIANA: Zaznaczone szafki mają jaskrawy niebieski obrys
+  const isSelected = isActiveModule || (userData && state.selectedModules && state.selectedModules.has(userData.moduleId));
   let edgeColor = isXrayMode ? (type === 'drawerBox' ? 0xd97706 : 0x64748b) : 0x334155; 
-  if (isActiveModule) edgeColor = isXrayMode ? 0x2563eb : 0x2563eb;
+  if (isSelected) edgeColor = 0x2563eb;
   
-  const lineMat = new THREE.LineBasicMaterial({ color: edgeColor, linewidth: 1 });
+  const lineMat = new THREE.LineBasicMaterial({ color: edgeColor, linewidth: isSelected ? 2 : 1 });
   const line = new THREE.LineSegments(edges, lineMat);
   if (userData) line.userData = userData; 
 
@@ -1371,6 +1385,9 @@ export function update3D() {
                       return; 
                   }
 
+                  // Wczytywanie lokalnych ustawień frontów dla widoku 3D!
+                  const f = { ...(state.project.front || {}), ...(mod.front || {}) };
+                  
                   let innerFrontThick = 18;
                   let innerSetback = 0;
                   let zForFront;
@@ -1404,10 +1421,10 @@ export function update3D() {
                               simulatedSpace = Math.min(simulatedSpace, availableSpace);
                           }
 
-                          const dHoles = calculateDrawerHoles(state.project.front.drawerSystem, el.y, simulatedSpace, th, el.frontIndex, isBottomInZone);
+                          const sysName = f.drawerSystem || 'merivobox';
+                          const dHoles = calculateDrawerHoles(sysName, el.y, simulatedSpace, th, el.frontIndex, isBottomInZone);
                           
                           const innerWidth = W - (th * 2);
-                          const sysName = state.project.front.drawerSystem || 'merivobox';
                           
                           let availableDepth = D - 19; 
                           if (isInternal) {

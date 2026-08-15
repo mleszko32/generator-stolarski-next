@@ -114,6 +114,10 @@ export function calculateProjectHardware() {
     const backP = mod.backPanel || { type: 'nakladane', offset: 16 };
     const topBottomDepth = backP.type === 'nut' ? D - backP.offset - backThick : D - backThick;
 
+    // LOKALNE USTAWIENIA FRONTÓW
+    const f = { ...(config.front || {}), ...(mod.front || {}) };
+    const fc = { ...(config.front?.clearance || {}), ...(mod.front?.clearance || {}) };
+
     if (mod.legs && mod.legs.active) {
       const legH = mod.legs.height || 100;
       const legKey = `Nóżka regulowana H-${legH}`;
@@ -139,15 +143,17 @@ export function calculateProjectHardware() {
         const isTopInZone = index === fronts.length - 1;
 
         let availableSpace = front.h;
-        if (isBottomInZone) availableSpace -= (board - (config.front.clearance.bottom || 0));
-        if (isTopInZone) availableSpace -= (board - (config.front.clearance.top || 0));
+        if (isBottomInZone) availableSpace -= (board - (parseFloat(fc.bottom) || 0));
+        if (isTopInZone) availableSpace -= (board - (parseFloat(fc.top) || 0));
 
         const innerWidth = front.baseZone ? (front.baseZone.maxX - front.baseZone.minX) : W - (board * 2);
         const userForcedVariant = front.forceVariant || 'auto';
-        const drawerComps = getDrawerComponents(config.front.drawerSystem, innerWidth, topBottomDepth, availableSpace, userForcedVariant);
+        
+        // Zastosowanie lokalnego systemu szuflad
+        const sysName = f.drawerSystem || 'merivobox';
+        const drawerComps = getDrawerComponents(sysName, innerWidth, topBottomDepth, availableSpace, userForcedVariant);
 
         if (drawerComps) {
-          const sysName = config.front.drawerSystem || 'merivobox';
           const nl = drawerComps.nominalLength;
           const variantType = drawerComps.back.variantType ? drawerComps.back.variantType.toUpperCase() : 'M';
           
@@ -289,7 +295,8 @@ function getInteriorParts(mod, config) {
   const backThick = config.materials.backThickness;
   const backP = mod.backPanel || { type: 'nakladane', offset: 16 };
   
-  const frontType = config.front && config.front.type ? config.front.type : 'nakladane';
+  const f = { ...(config.front || {}), ...(mod.front || {}) };
+  const frontType = f.type || 'nakladane';
   const isInset = frontType === 'wpuszczane';
 
   const topBottomDepth = backP.type === 'nut' ? depth - backP.offset - backThick : depth - backThick;
@@ -322,6 +329,8 @@ function getFrontsAndDrawers(mod, config) {
   const board = config.materials.boardThickness;
   const backP = mod.backPanel || { type: 'nakladane', offset: 16 };
   const topBottomDepth = backP.type === 'nut' ? depth - backP.offset - config.materials.backThickness : depth - config.materials.backThickness;
+
+  const f = { ...(config.front || {}), ...(mod.front || {}) };
 
   let drawerCount = 0;
   let doorCount = 0;
@@ -363,8 +372,10 @@ function getFrontsAndDrawers(mod, config) {
           simulatedSpace = Math.min(simulatedSpace, availableSpace); 
       }
 
+      const sysName = f.drawerSystem || 'merivobox';
+
       if (typeof calculateDrawerHoles === 'function') {
-        const drawerHoles = calculateDrawerHoles(config.front.drawerSystem, front.y, simulatedSpace, board, drawerCount - 1, isBottomInZone);
+        const drawerHoles = calculateDrawerHoles(sysName, front.y, simulatedSpace, board, drawerCount - 1, isBottomInZone);
         if (drawerHoles) { 
           const adjustedHoles = JSON.parse(JSON.stringify(drawerHoles));
           
@@ -394,7 +405,7 @@ function getFrontsAndDrawers(mod, config) {
         }
 
         const userForcedVariant = front.forceVariant || 'auto';
-        const drawerComps = getDrawerComponents(config.front.drawerSystem, width - (board * 2), availableDepth, simulatedSpace, userForcedVariant);
+        const drawerComps = getDrawerComponents(sysName, width - (board * 2), availableDepth, simulatedSpace, userForcedVariant);
         
         if (drawerComps) {
           parts.push({ name: `Dno W${width} NL${drawerComps.nominalLength}`, length: parseFloat(drawerComps.bottom.length.toFixed(1)), width: parseFloat(drawerComps.bottom.width.toFixed(1)), qty: 1, category: "Szuflada" });

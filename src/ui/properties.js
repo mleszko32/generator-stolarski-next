@@ -3,6 +3,15 @@ import { state, getActiveModule } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
 
+// Funkcja pomocnicza: Pobiera wszystkie aktualnie zaznaczone moduły
+function getSelectedMods() {
+    if (state.selectedModules && state.selectedModules.size > 0) {
+        return Array.from(state.selectedModules).map(id => state.project.modules.find(m => m.id === id)).filter(Boolean);
+    }
+    const active = getActiveModule();
+    return active ? [active] : [];
+}
+
 export function initPropertiesPanel() {
   const rightSidebar = document.querySelector(".sidebar-right");
   const activeModule = getActiveModule(); 
@@ -18,16 +27,19 @@ export function initPropertiesPanel() {
     return;
   }
 
-  if (!activeModule.legs) {
-     activeModule.legs = { active: false, height: 100, plinth: false, plinthOffset: 40 };
-  }
+  const multiCount = state.selectedModules && state.selectedModules.size > 1 ? state.selectedModules.size : 1;
 
-  // Wczytujemy ustawienia konstrukcyjne priorytetyzując szafkę, potem projekt, potem domyślne
+  if (!activeModule.legs) activeModule.legs = { active: false, height: 100, plinth: false, plinthOffset: 40 };
+
   const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(state.project.construction || {}), ...(activeModule.construction || {}) };
   const backP = activeModule.backPanel;
+  
+  // Wczytywanie lokalnych ustawień frontów dla prawego panelu
+  const f = { ...(state.project.front || {}), ...(activeModule.front || {}) };
+  const fc = { ...(state.project.front?.clearance || {}), ...(activeModule.front?.clearance || {}) };
 
   rightSidebar.innerHTML = `
-    <h2>Parametry szafki</h2>
+    <h2>Parametry szafki ${multiCount > 1 ? `<span style="color:#2563eb;">(Edytujesz ${multiCount} obiekty)</span>` : ''}</h2>
 
     <div class="property-group" style="background: #f8fafc; padding: 10px; border-radius: 4px; border: 1px solid #cbd5e1; margin-bottom: 15px;">
       <label style="font-weight: bold; color: #0f172a;">Nazwa szafki:</label>
@@ -115,15 +127,15 @@ export function initPropertiesPanel() {
     </div>
 
     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
-    <h3>Ustawienia Frontów i Szuflad</h3>
+    <h3 style="color: #059669;">Ustawienia Frontów i Szuflad (Lokalne)</h3>
     <div id="group-front-clearance">
-      <div class="property-group"><label>Typ frontów:</label><select id="input-front-type"><option value="nakladane" ${(!state.project.front.type || state.project.front.type === 'nakladane') ? 'selected' : ''}>Nakładane</option><option value="wpuszczane" ${state.project.front.type === 'wpuszczane' ? 'selected' : ''}>Wpuszczane</option></select></div>
-      <div class="property-group"><label>System szuflad:</label><select id="input-drawer-system"><option value="merivobox" ${state.project.front.drawerSystem === 'merivobox' ? 'selected' : ''}>Blum Merivobox</option><option value="legrabox" ${state.project.front.drawerSystem === 'legrabox' ? 'selected' : ''}>Blum Legrabox</option><option value="tandembox" ${state.project.front.drawerSystem === 'tandembox' ? 'selected' : ''}>Blum TANDEMBOX antaro</option><option value="gtv_axis_16" ${state.project.front.drawerSystem === 'gtv_axis_16' ? 'selected' : ''}>GTV Axis Pro (płyta 16mm)</option><option value="gtv_axis_18" ${state.project.front.drawerSystem === 'gtv_axis_18' ? 'selected' : ''}>GTV Axis Pro (płyta 18mm)</option></select></div>
-      <div class="property-group"><label>Przerwa między nimi (mm):</label><input type="number" id="input-front-gap" value="${state.project.front.gap}" step="0.5" /></div>
-      <div class="property-group"><label>Luz lewy (mm):</label><input type="number" id="input-front-left" value="${state.project.front.clearance.left ?? state.project.front.clearance.sides ?? 1.5}" step="0.5" /></div>
-      <div class="property-group"><label>Luz prawy (mm):</label><input type="number" id="input-front-right" value="${state.project.front.clearance.right ?? state.project.front.clearance.sides ?? 1.5}" step="0.5" /></div>
-      <div class="property-group"><label>Luz góra (mm):</label><input type="number" id="input-front-top" value="${state.project.front.clearance.top}" step="0.5" /></div>
-      <div class="property-group"><label>Luz dół (mm):</label><input type="number" id="input-front-bottom" value="${state.project.front.clearance.bottom}" step="0.5" /></div>
+      <div class="property-group"><label>Typ frontów:</label><select id="input-front-type"><option value="nakladane" ${(!f.type || f.type === 'nakladane') ? 'selected' : ''}>Nakładane</option><option value="wpuszczane" ${f.type === 'wpuszczane' ? 'selected' : ''}>Wpuszczane</option></select></div>
+      <div class="property-group"><label>System szuflad:</label><select id="input-drawer-system"><option value="merivobox" ${f.drawerSystem === 'merivobox' ? 'selected' : ''}>Blum Merivobox</option><option value="legrabox" ${f.drawerSystem === 'legrabox' ? 'selected' : ''}>Blum Legrabox</option><option value="tandembox" ${f.drawerSystem === 'tandembox' ? 'selected' : ''}>Blum TANDEMBOX antaro</option><option value="gtv_axis_16" ${f.drawerSystem === 'gtv_axis_16' ? 'selected' : ''}>GTV Axis Pro (płyta 16mm)</option><option value="gtv_axis_18" ${f.drawerSystem === 'gtv_axis_18' ? 'selected' : ''}>GTV Axis Pro (płyta 18mm)</option></select></div>
+      <div class="property-group"><label>Przerwa między frontami (mm):</label><input type="number" id="input-front-gap" value="${f.gap ?? 3}" step="0.5" /></div>
+      <div class="property-group"><label>Luz lewy (mm):</label><input type="number" id="input-front-left" value="${fc.left ?? 1.5}" step="0.5" /></div>
+      <div class="property-group"><label>Luz prawy (mm):</label><input type="number" id="input-front-right" value="${fc.right ?? 1.5}" step="0.5" /></div>
+      <div class="property-group"><label>Luz góra (mm):</label><input type="number" id="input-front-top" value="${fc.top ?? 2}" step="0.5" /></div>
+      <div class="property-group"><label>Luz dół (mm):</label><input type="number" id="input-front-bottom" value="${fc.bottom ?? 2}" step="0.5" /></div>
     </div>
   `;
 
@@ -131,8 +143,7 @@ export function initPropertiesPanel() {
 }
 
 function setupEventListeners() {
-  const activeModule = getActiveModule();
-  if(!activeModule) return;
+  if(!getActiveModule()) return;
 
   const numberInputs = [
     'pos-x', 'pos-y', 'traverse-width', 'board-thick', 'width', 'height', 'depth',
@@ -144,15 +155,11 @@ function setupEventListeners() {
   let typingTimer;
   const debouncedUpdateAll = () => { clearTimeout(typingTimer); typingTimer = setTimeout(() => { updateAll(); }, 200); };
 
-  // Nasłuchiwanie zmiany nazwy szafki
   const nameInput = document.getElementById('input-mod-name');
   if (nameInput) {
       nameInput.addEventListener('input', (e) => {
-          const mod = getActiveModule();
-          if (mod) {
-              mod.name = e.target.value;
-              debouncedUpdateAll(); 
-          }
+          getSelectedMods().forEach(mod => { mod.name = e.target.value; });
+          debouncedUpdateAll(); 
       });
   }
 
@@ -160,7 +167,7 @@ function setupEventListeners() {
   const legsOptions = document.getElementById('legs-options');
   if (legsActiveInput && legsOptions) {
     legsActiveInput.addEventListener('change', (e) => {
-      activeModule.legs.active = e.target.checked;
+      getSelectedMods().forEach(mod => { mod.legs.active = e.target.checked; });
       legsOptions.style.display = e.target.checked ? 'block' : 'none';
       updateAll();
     });
@@ -169,93 +176,115 @@ function setupEventListeners() {
   const plinthActiveInput = document.getElementById('input-plinth-active');
   if (plinthActiveInput) {
     plinthActiveInput.addEventListener('change', (e) => {
-      activeModule.legs.plinth = e.target.checked;
+      getSelectedMods().forEach(mod => { mod.legs.plinth = e.target.checked; });
       updateAll();
     });
   }
 
   const joinTypeInput = document.getElementById('input-join-type');
   if (joinTypeInput) joinTypeInput.addEventListener('change', (e) => { 
-      const mod = getActiveModule();
-      if (mod) {
+      getSelectedMods().forEach(mod => {
           if (!mod.construction) mod.construction = {};
           mod.construction.joinType = e.target.value; 
-          updateAll(); 
-      }
+      });
+      updateAll(); 
   });
 
   const topTypeInput = document.getElementById('input-top-type');
   const traverseOptions = document.getElementById('traverse-options');
   if (topTypeInput && traverseOptions) topTypeInput.addEventListener('change', (e) => { 
-      const mod = getActiveModule();
-      if (mod) {
+      getSelectedMods().forEach(mod => {
           if (!mod.construction) mod.construction = {};
           mod.construction.topType = e.target.value; 
-          traverseOptions.style.display = e.target.value !== 'pelny' ? 'block' : 'none'; 
-          updateAll(); 
-      }
+      });
+      traverseOptions.style.display = e.target.value !== 'pelny' ? 'block' : 'none'; 
+      updateAll(); 
   });
 
+  // Zapis do lokalnego frontu
   const typeInput = document.getElementById('input-front-type');
-  if (typeInput) typeInput.addEventListener('change', (e) => { state.project.front.type = e.target.value; updateAll(); });
+  if (typeInput) typeInput.addEventListener('change', (e) => { 
+      getSelectedMods().forEach(mod => {
+          if(!mod.front) mod.front={}; 
+          mod.front.type = e.target.value; 
+      });
+      updateAll(); 
+  });
+
+  const drawerSysInput = document.getElementById('input-drawer-system');
+  if(drawerSysInput) drawerSysInput.addEventListener('change', (e) => { 
+      getSelectedMods().forEach(mod => {
+          if(!mod.front) mod.front={}; 
+          mod.front.drawerSystem = e.target.value; 
+      });
+      updateAll(); 
+  });
 
   const backType = document.getElementById('input-back-type');
   const nutOptions = document.getElementById('nut-options');
   if (backType && nutOptions) {
-    backType.addEventListener('change', (e) => { activeModule.backPanel.type = e.target.value; nutOptions.style.display = e.target.value === 'nut' ? 'block' : 'none'; updateAll(); });
+    backType.addEventListener('change', (e) => { 
+        getSelectedMods().forEach(mod => { mod.backPanel.type = e.target.value; });
+        nutOptions.style.display = e.target.value === 'nut' ? 'block' : 'none'; 
+        updateAll(); 
+    });
   }
 
   const nutBuildInput = document.getElementById('input-nut-build');
-  if (nutBuildInput) nutBuildInput.addEventListener('change', (e) => { activeModule.backPanel.nutBuild = e.target.value; updateAll(); });
+  if (nutBuildInput) nutBuildInput.addEventListener('change', (e) => { 
+      getSelectedMods().forEach(mod => { mod.backPanel.nutBuild = e.target.value; });
+      updateAll(); 
+  });
 
   numberInputs.forEach(id => {
     const el = document.getElementById(`input-${id}`);
     if(el) {
       el.addEventListener('input', (e) => {
         const val = Number(e.target.value);
-        const mod = getActiveModule();
-        if (!mod) return;
-
-        if (id === 'pos-x') mod.position.x = val;
-        if (id === 'pos-y') mod.position.y = val;
         
-        if (id === 'legs-height') mod.legs.height = val;
-        if (id === 'plinth-offset') mod.legs.plinthOffset = val;
+        getSelectedMods().forEach(mod => {
+            if (id === 'pos-x') mod.position.x = val;
+            if (id === 'pos-y') mod.position.y = val;
+            
+            if (id === 'legs-height') mod.legs.height = val;
+            if (id === 'plinth-offset') mod.legs.plinthOffset = val;
 
-        if (id === 'traverse-width') {
-            if (!mod.construction) mod.construction = {};
-            mod.construction.traverseWidth = val;
-        }
-        if (id === 'board-thick') state.project.materials.boardThickness = val;
-
-        if (id === 'width') {
-          const oldWidth = parseFloat(mod.dimensions.width) || 0;
-          const delta = val - oldWidth; 
-          mod.dimensions.width = val;
-          state.project.modules.forEach(otherMod => {
-            if (otherMod.id !== mod.id && otherMod.position.x >= (mod.position.x + oldWidth - 1)) {
-              otherMod.position.x += delta; 
+            if (id === 'traverse-width') {
+                if (!mod.construction) mod.construction = {};
+                mod.construction.traverseWidth = val;
             }
-          });
-        }
+            if (id === 'board-thick') state.project.materials.boardThickness = val;
 
-        if (id === 'height') mod.dimensions.height = val;
-        if (id === 'depth') mod.dimensions.depth = val;
+            if (id === 'width') {
+              const oldWidth = parseFloat(mod.dimensions.width) || 0;
+              const delta = val - oldWidth; 
+              mod.dimensions.width = val;
+              state.project.modules.forEach(otherMod => {
+                if (otherMod.id !== mod.id && otherMod.position.x >= (mod.position.x + oldWidth - 1)) {
+                  otherMod.position.x += delta; 
+                }
+              });
+            }
 
-        if (id === 'front-gap') state.project.front.gap = val;
-        if (id === 'front-left') state.project.front.clearance.left = val;
-        if (id === 'front-right') state.project.front.clearance.right = val;
-        if (id === 'front-top') state.project.front.clearance.top = val;
-        if (id === 'front-bottom') state.project.front.clearance.bottom = val;
+            if (id === 'height') mod.dimensions.height = val;
+            if (id === 'depth') mod.dimensions.depth = val;
 
-        if (id === 'back-offset') mod.backPanel.offset = val;
-        if (id === 'back-groove') mod.backPanel.grooveDepth = val;
+            // Zapis luzów tylko do mod.front
+            if (!mod.front) mod.front = {};
+            if (!mod.front.clearance) mod.front.clearance = {};
+
+            if (id === 'front-gap') mod.front.gap = val;
+            if (id === 'front-left') mod.front.clearance.left = val;
+            if (id === 'front-right') mod.front.clearance.right = val;
+            if (id === 'front-top') mod.front.clearance.top = val;
+            if (id === 'front-bottom') mod.front.clearance.bottom = val;
+
+            if (id === 'back-offset') mod.backPanel.offset = val;
+            if (id === 'back-groove') mod.backPanel.grooveDepth = val;
+        });
 
         debouncedUpdateAll();
       });
     }
   });
-
-  const drawerSysInput = document.getElementById('input-drawer-system');
-  if(drawerSysInput) drawerSysInput.addEventListener('change', (e) => { state.project.front.drawerSystem = e.target.value; updateAll(); });
 }
