@@ -27,6 +27,146 @@ function hideLoading() {
     if(l) l.style.display = 'none';
 }
 
+// Funkcja odpowiedzialna za okno edycji CSV
+function openCsvEditorModal(partsList) {
+    // Sortowanie listami, żeby szły kategoriami
+    const catOrder = { 'Korpus': 1, 'Front': 2, 'Szuflada': 3, 'Plecy': 4, 'Inne': 5 };
+    partsList.sort((a, b) => (catOrder[a.category] || 99) - (catOrder[b.category] || 99));
+
+    const overlay = document.createElement('div');
+    Object.assign(overlay.style, {
+        position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
+        backgroundColor: 'rgba(15, 23, 42, 0.8)', zIndex: '10000', display: 'flex',
+        alignItems: 'center', justifyContent: 'center'
+    });
+
+    const modal = document.createElement('div');
+    Object.assign(modal.style, {
+        backgroundColor: '#fff', width: '95%', maxWidth: '900px', maxHeight: '90vh',
+        borderRadius: '8px', padding: '20px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+        display: 'flex', flexDirection: 'column', overflow: 'hidden'
+    });
+
+    const header = document.createElement('div');
+    header.innerHTML = `<h2 style="margin:0 0 15px 0; color:#1e293b;">Menedżer formatek (Pre-flight)</h2>`;
+    
+    const tableContainer = document.createElement('div');
+    Object.assign(tableContainer.style, { overflowY: 'auto', flexGrow: '1', marginBottom: '15px' });
+
+    let tableHtml = `
+      <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+        <thead style="background: #f8fafc; position: sticky; top: 0; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+          <tr>
+            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1;">Kategoria</th>
+            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1;">Nazwa elementu</th>
+            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; width: 90px;">Dł. (mm)</th>
+            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; width: 90px;">Szer. (mm)</th>
+            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; width: 70px;">Ilość</th>
+            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1;">Źródło / Szafki</th>
+            <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; width: 50px;">Usuń</th>
+          </tr>
+        </thead>
+        <tbody id="csv-editor-tbody">
+    `;
+
+    partsList.forEach((p, idx) => {
+        let catColor = '#94a3b8';
+        if(p.category === 'Korpus') catColor = '#3b82f6';
+        if(p.category === 'Front') catColor = '#8b5cf6';
+        if(p.category === 'Szuflada') catColor = '#f59e0b';
+        if(p.category === 'Plecy') catColor = '#10b981';
+
+        tableHtml += `
+          <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
+            <td style="padding: 6px;"><input type="text" value="${p.category || 'Inne'}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px; font-weight:bold; color:${catColor};"></td>
+            <td style="padding: 6px;"><input type="text" value="${p.name}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
+            <td style="padding: 6px;"><input type="number" value="${p.length}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
+            <td style="padding: 6px;"><input type="number" value="${p.width}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
+            <td style="padding: 6px;"><input type="number" value="${p.qty}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
+            <td style="padding: 6px;"><input type="text" value="${p.modules.join(' + ')}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px; font-size:11px; color:#64748b;"></td>
+            <td style="padding: 6px; text-align:center;"><button class="btn-del-row" style="background:#ef4444; color:white; border:none; border-radius:3px; cursor:pointer; padding:4px 8px;">❌</button></td>
+          </tr>
+        `;
+    });
+
+    tableHtml += `</tbody></table>`;
+    tableContainer.innerHTML = tableHtml;
+
+    const footer = document.createElement('div');
+    Object.assign(footer.style, { display: 'flex', justifyContent: 'space-between', gap: '10px' });
+    
+    footer.innerHTML = `
+        <button id="csv-btn-add" style="background:#3b82f6; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">➕ Dodaj pusty wiersz</button>
+        <div style="display: flex; gap: 10px;">
+            <button id="csv-btn-cancel" style="background:#94a3b8; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">Anuluj</button>
+            <button id="csv-btn-save" style="background:#10b981; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold; box-shadow:0 2px 4px rgba(0,0,0,0.1);">💾 Pobierz gotowy plik CSV</button>
+        </div>
+    `;
+
+    modal.appendChild(header);
+    modal.appendChild(tableContainer);
+    modal.appendChild(footer);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // Obsługa dodawania nowego wiersza
+    document.getElementById('csv-btn-add').addEventListener('click', () => {
+        const tbody = document.getElementById('csv-editor-tbody');
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = "1px solid #e2e8f0";
+        tr.innerHTML = `
+            <td style="padding: 6px;"><input type="text" value="Dodatkowe" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px; font-weight:bold; color:#ef4444;"></td>
+            <td style="padding: 6px;"><input type="text" value="Nowa formatka" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
+            <td style="padding: 6px;"><input type="number" value="0" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
+            <td style="padding: 6px;"><input type="number" value="0" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
+            <td style="padding: 6px;"><input type="number" value="1" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
+            <td style="padding: 6px;"><input type="text" value="Ręcznie dodane" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px; font-size:11px; color:#64748b;"></td>
+            <td style="padding: 6px; text-align:center;"><button class="btn-del-row" style="background:#ef4444; color:white; border:none; border-radius:3px; cursor:pointer; padding:4px 8px;">❌</button></td>
+        `;
+        tbody.appendChild(tr);
+        attachDeleteEvents();
+    });
+
+    // Usuwanie wierszy
+    function attachDeleteEvents() {
+        document.querySelectorAll('.btn-del-row').forEach(btn => {
+            btn.onclick = function() { this.closest('tr').remove(); };
+        });
+    }
+    attachDeleteEvents();
+
+    // Zamykanie
+    document.getElementById('csv-btn-cancel').addEventListener('click', () => { document.body.removeChild(overlay); });
+
+    // Zapis do CSV
+    document.getElementById('csv-btn-save').addEventListener('click', () => {
+        let csvContent = "\uFEFFKategoria;Nazwa;Dlugosc(mm);Szerokosc(mm);Ilosc;Zrodlo\n";
+        
+        const rows = document.querySelectorAll('#csv-editor-tbody tr');
+        rows.forEach(tr => {
+            const inputs = tr.querySelectorAll('input');
+            const cat = inputs[0].value.replace(/"/g, '""');
+            const name = inputs[1].value.replace(/"/g, '""');
+            const len = inputs[2].value;
+            const wid = inputs[3].value;
+            const qty = inputs[4].value;
+            const src = inputs[5].value.replace(/"/g, '""');
+            
+            csvContent += `"${cat}";"${name}";${len};${wid};${qty};"${src}"\n`;
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `Formatki_${state.project.name.replace(/\s+/g, '_')}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        document.body.removeChild(overlay); // Zamknij modal po pobraniu
+    });
+}
+
 export function updateSidebar() {
   const leftSidebar = document.querySelector(".sidebar-left");
   const { parts, mountingData } = calculateParts(); 
@@ -113,7 +253,7 @@ export function updateSidebar() {
             </button>
         </div>
         <button id="btn-export-csv" style="width: 100%; padding: 8px; background-color: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px;">
-          📊 Formatki CSV
+          📊 Menedżer Formatek (CSV)
         </button>
         <button id="btn-export-hardware" style="width: 100%; padding: 9px; background-color: #d97706; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           🛒 Pobierz listę zakupów (CSV)
@@ -205,13 +345,12 @@ export function updateSidebar() {
   };
   setupAddBtn('btn-add-base', 'base_cabinet'); setupAddBtn('btn-add-upper', 'upper_cabinet'); setupAddBtn('btn-add-tall', 'tall_cabinet');
 
-  // --- ZAAWANSOWANA LOGIKA AI (Import ze zdjęcia) ---
+  // Logika AI
   const btnAi = document.getElementById('btn-import-ai');
   const inputAi = document.getElementById('input-ai-image');
 
   if (btnAi && inputAi) {
       btnAi.addEventListener('click', () => {
-          // Usuwamy wyskakujące okienko i logikę zapamiętywania klucza w przeglądarce
           inputAi.click();
       });
 
@@ -227,7 +366,6 @@ export function updateSidebar() {
               const base64Image = ev.target.result.split(',')[1];
 
               try {
-                  // Aplikacja łączy się teraz z Twoim w pełni bezpiecznym, wirtualnym serwerem Vercel
                   const response = await fetch('/api/gemini', { 
                       method: "POST", 
                       headers: { "Content-Type": "application/json" }, 
@@ -427,20 +565,16 @@ export function updateSidebar() {
     });
   }
 
+  // ZMIANA: Obsługa nowego modalnego edytora formatek zamiast wymuszania pobierania CSV
   const exportBtn = document.getElementById('btn-export-csv');
   if (exportBtn) {
     exportBtn.addEventListener('click', () => {
       const allParts = calculateAllProjectParts();
-      if(allParts.length === 0) return;
-      let csvContent = "\uFEFFNazwa;Dlugosc(mm);Szerokosc(mm);Ilosc;Zrodlo\n";
-      allParts.forEach(part => { csvContent += `"${part.name}";${part.length};${part.width};${part.qty};"${part.modules.join(" + ")}"\n`; });
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `Formatki_${state.project.name.replace(/\s+/g, '_')}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      if(allParts.length === 0) {
+          alert("Twój projekt jest pusty. Dodaj szafkę, aby wygenerować formatki.");
+          return;
+      }
+      openCsvEditorModal(allParts);
     });
   }
 }

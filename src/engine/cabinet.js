@@ -74,13 +74,15 @@ export function calculateAllProjectParts() {
       length: parseFloat(run.w.toFixed(1)),
       width: parseFloat(run.h.toFixed(1)),
       qty: 1,
+      category: "Korpus",
       moduleName: "Elementy zbiorcze"
     });
   });
 
   const aggregated = {};
   allParts.forEach(part => {
-     const key = `${part.name}_${part.length}_${part.width}`;
+     // Grupujemy z uwzględnieniem kategorii
+     const key = `${part.category}_${part.name}_${part.length}_${part.width}`;
      if (aggregated[key]) {
          aggregated[key].qty += part.qty;
          if (!aggregated[key].modules.includes(part.moduleName)) {
@@ -88,6 +90,7 @@ export function calculateAllProjectParts() {
          }
      } else {
          aggregated[key] = {
+             category: part.category || "Inne",
              name: part.name,
              length: part.length,
              width: part.width,
@@ -233,26 +236,25 @@ function getCorpusParts(mod, config) {
 
   const sideDepth = backP.type === 'nut' ? depth : depth - backThick;
   const sideHeight = isTopBottomFullWidth ? height - (board * 2) : height;
-  parts.push({ name: "Bok (L/P)", length: parseFloat(sideHeight.toFixed(1)), width: sideDepth, qty: 2 });
+  parts.push({ name: "Bok (L/P)", length: parseFloat(sideHeight.toFixed(1)), width: sideDepth, qty: 2, category: "Korpus" });
 
   const tbDepth = backP.type === 'nut' ? depth - backP.offset - backThick : depth - backThick;
   const tbWidth = isTopBottomFullWidth ? width : width - (board * 2);
 
-  parts.push({ name: `W${width}`, length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1 });
+  parts.push({ name: `W${width}`, length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1, category: "Korpus" });
 
   if (construction.topType === 'pelny') {
-    parts.push({ name: `W${width}`, length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1 });
+    parts.push({ name: `W${width}`, length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1, category: "Korpus" });
   } else if (construction.topType.includes('trawersy')) {
     const isVertical = construction.topType === 'trawersy_pion';
     const trWidth = construction.traverseWidth || 100;
-    parts.push({ name: `Trawers górny (${isVertical ? 'pionowy' : 'poziomy'})`, length: parseFloat(tbWidth.toFixed(1)), width: trWidth, qty: 2 });
+    parts.push({ name: `Trawers górny (${isVertical ? 'pionowy' : 'poziomy'})`, length: parseFloat(tbWidth.toFixed(1)), width: trWidth, qty: 2, category: "Korpus" });
   }
 
   const structuralShelvesCount = mod.elements ? mod.elements.filter(el => el.typ === 'poziom' && el.isStructural).length : 0;
   if (structuralShelvesCount > 0) {
     const shelfWidth = width - (board * 2);
-    // Zmieniono nazwę półki konstrukcyjnej na W(szerokość)
-    parts.push({ name: `W${width}`, length: parseFloat(shelfWidth.toFixed(1)), width: tbDepth, qty: structuralShelvesCount });
+    parts.push({ name: `W${width}`, length: parseFloat(shelfWidth.toFixed(1)), width: tbDepth, qty: structuralShelvesCount, category: "Korpus" });
   }
 
   return parts;
@@ -276,7 +278,7 @@ function getBackPanelParts(mod, config) {
     hdfWidth = width - 4; hdfHeight = height - 4;
   }
 
-  return [{ name: "Plecy (HDF)", length: parseFloat(hdfHeight.toFixed(1)), width: parseFloat(hdfWidth.toFixed(1)), qty: 1 }];
+  return [{ name: "Plecy (HDF)", length: parseFloat(hdfHeight.toFixed(1)), width: parseFloat(hdfWidth.toFixed(1)), qty: 1, category: "Plecy" }];
 }
 
 function getInteriorParts(mod, config) {
@@ -299,9 +301,9 @@ function getInteriorParts(mod, config) {
   mod.elements.forEach(el => {
     if (el.typ === 'pion') {
       partitionCount++;
-      parts.push({ name: `Przegroda pionowa ${partitionCount}`, length: parseFloat(el.h.toFixed(1)), width: innerPartDepth, qty: 1 });
+      parts.push({ name: `Przegroda pionowa ${partitionCount}`, length: parseFloat(el.h.toFixed(1)), width: innerPartDepth, qty: 1, category: "Korpus" });
     } else if (el.typ === 'poziom' && !el.isStructural) {
-      parts.push({ name: `P${width}`, length: parseFloat(el.w.toFixed(1)), width: innerPartDepth - 5, qty: 1 });
+      parts.push({ name: `P${width}`, length: parseFloat(el.w.toFixed(1)), width: innerPartDepth - 5, qty: 1, category: "Korpus" });
     }
   });
 
@@ -335,7 +337,7 @@ function getFrontsAndDrawers(mod, config) {
       partName = `Drzwi ${side}`;
     }
 
-    parts.push({ name: partName, length: parseFloat(front.h.toFixed(1)), width: parseFloat(front.w.toFixed(1)), qty: 1 });
+    parts.push({ name: partName, length: parseFloat(front.h.toFixed(1)), width: parseFloat(front.w.toFixed(1)), qty: 1, category: "Front" });
 
     if (front.subtype.includes('szuflada')) {
       const isBottomInZone = front.frontIndex === 0;
@@ -396,8 +398,8 @@ function getFrontsAndDrawers(mod, config) {
         const drawerComps = getDrawerComponents(config.front.drawerSystem, width - (board * 2), availableDepth, simulatedSpace, userForcedVariant);
         
         if (drawerComps) {
-          parts.push({ name: `Dno szuflady (NL: ${drawerComps.nominalLength})`, length: parseFloat(drawerComps.bottom.length.toFixed(1)), width: parseFloat(drawerComps.bottom.width.toFixed(1)), qty: 1 });
-          parts.push({ name: `Tył szuflady (Wariant ${drawerComps.back.variantType})`, length: parseFloat(drawerComps.back.width.toFixed(1)), width: parseFloat(drawerComps.back.height.toFixed(1)), qty: 1 });
+          parts.push({ name: `Dno szuflady (NL: ${drawerComps.nominalLength})`, length: parseFloat(drawerComps.bottom.length.toFixed(1)), width: parseFloat(drawerComps.bottom.width.toFixed(1)), qty: 1, category: "Szuflada" });
+          parts.push({ name: `Tył szuflady (Wariant ${drawerComps.back.variantType})`, length: parseFloat(drawerComps.back.width.toFixed(1)), width: parseFloat(drawerComps.back.height.toFixed(1)), qty: 1, category: "Szuflada" });
         }
       }
     } 
