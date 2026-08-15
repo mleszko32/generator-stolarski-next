@@ -21,7 +21,7 @@ let alignMode = {
 let isXrayMode = true; 
 let isFrontsVisible = true; 
 let isDraggingTransform = false;
-let justFinishedDragging = false; // Flaga zapobiegająca odznaczaniu szafki po puszczeniu strzałki
+let justFinishedDragging = false; 
 
 function recalculateLayout(mod) {
   if (!mod || !mod.elements) return;
@@ -176,7 +176,7 @@ export function init3DViewer() {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0xf4f4f5); 
 
-  // --- POPRAWKA: Znacznie wydłużony zasięg kamery (100 metrów) ---
+  // Ogromny zasięg widzenia (aby ściany i szafki nie znikały przy oddalaniu)
   camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 10, 100000);
   camera.position.set(2500, 1500, 3500);
 
@@ -198,23 +198,31 @@ export function init3DViewer() {
   // --- Narzędzie przesuwania i łapania (TransformControls) ---
   tControls = new TransformControls(camera, renderer.domElement);
   tControls.setTranslationSnap(1); 
-  tControls.setSize(1.2); // Nieco większe strzałki dla wygody
+  tControls.setSize(1.5); // Duże, wygodne strzałki
   
   tControls.addEventListener('dragging-changed', function (event) {
       controls.enabled = !event.value;
       isDraggingTransform = event.value;
       
       if (!event.value) {
-          // Gdy użytkownik puszcza strzałkę, dodajemy opóźnienie blokujące "puste" kliknięcia
+          // Blokada przypadkowego odznaczania po puszczeniu strzałki
           justFinishedDragging = true;
           setTimeout(() => { justFinishedDragging = false; }, 150);
 
           if (state.activeModuleId && tControls.object) {
               const mod = state.project.modules.find(m => m.id === state.activeModuleId);
               if (mod) {
-                  mod.position.x = Math.round(tControls.object.position.x);
-                  mod.position.y = Math.round(tControls.object.position.y);
-                  mod.position.z = Math.round(tControls.object.position.z);
+                  const W = parseFloat(mod.dimensions.width) || 600;
+                  const H = parseFloat(mod.dimensions.height) || 720;
+                  const D = parseFloat(mod.dimensions.depth) || 510;
+                  let baseOffsetY = 0;
+                  if (mod.legs && mod.legs.active) baseOffsetY = parseFloat(mod.legs.height) || 100;
+
+                  // Przeliczenie z powrotem punktu z centrum na róg dolny-lewy
+                  mod.position.x = Math.round(tControls.object.position.x - W/2);
+                  mod.position.y = Math.round(tControls.object.position.y - H/2 - baseOffsetY);
+                  mod.position.z = Math.round(tControls.object.position.z - D/2);
+                  
                   updateSidebar();
                   initPropertiesPanel();
               }
@@ -269,7 +277,7 @@ export function init3DViewer() {
   });
 
   renderer.domElement.addEventListener('pointerup', (e) => {
-      // Zabezpieczenie przed utratą zaznaczenia szafki zaraz po zakończeniu przeciągania
+      // Przerywamy, jeśli użytkownik puścił właśnie strzałkę osi
       if (isDraggingTransform || justFinishedDragging || (tControls && tControls.axis !== null)) return;
 
       if (Math.abs(e.clientX - pointerDownPos.x) < 5 && Math.abs(e.clientY - pointerDownPos.y) < 5) {
@@ -420,7 +428,9 @@ function handle3DClick(event) {
               return;
           }
 
-          const objAbsoluteY = validHit.object.position.y + validHit.object.parent.position.y;
+          const worldPos = new THREE.Vector3();
+          validHit.object.getWorldPosition(worldPos);
+          const objAbsoluteY = worldPos.y;
           const targetAbsoluteBottomY = objAbsoluteY - (objHeight / 2);
 
           const sourceMod = alignMode.sourceMod;
@@ -775,7 +785,8 @@ function show3DContextMenu(event, hit, data) {
       const th = parseFloat(state.project.materials.boardThickness) || 18;
       const legHeight = mod.legs && mod.legs.active ? (parseFloat(mod.legs.height) || 0) : 0;
       
-      const objAbsoluteY = hit.object.position.y + hit.object.parent.position.y;
+      const worldPos = new THREE.Vector3();
+      hit.object.getWorldPosition(worldPos);
       const localY = hit.point.y - (parseFloat(mod.position.y) || 0) - legHeight;
       
       const H = parseFloat(mod.dimensions.height);
@@ -1083,18 +1094,26 @@ export function update3D() {
       const W = parseFloat(mod.dimensions.width);
       const H = parseFloat(mod.dimensions.height);
       const D = parseFloat(mod.dimensions.depth);
+      let baseOffsetY = 0;
+      if (mod.legs && mod.legs.active) baseOffsetY = parseFloat(mod.legs.height) || 100;
       
       const modGroup = new THREE.Group();
       modGroup.userData = { moduleId: mod.id };
+      
+      // ZMIANA: Przesuwamy punkt środkowy grupy idealnie w centrum szafki. 
+      // Dzięki temu strzałki do przesuwania wystają ze środka, a nie chowają się w ścianach!
       modGroup.position.set(
-          parseFloat(mod.position.x) || 0,
-          parseFloat(mod.position.y) || 0,
-          parseFloat(mod.position.z) || 0
+          (parseFloat(mod.position.x) || 0) + W/2,
+          (parseFloat(mod.position.y) || 0) + baseOffsetY + H/2,
+          (parseFloat(mod.position.z) || 0) + D/2
       );
 
+      // Wewnętrzna grupa korygująca koordynaty wstecz, aby kod rysowania pozostał taki sam
+      const innerGroup = new THREE.Group();
+      innerGroup.position.set(-W/2, -H/2 - baseOffsetY, -D/2);
+      modGroup.add(innerGroup);
+
       const posX = 0; 
-      let baseOffsetY = 0;
-      if (mod.legs && mod.legs.active) baseOffsetY = parseFloat(mod.legs.height) || 100;
       const posY = baseOffsetY; 
       const posZ = 0; 
 
@@ -1122,29 +1141,29 @@ export function update3D() {
       const tbStartZ = posZ + D - tbD;
 
       if (isTopBottomFull) {
-          addBox(W, th, tbD, posX, posY, tbStartZ, 'corpus', isActive, udCorp, modGroup); 
-          addBox(W, th, tbD, posX, posY + H - th, tbStartZ, 'corpus', isActive, udCorp, modGroup); 
-          addBox(th, H - 2*th, sideD, posX, posY + th, sideStartZ, 'corpus', isActive, udCorp, modGroup); 
-          addBox(th, H - 2*th, sideD, posX + W - th, posY + th, sideStartZ, 'corpus', isActive, udCorp, modGroup); 
+          addBox(W, th, tbD, posX, posY, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
+          addBox(W, th, tbD, posX, posY + H - th, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
+          addBox(th, H - 2*th, sideD, posX, posY + th, sideStartZ, 'corpus', isActive, udCorp, innerGroup); 
+          addBox(th, H - 2*th, sideD, posX + W - th, posY + th, sideStartZ, 'corpus', isActive, udCorp, innerGroup); 
       } else {
-          addBox(th, H, sideD, posX, posY, sideStartZ, 'corpus', isActive, udCorp, modGroup); 
-          addBox(th, H, sideD, posX + W - th, posY, sideStartZ, 'corpus', isActive, udCorp, modGroup); 
-          addBox(W - 2*th, th, tbD, posX + th, posY, tbStartZ, 'corpus', isActive, udCorp, modGroup); 
+          addBox(th, H, sideD, posX, posY, sideStartZ, 'corpus', isActive, udCorp, innerGroup); 
+          addBox(th, H, sideD, posX + W - th, posY, sideStartZ, 'corpus', isActive, udCorp, innerGroup); 
+          addBox(W - 2*th, th, tbD, posX + th, posY, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
           
           if (cons.topType === 'pelny') {
-              addBox(W - 2*th, th, tbD, posX + th, posY + H - th, tbStartZ, 'corpus', isActive, udCorp, modGroup); 
+              addBox(W - 2*th, th, tbD, posX + th, posY + H - th, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
           } else if (cons.topType === 'trawersy_poziom') {
               const trW = parseFloat(cons.traverseWidth) || 100;
-              addBox(W - 2*th, th, trW, posX + th, posY + H - th, posZ + D - trW, 'corpus', isActive, udCorp, modGroup); 
-              addBox(W - 2*th, th, trW, posX + th, posY + H - th, tbStartZ, 'corpus', isActive, udCorp, modGroup); 
+              addBox(W - 2*th, th, trW, posX + th, posY + H - th, posZ + D - trW, 'corpus', isActive, udCorp, innerGroup); 
+              addBox(W - 2*th, th, trW, posX + th, posY + H - th, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
           } else if (cons.topType === 'trawersy_pion') {
               const trW = parseFloat(cons.traverseWidth) || 100;
-              addBox(W - 2*th, trW, th, posX + th, posY + H - trW, posZ + D - th, 'corpus', isActive, udCorp, modGroup); 
-              addBox(W - 2*th, trW, th, posX + th, posY + H - trW, tbStartZ, 'corpus', isActive, udCorp, modGroup); 
+              addBox(W - 2*th, trW, th, posX + th, posY + H - trW, posZ + D - th, 'corpus', isActive, udCorp, innerGroup); 
+              addBox(W - 2*th, trW, th, posX + th, posY + H - trW, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
           }
       }
 
-      addBox(W - 4, H - 4, backThick, posX + 2, posY + 2, backZ, 'hdf', isActive, udBack, modGroup);
+      addBox(W - 4, H - 4, backThick, posX + 2, posY + 2, backZ, 'hdf', isActive, udBack, innerGroup);
 
       const hwAxis = isTopBottomFull ? 'y' : 'x';
       const jointXs = [posX + th/2, posX + W - th/2];
@@ -1154,24 +1173,24 @@ export function update3D() {
           const rearZ = tbStartZ + 37;
           const rearDowelZ = tbStartZ + 69;
           
-          addHardware('screw', jx, bottomY, posZ + D - 37, hwAxis, modGroup);
-          addHardware('dowel', jx, bottomY, posZ + D - 69, hwAxis, modGroup);
-          addHardware('screw', jx, bottomY, rearZ, hwAxis, modGroup);
-          addHardware('dowel', jx, bottomY, rearDowelZ, hwAxis, modGroup);
+          addHardware('screw', jx, bottomY, posZ + D - 37, hwAxis, innerGroup);
+          addHardware('dowel', jx, bottomY, posZ + D - 69, hwAxis, innerGroup);
+          addHardware('screw', jx, bottomY, rearZ, hwAxis, innerGroup);
+          addHardware('dowel', jx, bottomY, rearDowelZ, hwAxis, innerGroup);
           
           if (cons.topType === 'pelny' || cons.topType === 'trawersy_poziom') {
               const topY = posY + H - th/2;
-              addHardware('screw', jx, topY, posZ + D - 37, hwAxis, modGroup);
-              addHardware('dowel', jx, topY, posZ + D - 69, hwAxis, modGroup);
-              addHardware('screw', jx, topY, rearZ, hwAxis, modGroup);
-              addHardware('dowel', jx, topY, rearDowelZ, hwAxis, modGroup);
+              addHardware('screw', jx, topY, posZ + D - 37, hwAxis, innerGroup);
+              addHardware('dowel', jx, topY, posZ + D - 69, hwAxis, innerGroup);
+              addHardware('screw', jx, topY, rearZ, hwAxis, innerGroup);
+              addHardware('dowel', jx, topY, rearDowelZ, hwAxis, innerGroup);
           } else if (cons.topType === 'trawersy_pion') {
               const topY = posY + H - 37;
               const topDowelY = posY + H - 69;
-              addHardware('screw', jx, topY, posZ + D - th/2, 'x', modGroup);
-              addHardware('dowel', jx, topDowelY, posZ + D - th/2, 'x', modGroup);
-              addHardware('screw', jx, topY, tbStartZ + th/2, 'x', modGroup);
-              addHardware('dowel', jx, topDowelY, tbStartZ + th/2, 'x', modGroup);
+              addHardware('screw', jx, topY, posZ + D - th/2, 'x', innerGroup);
+              addHardware('dowel', jx, topDowelY, posZ + D - th/2, 'x', innerGroup);
+              addHardware('screw', jx, topY, tbStartZ + th/2, 'x', innerGroup);
+              addHardware('dowel', jx, topDowelY, tbStartZ + th/2, 'x', innerGroup);
           }
       });
 
@@ -1183,7 +1202,7 @@ export function update3D() {
               const udElement = { moduleId: mod.id, type: el.typ === 'front' ? 'front' : 'shelf', elementId: el.id };
 
               if (el.typ === 'poziom') {
-                  addBox(el.w, el.h, shelfDepth, posX + el.x, posY + el.y, innerZ, 'shelf', isActive, udElement, modGroup);
+                  addBox(el.w, el.h, shelfDepth, posX + el.x, posY + el.y, innerZ, 'shelf', isActive, udElement, innerGroup);
 
                   if (isXrayMode) {
                       const isStruct = el.isStructural;
@@ -1195,24 +1214,24 @@ export function update3D() {
                           if (isStruct) {
                               const holeY = posY + el.y + el.h / 2; 
                               const dowelZ = hz === frontHoleZ ? hz - 32 : hz + 32;
-                              addHole(2.5, th, posX + th/2, holeY, hz, 'x', modGroup); 
-                              addHole(2.5, th, posX + W - th/2, holeY, hz, 'x', modGroup); 
-                              addHardware('screw', posX + th/2, holeY, hz, 'x', modGroup); 
-                              addHardware('screw', posX + W - th/2, holeY, hz, 'x', modGroup); 
-                              addHardware('dowel', posX + th/2, holeY, dowelZ, 'x', modGroup); 
-                              addHardware('dowel', posX + W - th/2, holeY, dowelZ, 'x', modGroup); 
+                              addHole(2.5, th, posX + th/2, holeY, hz, 'x', innerGroup); 
+                              addHole(2.5, th, posX + W - th/2, holeY, hz, 'x', innerGroup); 
+                              addHardware('screw', posX + th/2, holeY, hz, 'x', innerGroup); 
+                              addHardware('screw', posX + W - th/2, holeY, hz, 'x', innerGroup); 
+                              addHardware('dowel', posX + th/2, holeY, dowelZ, 'x', innerGroup); 
+                              addHardware('dowel', posX + W - th/2, holeY, dowelZ, 'x', innerGroup); 
                           } else {
                               const supportY = posY + el.y - 2.5; 
-                              addHole(2.5, th, posX + th/2, supportY, hz, 'x', modGroup); 
-                              addHole(2.5, th, posX + W - th/2, supportY, hz, 'x', modGroup); 
-                              addHardware('support', posX + th + 4, supportY, hz, 'x', modGroup); 
-                              addHardware('support', posX + W - th - 4, supportY, hz, 'x', modGroup); 
+                              addHole(2.5, th, posX + th/2, supportY, hz, 'x', innerGroup); 
+                              addHole(2.5, th, posX + W - th/2, supportY, hz, 'x', innerGroup); 
+                              addHardware('support', posX + th + 4, supportY, hz, 'x', innerGroup); 
+                              addHardware('support', posX + W - th - 4, supportY, hz, 'x', innerGroup); 
                           }
                       });
                   }
               } 
               else if (el.typ === 'pion') {
-                  addBox(el.w, el.h, shelfDepth, posX + el.x, posY + el.y, innerZ, 'shelf', isActive, udElement, modGroup);
+                  addBox(el.w, el.h, shelfDepth, posX + el.x, posY + el.y, innerZ, 'shelf', isActive, udElement, innerGroup);
               }
               else if (el.typ === 'front') {
                   const isInternal = el.subtype === 'szuflada-wewnetrzna';
@@ -1233,7 +1252,7 @@ export function update3D() {
                       zForFront = posZ + D + 2; 
                   }
                   
-                  addBox(el.w, el.h, isInternal ? innerFrontThick : 18, posX + el.x, posY + el.y, zForFront, 'front', isActive, udElement, modGroup);
+                  addBox(el.w, el.h, isInternal ? innerFrontThick : 18, posX + el.x, posY + el.y, zForFront, 'front', isActive, udElement, innerGroup);
 
                   if (el.subtype.includes('szuflada')) {
                       if (isXrayMode) {
@@ -1286,10 +1305,10 @@ export function update3D() {
                               
                               const boxStartZ = zForFront - NL;
 
-                              addBox(dw, 16, NL, dX, dY, boxStartZ, 'drawerBox', isActive, udElement, modGroup); 
-                              addBox(drawerComps.back.width, dh, 16, dX + (dw - drawerComps.back.width)/2, dY + 16, boxStartZ, 'drawerBox', isActive, udElement, modGroup); 
-                              addBox(16, dh, NL, dX - 16, dY + 16, boxStartZ, 'drawerBox', isActive, udElement, modGroup); 
-                              addBox(16, dh, NL, dX + dw, dY + 16, boxStartZ, 'drawerBox', isActive, udElement, modGroup); 
+                              addBox(dw, 16, NL, dX, dY, boxStartZ, 'drawerBox', isActive, udElement, innerGroup); 
+                              addBox(drawerComps.back.width, dh, 16, dX + (dw - drawerComps.back.width)/2, dY + 16, boxStartZ, 'drawerBox', isActive, udElement, innerGroup); 
+                              addBox(16, dh, NL, dX - 16, dY + 16, boxStartZ, 'drawerBox', isActive, udElement, innerGroup); 
+                              addBox(16, dh, NL, dX + dw, dY + 16, boxStartZ, 'drawerBox', isActive, udElement, innerGroup); 
                           }
 
                           if (dHoles && dHoles.slideSideHoles) {
@@ -1297,15 +1316,15 @@ export function update3D() {
                               
                               dHoles.slideSideHoles.forEach(h => {
                                   let calcY = isTopBottomFull ? h.y - th : h.y;
-                                  addHole(2.5, th, posX + th/2, posY + calcY, posZ + D - h.x - slideZOffset, 'x', modGroup); 
-                                  addHole(2.5, th, posX + W - th/2, posY + calcY, posZ + D - h.x - slideZOffset, 'x', modGroup); 
+                                  addHole(2.5, th, posX + th/2, posY + calcY, posZ + D - h.x - slideZOffset, 'x', innerGroup); 
+                                  addHole(2.5, th, posX + W - th/2, posY + calcY, posZ + D - h.x - slideZOffset, 'x', innerGroup); 
                               });
                           }
                           if (dHoles && dHoles.frontHoles) {
                               dHoles.frontHoles.forEach(h => {
                                   let calcY = isTopBottomFull ? el.y + h.y - th : el.y + h.y;
-                                  addHole(2.5, 12, posX + el.x + (h.xOffsetLeft || 20.5), posY + calcY, zForFront + (isInternal ? innerFrontThick/2 : 9), 'z', modGroup); 
-                                  addHole(2.5, 12, posX + el.x + el.w - (h.xOffsetRight || 20.5), posY + calcY, zForFront + (isInternal ? innerFrontThick/2 : 9), 'z', modGroup); 
+                                  addHole(2.5, 12, posX + el.x + (h.xOffsetLeft || 20.5), posY + calcY, zForFront + (isInternal ? innerFrontThick/2 : 9), 'z', innerGroup); 
+                                  addHole(2.5, 12, posX + el.x + el.w - (h.xOffsetRight || 20.5), posY + calcY, zForFront + (isInternal ? innerFrontThick/2 : 9), 'z', innerGroup); 
                               });
                           }
                       }
@@ -1322,11 +1341,11 @@ export function update3D() {
                               const isLeft = side === 'left';
                               const cupX = isLeft ? el.x + h.cupXOffset : el.x + el.w - h.cupXOffset;
 
-                              addHole(17.5, 13, posX + cupX, posY + calcY, zForFront + 6.5, 'z', modGroup);
+                              addHole(17.5, 13, posX + cupX, posY + calcY, zForFront + 6.5, 'z', innerGroup);
 
                               const plateX = isLeft ? posX + th/2 : posX + W - th/2;
-                              addHole(2.5, th, plateX, posY + calcY - 16, posZ + D - 37, 'x', modGroup);
-                              addHole(2.5, th, plateX, posY + calcY + 16, posZ + D - 37, 'x', modGroup);
+                              addHole(2.5, th, plateX, posY + calcY - 16, posZ + D - 37, 'x', innerGroup);
+                              addHole(2.5, th, plateX, posY + calcY + 16, posZ + D - 37, 'x', innerGroup);
                           });
                       }
                   }
@@ -1338,14 +1357,14 @@ export function update3D() {
           const legH = mod.legs.height || 100;
           const rootY = 0; 
           
-          addBox(30, legH, 30, posX + 50, rootY, posZ + 50, 'corpus', false, null, modGroup);
-          addBox(30, legH, 30, posX + W - 80, rootY, posZ + 50, 'corpus', false, null, modGroup);
-          addBox(30, legH, 30, posX + 50, rootY, posZ + D - 80, 'corpus', false, null, modGroup);
-          addBox(30, legH, 30, posX + W - 80, rootY, posZ + D - 80, 'corpus', false, null, modGroup);
+          addBox(30, legH, 30, posX + 50, rootY, posZ + 50, 'corpus', false, null, innerGroup);
+          addBox(30, legH, 30, posX + W - 80, rootY, posZ + 50, 'corpus', false, null, innerGroup);
+          addBox(30, legH, 30, posX + 50, rootY, posZ + D - 80, 'corpus', false, null, innerGroup);
+          addBox(30, legH, 30, posX + W - 80, rootY, posZ + D - 80, 'corpus', false, null, innerGroup);
           
           if (mod.legs.plinth) {
               const offset = mod.legs.plinthOffset || 40;
-              addBox(W, legH, 18, posX, rootY, posZ + D - offset - 18, 'corpus', false, null, modGroup);
+              addBox(W, legH, 18, posX, rootY, posZ + D - offset - 18, 'corpus', false, null, innerGroup);
           }
       }
 
