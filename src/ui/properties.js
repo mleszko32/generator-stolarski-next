@@ -28,6 +28,11 @@ export function initPropertiesPanel() {
 
   rightSidebar.innerHTML = `
     <h2>Parametry szafki</h2>
+
+    <div class="property-group" style="background: #f8fafc; padding: 10px; border-radius: 4px; border: 1px solid #cbd5e1; margin-bottom: 15px;">
+      <label style="font-weight: bold; color: #0f172a;">Nazwa szafki:</label>
+      <input type="text" id="input-mod-name" value="${activeModule.name}" style="font-weight: bold; color: #1e293b;" />
+    </div>
     
     <h3>Wymiary Modułu</h3>
     <div class="property-group">
@@ -139,6 +144,18 @@ function setupEventListeners() {
   let typingTimer;
   const debouncedUpdateAll = () => { clearTimeout(typingTimer); typingTimer = setTimeout(() => { updateAll(); }, 200); };
 
+  // Nasłuchiwanie zmiany nazwy szafki
+  const nameInput = document.getElementById('input-mod-name');
+  if (nameInput) {
+      nameInput.addEventListener('input', (e) => {
+          const mod = getActiveModule();
+          if (mod) {
+              mod.name = e.target.value;
+              debouncedUpdateAll(); 
+          }
+      });
+  }
+
   const legsActiveInput = document.getElementById('input-legs-active');
   const legsOptions = document.getElementById('legs-options');
   if (legsActiveInput && legsOptions) {
@@ -157,7 +174,6 @@ function setupEventListeners() {
     });
   }
 
-  // Zapis ustawień konstrukcyjnych bezpośrednio do szafki
   const joinTypeInput = document.getElementById('input-join-type');
   if (joinTypeInput) joinTypeInput.addEventListener('change', (e) => { 
       const mod = getActiveModule();
@@ -206,7 +222,6 @@ function setupEventListeners() {
         if (id === 'legs-height') mod.legs.height = val;
         if (id === 'plinth-offset') mod.legs.plinthOffset = val;
 
-        // Zapis szerokości trawersów do wybranej szafki
         if (id === 'traverse-width') {
             if (!mod.construction) mod.construction = {};
             mod.construction.traverseWidth = val;
