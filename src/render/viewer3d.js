@@ -238,7 +238,7 @@ export function init3DViewer() {
   renderer.domElement.addEventListener('pointerdown', (e) => {
       pointerDownPos.set(e.clientX, e.clientY);
       
-      if (alignMode.active) return; // Zablokuj łapanie w trybie wyrównywania narzędzi precyzyjnych
+      if (alignMode.active) return;
 
       const rect = renderer.domElement.getBoundingClientRect();
       mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -248,7 +248,6 @@ export function init3DViewer() {
       const intersects = raycaster.intersectObjects(cabinetGroup.children, true);
       if (intersects.length > 0) {
           let group = intersects[0].object;
-          // Przebij się z pojedynczej formatki na główną grupę szafki
           while(group.parent && group.parent !== cabinetGroup) {
               group = group.parent;
           }
@@ -257,20 +256,17 @@ export function init3DViewer() {
               dragTarget = group;
               dragModule = state.project.modules.find(m => m.id === group.userData.moduleId);
               
-              controls.enabled = false; // Zatrzymaj obracanie kamerą!
+              controls.enabled = false; 
               
-              // Tworzymy niewidzialną płaszczyznę równoległą do kamery, po której będziemy suwać myszką
               const normal = camera.getWorldDirection(new THREE.Vector3()).negate();
               dragPlane.setFromNormalAndCoplanarPoint(normal, intersects[0].point);
               dragOffset.copy(dragTarget.position).sub(intersects[0].point);
               
-              // Jeśli szafka nie była aktywna, uaktywnij i odśwież panel
               if (state.activeModuleId !== dragModule.id) {
                   state.activeModuleId = dragModule.id;
                   updateSidebar();
                   initPropertiesPanel();
                   update3D(); 
-                  // Ponownie pobierz odświeżony obiekt grupy po przebudowaniu sceny w update3D
                   dragTarget = cabinetGroup.children.find(g => g.userData.moduleId === dragModule.id);
               }
           }
@@ -296,18 +292,15 @@ export function init3DViewer() {
           const D = parseFloat(dragModule.dimensions.depth) || 510;
           let baseOffsetY = (dragModule.legs && dragModule.legs.active) ? (parseFloat(dragModule.legs.height) || 100) : 0;
           
-          // Wyliczanie nowej logicznej pozycji szafki ze środka na zewnątrz
           let snapX = newGroupPos.x - W/2;
           let snapY = newGroupPos.y - H/2 - baseOffsetY;
           let snapZ = newGroupPos.z - D/2;
 
           // LOGIKA MAGNESU (Snapping)
-          // 1. Magnes do ścian
           if (Math.abs(snapX) < SNAP_DIST) snapX = 0;
           if (Math.abs(snapY) < SNAP_DIST) snapY = 0;
           if (Math.abs(snapZ) < SNAP_DIST) snapZ = 0;
 
-          // 2. Magnes do innych szafek
           state.project.modules.forEach(other => {
               if (other.id === dragModule.id) return;
               const oW = parseFloat(other.dimensions.width);
@@ -317,35 +310,37 @@ export function init3DViewer() {
               const oY = parseFloat(other.position.y);
               const oZ = parseFloat(other.position.z);
 
-              // X Magnes (lewo / prawo)
+              // X Magnes 
               if (Math.abs(snapX - (oX + oW)) < SNAP_DIST) snapX = oX + oW;
               if (Math.abs((snapX + W) - oX) < SNAP_DIST) snapX = oX - W;
               if (Math.abs(snapX - oX) < SNAP_DIST) snapX = oX;
 
-              // Y Magnes (góra / dół)
+              // Y Magnes 
               if (Math.abs(snapY - (oY + oH)) < SNAP_DIST) snapY = oY + oH;
               if (Math.abs((snapY + H) - oY) < SNAP_DIST) snapY = oY - H;
               if (Math.abs(snapY - oY) < SNAP_DIST) snapY = oY;
 
-              // Z Magnes (przód / tył)
+              // Z Magnes 
               if (Math.abs(snapZ - (oZ + oD)) < SNAP_DIST) snapZ = oZ + oD;
               if (Math.abs((snapZ + D) - oZ) < SNAP_DIST) snapZ = oZ - D;
               if (Math.abs(snapZ - oZ) < SNAP_DIST) snapZ = oZ;
           });
 
-          // Aktualizuj logikę
+          // Twarda blokada przenikania (ściany i podłoga nie pozwalają wyjść szafce na minus!)
+          snapX = Math.max(0, snapX);
+          snapY = Math.max(0, snapY);
+          snapZ = Math.max(0, snapZ);
+
           dragModule.position.x = Math.round(snapX);
           dragModule.position.y = Math.round(snapY);
           dragModule.position.z = Math.round(snapZ);
 
-          // Aktualizuj na ekranie w czasie rzeczywistym
           dragTarget.position.set(
               dragModule.position.x + W/2,
               dragModule.position.y + baseOffsetY + H/2,
               dragModule.position.z + D/2
           );
           
-          // Magia - zaktualizuj pola input po prawej, aby na żywo widzieć zmianę milimetrów!
           const inpX = document.getElementById('input-pos-x');
           const inpY = document.getElementById('input-pos-y');
           if (inpX) inpX.value = dragModule.position.x;
@@ -358,15 +353,13 @@ export function init3DViewer() {
           isDragging = false;
           dragTarget = null;
           dragModule = null;
-          controls.enabled = true; // Oddaj obracanie kamerze
+          controls.enabled = true; 
           updateSidebar();
           initPropertiesPanel();
       }
   });
 
-  // Odpalanie starego dobrego menu prawym lub zwykłym kliknięciem (ale tylko jeśli to nie był ruch)
   renderer.domElement.addEventListener('pointerup', (e) => {
-      // Jeśli myszka przesunęła się mniej niż 5 pikseli, traktujemy to jako KLIKNIĘCIE a nie PRZECIĄGANIE
       if (Math.abs(e.clientX - pointerDownPos.x) < 5 && Math.abs(e.clientY - pointerDownPos.y) < 5) {
           handle3DClick(e);
       }
