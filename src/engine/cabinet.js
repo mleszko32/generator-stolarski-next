@@ -81,7 +81,6 @@ export function calculateAllProjectParts() {
 
   const aggregated = {};
   allParts.forEach(part => {
-     // Grupujemy z uwzględnieniem kategorii
      const key = `${part.category}_${part.name}_${part.length}_${part.width}`;
      if (aggregated[key]) {
          aggregated[key].qty += part.qty;
@@ -398,8 +397,8 @@ function getFrontsAndDrawers(mod, config) {
         const drawerComps = getDrawerComponents(config.front.drawerSystem, width - (board * 2), availableDepth, simulatedSpace, userForcedVariant);
         
         if (drawerComps) {
-          parts.push({ name: `Dno szuflady (NL: ${drawerComps.nominalLength})`, length: parseFloat(drawerComps.bottom.length.toFixed(1)), width: parseFloat(drawerComps.bottom.width.toFixed(1)), qty: 1, category: "Szuflada" });
-          parts.push({ name: `Tył szuflady (Wariant ${drawerComps.back.variantType})`, length: parseFloat(drawerComps.back.width.toFixed(1)), width: parseFloat(drawerComps.back.height.toFixed(1)), qty: 1, category: "Szuflada" });
+          parts.push({ name: `Dno szuflady W${width} (NL: ${drawerComps.nominalLength})`, length: parseFloat(drawerComps.bottom.length.toFixed(1)), width: parseFloat(drawerComps.bottom.width.toFixed(1)), qty: 1, category: "Szuflada" });
+          parts.push({ name: `Tył szuflady W${width} (Wariant ${drawerComps.back.variantType})`, length: parseFloat(drawerComps.back.width.toFixed(1)), width: parseFloat(drawerComps.back.height.toFixed(1)), qty: 1, category: "Szuflada" });
         }
       }
     } 
