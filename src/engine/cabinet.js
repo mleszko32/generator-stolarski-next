@@ -277,7 +277,7 @@ function getBackPanelParts(mod, config) {
     hdfWidth = width - 4; hdfHeight = height - 4;
   }
 
-  return [{ name: "Plecy (HDF)", length: parseFloat(hdfHeight.toFixed(1)), width: parseFloat(hdfWidth.toFixed(1)), qty: 1, category: "Plecy" }];
+  return [{ name: `Plecy ${height}x${width}`, length: parseFloat(hdfHeight.toFixed(1)), width: parseFloat(hdfWidth.toFixed(1)), qty: 1, category: "Plecy" }];
 }
 
 function getInteriorParts(mod, config) {
