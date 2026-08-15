@@ -1,8 +1,7 @@
 // src/render/viewer3d.js
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
-import { state } from '../core/state.js';
+import { state, duplicateModule, deleteModule } from '../core/state.js';
 
 import { getDrawerComponents, calculateDrawerHoles } from '../core/drawerMath.js';
 import { calculateHinges } from '../core/hingeMath.js';
@@ -11,17 +10,17 @@ import { autoDistributeShelves } from '../core/shelfMath.js';
 import { updateSidebar } from '../ui/sidebar.js';
 import { initPropertiesPanel } from '../ui/properties.js';
 
-let alignMode = {
-    active: false,
-    sourceMod: null,
-    sourceEl: null,
-    banner: null
-};
-
+let alignMode = { active: false, sourceMod: null, sourceEl: null, banner: null };
 let isXrayMode = true; 
 let isFrontsVisible = true; 
-let isDraggingTransform = false;
-let justFinishedDragging = false; 
+
+// ZMIENNE DO SWOBODNEGO PRZECIĄGANIA (DRAG & DROP Z MAGNESEM)
+let isDragging = false;
+let dragTarget = null;
+let dragModule = null;
+const dragOffset = new THREE.Vector3();
+const dragPlane = new THREE.Plane();
+const SNAP_DIST = 40; // Odległość w mm, przy której włącza się "magnes"
 
 function recalculateLayout(mod) {
   if (!mod || !mod.elements) return;
@@ -161,7 +160,7 @@ function recalculateLayout(mod) {
   });
 }
 
-let scene, camera, renderer, controls, tControls;
+let scene, camera, renderer, controls;
 let container;
 let cabinetGroup;
 
@@ -176,7 +175,6 @@ export function init3DViewer() {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0xf4f4f5); 
 
-  // Ogromny zasięg widzenia (aby ściany i szafki nie znikały przy oddalaniu)
   camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 10, 100000);
   camera.position.set(2500, 1500, 3500);
 
@@ -195,42 +193,6 @@ export function init3DViewer() {
   controls.dampingFactor = 0.05;
   controls.target.set(500, 500, 0);
 
-  // --- Narzędzie przesuwania i łapania (TransformControls) ---
-  tControls = new TransformControls(camera, renderer.domElement);
-  tControls.setTranslationSnap(1); 
-  tControls.setSize(1.5); // Duże, wygodne strzałki
-  
-  tControls.addEventListener('dragging-changed', function (event) {
-      controls.enabled = !event.value;
-      isDraggingTransform = event.value;
-      
-      if (!event.value) {
-          // Blokada przypadkowego odznaczania po puszczeniu strzałki
-          justFinishedDragging = true;
-          setTimeout(() => { justFinishedDragging = false; }, 150);
-
-          if (state.activeModuleId && tControls.object) {
-              const mod = state.project.modules.find(m => m.id === state.activeModuleId);
-              if (mod) {
-                  const W = parseFloat(mod.dimensions.width) || 600;
-                  const H = parseFloat(mod.dimensions.height) || 720;
-                  const D = parseFloat(mod.dimensions.depth) || 510;
-                  let baseOffsetY = 0;
-                  if (mod.legs && mod.legs.active) baseOffsetY = parseFloat(mod.legs.height) || 100;
-
-                  // Przeliczenie z powrotem punktu z centrum na róg dolny-lewy
-                  mod.position.x = Math.round(tControls.object.position.x - W/2);
-                  mod.position.y = Math.round(tControls.object.position.y - H/2 - baseOffsetY);
-                  mod.position.z = Math.round(tControls.object.position.z - D/2);
-                  
-                  updateSidebar();
-                  initPropertiesPanel();
-              }
-          }
-      }
-  });
-  scene.add(tControls);
-
   const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.5);
   scene.add(hemiLight);
 
@@ -245,7 +207,7 @@ export function init3DViewer() {
   backLight.position.set(-1500, 1000, -2000);
   scene.add(backLight);
 
-  // --- Konstrukcja pomieszczenia (Ściany i Podłoga) ---
+  // --- Punkt Odniesienia (Ściany) ---
   const roomGroup = new THREE.Group();
   scene.add(roomGroup);
 
@@ -260,26 +222,151 @@ export function init3DViewer() {
   const wallMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 1 });
   
   const backWall = new THREE.Mesh(new THREE.BoxGeometry(10000, 3000, 20), wallMat);
-  backWall.position.set(4000, 1500, -10); 
+  backWall.position.set(5000, 1500, -10); // Tył kuchni to linia Z=0
   backWall.receiveShadow = true;
   roomGroup.add(backWall);
 
   const leftWall = new THREE.Mesh(new THREE.BoxGeometry(20, 3000, 5000), wallMat);
-  leftWall.position.set(-10, 1500, 2500); 
+  leftWall.position.set(-10, 1500, 2500); // Lewa ściana to linia X=0
   leftWall.receiveShadow = true;
   roomGroup.add(leftWall);
 
   cabinetGroup = new THREE.Group();
   scene.add(cabinetGroup);
 
+  // --- ZDARZENIA MYSZY DLA WŁASNEGO PRZECIĄGANIA ---
   renderer.domElement.addEventListener('pointerdown', (e) => {
       pointerDownPos.set(e.clientX, e.clientY);
+      
+      if (alignMode.active) return; // Zablokuj łapanie w trybie wyrównywania narzędzi precyzyjnych
+
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+
+      const intersects = raycaster.intersectObjects(cabinetGroup.children, true);
+      if (intersects.length > 0) {
+          let group = intersects[0].object;
+          // Przebij się z pojedynczej formatki na główną grupę szafki
+          while(group.parent && group.parent !== cabinetGroup) {
+              group = group.parent;
+          }
+          if (group.userData && group.userData.moduleId) {
+              isDragging = true;
+              dragTarget = group;
+              dragModule = state.project.modules.find(m => m.id === group.userData.moduleId);
+              
+              controls.enabled = false; // Zatrzymaj obracanie kamerą!
+              
+              // Tworzymy niewidzialną płaszczyznę równoległą do kamery, po której będziemy suwać myszką
+              const normal = camera.getWorldDirection(new THREE.Vector3()).negate();
+              dragPlane.setFromNormalAndCoplanarPoint(normal, intersects[0].point);
+              dragOffset.copy(dragTarget.position).sub(intersects[0].point);
+              
+              // Jeśli szafka nie była aktywna, uaktywnij i odśwież panel
+              if (state.activeModuleId !== dragModule.id) {
+                  state.activeModuleId = dragModule.id;
+                  updateSidebar();
+                  initPropertiesPanel();
+                  update3D(); 
+                  // Ponownie pobierz odświeżony obiekt grupy po przebudowaniu sceny w update3D
+                  dragTarget = cabinetGroup.children.find(g => g.userData.moduleId === dragModule.id);
+              }
+          }
+      }
   });
 
-  renderer.domElement.addEventListener('pointerup', (e) => {
-      // Przerywamy, jeśli użytkownik puścił właśnie strzałkę osi
-      if (isDraggingTransform || justFinishedDragging || (tControls && tControls.axis !== null)) return;
+  window.addEventListener('pointermove', (e) => {
+      if (!isDragging || !dragTarget || !dragModule) return;
+      
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      
+      const intersect = new THREE.Vector3();
+      raycaster.ray.intersectPlane(dragPlane, intersect);
+      
+      if (intersect) {
+          let newGroupPos = intersect.add(dragOffset);
+          
+          const W = parseFloat(dragModule.dimensions.width) || 600;
+          const H = parseFloat(dragModule.dimensions.height) || 720;
+          const D = parseFloat(dragModule.dimensions.depth) || 510;
+          let baseOffsetY = (dragModule.legs && dragModule.legs.active) ? (parseFloat(dragModule.legs.height) || 100) : 0;
+          
+          // Wyliczanie nowej logicznej pozycji szafki ze środka na zewnątrz
+          let snapX = newGroupPos.x - W/2;
+          let snapY = newGroupPos.y - H/2 - baseOffsetY;
+          let snapZ = newGroupPos.z - D/2;
 
+          // LOGIKA MAGNESU (Snapping)
+          // 1. Magnes do ścian
+          if (Math.abs(snapX) < SNAP_DIST) snapX = 0;
+          if (Math.abs(snapY) < SNAP_DIST) snapY = 0;
+          if (Math.abs(snapZ) < SNAP_DIST) snapZ = 0;
+
+          // 2. Magnes do innych szafek
+          state.project.modules.forEach(other => {
+              if (other.id === dragModule.id) return;
+              const oW = parseFloat(other.dimensions.width);
+              const oH = parseFloat(other.dimensions.height);
+              const oD = parseFloat(other.dimensions.depth);
+              const oX = parseFloat(other.position.x);
+              const oY = parseFloat(other.position.y);
+              const oZ = parseFloat(other.position.z);
+
+              // X Magnes (lewo / prawo)
+              if (Math.abs(snapX - (oX + oW)) < SNAP_DIST) snapX = oX + oW;
+              if (Math.abs((snapX + W) - oX) < SNAP_DIST) snapX = oX - W;
+              if (Math.abs(snapX - oX) < SNAP_DIST) snapX = oX;
+
+              // Y Magnes (góra / dół)
+              if (Math.abs(snapY - (oY + oH)) < SNAP_DIST) snapY = oY + oH;
+              if (Math.abs((snapY + H) - oY) < SNAP_DIST) snapY = oY - H;
+              if (Math.abs(snapY - oY) < SNAP_DIST) snapY = oY;
+
+              // Z Magnes (przód / tył)
+              if (Math.abs(snapZ - (oZ + oD)) < SNAP_DIST) snapZ = oZ + oD;
+              if (Math.abs((snapZ + D) - oZ) < SNAP_DIST) snapZ = oZ - D;
+              if (Math.abs(snapZ - oZ) < SNAP_DIST) snapZ = oZ;
+          });
+
+          // Aktualizuj logikę
+          dragModule.position.x = Math.round(snapX);
+          dragModule.position.y = Math.round(snapY);
+          dragModule.position.z = Math.round(snapZ);
+
+          // Aktualizuj na ekranie w czasie rzeczywistym
+          dragTarget.position.set(
+              dragModule.position.x + W/2,
+              dragModule.position.y + baseOffsetY + H/2,
+              dragModule.position.z + D/2
+          );
+          
+          // Magia - zaktualizuj pola input po prawej, aby na żywo widzieć zmianę milimetrów!
+          const inpX = document.getElementById('input-pos-x');
+          const inpY = document.getElementById('input-pos-y');
+          if (inpX) inpX.value = dragModule.position.x;
+          if (inpY) inpY.value = dragModule.position.y;
+      }
+  });
+
+  window.addEventListener('pointerup', (e) => {
+      if (isDragging) {
+          isDragging = false;
+          dragTarget = null;
+          dragModule = null;
+          controls.enabled = true; // Oddaj obracanie kamerze
+          updateSidebar();
+          initPropertiesPanel();
+      }
+  });
+
+  // Odpalanie starego dobrego menu prawym lub zwykłym kliknięciem (ale tylko jeśli to nie był ruch)
+  renderer.domElement.addEventListener('pointerup', (e) => {
+      // Jeśli myszka przesunęła się mniej niż 5 pikseli, traktujemy to jako KLIKNIĘCIE a nie PRZECIĄGANIE
       if (Math.abs(e.clientX - pointerDownPos.x) < 5 && Math.abs(e.clientY - pointerDownPos.y) < 5) {
           handle3DClick(e);
       }
@@ -470,8 +557,6 @@ function handle3DClick(event) {
 }
 
 function show3DContextMenu(event, hit, data) {
-  if (data.type === 'corpus' && data.part !== 'back') return;
-
   const menu = document.createElement('div');
   menu.id = 'context-menu-3d';
   Object.assign(menu.style, {
@@ -523,6 +608,53 @@ function show3DContextMenu(event, hit, data) {
 
   const mod = state.project.modules.find(m => m.id === data.moduleId);
   if (!mod) return;
+
+  if (data.type === 'corpus' && data.part !== 'back') {
+      menu.appendChild(createHeader('Pozycja szafki (Ręczna korekta)'));
+      
+      const posWrap = document.createElement('div');
+      Object.assign(posWrap.style, { padding: '8px', backgroundColor: '#f8fafc', borderRadius: '4px', marginBottom: '6px' });
+      
+      const createPosControl = (axis, label, val) => {
+          const row = document.createElement('div');
+          row.style.display = 'flex'; row.style.alignItems = 'center'; row.style.justifyContent = 'space-between'; row.style.marginBottom = '6px';
+          
+          const lbl = document.createElement('span'); lbl.innerText = label; lbl.style.fontSize = '12px'; lbl.style.fontWeight = 'bold'; lbl.style.color = '#334155';
+          
+          const controls = document.createElement('div'); controls.style.display = 'flex'; controls.style.gap = '4px';
+          
+          const btnMinus = document.createElement('button'); btnMinus.innerText = '-'; 
+          const btnPlus = document.createElement('button'); btnPlus.innerText = '+';
+          const inp = document.createElement('input'); inp.type = 'number'; inp.value = val; inp.style.width = '55px'; inp.style.textAlign = 'center';
+          
+          [btnMinus, btnPlus].forEach(b => Object.assign(b.style, { width: '28px', height: '28px', cursor: 'pointer', border: '1px solid #cbd5e1', background: '#fff', borderRadius: '4px', fontWeight: 'bold', color: '#0ea5e9' }));
+          
+          const updatePos = (newVal) => {
+              mod.position[axis] = parseFloat(newVal) || 0;
+              inp.value = mod.position[axis];
+              update3D();
+              updateSidebar();
+              initPropertiesPanel();
+          };
+          
+          btnMinus.onclick = (e) => { e.stopPropagation(); updatePos(mod.position[axis] - 10); };
+          btnPlus.onclick = (e) => { e.stopPropagation(); updatePos(mod.position[axis] + 10); };
+          inp.onchange = (e) => { e.stopPropagation(); updatePos(e.target.value); };
+          
+          controls.appendChild(btnMinus); controls.appendChild(inp); controls.appendChild(btnPlus);
+          row.appendChild(lbl); row.appendChild(controls);
+          return row;
+      };
+      
+      posWrap.appendChild(createPosControl('x', '↔️ Oś X', mod.position.x));
+      posWrap.appendChild(createPosControl('y', '↕️ Oś Y', mod.position.y));
+      posWrap.appendChild(createPosControl('z', '↗️ Oś Z', mod.position.z || 0));
+      menu.appendChild(posWrap);
+
+      menu.appendChild(createHeader('Akcje korpusu'));
+      menu.appendChild(createOption('Klonuj szafkę obok', '📋', () => { duplicateModule(mod.id); }, '#059669'));
+      menu.appendChild(createOption('Usuń całą szafkę', '🗑️', () => { deleteModule(mod.id); state.activeModuleId = null; }, '#dc2626'));
+  }
 
   if (data.type === 'shelf') {
       const el = mod.elements.find(e => e.id === data.elementId);
@@ -1082,7 +1214,6 @@ function addHardware(type, x, y, z, axis, parentGroup) {
 export function update3D() {
   if (!cabinetGroup) return;
   
-  if (tControls) tControls.detach();
   while(cabinetGroup.children.length > 0){ cabinetGroup.remove(cabinetGroup.children[0]); }
 
   const th = parseFloat(state.project.materials.boardThickness) || 18;
@@ -1100,15 +1231,12 @@ export function update3D() {
       const modGroup = new THREE.Group();
       modGroup.userData = { moduleId: mod.id };
       
-      // ZMIANA: Przesuwamy punkt środkowy grupy idealnie w centrum szafki. 
-      // Dzięki temu strzałki do przesuwania wystają ze środka, a nie chowają się w ścianach!
       modGroup.position.set(
           (parseFloat(mod.position.x) || 0) + W/2,
           (parseFloat(mod.position.y) || 0) + baseOffsetY + H/2,
           (parseFloat(mod.position.z) || 0) + D/2
       );
 
-      // Wewnętrzna grupa korygująca koordynaty wstecz, aby kod rysowania pozostał taki sam
       const innerGroup = new THREE.Group();
       innerGroup.position.set(-W/2, -H/2 - baseOffsetY, -D/2);
       modGroup.add(innerGroup);
@@ -1370,11 +1498,4 @@ export function update3D() {
 
       cabinetGroup.add(modGroup);
   });
-
-  if (state.activeModuleId && tControls) {
-      const activeGroup = cabinetGroup.children.find(g => g.userData.moduleId === state.activeModuleId);
-      if (activeGroup) {
-          tControls.attach(activeGroup);
-      }
-  }
 }
