@@ -175,7 +175,7 @@ export function calculateProjectHardware() {
 function getCorpusHoles(mod, config) {
   const { width, height, depth } = mod.dimensions;
   const th = config.materials.boardThickness || 18;
-  const cons = config.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
+  const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(config.construction || {}), ...(mod.construction || {}) };
   
   const holes = [];
 
@@ -230,7 +230,7 @@ function getCorpusParts(mod, config) {
   const backThick = config.materials.backThickness;
   const backP = mod.backPanel || { type: 'nakladane', offset: 16 }; 
   
-  const construction = config.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
+  const construction = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(config.construction || {}), ...(mod.construction || {}) };
   const isTopBottomFullWidth = construction.joinType === 'wience_przelotowe';
 
   const sideDepth = backP.type === 'nut' ? depth : depth - backThick;

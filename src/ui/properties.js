@@ -3,7 +3,6 @@ import { state, getActiveModule } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
 
-
 export function initPropertiesPanel() {
   const rightSidebar = document.querySelector(".sidebar-right");
   const activeModule = getActiveModule(); 
@@ -19,12 +18,12 @@ export function initPropertiesPanel() {
     return;
   }
 
-  // Zabezpieczenie przed brakiem obiektu legs w starszych szafkach
   if (!activeModule.legs) {
      activeModule.legs = { active: false, height: 100, plinth: false, plinthOffset: 40 };
   }
 
-  const cons = state.project.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
+  // Wczytujemy ustawienia konstrukcyjne priorytetyzując szafkę, potem projekt, potem domyślne
+  const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(state.project.construction || {}), ...(activeModule.construction || {}) };
   const backP = activeModule.backPanel;
 
   rightSidebar.innerHTML = `
@@ -133,14 +132,13 @@ function setupEventListeners() {
   const numberInputs = [
     'pos-x', 'pos-y', 'traverse-width', 'board-thick', 'width', 'height', 'depth',
     'front-gap', 'front-left', 'front-right', 'front-top', 'front-bottom', 'back-offset', 'back-groove',
-    'legs-height', 'plinth-offset' // Nowe ID
+    'legs-height', 'plinth-offset'
   ];
 
   const updateAll = () => { update3D(); updateSidebar(); };
   let typingTimer;
   const debouncedUpdateAll = () => { clearTimeout(typingTimer); typingTimer = setTimeout(() => { updateAll(); }, 200); };
 
-  // --- Obsługa checkboxów nóżek i cokołu ---
   const legsActiveInput = document.getElementById('input-legs-active');
   const legsOptions = document.getElementById('legs-options');
   if (legsActiveInput && legsOptions) {
@@ -158,14 +156,29 @@ function setupEventListeners() {
       updateAll();
     });
   }
-  // ----------------------------------------
 
+  // Zapis ustawień konstrukcyjnych bezpośrednio do szafki
   const joinTypeInput = document.getElementById('input-join-type');
-  if (joinTypeInput) joinTypeInput.addEventListener('change', (e) => { state.project.construction.joinType = e.target.value; updateAll(); });
+  if (joinTypeInput) joinTypeInput.addEventListener('change', (e) => { 
+      const mod = getActiveModule();
+      if (mod) {
+          if (!mod.construction) mod.construction = {};
+          mod.construction.joinType = e.target.value; 
+          updateAll(); 
+      }
+  });
 
   const topTypeInput = document.getElementById('input-top-type');
   const traverseOptions = document.getElementById('traverse-options');
-  if (topTypeInput && traverseOptions) topTypeInput.addEventListener('change', (e) => { state.project.construction.topType = e.target.value; traverseOptions.style.display = e.target.value !== 'pelny' ? 'block' : 'none'; updateAll(); });
+  if (topTypeInput && traverseOptions) topTypeInput.addEventListener('change', (e) => { 
+      const mod = getActiveModule();
+      if (mod) {
+          if (!mod.construction) mod.construction = {};
+          mod.construction.topType = e.target.value; 
+          traverseOptions.style.display = e.target.value !== 'pelny' ? 'block' : 'none'; 
+          updateAll(); 
+      }
+  });
 
   const typeInput = document.getElementById('input-front-type');
   if (typeInput) typeInput.addEventListener('change', (e) => { state.project.front.type = e.target.value; updateAll(); });
@@ -190,11 +203,14 @@ function setupEventListeners() {
         if (id === 'pos-x') mod.position.x = val;
         if (id === 'pos-y') mod.position.y = val;
         
-        // Zapis wartości nóżek
         if (id === 'legs-height') mod.legs.height = val;
         if (id === 'plinth-offset') mod.legs.plinthOffset = val;
 
-        if (id === 'traverse-width') state.project.construction.traverseWidth = val;
+        // Zapis szerokości trawersów do wybranej szafki
+        if (id === 'traverse-width') {
+            if (!mod.construction) mod.construction = {};
+            mod.construction.traverseWidth = val;
+        }
         if (id === 'board-thick') state.project.materials.boardThickness = val;
 
         if (id === 'width') {
