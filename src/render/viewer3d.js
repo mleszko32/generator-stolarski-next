@@ -36,7 +36,8 @@ function recalculateLayout(mod) {
   const cTop = parseFloat(fc.top ?? fc.gora ?? 2) || 0;
   const cBottom = parseFloat(fc.bottom ?? fc.dol ?? 2) || 0;
 
-  const cons = config.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
+  // ZMIANA: Pobieranie indywidualnych ustawień konstrukcji szafki
+  const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(config.construction || {}), ...(mod.construction || {}) };
   const hasTraverses = cons.topType.includes('trawersy');
   const isVerticalTraverse = cons.topType === 'trawersy_pion';
   const traverseWidth = cons.traverseWidth || 100;
@@ -464,7 +465,7 @@ function show3DContextMenu(event, hit, data) {
           const th = parseFloat(state.project.materials.boardThickness) || 18;
           const H = parseFloat(mod.dimensions.height);
           const W = parseFloat(mod.dimensions.width);
-          const cons = state.project.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
+          const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(state.project.construction || {}), ...(mod.construction || {}) };
           const hasTraverses = cons.topType.includes('trawersy');
           const isVerticalTraverse = cons.topType === 'trawersy_pion';
           const traverseWidth = cons.traverseWidth || 100;
@@ -600,7 +601,6 @@ function show3DContextMenu(event, hit, data) {
               boxWrap.appendChild(applyBoxBtn);
               menu.appendChild(boxWrap);
               
-              // ZMIANA: Dodano automatyczny przycisk budowania szuflad wewnętrznych nad obecną
               menu.appendChild(createOption('➕ Dodaj szufladę wewn. nad tą', '📥', () => {
                   let boxHeight = el.h;
                   if (el.forceVariant && el.forceVariant !== 'auto') {
@@ -703,7 +703,7 @@ function show3DContextMenu(event, hit, data) {
               }
           }
 
-          menu.appendChild(createHeader('Zarządzanie blokiem'));
+          menu.appendChild(createHeader('Zarządzanie bloku'));
           menu.appendChild(createOption('Usuń ten front/szufladę', '🗑️', () => { mod.elements = mod.elements.filter(e => e.id !== el.id); }, '#dc2626'));
           
           if (el.baseZone) {
@@ -1027,7 +1027,8 @@ export function update3D() {
       const posY = (parseFloat(mod.position.y) || 0) + baseOffsetY;
       const posZ = parseFloat(mod.position.z) || 0;
 
-      const cons = state.project.construction || { joinType: 'boki_przelotowe', topType: 'pelny' };
+      // ZMIANA: Pobieranie indywidualnych ustawień konstrukcji szafki dla widoku 3D
+      const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(state.project.construction || {}), ...(mod.construction || {}) };
       const isTopBottomFull = cons.joinType === 'wience_przelotowe';
 
       const udCorp = { moduleId: mod.id, type: 'corpus' };
