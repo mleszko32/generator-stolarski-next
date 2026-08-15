@@ -1,6 +1,7 @@
 // src/render/viewer3d.js
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { state, duplicateModule, deleteModule } from '../core/state.js';
 
 import { getDrawerComponents, calculateDrawerHoles } from '../core/drawerMath.js';
@@ -173,7 +174,7 @@ export function init3DViewer() {
   if (!container) return;
 
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xf4f4f5); 
+  scene.background = new THREE.Color(0xf1f5f9); // Jasne tło aplikacji
 
   camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 10, 100000);
   camera.position.set(2500, 1500, 3500);
@@ -193,41 +194,52 @@ export function init3DViewer() {
   controls.dampingFactor = 0.05;
   controls.target.set(500, 500, 0);
 
-  const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.5);
+  // --- ZOPTYMALIZOWANE OŚWIETLENIE STUDYJNE ---
+  const hemiLight = new THREE.HemisphereLight(0xffffff, 0x94a3b8, 0.6); // Jasne oświetlenie ambientowe z chłodnym cieniem
   scene.add(hemiLight);
 
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
-  dirLight.position.set(2000, 3000, 2500);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.85); // Mocne główne światło
+  dirLight.position.set(4000, 5000, 6000);
   dirLight.castShadow = true;
   dirLight.shadow.mapSize.width = 2048; 
   dirLight.shadow.mapSize.height = 2048;
+  
+  // POPRAWKA CIENI: Ogromny zasięg kamery cienia, aby ściany nie były sztucznie ciemne
+  const d = 8000;
+  dirLight.shadow.camera.left = -d;
+  dirLight.shadow.camera.right = d;
+  dirLight.shadow.camera.top = d;
+  dirLight.shadow.camera.bottom = -d;
+  dirLight.shadow.camera.far = 20000;
+  dirLight.shadow.bias = -0.0005; // Usuwa "brud" z płyt
   scene.add(dirLight);
 
-  const backLight = new THREE.DirectionalLight(0xffffff, 0.3);
-  backLight.position.set(-1500, 1000, -2000);
+  const backLight = new THREE.DirectionalLight(0xffffff, 0.4); // Dodatkowe doświetlenie tyłu
+  backLight.position.set(-2000, 2000, -3000);
   scene.add(backLight);
 
-  // --- Punkt Odniesienia (Ściany) ---
+  // --- JASNE ŚCIANY (Styl Studyjny) ---
   const roomGroup = new THREE.Group();
   scene.add(roomGroup);
 
   const floorGeo = new THREE.PlaneGeometry(25000, 25000);
-  const floorMat = new THREE.ShadowMaterial({ opacity: 0.12 });
+  const floorMat = new THREE.ShadowMaterial({ opacity: 0.07 }); // Bardzo delikatny cień na podłodze
   const floor = new THREE.Mesh(floorGeo, floorMat);
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = 0;
   floor.receiveShadow = true;
   roomGroup.add(floor);
 
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 1 });
+  // LambertMaterial odbija światło miękko, nie robi się czarny pod kątem
+  const wallMat = new THREE.MeshLambertMaterial({ color: 0xffffff }); 
   
-  const backWall = new THREE.Mesh(new THREE.BoxGeometry(10000, 3000, 20), wallMat);
-  backWall.position.set(5000, 1500, -10); // Tył kuchni to linia Z=0
+  const backWall = new THREE.Mesh(new THREE.BoxGeometry(10000, 3500, 20), wallMat);
+  backWall.position.set(5000, 1750, -10); 
   backWall.receiveShadow = true;
   roomGroup.add(backWall);
 
-  const leftWall = new THREE.Mesh(new THREE.BoxGeometry(20, 3000, 5000), wallMat);
-  leftWall.position.set(-10, 1500, 2500); // Lewa ściana to linia X=0
+  const leftWall = new THREE.Mesh(new THREE.BoxGeometry(20, 3500, 5000), wallMat);
+  leftWall.position.set(-10, 1750, 2500); 
   leftWall.receiveShadow = true;
   roomGroup.add(leftWall);
 
@@ -310,23 +322,19 @@ export function init3DViewer() {
               const oY = parseFloat(other.position.y);
               const oZ = parseFloat(other.position.z);
 
-              // X Magnes 
               if (Math.abs(snapX - (oX + oW)) < SNAP_DIST) snapX = oX + oW;
               if (Math.abs((snapX + W) - oX) < SNAP_DIST) snapX = oX - W;
               if (Math.abs(snapX - oX) < SNAP_DIST) snapX = oX;
 
-              // Y Magnes 
               if (Math.abs(snapY - (oY + oH)) < SNAP_DIST) snapY = oY + oH;
               if (Math.abs((snapY + H) - oY) < SNAP_DIST) snapY = oY - H;
               if (Math.abs(snapY - oY) < SNAP_DIST) snapY = oY;
 
-              // Z Magnes 
               if (Math.abs(snapZ - (oZ + oD)) < SNAP_DIST) snapZ = oZ + oD;
               if (Math.abs((snapZ + D) - oZ) < SNAP_DIST) snapZ = oZ - D;
               if (Math.abs(snapZ - oZ) < SNAP_DIST) snapZ = oZ;
           });
 
-          // Twarda blokada przenikania (ściany i podłoga nie pozwalają wyjść szafce na minus!)
           snapX = Math.max(0, snapX);
           snapY = Math.max(0, snapY);
           snapZ = Math.max(0, snapZ);
@@ -1128,13 +1136,14 @@ function show3DContextMenu(event, hit, data) {
   if (menu.children.length > 0) document.body.appendChild(menu);
 }
 
+// --- ZAKTUALIZOWANE JASNE MATERIAŁY ---
 const mats = {
   solid: {
-      corpus: new THREE.MeshStandardMaterial({ color: 0xfdfbf7, roughness: 0.7, metalness: 0.05 }), 
-      front: new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.15 }),  
-      shelf: new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.8, metalness: 0.0 }),   
+      corpus: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, metalness: 0.1 }), 
+      front: new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.5, metalness: 0.1 }),  // Stalowy/Jasnoszary front
+      shelf: new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.7, metalness: 0.0 }),   
       drawerBox: new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.8, metalness: 0.0 }),
-      hdf: new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.9, metalness: 0.0 })
+      hdf: new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.9, metalness: 0.0 })
   },
   xray: {
       corpus: new THREE.MeshStandardMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.15, depthWrite: false }),
@@ -1162,8 +1171,9 @@ function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, parentG
   mesh.castShadow = !isXrayMode; mesh.receiveShadow = !isXrayMode;
 
   const edges = new THREE.EdgesGeometry(geo);
-  let edgeColor = isXrayMode ? (type === 'drawerBox' ? 0xd97706 : 0x64748b) : 0x475569;
-  if (isActiveModule) edgeColor = isXrayMode ? 0x2563eb : 0x1d4ed8;
+  // ZMIANA: Ciemny, mocny obrys dla pełnej czytelności na białych szafkach
+  let edgeColor = isXrayMode ? (type === 'drawerBox' ? 0xd97706 : 0x64748b) : 0x334155; 
+  if (isActiveModule) edgeColor = isXrayMode ? 0x2563eb : 0x2563eb;
   
   const lineMat = new THREE.LineBasicMaterial({ color: edgeColor, linewidth: 1 });
   const line = new THREE.LineSegments(edges, lineMat);
