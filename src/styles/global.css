@@ -15,6 +15,7 @@ body {
   font-family: Arial, Helvetica, sans-serif;
   background: #f3f5f7;
 }
+
 /* Główny kontener aplikacji */
 .app-container {
   display: flex;
@@ -34,14 +35,14 @@ body {
 }
 
 /* Obszar roboczy - podzielony na 3 kolumny */
-.main-workspace {
+.main-workspace, .main-content {
   display: flex;
   flex: 1;
   overflow: hidden;
 }
 
 .sidebar-left, .sidebar-right {
-  width: 500px;
+  width: 320px; /* Zmieniłem na 320px, by pasowało do Twojego layoutu w JS */
   height: auto;
   background: #ffffff;
   border-right: 1px solid #ddd;
@@ -54,7 +55,7 @@ body {
   border-left: 1px solid #ddd;
 }
 
-.viewport-3d {
+.viewport-3d, .center-panel {
   flex: 1;
   background: #e2e8f0;
   padding: 15px;
@@ -72,6 +73,7 @@ body {
   display: flex;
   align-items: center;
 }
+
 /* Style dla panelu parametrów */
 .property-group {
   margin-top: 20px;
@@ -86,7 +88,7 @@ body {
   font-weight: bold;
 }
 
-.property-group input {
+.property-group input, .property-group select {
   padding: 8px;
   border: 1px solid #bdc3c7;
   border-radius: 4px;
@@ -95,9 +97,10 @@ body {
   transition: border-color 0.2s;
 }
 
-.property-group input:focus {
+.property-group input:focus, .property-group select:focus {
   border-color: #3498db;
 }
+
 /* Style dla listy formatek */
 .parts-list {
   list-style: none;
@@ -115,4 +118,63 @@ body {
 
 .parts-list li span {
   color: #7f8c8d;
+}
+
+/* =========================================
+   RESPONSYWNOŚĆ - WIDOK DLA SMARTFONÓW 
+   ========================================= */
+@media (max-width: 768px) {
+  /* Złamanie sztywnego układu poziomego na pionowy */
+  .main-workspace, 
+  .main-content {
+      flex-direction: column !important;
+      height: auto !important; 
+      overflow-y: auto !important;
+      display: flex !important;
+  }
+
+  /* 1. WIDOK 3D NA SAMEJ GÓRZE */
+  .viewport-3d, 
+  .center-panel {
+      order: 1 !important; /* Wypycha 3D na górę ekranu */
+      width: 100% !important;
+      height: 50vh !important; /* Zajmuje równo połowę wysokości ekranu telefonu */
+      min-height: 350px !important;
+      flex: none !important;
+      border-bottom: 3px solid #3b82f6 !important;
+      padding: 0 !important;
+  }
+
+  /* Wymuszenie dopasowania kontenera renderera */
+  #editor-3d-container, 
+  #viewer-3d-container {
+      position: relative !important;
+      width: 100% !important;
+      height: 100% !important;
+  }
+
+  /* 2. LEWY PANEL (Lista szafek) POD WIDOKIEM 3D */
+  .sidebar-left {
+      order: 2 !important;
+      width: 100% !important;
+      min-width: 100% !important;
+      height: auto !important;
+      max-height: none !important;
+      border-right: none !important;
+      border-bottom: 2px solid #cbd5e1 !important;
+      flex: none !important;
+      overflow: visible !important;
+  }
+
+  /* 3. PRAWY PANEL (Parametry) NA SAMYM DOLE */
+  .sidebar-right {
+      order: 3 !important;
+      width: 100% !important;
+      min-width: 100% !important;
+      height: auto !important;
+      border-left: none !important;
+      padding-bottom: 60px !important; /* Margines na dole dla wygody scrollowania */
+      flex: none !important;
+      overflow: visible !important;
+  }
 }
