@@ -30,10 +30,8 @@ function recalculateLayout(mod) {
   const width = parseFloat(mod.dimensions.width) || 600;
   const height = parseFloat(mod.dimensions.height) || 720;
   
-  // Wczytywanie lokalnych ustawień frontów szafki!
-  const f = { ...(config.front || {}), ...(mod.front || {}) };
-  const fc = { ...(config.front?.clearance || {}), ...(mod.front?.clearance || {}) };
-  
+  const f = config.front || {};
+  const fc = f.clearance || {};
   const isInset = f.type === 'wpuszczane';
 
   const cLeft = parseFloat(fc.left ?? fc.sides ?? 1.5) || 0;
@@ -241,7 +239,6 @@ export function init3DViewer() {
   cabinetGroup = new THREE.Group();
   scene.add(cabinetGroup);
 
-  // --- ZDARZENIA MYSZY DLA WŁASNEGO PRZECIĄGANIA ---
   renderer.domElement.addEventListener('pointerdown', (e) => {
       pointerDownPos.set(e.clientX, e.clientY);
       if (alignMode.active) return;
@@ -267,7 +264,6 @@ export function init3DViewer() {
               dragPlane.setFromNormalAndCoplanarPoint(normal, intersects[0].point);
               dragOffset.copy(dragTarget.position).sub(intersects[0].point);
               
-              // ZMIANA: Obsługa multiselecta z klawiszem SHIFT podczas przeciągania w 3D
               if (e.shiftKey) {
                   if (!state.selectedModules) state.selectedModules = new Set();
                   if (!state.selectedModules.has(dragModule.id)) {
@@ -503,7 +499,6 @@ function handle3DClick(event) {
   if (existingMenu) existingMenu.remove();
 
   if (!validHit) {
-      // Jeśli kliknięto w puste tło i NIE trzymamy SHIFTA, odznaczamy wszystko
       if (!event.shiftKey) {
           state.activeModuleId = null;
           if (state.selectedModules) state.selectedModules.clear();
@@ -547,7 +542,6 @@ function handle3DClick(event) {
   }
 
   if (validHit && data) {
-      // ZMIANA: Obsługa multiselecta z klawiszem SHIFT przy kliknięciu bez przeciągania
       if (event.shiftKey) {
           if (!state.selectedModules) state.selectedModules = new Set();
           if (state.selectedModules.has(data.moduleId)) {
@@ -969,6 +963,13 @@ function show3DContextMenu(event, hit, data) {
               offsetBottom: 0, offsetTop: 0 
           };
 
+          // ZMIANA: Dodano fullCabBaseZone, która ignoruje półki wewnątrz i widzi tylko spód/górę korpusu
+          const fullCabBaseZone = {
+              minX: th, maxX: W - th, minY: th, maxY: H - th,
+              boundBottom: 'cab-bottom', boundTop: 'cab-top', boundLeft: 'cab-left', boundRight: 'cab-right',
+              offsetBottom: 0, offsetTop: 0
+          };
+
           menu.appendChild(createHeader('Dodaj elementy konstrukcyjne'));
           
           menu.appendChild(createOption(`Wstaw półkę (Wys: ${Math.round(localY)} mm)`, '➕', () => {
@@ -1044,7 +1045,7 @@ function show3DContextMenu(event, hit, data) {
               });
           }, '#059669'));
 
-          menu.appendChild(createHeader('Zabuduj pustą przestrzeń'));
+          menu.appendChild(createHeader('Zabuduj wybraną wnękę'));
 
           const showDrawerMenu = (e, subtype, titleTxt) => {
               e.stopPropagation();
@@ -1144,6 +1145,26 @@ function show3DContextMenu(event, hit, data) {
               mod.elements.push({ id: 'front-P-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi-lp', baseZone: targetBaseZone, frontCount: 2, frontIndex: 1, gap: gapLp });
           }, '#1e40af');
           menu.appendChild(btnDoorLP);
+
+          // ZMIANA: Zupełnie nowa sekcja menu odpowiedzialna za całą szafkę
+          menu.appendChild(createHeader('Zabudowa całej szafki (Zasłania półki)'));
+
+          const btnFullDoor = createOption('Drzwi pojedyncze (Całość)', '🚪', () => {
+              mod.elements.push({
+                  id: 'front-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+                  typ: 'front', subtype: 'drzwi', baseZone: fullCabBaseZone, openingSide: 'left',
+                  frontCount: 1, frontIndex: 0, gap: parseFloat(state.project.front?.gap) || 3
+              });
+          }, '#7c3aed');
+          menu.appendChild(btnFullDoor);
+
+          const btnFullDoorLP = createOption('Drzwi podwójne (Całość)', '🚪', () => {
+              const gapLp = parseFloat(state.project.front?.gap) || 3;
+              mod.elements.push({ id: 'front-L-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi-lp', baseZone: fullCabBaseZone, frontCount: 2, frontIndex: 0, gap: gapLp });
+              mod.elements.push({ id: 'front-P-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi-lp', baseZone: fullCabBaseZone, frontCount: 2, frontIndex: 1, gap: gapLp });
+          }, '#7c3aed');
+          menu.appendChild(btnFullDoorLP);
+
       }
   }
 
@@ -1184,7 +1205,6 @@ function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, parentG
   mesh.castShadow = !isXrayMode; mesh.receiveShadow = !isXrayMode;
 
   const edges = new THREE.EdgesGeometry(geo);
-  // ZMIANA: Zaznaczone szafki mają jaskrawy niebieski obrys
   const isSelected = isActiveModule || (userData && state.selectedModules && state.selectedModules.has(userData.moduleId));
   let edgeColor = isXrayMode ? (type === 'drawerBox' ? 0xd97706 : 0x64748b) : 0x334155; 
   if (isSelected) edgeColor = 0x2563eb;
@@ -1385,7 +1405,6 @@ export function update3D() {
                       return; 
                   }
 
-                  // Wczytywanie lokalnych ustawień frontów dla widoku 3D!
                   const f = { ...(state.project.front || {}), ...(mod.front || {}) };
                   
                   let innerFrontThick = 18;
