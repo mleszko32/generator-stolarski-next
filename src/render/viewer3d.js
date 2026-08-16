@@ -21,7 +21,7 @@ let dragTarget = null;
 let dragModule = null;
 const dragOffset = new THREE.Vector3();
 const dragPlane = new THREE.Plane();
-const SNAP_DIST = 40; // Odległość w mm, przy której włącza się "magnes"
+const SNAP_DIST = 40; 
 
 function recalculateLayout(mod) {
   if (!mod || !mod.elements) return;
@@ -30,8 +30,9 @@ function recalculateLayout(mod) {
   const width = parseFloat(mod.dimensions.width) || 600;
   const height = parseFloat(mod.dimensions.height) || 720;
   
-  const f = config.front || {};
-  const fc = f.clearance || {};
+  // POPRAWKA: Pobieramy lokalne ustawienia i luzy frontów z wybranej szafki!
+  const f = { ...(config.front || {}), ...(mod.front || {}) };
+  const fc = { ...(config.front?.clearance || {}), ...(mod.front?.clearance || {}) };
   const isInset = f.type === 'wpuszczane';
 
   const cLeft = parseFloat(fc.left ?? fc.sides ?? 1.5) || 0;
@@ -174,7 +175,7 @@ export function init3DViewer() {
   if (!container) return;
 
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xf1f5f9);
+  scene.background = new THREE.Color(0xf1f5f9); 
 
   camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 10, 100000);
   camera.position.set(2500, 1500, 3500);
@@ -241,6 +242,7 @@ export function init3DViewer() {
 
   renderer.domElement.addEventListener('pointerdown', (e) => {
       pointerDownPos.set(e.clientX, e.clientY);
+      
       if (alignMode.active) return;
 
       const rect = renderer.domElement.getBoundingClientRect();
@@ -251,8 +253,9 @@ export function init3DViewer() {
       const intersects = raycaster.intersectObjects(cabinetGroup.children, true);
       if (intersects.length > 0) {
           let group = intersects[0].object;
-          while(group.parent && group.parent !== cabinetGroup) { group = group.parent; }
-          
+          while(group.parent && group.parent !== cabinetGroup) {
+              group = group.parent;
+          }
           if (group.userData && group.userData.moduleId) {
               isDragging = true;
               dragTarget = group;
@@ -911,6 +914,15 @@ function show3DContextMenu(event, hit, data) {
                   menu.appendChild(bWrap);
               }
           }
+          
+          // POPRAWKA: OPCJE DLA ZWYKŁYCH DRZWI (W TYM FULL-CABINET)
+          if (el.subtype === 'drzwi') {
+              menu.appendChild(createHeader('Kierunek otwierania'));
+              const isLeft = (el.openingSide === 'left' || !el.openingSide);
+              menu.appendChild(createOption(isLeft ? 'Zmień na Prawe (Zawias z prawej)' : 'Zmień na Lewe (Zawias z lewej)', '🔄', () => {
+                  el.openingSide = isLeft ? 'right' : 'left';
+              }, '#0284c7'));
+          }
 
           menu.appendChild(createHeader('Zarządzanie bloku'));
           menu.appendChild(createOption('Usuń ten front/szufladę', '🗑️', () => { mod.elements = mod.elements.filter(e => e.id !== el.id); }, '#dc2626'));
@@ -963,7 +975,6 @@ function show3DContextMenu(event, hit, data) {
               offsetBottom: 0, offsetTop: 0 
           };
 
-          // ZMIANA: Dodano fullCabBaseZone, która ignoruje półki wewnątrz i widzi tylko spód/górę korpusu
           const fullCabBaseZone = {
               minX: th, maxX: W - th, minY: th, maxY: H - th,
               boundBottom: 'cab-bottom', boundTop: 'cab-top', boundLeft: 'cab-left', boundRight: 'cab-right',
@@ -1146,7 +1157,6 @@ function show3DContextMenu(event, hit, data) {
           }, '#1e40af');
           menu.appendChild(btnDoorLP);
 
-          // ZMIANA: Zupełnie nowa sekcja menu odpowiedzialna za całą szafkę
           menu.appendChild(createHeader('Zabudowa całej szafki (Zasłania półki)'));
 
           const btnFullDoor = createOption('Drzwi pojedyncze (Całość)', '🚪', () => {
