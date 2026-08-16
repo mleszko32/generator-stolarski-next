@@ -30,7 +30,6 @@ function recalculateLayout(mod) {
   const width = parseFloat(mod.dimensions.width) || 600;
   const height = parseFloat(mod.dimensions.height) || 720;
   
-  // POPRAWKA: Pobieramy lokalne ustawienia i luzy frontów z wybranej szafki!
   const f = { ...(config.front || {}), ...(mod.front || {}) };
   const fc = { ...(config.front?.clearance || {}), ...(mod.front?.clearance || {}) };
   const isInset = f.type === 'wpuszczane';
@@ -158,6 +157,12 @@ function recalculateLayout(mod) {
               let myX = el.frontIndex === 0 ? startX : startX + singleW + gapVal; 
               el.x = isNaN(myX) ? 0 : myX;
           }
+          
+          // --- NOWOŚĆ: BEZWZGLĘDNE NADPISYWANIE WYMIARÓW ---
+          if (el.forceH !== undefined && el.forceH !== null && !isNaN(el.forceH)) el.h = el.forceH;
+          if (el.forceW !== undefined && el.forceW !== null && !isNaN(el.forceW)) el.w = el.forceW;
+          if (el.forceOffsetX) el.x += el.forceOffsetX;
+          if (el.forceOffsetY) el.y += el.forceOffsetY;
       }
   });
 }
@@ -175,7 +180,7 @@ export function init3DViewer() {
   if (!container) return;
 
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xf1f5f9); 
+  scene.background = new THREE.Color(0xf1f5f9);
 
   camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 10, 100000);
   camera.position.set(2500, 1500, 3500);
@@ -242,7 +247,6 @@ export function init3DViewer() {
 
   renderer.domElement.addEventListener('pointerdown', (e) => {
       pointerDownPos.set(e.clientX, e.clientY);
-      
       if (alignMode.active) return;
 
       const rect = renderer.domElement.getBoundingClientRect();
@@ -253,9 +257,8 @@ export function init3DViewer() {
       const intersects = raycaster.intersectObjects(cabinetGroup.children, true);
       if (intersects.length > 0) {
           let group = intersects[0].object;
-          while(group.parent && group.parent !== cabinetGroup) {
-              group = group.parent;
-          }
+          while(group.parent && group.parent !== cabinetGroup) { group = group.parent; }
+          
           if (group.userData && group.userData.moduleId) {
               isDragging = true;
               dragTarget = group;
@@ -771,6 +774,46 @@ function show3DContextMenu(event, hit, data) {
       const el = mod.elements.find(e => e.id === data.elementId);
       if (el) {
           
+          // --- NOWA SEKCJA: RĘCZNE NADPISYWANIE WYMIARÓW FRONTU ---
+          menu.appendChild(createHeader('Korekta Ręczna Frontu'));
+          const overrideWrap = document.createElement('div');
+          Object.assign(overrideWrap.style, { padding: '10px', backgroundColor: '#f8fafc', borderRadius: '4px', marginBottom: '6px', border: '1px solid #e2e8f0' });
+          
+          const info = document.createElement('div');
+          info.innerHTML = `Aktualne: <b>${(el.w||0).toFixed(1)} x ${(el.h||0).toFixed(1)}</b> mm`;
+          Object.assign(info.style, { fontSize: '10px', color: '#64748b', marginBottom: '8px', textAlign: 'center' });
+          overrideWrap.appendChild(info);
+
+          const rowH = createInputRow('Wymuś Wys. [mm]:', el.forceH || '');
+          rowH.inp.placeholder = 'Auto';
+          const rowW = createInputRow('Wymuś Szer. [mm]:', el.forceW || '');
+          rowW.inp.placeholder = 'Auto';
+          const rowY = createInputRow('Przesuń Y ↕ [mm]:', el.forceOffsetY || '0');
+          const rowX = createInputRow('Przesuń X ↔ [mm]:', el.forceOffsetX || '0');
+
+          const btnApplyOverride = document.createElement('button');
+          btnApplyOverride.innerText = 'Zastosuj korektę';
+          Object.assign(btnApplyOverride.style, { width: '100%', padding: '6px', backgroundColor: '#8b5cf6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginTop: '4px' });
+
+          btnApplyOverride.onclick = (evt) => {
+              evt.stopPropagation();
+              el.forceH = rowH.inp.value !== '' ? parseFloat(rowH.inp.value) : null;
+              el.forceW = rowW.inp.value !== '' ? parseFloat(rowW.inp.value) : null;
+              el.forceOffsetY = rowY.inp.value !== '' ? parseFloat(rowY.inp.value) : 0;
+              el.forceOffsetX = rowX.inp.value !== '' ? parseFloat(rowX.inp.value) : 0;
+              menu.remove();
+              update3D();
+              updateSidebar();
+          };
+
+          overrideWrap.appendChild(rowH.row);
+          overrideWrap.appendChild(rowW.row);
+          overrideWrap.appendChild(rowY.row);
+          overrideWrap.appendChild(rowX.row);
+          overrideWrap.appendChild(btnApplyOverride);
+          menu.appendChild(overrideWrap);
+          // ---------------------------------------------------
+
           if (el.subtype.includes('szuflada')) {
               menu.appendChild(createHeader('Opcje pudła szuflady'));
               const boxWrap = document.createElement('div');
@@ -914,8 +957,7 @@ function show3DContextMenu(event, hit, data) {
                   menu.appendChild(bWrap);
               }
           }
-          
-          // POPRAWKA: OPCJE DLA ZWYKŁYCH DRZWI (W TYM FULL-CABINET)
+
           if (el.subtype === 'drzwi') {
               menu.appendChild(createHeader('Kierunek otwierania'));
               const isLeft = (el.openingSide === 'left' || !el.openingSide);
