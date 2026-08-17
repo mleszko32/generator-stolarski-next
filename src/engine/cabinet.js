@@ -114,7 +114,6 @@ export function calculateProjectHardware() {
     const backP = mod.backPanel || { type: 'nakladane', offset: 16 };
     const topBottomDepth = backP.type === 'nut' ? D - backP.offset - backThick : D - backThick;
 
-    // LOKALNE USTAWIENIA FRONTÓW
     const f = { ...(config.front || {}), ...(mod.front || {}) };
     const fc = { ...(config.front?.clearance || {}), ...(mod.front?.clearance || {}) };
 
@@ -149,7 +148,6 @@ export function calculateProjectHardware() {
         const innerWidth = front.baseZone ? (front.baseZone.maxX - front.baseZone.minX) : W - (board * 2);
         const userForcedVariant = front.forceVariant || 'auto';
         
-        // Zastosowanie lokalnego systemu szuflad
         const sysName = f.drawerSystem || 'merivobox';
         const drawerComps = getDrawerComponents(sysName, innerWidth, topBottomDepth, availableSpace, userForcedVariant);
 
@@ -307,9 +305,9 @@ function getInteriorParts(mod, config) {
   mod.elements.forEach(el => {
     if (el.typ === 'pion') {
       partitionCount++;
-      parts.push({ name: `Przegroda pionowa ${partitionCount}`, length: parseFloat(el.h.toFixed(1)), width: innerPartDepth, qty: 1, category: "Korpus" });
+      parts.push({ name: `Przegroda pionowa ${partitionCount}`, length: parseFloat((el.h || 0).toFixed(1)), width: innerPartDepth, qty: 1, category: "Korpus" });
     } else if (el.typ === 'poziom' && !el.isStructural) {
-      parts.push({ name: `P${width}`, length: parseFloat(el.w.toFixed(1)), width: innerPartDepth - 5, qty: 1, category: "Korpus" });
+      parts.push({ name: `P${width}`, length: parseFloat((el.w || 0).toFixed(1)), width: innerPartDepth - 5, qty: 1, category: "Korpus" });
     }
   });
 
@@ -345,7 +343,7 @@ function getFrontsAndDrawers(mod, config) {
       partName = `Drzwi ${side}`;
     }
 
-    parts.push({ name: partName, length: parseFloat(front.h.toFixed(1)), width: parseFloat(front.w.toFixed(1)), qty: 1, category: "Front" });
+    parts.push({ name: partName, length: parseFloat((front.h || 0).toFixed(1)), width: parseFloat((front.w || 0).toFixed(1)), qty: 1, category: "Front" });
 
     if (front.subtype.includes('szuflada')) {
       const isBottomInZone = front.frontIndex === 0;
@@ -388,6 +386,29 @@ function getFrontsAndDrawers(mod, config) {
               }
           }
 
+          // --- POPRAWKA DYNAMICZNYCH LUZÓW ---
+          if (adjustedHoles.frontHoles) {
+              adjustedHoles.frontHoles.forEach(h => {
+                  // front.x to szczelina z lewej (np. 1.5mm).
+                  // board to grubość boku (np. 18mm).
+                  // Nałożenie z lewej strony wynosi: 18 - 1.5 = 16.5mm
+                  const actualOverlapLeft = board - (front.x || 0);
+                  
+                  // Prawa szczelina to całkowita szerokość korpusu odjąć (pozycja X frontu + jego szerokość)
+                  const rightGap = width - ((front.x || 0) + (front.w || width));
+                  // Nałożenie z prawej strony wynosi: board - szczelina z prawej
+                  const actualOverlapRight = board - rightGap;
+                  
+                  // Zgodnie z parametrami montażowymi, wymiar od wewnętrznej krawędzi do osi wiercenia 
+                  // to równe 20.5 mm dla popularnych szuflad. 
+                  // Przekładając to na front (licząc od krawędzi bocznej frontu):
+                  const innerDist = 20.5;
+                  
+                  h.xOffsetLeft = actualOverlapLeft + innerDist;
+                  h.xOffsetRight = actualOverlapRight + innerDist;
+              });
+          }
+
           adjustedHoles.frontId = front.id; 
           adjustedHoles.type = 'drawer'; 
           mountingData.push(adjustedHoles); 
@@ -408,8 +429,8 @@ function getFrontsAndDrawers(mod, config) {
         const drawerComps = getDrawerComponents(sysName, width - (board * 2), availableDepth, simulatedSpace, userForcedVariant);
         
         if (drawerComps) {
-          parts.push({ name: `Dno W${width} NL${drawerComps.nominalLength}`, length: parseFloat(drawerComps.bottom.length.toFixed(1)), width: parseFloat(drawerComps.bottom.width.toFixed(1)), qty: 1, category: "Szuflada" });
-          parts.push({ name: `Tył W${width} (${drawerComps.back.variantType})`, length: parseFloat(drawerComps.back.width.toFixed(1)), width: parseFloat(drawerComps.back.height.toFixed(1)), qty: 1, category: "Szuflada" });
+          parts.push({ name: `Dno W${width} NL${drawerComps.nominalLength}`, length: parseFloat((drawerComps.bottom.length || 0).toFixed(1)), width: parseFloat((drawerComps.bottom.width || 0).toFixed(1)), qty: 1, category: "Szuflada" });
+          parts.push({ name: `Tył W${width} (${drawerComps.back.variantType})`, length: parseFloat((drawerComps.back.width || 0).toFixed(1)), width: parseFloat((drawerComps.back.height || 0).toFixed(1)), qty: 1, category: "Szuflada" });
         }
       }
     } 
