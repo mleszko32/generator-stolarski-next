@@ -49,9 +49,18 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
       const maxY = Math.max(y1, y2);
       const midY = (minY + maxY) / 2;
       let res = `<line x1="${x}" y1="${minY}" x2="${x}" y2="${maxY}" stroke="${color}" stroke-width="1.5" marker-start="url(#${marker})" marker-end="url(#${marker})" />`;
-      res += `<rect x="${x-18}" y="${midY-8}" width="36" height="16" fill="#f8fafc" />`;
+      res += `<rect x="${x-18}" y="${midY-8}" width="36" height="16" fill="#ffffff" />`;
       res += `<text x="${x}" y="${midY+4}" font-size="10" fill="${color}" font-weight="bold" text-anchor="middle">${val}</text>`;
       return res;
+  };
+
+  const dimV_TextOffset = (x, y1, y2, val, color="#dc2626", marker="arrow-red", labelOffset=20) => {
+    const minY = Math.min(y1, y2);
+    const maxY = Math.max(y1, y2);
+    const midY = (minY + maxY) / 2;
+    let res = `<line x1="${x}" y1="${minY}" x2="${x}" y2="${maxY}" stroke="${color}" stroke-width="1.5" marker-start="url(#${marker})" marker-end="url(#${marker})" />`;
+    res += `<text x="${x + labelOffset}" y="${midY+4}" font-size="10" fill="${color}" font-weight="bold" text-anchor="${labelOffset > 0 ? 'start' : 'end'}">${val}</text>`;
+    return res;
   };
 
   const dimH = (x1, x2, y, val, color="#dc2626", marker="arrow-red") => {
@@ -305,7 +314,6 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
         svg += `</g>`;
       }
       
-      // NOWE WYMIAROWANIE PÓŁEK RUCHOMYCH
       if (sortedShelfYs.length > 0) {
         svg += `<g class="layer-holes-shelf">`; 
         
@@ -340,16 +348,17 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
         svg += `</g>`;
       }
 
-      // PRZYWRÓCONY WYMIAR MIĘDZY ŚRODKOWYMI OTWORAMI PÓŁEK
+      // NOWOŚĆ: WYMIAR MIĘDZY PÓŁKAMI PRZENIESIONY NA FORMATKĘ! (ok. 80mm od lewej krawędzi)
       if (sortedShelfYs.length > 1) {
           svg += `<g class="layer-holes-shelf">`;
           for (let i = 0; i < sortedShelfYs.length - 1; i++) {
               let svgY1 = sideH - sortedShelfYs[i];
               let svgY2 = sideH - sortedShelfYs[i+1];
               let val = formatVal(sortedShelfYs[i+1] - sortedShelfYs[i]);
-              svg += dimV(currentDimX_L, svgY1, svgY2, val, "#ea580c", "arrow-amber");
+              
+              // Rysujemy wymiar wewnątrz formatki (bokLX + 80)
+              svg += dimV(bokLX + 80, svgY1, svgY2, val, "#ea580c", "arrow-amber");
           }
-          currentDimX_L -= 35;
           svg += `</g>`;
       }
 
@@ -434,16 +443,17 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
         svg += `</g>`;
       }
 
-      // PRZYWRÓCONY WYMIAR MIĘDZY ŚRODKOWYMI OTWORAMI PÓŁEK
+      // NOWOŚĆ: WYMIAR MIĘDZY PÓŁKAMI PRZENIESIONY NA FORMATKĘ! (ok. 80mm od prawej przedniej krawędzi)
       if (sortedShelfYs.length > 1) {
           svg += `<g class="layer-holes-shelf">`;
           for (let i = 0; i < sortedShelfYs.length - 1; i++) {
               let svgY1 = sideH - sortedShelfYs[i];
               let svgY2 = sideH - sortedShelfYs[i+1];
               let val = formatVal(sortedShelfYs[i+1] - sortedShelfYs[i]);
-              svg += dimV(currentDimX_R, svgY1, svgY2, val, "#ea580c", "arrow-amber");
+              
+              // Rysujemy wymiar wewnątrz formatki (od prawej krawędzi)
+              svg += dimV(bokRX + depth - 80, svgY1, svgY2, val, "#ea580c", "arrow-amber");
           }
-          currentDimX_R += 35;
           svg += `</g>`;
       }
 
