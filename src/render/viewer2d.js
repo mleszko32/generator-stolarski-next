@@ -54,15 +54,6 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
       return res;
   };
 
-  const dimV_TextOffset = (x, y1, y2, val, color="#dc2626", marker="arrow-red", labelOffset=20) => {
-    const minY = Math.min(y1, y2);
-    const maxY = Math.max(y1, y2);
-    const midY = (minY + maxY) / 2;
-    let res = `<line x1="${x}" y1="${minY}" x2="${x}" y2="${maxY}" stroke="${color}" stroke-width="1.5" marker-start="url(#${marker})" marker-end="url(#${marker})" />`;
-    res += `<text x="${x + labelOffset}" y="${midY+4}" font-size="10" fill="${color}" font-weight="bold" text-anchor="${labelOffset > 0 ? 'start' : 'end'}">${val}</text>`;
-    return res;
-  };
-
   const dimH = (x1, x2, y, val, color="#dc2626", marker="arrow-red") => {
       const minX = Math.min(x1, x2);
       const maxX = Math.max(x1, x2);
@@ -194,7 +185,7 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
 
   let drawerYs = new Set();
   let corpusYs = new Set(); 
-  let shelfYsObj = []; 
+  let shelfYs = new Set(); // POPRAWKA: Pobieramy wymiary wszystkich otworów
 
   const shelfHoles = calculateShelfHoles();
   if (shelfHoles && shelfHoles.length > 0) {
@@ -206,44 +197,23 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
       const radius = hole.diameter ? (hole.diameter / 2) : 2.5; 
       const layerClass = isStruct ? 'layer-holes-corpus' : 'layer-holes-shelf';
       
-      if (!isStruct) {
-          const holeY1 = calcY - 32;
-          const holeY2 = calcY; 
-          const holeY3 = calcY + 32;
+      const svgY = sideH - calcY;
+      
+      // Rysujemy każdy otwór dokładnie z parametrami jakie zwraca shelfMath.js (niczego nie powielamy!)
+      svg += `<g class="${layerClass}">`;
+      if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') {
+          svg += `<circle cx="${bokLX + hole.x}" cy="${svgY}" r="${radius}" fill="${color}" />`;
+      }
+      if (viewMode === 'all' || viewMode === 'bokR' || viewMode === 'boki') {
+          svg += `<circle cx="${bokRX + depth - hole.x}" cy="${svgY}" r="${radius}" fill="${color}" />`;
+      }
+      svg += `</g>`;
 
-          const svgY1 = sideH - holeY1;
-          const svgY2 = sideH - holeY2;
-          const svgY3 = sideH - holeY3;
-
-          svg += `<g class="${layerClass}">`;
-          if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') {
-              svg += `<circle cx="${bokLX + hole.x}" cy="${svgY1}" r="${radius}" fill="${color}" />`;
-              svg += `<circle cx="${bokLX + hole.x}" cy="${svgY2}" r="${radius}" fill="${color}" />`;
-              svg += `<circle cx="${bokLX + hole.x}" cy="${svgY3}" r="${radius}" fill="${color}" />`;
-          }
-          if (viewMode === 'all' || viewMode === 'bokR' || viewMode === 'boki') {
-              svg += `<circle cx="${bokRX + depth - hole.x}" cy="${svgY1}" r="${radius}" fill="${color}" />`;
-              svg += `<circle cx="${bokRX + depth - hole.x}" cy="${svgY2}" r="${radius}" fill="${color}" />`;
-              svg += `<circle cx="${bokRX + depth - hole.x}" cy="${svgY3}" r="${radius}" fill="${color}" />`;
-          }
-          svg += `</g>`;
-
-          // POPRAWKA: Pobieramy wymiar raz na PÓŁKĘ, bez duplikacji przez X (przód/tył)
-          if (hole.isCenter && hole.x === 37) {
-              shelfYsObj.push({ bottomY: holeY1 });
-          }
-      } else {
-          const svgY = sideH - calcY;
-          svg += `<g class="${layerClass}">`;
-          if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') {
-              svg += `<circle cx="${bokLX + hole.x}" cy="${svgY}" r="${radius}" fill="${color}" />`;
-          }
-          if (viewMode === 'all' || viewMode === 'bokR' || viewMode === 'boki') {
-              svg += `<circle cx="${bokRX + depth - hole.x}" cy="${svgY}" r="${radius}" fill="${color}" />`;
-          }
-          svg += `</g>`;
-
-          if (hole.isCenter) corpusYs.add(calcY);
+      if (isStruct && hole.isCenter) {
+          corpusYs.add(calcY);
+      } else if (!isStruct && hole.x === 37) { 
+          // Pobieramy calcY do wymiarowania (sprawdzamy x===37 żeby nie dublować Y z tyłu szafki)
+          shelfYs.add(calcY); 
       }
     });
   }
@@ -310,7 +280,7 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
 
   const sortedDrawerYs = Array.from(drawerYs).sort((a,b) => a - b);
   const sortedCorpusYs = Array.from(corpusYs).sort((a,b) => a - b);
-  const sortedShelfYsObjects = Array.from(shelfYsObj).sort((a,b) => a.bottomY - b.bottomY);
+  const sortedShelfYs = Array.from(shelfYs).sort((a,b) => a - b);
 
   if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') {
       let currentDimX_L = bokLX - 25;
@@ -337,16 +307,23 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
         svg += `</g>`;
       }
       
-      if (sortedShelfYsObjects.length > 0) {
+      // POPRAWKA: WYMIAROWANIE PÓŁEK Z KOMPLETEM INFORMACJI DO KAŻDEJ DZIURKI (Z GÓRY I Z DOŁU)
+      if (sortedShelfYs.length > 0) {
         svg += `<g class="layer-holes-shelf">`; 
-        sortedShelfYsObjects.forEach(shelfHole => {
-          let lowestHoleSvgY = sideH - shelfHole.bottomY;
-          let labelText = `${formatVal(shelfHole.bottomY)}  (${formatVal(sideH - shelfHole.bottomY)})`;
+        
+        // Jedna pionowa linia prowadząca od dołu boku do najwyższego otworu półki
+        const highestHoleSvgY = sideH - sortedShelfYs[sortedShelfYs.length - 1];
+        svg += `<line x1="${currentDimX_L}" y1="${sideH}" x2="${currentDimX_L}" y2="${highestHoleSvgY}" stroke="#f59e0b" stroke-width="1.5" />`;
+
+        sortedShelfYs.forEach(calcY => {
+          let holeSvgY = sideH - calcY;
+          let labelText = `${formatVal(calcY)}  (${formatVal(sideH - calcY)})`;
           
-          svg += `<line x1="${bokLX}" y1="${lowestHoleSvgY}" x2="${currentDimX_L}" y2="${lowestHoleSvgY}" stroke="#f59e0b" stroke-width="0.5" stroke-dasharray="2,2" />`;
-          svg += dimV_TextOffset(currentDimX_L, sideH, lowestHoleSvgY, labelText, "#f59e0b", "arrow-amber", -10);
-          currentDimX_L -= 35;
+          // Odsadzenia dla czytelności – krótka pozioma linia do otworów
+          svg += `<line x1="${bokLX}" y1="${holeSvgY}" x2="${currentDimX_L}" y2="${holeSvgY}" stroke="#f59e0b" stroke-width="0.5" stroke-dasharray="2,2" />`;
+          svg += `<text x="${currentDimX_L - 6}" y="${holeSvgY + 3.5}" font-size="10" fill="#f59e0b" font-weight="bold" text-anchor="end">${labelText}</text>`;
         });
+        currentDimX_L -= 65; 
         svg += `</g>`;
       }
 
@@ -396,16 +373,20 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
         svg += `</g>`;
       }
       
-      if (sortedShelfYsObjects.length > 0) {
+      if (sortedShelfYs.length > 0) {
         svg += `<g class="layer-holes-shelf">`;
-        sortedShelfYsObjects.forEach(shelfHole => {
-          let lowestHoleSvgY = sideH - shelfHole.bottomY;
-          let labelText = `${formatVal(shelfHole.bottomY)}  (${formatVal(sideH - shelfHole.bottomY)})`;
+        
+        const highestHoleSvgY = sideH - sortedShelfYs[sortedShelfYs.length - 1];
+        svg += `<line x1="${currentDimX_R}" y1="${sideH}" x2="${currentDimX_R}" y2="${highestHoleSvgY}" stroke="#f59e0b" stroke-width="1.5" />`;
 
-          svg += `<line x1="${bokRX + depth}" y1="${lowestHoleSvgY}" x2="${currentDimX_R}" y2="${lowestHoleSvgY}" stroke="#f59e0b" stroke-width="0.5" stroke-dasharray="2,2" />`;
-          svg += dimV_TextOffset(currentDimX_R, sideH, lowestHoleSvgY, labelText, "#f59e0b", "arrow-amber", 10);
-          currentDimX_R += 35;
+        sortedShelfYs.forEach(calcY => {
+          let holeSvgY = sideH - calcY;
+          let labelText = `${formatVal(calcY)}  (${formatVal(sideH - calcY)})`;
+
+          svg += `<line x1="${bokRX + depth}" y1="${holeSvgY}" x2="${currentDimX_R}" y2="${holeSvgY}" stroke="#f59e0b" stroke-width="0.5" stroke-dasharray="2,2" />`;
+          svg += `<text x="${currentDimX_R + 6}" y="${holeSvgY + 3.5}" font-size="10" fill="#f59e0b" font-weight="bold" text-anchor="start">${labelText}</text>`;
         });
+        currentDimX_R += 65;
         svg += `</g>`;
       }
 
