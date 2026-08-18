@@ -49,7 +49,7 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
       const maxY = Math.max(y1, y2);
       const midY = (minY + maxY) / 2;
       let res = `<line x1="${x}" y1="${minY}" x2="${x}" y2="${maxY}" stroke="${color}" stroke-width="1.5" marker-start="url(#${marker})" marker-end="url(#${marker})" />`;
-      res += `<rect x="${x-18}" y="${midY-8}" width="36" height="16" fill="#ffffff" />`;
+      res += `<rect x="${x-18}" y="${midY-8}" width="36" height="16" fill="#f8fafc" />`;
       res += `<text x="${x}" y="${midY+4}" font-size="10" fill="${color}" font-weight="bold" text-anchor="middle">${val}</text>`;
       return res;
   };
@@ -231,17 +231,24 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
           let calcY = isTopBottomFullWidth ? hinge.y - th : hinge.y;
           const svgY = sideH - calcY;
           
+          // NOWOŚĆ: Bliższa krawędź dla zawiasów (Prowadniki na boku)
+          let distBottom = calcY;
+          let distTop = sideH - calcY;
+          let primary = distBottom <= distTop ? distBottom : distTop;
+          let secondary = distBottom <= distTop ? distTop : distBottom;
+          let labelText = `Y: ${formatVal(primary)} (${formatVal(secondary)})`;
+          
           svg += `<g class="layer-holes-hinge">`;
           if (data.side === 'left' && (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki')) {
             const svgX = bokLX + 37;
             svg += `<circle cx="${svgX}" cy="${svgY - 16}" r="2.5" fill="#16a34a" />`;
             svg += `<circle cx="${svgX}" cy="${svgY + 16}" r="2.5" fill="#16a34a" />`;
-            svg += `<text x="${svgX + 8}" y="${svgY + 4}" font-size="10" font-weight="bold" fill="#16a34a">Y: ${formatVal(hinge.y)}</text>`;
+            svg += `<text x="${svgX + 8}" y="${svgY + 4}" font-size="10" font-weight="bold" fill="#16a34a">${labelText}</text>`;
           } else if (data.side === 'right' && (viewMode === 'all' || viewMode === 'bokR' || viewMode === 'boki')) {
             const svgX = bokRX + depth - 37;
             svg += `<circle cx="${svgX}" cy="${svgY - 16}" r="2.5" fill="#16a34a" />`;
             svg += `<circle cx="${svgX}" cy="${svgY + 16}" r="2.5" fill="#16a34a" />`;
-            svg += `<text x="${svgX - 8}" y="${svgY + 4}" font-size="10" font-weight="bold" fill="#16a34a" text-anchor="end">Y: ${formatVal(hinge.y)}</text>`;
+            svg += `<text x="${svgX - 8}" y="${svgY + 4}" font-size="10" font-weight="bold" fill="#16a34a" text-anchor="end">${labelText}</text>`;
           }
           svg += `</g>`;
         });
@@ -348,7 +355,6 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
         svg += `</g>`;
       }
 
-      // NOWOŚĆ: WYMIAR MIĘDZY PÓŁKAMI PRZENIESIONY NA FORMATKĘ! (ok. 80mm od lewej krawędzi)
       if (sortedShelfYs.length > 1) {
           svg += `<g class="layer-holes-shelf">`;
           for (let i = 0; i < sortedShelfYs.length - 1; i++) {
@@ -356,7 +362,6 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
               let svgY2 = sideH - sortedShelfYs[i+1];
               let val = formatVal(sortedShelfYs[i+1] - sortedShelfYs[i]);
               
-              // Rysujemy wymiar wewnątrz formatki (bokLX + 80)
               svg += dimV(bokLX + 80, svgY1, svgY2, val, "#ea580c", "arrow-amber");
           }
           svg += `</g>`;
@@ -443,7 +448,6 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
         svg += `</g>`;
       }
 
-      // NOWOŚĆ: WYMIAR MIĘDZY PÓŁKAMI PRZENIESIONY NA FORMATKĘ! (ok. 80mm od prawej przedniej krawędzi)
       if (sortedShelfYs.length > 1) {
           svg += `<g class="layer-holes-shelf">`;
           for (let i = 0; i < sortedShelfYs.length - 1; i++) {
@@ -451,7 +455,6 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
               let svgY2 = sideH - sortedShelfYs[i+1];
               let val = formatVal(sortedShelfYs[i+1] - sortedShelfYs[i]);
               
-              // Rysujemy wymiar wewnątrz formatki (od prawej krawędzi)
               svg += dimV(bokRX + depth - 80, svgY1, svgY2, val, "#ea580c", "arrow-amber");
           }
           svg += `</g>`;
@@ -520,8 +523,14 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
                  svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="17.5" fill="#fcfdfd" stroke="#16a34a" stroke-width="1.5" />`;
                  svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="2.5" fill="#16a34a" />`;
 
-                 const yBottom = Number(hinge.relY).toFixed(1);
-                 svg += `<text x="${cupX + (isLeft ? 22 : -22)}" y="${holeSvgY + 4}" font-size="10" fill="#16a34a" font-weight="bold" text-anchor="${isLeft ? 'start' : 'end'}">Y: ${yBottom}</text>`;
+                 // NOWOŚĆ: Bliższa krawędź dla otworów puszek we froncie
+                 let distBottom = hinge.relY;
+                 let distTop = front.h - hinge.relY;
+                 let primary = distBottom <= distTop ? distBottom : distTop;
+                 let secondary = distBottom <= distTop ? distTop : distBottom;
+                 let label = `Y: ${formatVal(primary)} (${formatVal(secondary)})`;
+
+                 svg += `<text x="${cupX + (isLeft ? 22 : -22)}" y="${holeSvgY + 4}" font-size="10" fill="#16a34a" font-weight="bold" text-anchor="${isLeft ? 'start' : 'end'}">${label}</text>`;
               });
             }
             svg += `</g>`;
