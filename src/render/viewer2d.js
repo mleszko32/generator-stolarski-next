@@ -11,7 +11,7 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
   const cabWidth = parseFloat(mod.dimensions?.width) || 600;
   const th = parseFloat(config.materials?.boardThickness) || 18;
 
-  const cons = config.construction || { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100 };
+  const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(config.construction || {}), ...(mod.construction || {}) };
   const isTopBottomFullWidth = cons.joinType === 'wience_przelotowe';
   const sideH = isTopBottomFullWidth ? height - (th * 2) : height;
   const viewH = sideH; 
@@ -52,6 +52,15 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
       res += `<rect x="${x-18}" y="${midY-8}" width="36" height="16" fill="#f8fafc" />`;
       res += `<text x="${x}" y="${midY+4}" font-size="10" fill="${color}" font-weight="bold" text-anchor="middle">${val}</text>`;
       return res;
+  };
+
+  const dimV_TextOffset = (x, y1, y2, val, color="#dc2626", marker="arrow-red", labelOffset=20) => {
+    const minY = Math.min(y1, y2);
+    const maxY = Math.max(y1, y2);
+    const midY = (minY + maxY) / 2;
+    let res = `<line x1="${x}" y1="${minY}" x2="${x}" y2="${maxY}" stroke="${color}" stroke-width="1.5" marker-start="url(#${marker})" marker-end="url(#${marker})" />`;
+    res += `<text x="${x + labelOffset}" y="${midY+4}" font-size="10" fill="${color}" font-weight="bold" text-anchor="${labelOffset > 0 ? 'start' : 'end'}">${val}</text>`;
+    return res;
   };
 
   const dimH = (x1, x2, y, val, color="#dc2626", marker="arrow-red") => {
@@ -96,7 +105,7 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
         <circle cx="0" cy="20" r="4" fill="#9333ea"/><circle cx="12" cy="20" r="1.5" fill="#9333ea"/>
         <text x="22" y="24" font-size="12" fill="#9333ea">Konstrukcja: Wieńce / Półki stałe (Kołki + Wkręty)</text>
         <circle cx="0" cy="45" r="2.5" fill="#f59e0b"/>
-        <text x="22" y="49" font-size="12" fill="#f59e0b">Podpórki półek ruchomych (5mm)</text>
+        <text x="22" y="49" font-size="12" fill="#f59e0b">Podpórki półek ruchomych (Trzy otwory System 32)</text>
         <circle cx="340" cy="20" r="2.5" fill="#0284c7"/>
         <text x="352" y="24" font-size="12" fill="#0284c7">Prowadnice szuflad (5mm)</text>
         <circle cx="340" cy="45" r="2.5" fill="#dc2626"/>
@@ -185,30 +194,59 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
 
   let drawerYs = new Set();
   let corpusYs = new Set(); 
-  let shelfYs = new Set(); 
+  let shelfYsObj = []; 
 
   const shelfHoles = calculateShelfHoles();
   if (shelfHoles && shelfHoles.length > 0) {
     shelfHoles.forEach(hole => {
       let calcY = isTopBottomFullWidth ? hole.y - th : hole.y;
-      const svgY = sideH - calcY;
       
       const isStruct = hole.isStructural === true || hole.type === 'konstrukcyjna';
       const color = isStruct ? '#9333ea' : '#f59e0b';
       const radius = hole.diameter ? (hole.diameter / 2) : 2.5; 
       const layerClass = isStruct ? 'layer-holes-corpus' : 'layer-holes-shelf';
       
-      svg += `<g class="${layerClass}">`;
-      if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') {
-          svg += `<circle cx="${bokLX + hole.x}" cy="${svgY}" r="${radius}" fill="${color}" />`;
-      }
-      if (viewMode === 'all' || viewMode === 'bokR' || viewMode === 'boki') {
-          svg += `<circle cx="${bokRX + depth - hole.x}" cy="${svgY}" r="${radius}" fill="${color}" />`;
-      }
-      svg += `</g>`;
+      // ZMIANA: Obsługa "SYSTEMU 32" DLA PÓŁEK RUCHOMYCH
+      if (!isStruct) {
+          // Wygenerujemy 3 otwory, w odległości 32mm od siebie
+          const holeY1 = calcY - 32;
+          const holeY2 = calcY; // Środek półki
+          const holeY3 = calcY + 32;
 
-      if (isStruct && hole.isCenter) corpusYs.add(calcY);
-      else if (!isStruct && hole.isCenter) shelfYs.add(calcY);
+          const svgY1 = sideH - holeY1;
+          const svgY2 = sideH - holeY2;
+          const svgY3 = sideH - holeY3;
+
+          svg += `<g class="${layerClass}">`;
+          if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') {
+              svg += `<circle cx="${bokLX + hole.x}" cy="${svgY1}" r="${radius}" fill="${color}" />`;
+              svg += `<circle cx="${bokLX + hole.x}" cy="${svgY2}" r="${radius}" fill="${color}" />`;
+              svg += `<circle cx="${bokLX + hole.x}" cy="${svgY3}" r="${radius}" fill="${color}" />`;
+          }
+          if (viewMode === 'all' || viewMode === 'bokR' || viewMode === 'boki') {
+              svg += `<circle cx="${bokRX + depth - hole.x}" cy="${svgY1}" r="${radius}" fill="${color}" />`;
+              svg += `<circle cx="${bokRX + depth - hole.x}" cy="${svgY2}" r="${radius}" fill="${color}" />`;
+              svg += `<circle cx="${bokRX + depth - hole.x}" cy="${svgY3}" r="${radius}" fill="${color}" />`;
+          }
+          svg += `</g>`;
+
+          if (hole.isCenter) {
+              shelfYsObj.push({ y1: holeY1, y2: holeY2, y3: holeY3, bottomY: holeY1 }); // Bierzemy najniższy punkt do wymiarowania!
+          }
+      } else {
+          // Półka konstrukcyjna (bez zmian)
+          const svgY = sideH - calcY;
+          svg += `<g class="${layerClass}">`;
+          if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') {
+              svg += `<circle cx="${bokLX + hole.x}" cy="${svgY}" r="${radius}" fill="${color}" />`;
+          }
+          if (viewMode === 'all' || viewMode === 'bokR' || viewMode === 'boki') {
+              svg += `<circle cx="${bokRX + depth - hole.x}" cy="${svgY}" r="${radius}" fill="${color}" />`;
+          }
+          svg += `</g>`;
+
+          if (hole.isCenter) corpusYs.add(calcY);
+      }
     });
   }
 
@@ -274,7 +312,7 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
 
   const sortedDrawerYs = Array.from(drawerYs).sort((a,b) => a - b);
   const sortedCorpusYs = Array.from(corpusYs).sort((a,b) => a - b);
-  const sortedShelfYs = Array.from(shelfYs).sort((a,b) => a - b);
+  const sortedShelfYsObjects = Array.from(shelfYsObj).sort((a,b) => a.bottomY - b.bottomY);
 
   if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') {
       let currentDimX_L = bokLX - 25;
@@ -301,27 +339,19 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
         svg += `</g>`;
       }
       
-      if (sortedShelfYs.length > 0) {
+      if (sortedShelfYsObjects.length > 0) {
         svg += `<g class="layer-holes-shelf">`; 
-        sortedShelfYs.forEach(calcY => {
-          let holeSvgY = sideH - calcY;
-          svg += `<line x1="${bokLX}" y1="${holeSvgY}" x2="${currentDimX_L}" y2="${holeSvgY}" stroke="#f59e0b" stroke-width="0.5" stroke-dasharray="2,2" />`;
-          svg += dimV(currentDimX_L, sideH, holeSvgY, formatVal(calcY), "#f59e0b", "arrow-amber");
-          currentDimX_L -= 25;
+        sortedShelfYsObjects.forEach(shelfHole => {
+          // ZMIANA: Wymiarujemy do najniższego z trzech otworów
+          let lowestHoleSvgY = sideH - shelfHole.bottomY;
+          let labelText = `${formatVal(shelfHole.bottomY)}  (${formatVal(sideH - shelfHole.bottomY)})`;
+          
+          svg += `<line x1="${bokLX}" y1="${lowestHoleSvgY}" x2="${currentDimX_L}" y2="${lowestHoleSvgY}" stroke="#f59e0b" stroke-width="0.5" stroke-dasharray="2,2" />`;
+          // Używamy nowej funkcji z offsetem, żeby długi tekst (z nawiasem) nie nachodził na linię
+          svg += dimV_TextOffset(currentDimX_L, sideH, lowestHoleSvgY, labelText, "#f59e0b", "arrow-amber", -10);
+          currentDimX_L -= 35;
         });
         svg += `</g>`;
-      }
-
-      if (sortedShelfYs.length > 1) {
-          svg += `<g class="layer-holes-shelf">`;
-          for (let i = 0; i < sortedShelfYs.length - 1; i++) {
-              let svgY1 = sideH - sortedShelfYs[i];
-              let svgY2 = sideH - sortedShelfYs[i+1];
-              let val = formatVal(sortedShelfYs[i+1] - sortedShelfYs[i]);
-              let dimXL = bokLX + 37 + 20; 
-              svg += dimV(dimXL, svgY1, svgY2, val, "#f59e0b", "arrow-amber");
-          }
-          svg += `</g>`;
       }
 
       if (mountingData) {
@@ -370,27 +400,17 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
         svg += `</g>`;
       }
       
-      if (sortedShelfYs.length > 0) {
+      if (sortedShelfYsObjects.length > 0) {
         svg += `<g class="layer-holes-shelf">`;
-        sortedShelfYs.forEach(calcY => {
-          let holeSvgY = sideH - calcY;
-          svg += `<line x1="${bokRX + depth}" y1="${holeSvgY}" x2="${currentDimX_R}" y2="${holeSvgY}" stroke="#f59e0b" stroke-width="0.5" stroke-dasharray="2,2" />`;
-          svg += dimV(currentDimX_R, sideH, holeSvgY, formatVal(calcY), "#f59e0b", "arrow-amber");
-          currentDimX_R += 25;
+        sortedShelfYsObjects.forEach(shelfHole => {
+          let lowestHoleSvgY = sideH - shelfHole.bottomY;
+          let labelText = `${formatVal(shelfHole.bottomY)}  (${formatVal(sideH - shelfHole.bottomY)})`;
+
+          svg += `<line x1="${bokRX + depth}" y1="${lowestHoleSvgY}" x2="${currentDimX_R}" y2="${lowestHoleSvgY}" stroke="#f59e0b" stroke-width="0.5" stroke-dasharray="2,2" />`;
+          svg += dimV_TextOffset(currentDimX_R, sideH, lowestHoleSvgY, labelText, "#f59e0b", "arrow-amber", 10);
+          currentDimX_R += 35;
         });
         svg += `</g>`;
-      }
-
-      if (sortedShelfYs.length > 1) {
-          svg += `<g class="layer-holes-shelf">`;
-          for (let i = 0; i < sortedShelfYs.length - 1; i++) {
-              let svgY1 = sideH - sortedShelfYs[i];
-              let svgY2 = sideH - sortedShelfYs[i+1];
-              let val = formatVal(sortedShelfYs[i+1] - sortedShelfYs[i]);
-              let dimXR = bokRX + depth - 37 - 20;
-              svg += dimV(dimXR, svgY1, svgY2, val, "#f59e0b", "arrow-amber");
-          }
-          svg += `</g>`;
       }
 
       if (mountingData) {
