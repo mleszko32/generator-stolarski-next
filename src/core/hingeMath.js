@@ -1,9 +1,19 @@
 // src/core/hingeMath.js
+import { state } from './state.js';
 
 export function calculateHinges(front, boardThick, obstacles, side) {
-  // Wymuszamy pełne milimetry już na starcie
   const h = Math.round(front.h); 
   const y = Math.round(front.y); 
+  
+  // Znajdujemy moduł, w którym fizycznie znajduje się ten konkretny front
+  const parentModule = state.project.modules.find(m => m.elements && m.elements.some(e => e.id === front.id));
+  
+  // Wyciągamy ustawienia z tego konretnego modułu (lub używamy domyślnych, jeśli to stary projekt)
+  const modHinges = parentModule?.front?.hinges || { topOffset: 100, bottomOffset: 100, margin: 40 };
+  
+  const topDist = Number(modHinges.topOffset);
+  const bottomDist = Number(modHinges.bottomOffset);
+  const customMargin = Number(modHinges.margin);
   
   let count = 2;
   if (h > 2000) count = 5;
@@ -11,21 +21,18 @@ export function calculateHinges(front, boardThick, obstacles, side) {
   else if (h > 900) count = 3;
 
   let cupRelPositions = [];
-  const edgeDist = 100;
   
   if (count === 2) {
-    cupRelPositions = [edgeDist, h - edgeDist];
+    cupRelPositions = [bottomDist, h - topDist];
   } else {
-    // Krok między zawiasami zaokrąglony do pełnych mm
-    const step = Math.round((h - 2 * edgeDist) / (count - 1));
+    const step = Math.round((h - topDist - bottomDist) / (count - 1));
     for (let i = 0; i < count; i++) {
       if (i === 0) {
-         cupRelPositions.push(edgeDist);
+         cupRelPositions.push(bottomDist);
       } else if (i === count - 1) {
-         // Ostatni zawias trzyma twarde 100 mm od góry
-         cupRelPositions.push(h - edgeDist); 
+         cupRelPositions.push(h - topDist); 
       } else {
-         cupRelPositions.push(edgeDist + i * step);
+         cupRelPositions.push(bottomDist + i * step);
       }
     }
   }
@@ -41,27 +48,28 @@ export function calculateHinges(front, boardThick, obstacles, side) {
     while (collision && attempts < 15) {
       collision = false;
       let testRelY = relY + shift;
-      let testAbsY = y + testRelY;
+      let testAbsY = y + testRelY; 
       
-      // BLOKADA: Zawias nie może uciec poza formatkę drzwi (min 30mm od krawędzi)
       if (testRelY < 30 || testRelY > h - 30) {
           collision = true;
       } else {
           for (const obs of obstacles) {
             if (obs.typ === 'poziom') {
-              const sCenter = Number(obs.y) + Number(boardThick) / 2;
+              const shelfBottomEdge = Number(obs.y);
+              const shelfTopEdge = Number(obs.y) + (Number(obs.h) || Number(boardThick));
               
-              // ROZWIĄZANIE: Półki ruchome mają strefę +/- 32mm na podpórki!
-              // Zwiększamy strefę bezpieczeństwa wokół półek ruchomych do 60mm.
-              const isStructural = obs.isStructural === true;
-              const safeZone = isStructural ? 35 : 60; 
-              
-              if (testAbsY > sCenter - safeZone && testAbsY < sCenter + safeZone) {
+              const plateHoleBottom = testAbsY - 16;
+              const plateHoleTop = testAbsY + 16;
+
+              const margin = customMargin; 
+              const extraAdjustableMargin = (obs.isStructural === true) ? 0 : 32;
+              const totalMargin = margin + extraAdjustableMargin;
+
+              if ((plateHoleTop + totalMargin > shelfBottomEdge) && (plateHoleBottom - totalMargin < shelfTopEdge)) {
                 collision = true;
                 break;
               }
             } else {
-              // Kolizja z innymi przeszkodami (np. szuflady wewnętrzne)
               let obsMin = Number(obs.y);
               let obsMax = Number(obs.y) + Number(obs.h);
               if (testAbsY + 35 > obsMin && testAbsY - 35 < obsMax) {
@@ -74,7 +82,6 @@ export function calculateHinges(front, boardThick, obstacles, side) {
       
       if (collision) {
         attempts++;
-        // Przeskakujemy co 32 mm na przemian w górę i w dół (System 32)
         shift = 32 * Math.ceil(attempts / 2) * (attempts % 2 !== 0 ? 1 : -1); 
       } else {
         absY = testAbsY;
@@ -82,7 +89,6 @@ export function calculateHinges(front, boardThick, obstacles, side) {
       }
     }
 
-    // Ostateczne zabezpieczenie: jeśli nie udało się znaleźć miejsca po 15 próbach
     if (collision) {
        currentRelY = relY;
        absY = y + relY;

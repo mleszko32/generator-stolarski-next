@@ -58,6 +58,8 @@ export function addModule(type = "base_cabinet") {
     position: { x: nextX, y: posY, z: 0 }, 
     backPanel: { type: "nakladane", offset: 20, grooveDepth: 7, nutBuild: "all", clearance: 2 },
     legs: legs,
+    // NOWOŚĆ: Lokalne, edytowalne ustawienia zawiasów dla konkretnego modułu
+    front: { hinges: { topOffset: 100, bottomOffset: 100, margin: 40 } },
     elements: []
   };
   
@@ -67,7 +69,6 @@ export function addModule(type = "base_cabinet") {
   return newModule;
 }
 
-// NOWOŚĆ: Usuwanie szafki
 export function deleteModule(moduleId) {
   state.project.modules = state.project.modules.filter(m => m.id !== moduleId);
   if (state.activeModuleId === moduleId) {
@@ -75,14 +76,12 @@ export function deleteModule(moduleId) {
   }
 }
 
-// NOWOŚĆ: Kopiowanie szafki wraz z zawartością
 export function duplicateModule(moduleId) {
   const target = state.project.modules.find(m => m.id === moduleId);
   if (!target) return null;
   
   const newMod = JSON.parse(JSON.stringify(target));
   
-  // Zapewniamy całkowicie unikalne ID dla nowej szafki
   newMod.id = 'mod-' + Date.now() + Math.random().toString(36).substring(2, 6);
   newMod.name = newMod.name + " (Kopia)";
   
@@ -92,8 +91,6 @@ export function duplicateModule(moduleId) {
   }
   newMod.position.x = nextX;
   
-  // KLUCZOWE ZABEZPIECZENIE: Wszystkie elementy (półki/szuflady) sklonowanej szafki 
-  // otrzymują absolutnie unikalne ID. Rozwiązuje to problem usunięcia np. wszystkich na raz!
   if (newMod.elements) {
     newMod.elements.forEach(el => {
       el.id = 'el-' + Date.now() + Math.random().toString(36).substring(2, 9);
