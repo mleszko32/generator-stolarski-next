@@ -206,11 +206,9 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
       const radius = hole.diameter ? (hole.diameter / 2) : 2.5; 
       const layerClass = isStruct ? 'layer-holes-corpus' : 'layer-holes-shelf';
       
-      // ZMIANA: Obsługa "SYSTEMU 32" DLA PÓŁEK RUCHOMYCH
       if (!isStruct) {
-          // Wygenerujemy 3 otwory, w odległości 32mm od siebie
           const holeY1 = calcY - 32;
-          const holeY2 = calcY; // Środek półki
+          const holeY2 = calcY; 
           const holeY3 = calcY + 32;
 
           const svgY1 = sideH - holeY1;
@@ -230,11 +228,11 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
           }
           svg += `</g>`;
 
-          if (hole.isCenter) {
-              shelfYsObj.push({ y1: holeY1, y2: holeY2, y3: holeY3, bottomY: holeY1 }); // Bierzemy najniższy punkt do wymiarowania!
+          // POPRAWKA: Pobieramy wymiar raz na PÓŁKĘ, bez duplikacji przez X (przód/tył)
+          if (hole.isCenter && hole.x === 37) {
+              shelfYsObj.push({ bottomY: holeY1 });
           }
       } else {
-          // Półka konstrukcyjna (bez zmian)
           const svgY = sideH - calcY;
           svg += `<g class="${layerClass}">`;
           if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') {
@@ -342,12 +340,10 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
       if (sortedShelfYsObjects.length > 0) {
         svg += `<g class="layer-holes-shelf">`; 
         sortedShelfYsObjects.forEach(shelfHole => {
-          // ZMIANA: Wymiarujemy do najniższego z trzech otworów
           let lowestHoleSvgY = sideH - shelfHole.bottomY;
           let labelText = `${formatVal(shelfHole.bottomY)}  (${formatVal(sideH - shelfHole.bottomY)})`;
           
           svg += `<line x1="${bokLX}" y1="${lowestHoleSvgY}" x2="${currentDimX_L}" y2="${lowestHoleSvgY}" stroke="#f59e0b" stroke-width="0.5" stroke-dasharray="2,2" />`;
-          // Używamy nowej funkcji z offsetem, żeby długi tekst (z nawiasem) nie nachodził na linię
           svg += dimV_TextOffset(currentDimX_L, sideH, lowestHoleSvgY, labelText, "#f59e0b", "arrow-amber", -10);
           currentDimX_L -= 35;
         });
