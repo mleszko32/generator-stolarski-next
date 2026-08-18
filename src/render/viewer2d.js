@@ -187,20 +187,17 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
   let corpusYs = new Set(); 
   let shelfYs = new Set(); 
 
-  // POBIERANIE OTWORÓW - UFAMY shelfMath.js !
   const shelfHoles = calculateShelfHoles();
   if (shelfHoles && shelfHoles.length > 0) {
     shelfHoles.forEach(hole => {
       let calcY = isTopBottomFullWidth ? hole.y - th : hole.y;
       
       const isStruct = hole.isStructural === true || hole.type === 'konstrukcyjna';
-      // Używamy kolorów bezpośrednio zdefiniowanych w shelfMath.js 
       const color = hole.color || (isStruct ? '#9333ea' : '#f59e0b');
       const radius = hole.diameter ? (hole.diameter / 2) : 2.5; 
       const layerClass = isStruct ? 'layer-holes-corpus' : 'layer-holes-shelf';
       const svgY = sideH - calcY;
       
-      // Rysujemy kropki (tak jak przychodzą, bez modyfikacji!)
       svg += `<g class="${layerClass}">`;
       if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') {
           svg += `<circle cx="${bokLX + hole.x}" cy="${svgY}" r="${radius}" fill="${color}" />`;
@@ -210,11 +207,9 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
       }
       svg += `</g>`;
 
-      // Rejestrujemy położenie otworów dla linii wymiarowych
       if (isStruct && hole.isCenter) {
           corpusYs.add(calcY);
       } else if (!isStruct && hole.isCenter && hole.x === 37) { 
-          // Łapiemy calcY środkowego otworu (isCenter) dla każdej półki
           shelfYs.add(calcY); 
       }
     });
@@ -310,17 +305,15 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
         svg += `</g>`;
       }
       
-      // NOWE WYMIAROWANIE PÓŁEK (System 32)
+      // NOWE WYMIAROWANIE PÓŁEK RUCHOMYCH
       if (sortedShelfYs.length > 0) {
         svg += `<g class="layer-holes-shelf">`; 
         
-        // Prowadzimy główną czerwoną/pomarańczową oś pomiarową na całą wysokość najwyższego otworu
         const highestCenterY = sortedShelfYs[sortedShelfYs.length - 1];
         const highestSvgY = sideH - (highestCenterY + 32); 
         svg += `<line x1="${currentDimX_L}" y1="${sideH}" x2="${currentDimX_L}" y2="${highestSvgY}" stroke="#ea580c" stroke-width="1.5" marker-start="url(#arrow-amber)" />`;
 
         sortedShelfYs.forEach(calcY => {
-          // Dla każdego punktu "center" w półce, wymiarujemy 3 dziurki w rzędzie (+32, 0, -32)
           const offsets = [32, 0, -32]; 
           
           offsets.forEach(dy => {
@@ -343,8 +336,21 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
                      </text>`;
           });
         });
-        currentDimX_L -= 110; // Sporo miejsca na długi tekst
+        currentDimX_L -= 110; 
         svg += `</g>`;
+      }
+
+      // PRZYWRÓCONY WYMIAR MIĘDZY ŚRODKOWYMI OTWORAMI PÓŁEK
+      if (sortedShelfYs.length > 1) {
+          svg += `<g class="layer-holes-shelf">`;
+          for (let i = 0; i < sortedShelfYs.length - 1; i++) {
+              let svgY1 = sideH - sortedShelfYs[i];
+              let svgY2 = sideH - sortedShelfYs[i+1];
+              let val = formatVal(sortedShelfYs[i+1] - sortedShelfYs[i]);
+              svg += dimV(currentDimX_L, svgY1, svgY2, val, "#ea580c", "arrow-amber");
+          }
+          currentDimX_L -= 35;
+          svg += `</g>`;
       }
 
       if (mountingData) {
@@ -426,6 +432,19 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
         });
         currentDimX_R += 110;
         svg += `</g>`;
+      }
+
+      // PRZYWRÓCONY WYMIAR MIĘDZY ŚRODKOWYMI OTWORAMI PÓŁEK
+      if (sortedShelfYs.length > 1) {
+          svg += `<g class="layer-holes-shelf">`;
+          for (let i = 0; i < sortedShelfYs.length - 1; i++) {
+              let svgY1 = sideH - sortedShelfYs[i];
+              let svgY2 = sideH - sortedShelfYs[i+1];
+              let val = formatVal(sortedShelfYs[i+1] - sortedShelfYs[i]);
+              svg += dimV(currentDimX_R, svgY1, svgY2, val, "#ea580c", "arrow-amber");
+          }
+          currentDimX_R += 35;
+          svg += `</g>`;
       }
 
       if (mountingData) {
