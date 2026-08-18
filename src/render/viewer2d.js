@@ -185,7 +185,7 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
 
   let drawerYs = new Set();
   let corpusYs = new Set(); 
-  let shelfYs = new Set(); // POPRAWKA: Pobieramy wymiary wszystkich otworów
+  let shelfYs = new Set(); 
 
   const shelfHoles = calculateShelfHoles();
   if (shelfHoles && shelfHoles.length > 0) {
@@ -199,7 +199,6 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
       
       const svgY = sideH - calcY;
       
-      // Rysujemy każdy otwór dokładnie z parametrami jakie zwraca shelfMath.js (niczego nie powielamy!)
       svg += `<g class="${layerClass}">`;
       if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') {
           svg += `<circle cx="${bokLX + hole.x}" cy="${svgY}" r="${radius}" fill="${color}" />`;
@@ -212,7 +211,6 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
       if (isStruct && hole.isCenter) {
           corpusYs.add(calcY);
       } else if (!isStruct && hole.x === 37) { 
-          // Pobieramy calcY do wymiarowania (sprawdzamy x===37 żeby nie dublować Y z tyłu szafki)
           shelfYs.add(calcY); 
       }
     });
@@ -307,21 +305,22 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
         svg += `</g>`;
       }
       
-      // POPRAWKA: WYMIAROWANIE PÓŁEK Z KOMPLETEM INFORMACJI DO KAŻDEJ DZIURKI (Z GÓRY I Z DOŁU)
       if (sortedShelfYs.length > 0) {
         svg += `<g class="layer-holes-shelf">`; 
         
-        // Jedna pionowa linia prowadząca od dołu boku do najwyższego otworu półki
         const highestHoleSvgY = sideH - sortedShelfYs[sortedShelfYs.length - 1];
         svg += `<line x1="${currentDimX_L}" y1="${sideH}" x2="${currentDimX_L}" y2="${highestHoleSvgY}" stroke="#f59e0b" stroke-width="1.5" />`;
 
         sortedShelfYs.forEach(calcY => {
           let holeSvgY = sideH - calcY;
-          let labelText = `${formatVal(calcY)}  (${formatVal(sideH - calcY)})`;
+          let valBottom = formatVal(calcY);
+          let valTop = formatVal(sideH - calcY);
           
-          // Odsadzenia dla czytelności – krótka pozioma linia do otworów
           svg += `<line x1="${bokLX}" y1="${holeSvgY}" x2="${currentDimX_L}" y2="${holeSvgY}" stroke="#f59e0b" stroke-width="0.5" stroke-dasharray="2,2" />`;
-          svg += `<text x="${currentDimX_L - 6}" y="${holeSvgY + 3.5}" font-size="10" fill="#f59e0b" font-weight="bold" text-anchor="end">${labelText}</text>`;
+          // Używamy tspan do podzielenia kolorów wewnątrz jednego elementu text
+          svg += `<text x="${currentDimX_L - 6}" y="${holeSvgY + 3.5}" font-size="10" font-weight="bold" text-anchor="end">
+                    <tspan fill="#f59e0b">${valBottom}</tspan> <tspan fill="#64748b">(${valTop})</tspan>
+                  </text>`;
         });
         currentDimX_L -= 65; 
         svg += `</g>`;
@@ -381,10 +380,14 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
 
         sortedShelfYs.forEach(calcY => {
           let holeSvgY = sideH - calcY;
-          let labelText = `${formatVal(calcY)}  (${formatVal(sideH - calcY)})`;
+          let valBottom = formatVal(calcY);
+          let valTop = formatVal(sideH - calcY);
 
           svg += `<line x1="${bokRX + depth}" y1="${holeSvgY}" x2="${currentDimX_R}" y2="${holeSvgY}" stroke="#f59e0b" stroke-width="0.5" stroke-dasharray="2,2" />`;
-          svg += `<text x="${currentDimX_R + 6}" y="${holeSvgY + 3.5}" font-size="10" fill="#f59e0b" font-weight="bold" text-anchor="start">${labelText}</text>`;
+          // Używamy tspan do podzielenia kolorów wewnątrz jednego elementu text
+          svg += `<text x="${currentDimX_R + 6}" y="${holeSvgY + 3.5}" font-size="10" font-weight="bold" text-anchor="start">
+                    <tspan fill="#f59e0b">${valBottom}</tspan> <tspan fill="#64748b">(${valTop})</tspan>
+                  </text>`;
         });
         currentDimX_R += 65;
         svg += `</g>`;
