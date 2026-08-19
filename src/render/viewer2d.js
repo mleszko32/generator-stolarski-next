@@ -54,15 +54,6 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
       return res;
   };
 
-  const dimV_TextOffset = (x, y1, y2, val, color="#dc2626", marker="arrow-red", labelOffset=20) => {
-    const minY = Math.min(y1, y2);
-    const maxY = Math.max(y1, y2);
-    const midY = (minY + maxY) / 2;
-    let res = `<line x1="${x}" y1="${minY}" x2="${x}" y2="${maxY}" stroke="${color}" stroke-width="1.5" marker-start="url(#${marker})" marker-end="url(#${marker})" />`;
-    res += `<text x="${x + labelOffset}" y="${midY+4}" font-size="10" fill="${color}" font-weight="bold" text-anchor="${labelOffset > 0 ? 'start' : 'end'}">${val}</text>`;
-    return res;
-  };
-
   const dimH = (x1, x2, y, val, color="#dc2626", marker="arrow-red") => {
       const minX = Math.min(x1, x2);
       const maxX = Math.max(x1, x2);
@@ -231,24 +222,27 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
           let calcY = isTopBottomFullWidth ? hinge.y - th : hinge.y;
           const svgY = sideH - calcY;
           
-          // NOWOŚĆ: Bliższa krawędź dla zawiasów (Prowadniki na boku)
           let distBottom = calcY;
           let distTop = sideH - calcY;
-          let primary = distBottom <= distTop ? distBottom : distTop;
-          let secondary = distBottom <= distTop ? distTop : distBottom;
-          let labelText = `Y: ${formatVal(primary)} (${formatVal(secondary)})`;
+          let isBottomCloser = distBottom <= distTop;
+          let primary = isBottomCloser ? distBottom : distTop;
+          let secondary = isBottomCloser ? distTop : distBottom;
+          
+          let tspanHtml = `<tspan fill="#16a34a" font-weight="bold" font-size="11">${formatVal(primary)}</tspan> ` +
+                          `<tspan fill="#15803d" font-size="9" font-weight="bold">${isBottomCloser ? 'DÓŁ' : 'GÓRA'}</tspan> ` +
+                          `<tspan fill="#94a3b8" font-size="9" font-weight="normal">(${formatVal(secondary)} ${isBottomCloser ? 'GÓRA' : 'DÓŁ'})</tspan>`;
           
           svg += `<g class="layer-holes-hinge">`;
           if (data.side === 'left' && (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki')) {
             const svgX = bokLX + 37;
             svg += `<circle cx="${svgX}" cy="${svgY - 16}" r="2.5" fill="#16a34a" />`;
             svg += `<circle cx="${svgX}" cy="${svgY + 16}" r="2.5" fill="#16a34a" />`;
-            svg += `<text x="${svgX + 8}" y="${svgY + 4}" font-size="10" font-weight="bold" fill="#16a34a">${labelText}</text>`;
+            svg += `<text x="${svgX + 8}" y="${svgY + 4}" font-family="sans-serif">${tspanHtml}</text>`;
           } else if (data.side === 'right' && (viewMode === 'all' || viewMode === 'bokR' || viewMode === 'boki')) {
             const svgX = bokRX + depth - 37;
             svg += `<circle cx="${svgX}" cy="${svgY - 16}" r="2.5" fill="#16a34a" />`;
             svg += `<circle cx="${svgX}" cy="${svgY + 16}" r="2.5" fill="#16a34a" />`;
-            svg += `<text x="${svgX - 8}" y="${svgY + 4}" font-size="10" font-weight="bold" fill="#16a34a" text-anchor="end">${labelText}</text>`;
+            svg += `<text x="${svgX - 8}" y="${svgY + 4}" text-anchor="end" font-family="sans-serif">${tspanHtml}</text>`;
           }
           svg += `</g>`;
         });
@@ -295,7 +289,6 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
   const sortedCorpusYs = Array.from(corpusYs).sort((a,b) => a - b);
   const sortedShelfYs = Array.from(shelfYs).sort((a,b) => a - b);
 
-  // --- WYMIAROWANIE BOKU LEWEGO ---
   if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') {
       let currentDimX_L = bokLX - 25;
       
@@ -388,7 +381,6 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
       }
   }
 
-  // --- WYMIAROWANIE BOKU PRAWEGO ---
   if (viewMode === 'all' || viewMode === 'bokR' || viewMode === 'boki') {
       let currentDimX_R = bokRX + depth + 25;
       
@@ -523,14 +515,17 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
                  svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="17.5" fill="#fcfdfd" stroke="#16a34a" stroke-width="1.5" />`;
                  svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="2.5" fill="#16a34a" />`;
 
-                 // NOWOŚĆ: Bliższa krawędź dla otworów puszek we froncie
                  let distBottom = hinge.relY;
                  let distTop = front.h - hinge.relY;
-                 let primary = distBottom <= distTop ? distBottom : distTop;
-                 let secondary = distBottom <= distTop ? distTop : distBottom;
-                 let label = `Y: ${formatVal(primary)} (${formatVal(secondary)})`;
+                 let isBottomCloser = distBottom <= distTop;
+                 let primary = isBottomCloser ? distBottom : distTop;
+                 let secondary = isBottomCloser ? distTop : distBottom;
+                 
+                 let tspanHtml = `<tspan fill="#16a34a" font-weight="bold" font-size="11">${formatVal(primary)}</tspan> ` +
+                                 `<tspan fill="#15803d" font-size="9" font-weight="bold">${isBottomCloser ? 'DÓŁ' : 'GÓRA'}</tspan> ` +
+                                 `<tspan fill="#94a3b8" font-size="9" font-weight="normal">(${formatVal(secondary)} ${isBottomCloser ? 'GÓRA' : 'DÓŁ'})</tspan>`;
 
-                 svg += `<text x="${cupX + (isLeft ? 22 : -22)}" y="${holeSvgY + 4}" font-size="10" fill="#16a34a" font-weight="bold" text-anchor="${isLeft ? 'start' : 'end'}">${label}</text>`;
+                 svg += `<text x="${cupX + (isLeft ? 22 : -22)}" y="${holeSvgY + 4}" text-anchor="${isLeft ? 'start' : 'end'}" font-family="sans-serif">${tspanHtml}</text>`;
               });
             }
             svg += `</g>`;
