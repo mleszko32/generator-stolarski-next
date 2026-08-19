@@ -260,14 +260,14 @@ export function updateSidebar() {
                 <option value="frontInner">Tylko Fronty Wewn.</option>
             </select>
             <button id="btn-print-2d" ${!activeMod ? 'disabled style="opacity: 0.5;"' : ''} style="flex: 1; padding: 8px; background-color: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px;">
-              📄 Drukuj
+              📄 Drukuj 2D
             </button>
         </div>
         <button id="btn-export-csv" style="width: 100%; padding: 8px; background-color: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px;">
           📊 Menedżer Formatek (CSV)
         </button>
         <button id="btn-export-hardware" style="width: 100%; padding: 9px; background-color: #d97706; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-          🛒 Pobierz listę zakupów (CSV)
+          🛒 Wydrukuj / PDF (Lista Zakupów)
         </button>
       </div>
     `;
@@ -501,7 +501,6 @@ export function updateSidebar() {
       });
   }
 
-  // --- PRZYWRÓCONA LOGIKA DRUKOWANIA 2D ---
   const printBtn = document.getElementById('btn-print-2d');
   if (printBtn && activeMod) {
     printBtn.addEventListener('click', () => {
@@ -606,7 +605,7 @@ export function updateSidebar() {
     });
   }
 
-  // --- NOWOŚĆ: AKCJA DLA PRZYCISKU LISTY ZAKUPÓW ---
+  // NOWA LOGIKA GENEROWANIA ESTETYCZNEGO WYDRUKU / PDF DLA OKUĆ
   const exportHardwareBtn = document.getElementById('btn-export-hardware');
   if (exportHardwareBtn) {
     exportHardwareBtn.addEventListener('click', () => {
@@ -615,23 +614,84 @@ export function updateSidebar() {
           return;
       }
       
-      // Tworzymy nagłówki dla pliku CSV (z BOM dla polskich znaków)
-      let csvContent = "\uFEFFNazwa Okucia;Ilość;Jednostka\n";
+      const dateStr = new Date().toLocaleDateString('pl-PL');
       
-      // Dodajemy wiersze
+      let htmlContent = `
+        <!DOCTYPE html>
+        <html lang="pl">
+        <head>
+            <meta charset="UTF-8">
+            <title>Lista Zakupów - ${state.project.name}</title>
+            <style>
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1e293b; max-width: 900px; margin: 0 auto; }
+                .header { border-bottom: 2px solid #cbd5e1; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
+                .header h1 { margin: 0; color: #0f172a; font-size: 28px; }
+                .header p { margin: 5px 0 0 0; color: #64748b; font-size: 14px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+                th { background-color: #f8fafc; color: #334155; font-weight: bold; border-bottom: 2px solid #cbd5e1; }
+                td.qty { font-weight: bold; color: #0f172a; text-align: center; width: 80px; font-size: 15px; }
+                td.unit { color: #64748b; text-align: center; width: 80px; }
+                tr:nth-child(even) { background-color: #f8fafc; }
+                
+                @media print {
+                    body { padding: 0; max-width: 100%; }
+                    .no-print { display: none !important; }
+                    .header { border-bottom: 2px solid #000; }
+                    th { border-bottom: 2px solid #000; background-color: transparent; }
+                    tr:nth-child(even) { background-color: transparent; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="no-print" style="margin-bottom: 30px; display: flex; justify-content: flex-end;">
+                <button onclick="window.print()" style="padding: 12px 24px; background-color: #059669; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    🖨️ Drukuj / Zapisz jako PDF
+                </button>
+            </div>
+            <div class="header">
+                <div>
+                    <h1>Lista Zakupów: Okucia</h1>
+                    <p>Projekt: <strong style="color: #0f172a;">${state.project.name}</strong></p>
+                </div>
+                <div style="text-align: right; color: #64748b; font-size: 14px;">
+                    Data wygenerowania: <strong>${dateStr}</strong>
+                </div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nazwa okucia / Elementu</th>
+                        <th style="text-align: center;">Ilość</th>
+                        <th style="text-align: center;">J.m.</th>
+                    </tr>
+                </thead>
+                <tbody>
+      `;
+      
       projectHardware.forEach(hw => {
-          const name = hw.name.replace(/"/g, '""'); // Zabezpieczenie nazw
-          csvContent += `"${name}";${hw.qty};"${hw.unit}"\n`;
+          htmlContent += `
+            <tr>
+                <td>${hw.name}</td>
+                <td class="qty">${hw.qty}</td>
+                <td class="unit">${hw.unit}</td>
+            </tr>
+          `;
       });
       
-      // Generujemy i pobieramy plik
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `Lista_Zakupow_Okucia_${state.project.name.replace(/\s+/g, '_')}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      htmlContent += `
+                </tbody>
+            </table>
+            
+            <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 12px;">
+                Wygenerowano automatycznie z systemu Generator Stolarski Next
+            </div>
+        </body>
+        </html>
+      `;
+      
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+      window.open(URL.createObjectURL(blob), '_blank');
     });
   }
 }
