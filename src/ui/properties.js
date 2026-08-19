@@ -36,8 +36,8 @@ export function initPropertiesPanel() {
   const f = { ...(state.project.front || {}), ...(activeModule.front || {}) };
   const fc = { ...(state.project.front?.clearance || {}), ...(activeModule.front?.clearance || {}) };
   
-  // ZMIANA: Zaciągamy ustawienia zawiasów lokalnie (dla aktywnej szafki)
-  const fh = { topOffset: 100, bottomOffset: 100, margin: 40, ...(state.project.front?.hinges || {}), ...(activeModule.front?.hinges || {}) };
+  // Zaciągamy ustawienia zawiasów (teraz z opcją forceCount)
+  const fh = { topOffset: 100, bottomOffset: 100, margin: 40, forceCount: 0, ...(state.project.front?.hinges || {}), ...(activeModule.front?.hinges || {}) };
 
   rightSidebar.innerHTML = `
     <h2>Parametry szafki ${multiCount > 1 ? `<span style="color:#2563eb;">(Edytujesz ${multiCount} obiekty)</span>` : ''}</h2>
@@ -150,9 +150,13 @@ export function initPropertiesPanel() {
         <label style="font-size: 11px;">Od dołu do środka puszki (mm):</label>
         <input type="number" id="input-hinge-bottom" value="${fh.bottomOffset}" step="1" />
       </div>
-      <div class="property-group" style="margin-bottom: 0;">
-        <label style="font-size: 11px;">Bufor omijania półek / luz wkrętarki (mm):</label>
+      <div class="property-group">
+        <label style="font-size: 11px;">Bezpieczny margines od półki (mm):</label>
         <input type="number" id="input-hinge-margin" value="${fh.margin}" step="1" />
+      </div>
+      <div class="property-group" style="margin-top: 8px; margin-bottom: 0;">
+        <label style="font-size: 11px; font-weight: bold; color: #065f46;">Wymuś ilość zawiasów (0 = Auto):</label>
+        <input type="number" id="input-hinge-count" value="${fh.forceCount || 0}" step="1" min="0" max="10" style="border-color: #34d399; background-color: #d1fae5;" />
       </div>
     </div>
   `;
@@ -166,7 +170,7 @@ function setupEventListeners() {
   const numberInputs = [
     'pos-x', 'pos-y', 'traverse-width', 'board-thick', 'width', 'height', 'depth',
     'front-gap', 'front-left', 'front-right', 'front-top', 'front-bottom', 'back-offset', 'back-groove',
-    'legs-height', 'plinth-offset', 'hinge-top', 'hinge-bottom', 'hinge-margin'
+    'legs-height', 'plinth-offset', 'hinge-top', 'hinge-bottom', 'hinge-margin', 'hinge-count'
   ];
 
   const updateAll = () => { update3D(); updateSidebar(); };
@@ -257,16 +261,16 @@ function setupEventListeners() {
     const el = document.getElementById(`input-${id}`);
     if(el) {
       el.addEventListener('input', (e) => {
-        const val = Number(e.target.value);
+        const val = e.target.value === '' ? null : Number(e.target.value);
         
         getSelectedMods().forEach(mod => {
-            // ZMIANA: Zapisujemy parametry zawiasów LOKALNIE w mod.front.hinges
-            if (['hinge-top', 'hinge-bottom', 'hinge-margin'].includes(id)) {
+            if (['hinge-top', 'hinge-bottom', 'hinge-margin', 'hinge-count'].includes(id)) {
                 if (!mod.front) mod.front = {};
-                if (!mod.front.hinges) mod.front.hinges = {};
+                if (!mod.front.hinges) mod.front.hinges = { topOffset: 100, bottomOffset: 100, margin: 40, forceCount: 0 };
                 if (id === 'hinge-top') mod.front.hinges.topOffset = val;
                 if (id === 'hinge-bottom') mod.front.hinges.bottomOffset = val;
                 if (id === 'hinge-margin') mod.front.hinges.margin = val;
+                if (id === 'hinge-count') mod.front.hinges.forceCount = val;
             }
 
             if (id === 'pos-x') mod.position.x = val;

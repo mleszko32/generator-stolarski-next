@@ -8,7 +8,7 @@ export function calculateHinges(front, boardThick, obstacles, side) {
   // Szukamy modułu, do którego należy ten konkretny front, aby pobrać LOKALNE ustawienia
   const mod = state.project.modules.find(m => m.elements && m.elements.some(e => e.id === front.id));
   
-  const globalHinges = state.project.front?.hinges || { topOffset: 100, bottomOffset: 100, margin: 40 };
+  const globalHinges = state.project.front?.hinges || { topOffset: 100, bottomOffset: 100, margin: 40, forceCount: 0 };
   const localHinges = mod?.front?.hinges || {};
   
   // Łączymy ustawienia (Lokalne nadpisują globalne)
@@ -19,9 +19,21 @@ export function calculateHinges(front, boardThick, obstacles, side) {
   const customMargin = Number(hingeSettings.margin ?? 40);
   
   let count = 2;
-  if (h > 2000) count = 5;
-  else if (h > 1600) count = 4;
-  else if (h > 900) count = 3;
+  
+  // Sprawdzamy czy użytkownik wymusił ilość zawiasów ręcznie
+  if (front.forceHingeCount && front.forceHingeCount > 0) {
+      count = parseInt(front.forceHingeCount);
+  } else if (hingeSettings.forceCount && hingeSettings.forceCount > 0) {
+      count = parseInt(hingeSettings.forceCount);
+  } else {
+      // Automatyczny dobór ilości
+      if (h > 2000) count = 5;
+      else if (h > 1600) count = 4;
+      else if (h > 900) count = 3;
+  }
+  
+  // Minimalna ilość zawiasów to 2
+  if (count < 2) count = 2;
 
   let cupRelPositions = [];
   
