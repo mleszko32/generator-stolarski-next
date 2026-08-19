@@ -5,15 +5,11 @@ export function calculateHinges(front, boardThick, obstacles, side) {
   const h = Math.round(front.h); 
   const y = Math.round(front.y); 
   
-  // Znajdujemy moduł, w którym fizycznie znajduje się ten konkretny front
-  const parentModule = state.project.modules.find(m => m.elements && m.elements.some(e => e.id === front.id));
-  
-  // Wyciągamy ustawienia z tego konretnego modułu (lub używamy domyślnych, jeśli to stary projekt)
-  const modHinges = parentModule?.front?.hinges || { topOffset: 100, bottomOffset: 100, margin: 40 };
-  
-  const topDist = Number(modHinges.topOffset);
-  const bottomDist = Number(modHinges.bottomOffset);
-  const customMargin = Number(modHinges.margin);
+  // Bezpieczne pobieranie wartości - jeśli którejś brakuje, system wymusza domyślną
+  const hingeSettings = state.project.front?.hinges || {};
+  const topDist = Number(hingeSettings.topOffset ?? 100);
+  const bottomDist = Number(hingeSettings.bottomOffset ?? 100);
+  const customMargin = Number(hingeSettings.margin ?? 40);
   
   let count = 2;
   if (h > 2000) count = 5;
@@ -50,6 +46,7 @@ export function calculateHinges(front, boardThick, obstacles, side) {
       let testRelY = relY + shift;
       let testAbsY = y + testRelY; 
       
+      // Zabezpieczenie przed wyjechaniem zawiasu poza front (min. 30mm)
       if (testRelY < 30 || testRelY > h - 30) {
           collision = true;
       } else {
@@ -61,9 +58,7 @@ export function calculateHinges(front, boardThick, obstacles, side) {
               const plateHoleBottom = testAbsY - 16;
               const plateHoleTop = testAbsY + 16;
 
-              const margin = customMargin; 
-              const extraAdjustableMargin = (obs.isStructural === true) ? 0 : 32;
-              const totalMargin = margin + extraAdjustableMargin;
+              const totalMargin = customMargin + ((obs.isStructural === true) ? 0 : 32);
 
               if ((plateHoleTop + totalMargin > shelfBottomEdge) && (plateHoleBottom - totalMargin < shelfTopEdge)) {
                 collision = true;

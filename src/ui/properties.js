@@ -3,7 +3,6 @@ import { state, getActiveModule } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
 
-// Funkcja pomocnicza: Pobiera wszystkie aktualnie zaznaczone moduły
 function getSelectedMods() {
     if (state.selectedModules && state.selectedModules.size > 0) {
         return Array.from(state.selectedModules).map(id => state.project.modules.find(m => m.id === id)).filter(Boolean);
@@ -34,7 +33,6 @@ export function initPropertiesPanel() {
   const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(state.project.construction || {}), ...(activeModule.construction || {}) };
   const backP = activeModule.backPanel;
   
-  // Wczytywanie lokalnych ustawień frontów dla prawego panelu
   const f = { ...(state.project.front || {}), ...(activeModule.front || {}) };
   const fc = { ...(state.project.front?.clearance || {}), ...(activeModule.front?.clearance || {}) };
   const fh = { topOffset: 100, bottomOffset: 100, margin: 40, ...(state.project.front?.hinges || {}) };
@@ -129,7 +127,7 @@ export function initPropertiesPanel() {
 
     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
     
-    <h3 style="color: #059669;">Ustawienia Frontów i Szuflad (Lokalne)</h3>
+    <h3 style="color: #059669;">Ustawienia Frontów i Szuflad</h3>
     <div id="group-front-clearance">
       <div class="property-group"><label>Typ frontów:</label><select id="input-front-type"><option value="nakladane" ${(!f.type || f.type === 'nakladane') ? 'selected' : ''}>Nakładane</option><option value="wpuszczane" ${f.type === 'wpuszczane' ? 'selected' : ''}>Wpuszczane</option></select></div>
       <div class="property-group"><label>System szuflad:</label><select id="input-drawer-system"><option value="merivobox" ${f.drawerSystem === 'merivobox' ? 'selected' : ''}>Blum Merivobox</option><option value="legrabox" ${f.drawerSystem === 'legrabox' ? 'selected' : ''}>Blum Legrabox</option><option value="tandembox" ${f.drawerSystem === 'tandembox' ? 'selected' : ''}>Blum TANDEMBOX antaro</option><option value="gtv_axis_16" ${f.drawerSystem === 'gtv_axis_16' ? 'selected' : ''}>GTV Axis Pro (płyta 16mm)</option><option value="gtv_axis_18" ${f.drawerSystem === 'gtv_axis_18' ? 'selected' : ''}>GTV Axis Pro (płyta 18mm)</option></select></div>
@@ -141,17 +139,17 @@ export function initPropertiesPanel() {
     </div>
     
     <div style="background: #ecfdf5; padding: 10px; border: 1px dashed #6ee7b7; border-radius: 4px; margin-top: 15px;">
-      <h4 style="margin: 0 0 10px 0; color: #047857; font-size: 13px;">Ustawienia Zawiasów</h4>
+      <h4 style="margin: 0 0 10px 0; color: #047857; font-size: 13px;">Wymiary Osi Zawiasów</h4>
       <div class="property-group">
-        <label style="font-size: 11px;">Oś górnego zawiasu od krawędzi frontu (mm):</label>
+        <label style="font-size: 11px;">Od góry do środka puszki (mm):</label>
         <input type="number" id="input-hinge-top" value="${fh.topOffset}" step="1" />
       </div>
       <div class="property-group">
-        <label style="font-size: 11px;">Oś dolnego zawiasu od krawędzi frontu (mm):</label>
+        <label style="font-size: 11px;">Od dołu do środka puszki (mm):</label>
         <input type="number" id="input-hinge-bottom" value="${fh.bottomOffset}" step="1" />
       </div>
       <div class="property-group" style="margin-bottom: 0;">
-        <label style="font-size: 11px;">Bezpieczny margines od półki/przeszkody (mm):</label>
+        <label style="font-size: 11px;">Bufor omijania półek / luz wkrętarki (mm):</label>
         <input type="number" id="input-hinge-margin" value="${fh.margin}" step="1" />
       </div>
     </div>
@@ -166,7 +164,7 @@ function setupEventListeners() {
   const numberInputs = [
     'pos-x', 'pos-y', 'traverse-width', 'board-thick', 'width', 'height', 'depth',
     'front-gap', 'front-left', 'front-right', 'front-top', 'front-bottom', 'back-offset', 'back-groove',
-    'legs-height', 'plinth-offset', 'hinge-top', 'hinge-bottom', 'hinge-margin' // Dodano nowe parametry
+    'legs-height', 'plinth-offset', 'hinge-top', 'hinge-bottom', 'hinge-margin'
   ];
 
   const updateAll = () => { update3D(); updateSidebar(); };
@@ -219,7 +217,6 @@ function setupEventListeners() {
       updateAll(); 
   });
 
-  // Zapis do lokalnego frontu
   const typeInput = document.getElementById('input-front-type');
   if (typeInput) typeInput.addEventListener('change', (e) => { 
       getSelectedMods().forEach(mod => {
@@ -260,9 +257,12 @@ function setupEventListeners() {
       el.addEventListener('input', (e) => {
         const val = Number(e.target.value);
         
-        // Zapis ustawień globalnych do projektu
+        // Zabezpieczenie brakujących właściwości w stanie przed przypisaniem
         if (['hinge-top', 'hinge-bottom', 'hinge-margin'].includes(id)) {
-            if (!state.project.front.hinges) state.project.front.hinges = {};
+            if (!state.project.front) state.project.front = {};
+            if (!state.project.front.hinges) {
+                state.project.front.hinges = { topOffset: 100, bottomOffset: 100, margin: 40 };
+            }
             if (id === 'hinge-top') state.project.front.hinges.topOffset = val;
             if (id === 'hinge-bottom') state.project.front.hinges.bottomOffset = val;
             if (id === 'hinge-margin') state.project.front.hinges.margin = val;
@@ -295,7 +295,6 @@ function setupEventListeners() {
             if (id === 'height') mod.dimensions.height = val;
             if (id === 'depth') mod.dimensions.depth = val;
 
-            // Zapis luzów tylko do mod.front
             if (!mod.front) mod.front = {};
             if (!mod.front.clearance) mod.front.clearance = {};
 
