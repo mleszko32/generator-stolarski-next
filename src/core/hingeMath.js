@@ -5,8 +5,15 @@ export function calculateHinges(front, boardThick, obstacles, side) {
   const h = Math.round(front.h); 
   const y = Math.round(front.y); 
   
-  // Bezpieczne pobieranie wartości - jeśli którejś brakuje, system wymusza domyślną
-  const hingeSettings = state.project.front?.hinges || {};
+  // Szukamy modułu, do którego należy ten konkretny front, aby pobrać LOKALNE ustawienia
+  const mod = state.project.modules.find(m => m.elements && m.elements.some(e => e.id === front.id));
+  
+  const globalHinges = state.project.front?.hinges || { topOffset: 100, bottomOffset: 100, margin: 40 };
+  const localHinges = mod?.front?.hinges || {};
+  
+  // Łączymy ustawienia (Lokalne nadpisują globalne)
+  const hingeSettings = { ...globalHinges, ...localHinges };
+  
   const topDist = Number(hingeSettings.topOffset ?? 100);
   const bottomDist = Number(hingeSettings.bottomOffset ?? 100);
   const customMargin = Number(hingeSettings.margin ?? 40);
@@ -46,7 +53,7 @@ export function calculateHinges(front, boardThick, obstacles, side) {
       let testRelY = relY + shift;
       let testAbsY = y + testRelY; 
       
-      // Zabezpieczenie przed wyjechaniem zawiasu poza front (min. 30mm)
+      // Zabezpieczenie przed ucieczką puszki poza formatkę (sztywne minimum 30mm)
       if (testRelY < 30 || testRelY > h - 30) {
           collision = true;
       } else {

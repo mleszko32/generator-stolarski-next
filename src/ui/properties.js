@@ -35,7 +35,9 @@ export function initPropertiesPanel() {
   
   const f = { ...(state.project.front || {}), ...(activeModule.front || {}) };
   const fc = { ...(state.project.front?.clearance || {}), ...(activeModule.front?.clearance || {}) };
-  const fh = { topOffset: 100, bottomOffset: 100, margin: 40, ...(state.project.front?.hinges || {}) };
+  
+  // ZMIANA: Zaciągamy ustawienia zawiasów lokalnie (dla aktywnej szafki)
+  const fh = { topOffset: 100, bottomOffset: 100, margin: 40, ...(state.project.front?.hinges || {}), ...(activeModule.front?.hinges || {}) };
 
   rightSidebar.innerHTML = `
     <h2>Parametry szafki ${multiCount > 1 ? `<span style="color:#2563eb;">(Edytujesz ${multiCount} obiekty)</span>` : ''}</h2>
@@ -127,7 +129,7 @@ export function initPropertiesPanel() {
 
     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
     
-    <h3 style="color: #059669;">Ustawienia Frontów i Szuflad</h3>
+    <h3 style="color: #059669;">Ustawienia Frontów i Szuflad (Lokalne)</h3>
     <div id="group-front-clearance">
       <div class="property-group"><label>Typ frontów:</label><select id="input-front-type"><option value="nakladane" ${(!f.type || f.type === 'nakladane') ? 'selected' : ''}>Nakładane</option><option value="wpuszczane" ${f.type === 'wpuszczane' ? 'selected' : ''}>Wpuszczane</option></select></div>
       <div class="property-group"><label>System szuflad:</label><select id="input-drawer-system"><option value="merivobox" ${f.drawerSystem === 'merivobox' ? 'selected' : ''}>Blum Merivobox</option><option value="legrabox" ${f.drawerSystem === 'legrabox' ? 'selected' : ''}>Blum Legrabox</option><option value="tandembox" ${f.drawerSystem === 'tandembox' ? 'selected' : ''}>Blum TANDEMBOX antaro</option><option value="gtv_axis_16" ${f.drawerSystem === 'gtv_axis_16' ? 'selected' : ''}>GTV Axis Pro (płyta 16mm)</option><option value="gtv_axis_18" ${f.drawerSystem === 'gtv_axis_18' ? 'selected' : ''}>GTV Axis Pro (płyta 18mm)</option></select></div>
@@ -139,7 +141,7 @@ export function initPropertiesPanel() {
     </div>
     
     <div style="background: #ecfdf5; padding: 10px; border: 1px dashed #6ee7b7; border-radius: 4px; margin-top: 15px;">
-      <h4 style="margin: 0 0 10px 0; color: #047857; font-size: 13px;">Wymiary Osi Zawiasów</h4>
+      <h4 style="margin: 0 0 10px 0; color: #047857; font-size: 13px;">Wymiary Osi Zawiasów (Lokalne)</h4>
       <div class="property-group">
         <label style="font-size: 11px;">Od góry do środka puszki (mm):</label>
         <input type="number" id="input-hinge-top" value="${fh.topOffset}" step="1" />
@@ -257,18 +259,16 @@ function setupEventListeners() {
       el.addEventListener('input', (e) => {
         const val = Number(e.target.value);
         
-        // Zabezpieczenie brakujących właściwości w stanie przed przypisaniem
-        if (['hinge-top', 'hinge-bottom', 'hinge-margin'].includes(id)) {
-            if (!state.project.front) state.project.front = {};
-            if (!state.project.front.hinges) {
-                state.project.front.hinges = { topOffset: 100, bottomOffset: 100, margin: 40 };
-            }
-            if (id === 'hinge-top') state.project.front.hinges.topOffset = val;
-            if (id === 'hinge-bottom') state.project.front.hinges.bottomOffset = val;
-            if (id === 'hinge-margin') state.project.front.hinges.margin = val;
-        }
-        
         getSelectedMods().forEach(mod => {
+            // ZMIANA: Zapisujemy parametry zawiasów LOKALNIE w mod.front.hinges
+            if (['hinge-top', 'hinge-bottom', 'hinge-margin'].includes(id)) {
+                if (!mod.front) mod.front = {};
+                if (!mod.front.hinges) mod.front.hinges = {};
+                if (id === 'hinge-top') mod.front.hinges.topOffset = val;
+                if (id === 'hinge-bottom') mod.front.hinges.bottomOffset = val;
+                if (id === 'hinge-margin') mod.front.hinges.margin = val;
+            }
+
             if (id === 'pos-x') mod.position.x = val;
             if (id === 'pos-y') mod.position.y = val;
             
