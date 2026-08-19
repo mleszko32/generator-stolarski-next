@@ -605,4 +605,33 @@ export function updateSidebar() {
       openCsvEditorModal(allParts);
     });
   }
+
+  // --- NOWOŚĆ: AKCJA DLA PRZYCISKU LISTY ZAKUPÓW ---
+  const exportHardwareBtn = document.getElementById('btn-export-hardware');
+  if (exportHardwareBtn) {
+    exportHardwareBtn.addEventListener('click', () => {
+      if (projectHardware.length === 0) {
+          alert("Lista zakupów jest pusta.");
+          return;
+      }
+      
+      // Tworzymy nagłówki dla pliku CSV (z BOM dla polskich znaków)
+      let csvContent = "\uFEFFNazwa Okucia;Ilość;Jednostka\n";
+      
+      // Dodajemy wiersze
+      projectHardware.forEach(hw => {
+          const name = hw.name.replace(/"/g, '""'); // Zabezpieczenie nazw
+          csvContent += `"${name}";${hw.qty};"${hw.unit}"\n`;
+      });
+      
+      // Generujemy i pobieramy plik
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `Lista_Zakupow_Okucia_${state.project.name.replace(/\s+/g, '_')}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+  }
 }

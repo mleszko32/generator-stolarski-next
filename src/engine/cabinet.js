@@ -161,13 +161,14 @@ export function calculateProjectHardware() {
           hardwareList[hwKey].qty += 1;
         }
       } 
+      // Zliczanie zawiasów i prowadników
       else if (front.subtype.includes('drzwi')) {
         const side = front.subtype === 'drzwi-lp' ? (front.id.endsWith('-L') ? 'left' : 'right') : (front.openingSide || 'left');
         const hinges = calculateHinges(front, board, obstacles, side);
         const hingeCount = hinges.length;
 
-        const hingeKey = `Zawias meblowy + prowadnik (puszka 35mm)`;
-        if (!hardwareList[hingeKey]) hardwareList[hingeKey] = { name: hingeKey, qty: 0, unit: 'szt.' };
+        const hingeKey = `Zawias meblowy + prowadnik krzyżakowy (puszka 35mm)`;
+        if (!hardwareList[hingeKey]) hardwareList[hingeKey] = { name: hingeKey, qty: 0, unit: 'kpl.' };
         hardwareList[hingeKey].qty += hingeCount;
       }
     });
@@ -386,22 +387,11 @@ function getFrontsAndDrawers(mod, config) {
               }
           }
 
-          // --- POPRAWKA DYNAMICZNYCH LUZÓW ---
           if (adjustedHoles.frontHoles) {
               adjustedHoles.frontHoles.forEach(h => {
-                  // front.x to szczelina z lewej (np. 1.5mm).
-                  // board to grubość boku (np. 18mm).
-                  // Nałożenie z lewej strony wynosi: 18 - 1.5 = 16.5mm
                   const actualOverlapLeft = board - (front.x || 0);
-                  
-                  // Prawa szczelina to całkowita szerokość korpusu odjąć (pozycja X frontu + jego szerokość)
                   const rightGap = width - ((front.x || 0) + (front.w || width));
-                  // Nałożenie z prawej strony wynosi: board - szczelina z prawej
                   const actualOverlapRight = board - rightGap;
-                  
-                  // Zgodnie z parametrami montażowymi, wymiar od wewnętrznej krawędzi do osi wiercenia 
-                  // to równe 20.5 mm dla popularnych szuflad. 
-                  // Przekładając to na front (licząc od krawędzi bocznej frontu):
                   const innerDist = 20.5;
                   
                   h.xOffsetLeft = actualOverlapLeft + innerDist;
