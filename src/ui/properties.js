@@ -37,6 +37,7 @@ export function initPropertiesPanel() {
   // Wczytywanie lokalnych ustawień frontów dla prawego panelu
   const f = { ...(state.project.front || {}), ...(activeModule.front || {}) };
   const fc = { ...(state.project.front?.clearance || {}), ...(activeModule.front?.clearance || {}) };
+  const fh = { topOffset: 100, bottomOffset: 100, margin: 40, ...(state.project.front?.hinges || {}) };
 
   rightSidebar.innerHTML = `
     <h2>Parametry szafki ${multiCount > 1 ? `<span style="color:#2563eb;">(Edytujesz ${multiCount} obiekty)</span>` : ''}</h2>
@@ -127,6 +128,7 @@ export function initPropertiesPanel() {
     </div>
 
     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
+    
     <h3 style="color: #059669;">Ustawienia Frontów i Szuflad (Lokalne)</h3>
     <div id="group-front-clearance">
       <div class="property-group"><label>Typ frontów:</label><select id="input-front-type"><option value="nakladane" ${(!f.type || f.type === 'nakladane') ? 'selected' : ''}>Nakładane</option><option value="wpuszczane" ${f.type === 'wpuszczane' ? 'selected' : ''}>Wpuszczane</option></select></div>
@@ -136,6 +138,22 @@ export function initPropertiesPanel() {
       <div class="property-group"><label>Luz prawy (mm):</label><input type="number" id="input-front-right" value="${fc.right ?? 1.5}" step="0.5" /></div>
       <div class="property-group"><label>Luz góra (mm):</label><input type="number" id="input-front-top" value="${fc.top ?? 2}" step="0.5" /></div>
       <div class="property-group"><label>Luz dół (mm):</label><input type="number" id="input-front-bottom" value="${fc.bottom ?? 2}" step="0.5" /></div>
+    </div>
+    
+    <div style="background: #ecfdf5; padding: 10px; border: 1px dashed #6ee7b7; border-radius: 4px; margin-top: 15px;">
+      <h4 style="margin: 0 0 10px 0; color: #047857; font-size: 13px;">Ustawienia Zawiasów</h4>
+      <div class="property-group">
+        <label style="font-size: 11px;">Oś górnego zawiasu od krawędzi frontu (mm):</label>
+        <input type="number" id="input-hinge-top" value="${fh.topOffset}" step="1" />
+      </div>
+      <div class="property-group">
+        <label style="font-size: 11px;">Oś dolnego zawiasu od krawędzi frontu (mm):</label>
+        <input type="number" id="input-hinge-bottom" value="${fh.bottomOffset}" step="1" />
+      </div>
+      <div class="property-group" style="margin-bottom: 0;">
+        <label style="font-size: 11px;">Bezpieczny margines od półki/przeszkody (mm):</label>
+        <input type="number" id="input-hinge-margin" value="${fh.margin}" step="1" />
+      </div>
     </div>
   `;
 
@@ -148,7 +166,7 @@ function setupEventListeners() {
   const numberInputs = [
     'pos-x', 'pos-y', 'traverse-width', 'board-thick', 'width', 'height', 'depth',
     'front-gap', 'front-left', 'front-right', 'front-top', 'front-bottom', 'back-offset', 'back-groove',
-    'legs-height', 'plinth-offset'
+    'legs-height', 'plinth-offset', 'hinge-top', 'hinge-bottom', 'hinge-margin' // Dodano nowe parametry
   ];
 
   const updateAll = () => { update3D(); updateSidebar(); };
@@ -241,6 +259,14 @@ function setupEventListeners() {
     if(el) {
       el.addEventListener('input', (e) => {
         const val = Number(e.target.value);
+        
+        // Zapis ustawień globalnych do projektu
+        if (['hinge-top', 'hinge-bottom', 'hinge-margin'].includes(id)) {
+            if (!state.project.front.hinges) state.project.front.hinges = {};
+            if (id === 'hinge-top') state.project.front.hinges.topOffset = val;
+            if (id === 'hinge-bottom') state.project.front.hinges.bottomOffset = val;
+            if (id === 'hinge-margin') state.project.front.hinges.margin = val;
+        }
         
         getSelectedMods().forEach(mod => {
             if (id === 'pos-x') mod.position.x = val;
