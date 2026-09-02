@@ -285,29 +285,39 @@ function setupEventListeners() {
             }
             if (id === 'board-thick') state.project.materials.boardThickness = val;
 
+            
             if (id === 'width') {
+              if (val < 50) return; // Sprzęgło bezpieczeństwa podczas pisania
+
               const oldWidth = parseFloat(mod.dimensions.width) || 0;
               const delta = val - oldWidth; 
-              mod.dimensions.width = val;
               
-              // --- DYNAMICZNE SKALOWANIE WNĘTRZA (PÓŁKI I PRZEGRODY) ---
               const th = parseFloat(state.project.materials.boardThickness) || 18;
               const innerOldX = oldWidth - 2 * th;
               const innerNewX = val - 2 * th;
               
+              // Stabilne przeliczanie absolutnych ułamków
               if (innerOldX > 0 && innerNewX > 0 && mod.elements) {
-                  const scaleX = innerNewX / innerOldX;
                   mod.elements.forEach(el => {
                       if (el.typ === 'poziom') {
-                          el.x = th + (el.x - th) * scaleX;
-                          el.w = el.w * scaleX;
+                          let relativeX = (el.x - th) / innerOldX;
+                          let relativeW = el.w / innerOldX;
+                          el.x = th + (relativeX * innerNewX);
+                          el.w = relativeW * innerNewX;
                       } else if (el.typ === 'pion') {
-                          el.x = th + (el.x - th) * scaleX;
+                          let relativeX = (el.x - th) / innerOldX;
+                          el.x = th + (relativeX * innerNewX);
+                      } else if (el.typ === 'front' && el.baseZone && !el.baseZone.boundLeft) {
+                          let relMin = (parseFloat(el.baseZone.minX) - th) / innerOldX;
+                          let relMax = (parseFloat(el.baseZone.maxX) - th) / innerOldX;
+                          el.baseZone.minX = th + (relMin * innerNewX);
+                          el.baseZone.maxX = th + (relMax * innerNewX);
                       }
                   });
               }
-              // ---------------------------------------------------------
-
+              
+              mod.dimensions.width = val;
+              
               state.project.modules.forEach(otherMod => {
                 if (otherMod.id !== mod.id && otherMod.position.x >= (mod.position.x + oldWidth - 1)) {
                   otherMod.position.x += delta; 
@@ -316,10 +326,9 @@ function setupEventListeners() {
             }
 
             if (id === 'height') {
-              const oldHeight = parseFloat(mod.dimensions.height) || 0;
-              mod.dimensions.height = val;
+              if (val < 50) return; // Sprzęgło bezpieczeństwa podczas pisania
 
-              // --- DYNAMICZNE SKALOWANIE WNĘTRZA (OS Y) ---
+              const oldHeight = parseFloat(mod.dimensions.height) || 0;
               const th = parseFloat(state.project.materials.boardThickness) || 18;
               const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(state.project.construction || {}), ...(mod.construction || {}) };
               let topZoneH = (cons.topType === 'trawersy_pion') ? (parseFloat(cons.traverseWidth) || 100) : th;
@@ -328,17 +337,25 @@ function setupEventListeners() {
               const innerNewY = val - th - topZoneH;
 
               if (innerOldY > 0 && innerNewY > 0 && mod.elements) {
-                  const scaleY = innerNewY / innerOldY;
                   mod.elements.forEach(el => {
                       if (el.typ === 'poziom') {
-                          el.y = th + (el.y - th) * scaleY;
+                          let relativeY = (el.y - th) / innerOldY;
+                          el.y = th + (relativeY * innerNewY);
                       } else if (el.typ === 'pion') {
-                          el.y = th + (el.y - th) * scaleY;
-                          el.h = el.h * scaleY;
+                          let relativeY = (el.y - th) / innerOldY;
+                          let relativeH = el.h / innerOldY;
+                          el.y = th + (relativeY * innerNewY);
+                          el.h = relativeH * innerNewY;
+                      } else if (el.typ === 'front' && el.baseZone && !el.baseZone.boundBottom) {
+                          let relMin = (parseFloat(el.baseZone.minY) - th) / innerOldY;
+                          let relMax = (parseFloat(el.baseZone.maxY) - th) / innerOldY;
+                          el.baseZone.minY = th + (relMin * innerNewY);
+                          el.baseZone.maxY = th + (relMax * innerNewY);
                       }
                   });
               }
-              // -------------------------------------------
+              
+              mod.dimensions.height = val;
             }
             
             if (id === 'depth') mod.dimensions.depth = val;
