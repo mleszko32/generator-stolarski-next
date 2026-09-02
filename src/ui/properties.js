@@ -2,6 +2,7 @@
 import { state, getActiveModule } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
+import { calculateParts } from "../engine/cabinet.js"; // Import silnika do pobierania rzeczywistych wymiarów
 
 function getSelectedMods() {
     if (state.selectedModules && state.selectedModules.size > 0) {
@@ -36,8 +37,39 @@ export function initPropertiesPanel() {
   const f = { ...(state.project.front || {}), ...(activeModule.front || {}) };
   const fc = { ...(state.project.front?.clearance || {}), ...(activeModule.front?.clearance || {}) };
   
-  // Zaciągamy ustawienia zawiasów (teraz z opcją forceCount)
   const fh = { topOffset: 100, bottomOffset: 100, margin: 40, forceCount: 0, ...(state.project.front?.hinges || {}), ...(activeModule.front?.hinges || {}) };
+
+  // --- NOWOŚĆ: POBIERANIE RZECZYWISTYCH POZYCJI ZAWIASÓW ---
+  let actualBottomText = "";
+  let actualTopText = "";
+
+  try {
+      // Symulujemy przeliczenie szafki w tle, żeby sprawdzić, czy zawiasy o coś nie uderzyły
+      const { mountingData } = calculateParts();
+      const activeDoor = mountingData.find(d => d.type === 'door');
+      
+      if (activeDoor && activeDoor.hinges && activeDoor.hinges.length >= 2) {
+          const hinges = activeDoor.hinges;
+          const front = activeModule.elements.find(e => e.id === activeDoor.frontId);
+          if (front) {
+              const h = Math.round(front.h);
+              const bottomHinge = hinges[0];
+              const topHinge = hinges[hinges.length - 1];
+
+              // Jeśli algorytm uznał, że musi przesunąć zawias...
+              if (bottomHinge.isAdjusted) {
+                  actualBottomText = `<div style="color: #c2410c; font-size: 10px; margin-top: 4px; padding: 4px 6px; background: #ffedd5; border-left: 3px solid #ea580c; border-radius: 2px; line-height: 1.2;">⚠️ Zmieniono na: <b>${bottomHinge.relY} mm</b> (Kolizja z półką)</div>`;
+              }
+              if (topHinge.isAdjusted) {
+                  const actualTopOffset = Math.round(h - topHinge.relY);
+                  actualTopText = `<div style="color: #c2410c; font-size: 10px; margin-top: 4px; padding: 4px 6px; background: #ffedd5; border-left: 3px solid #ea580c; border-radius: 2px; line-height: 1.2;">⚠️ Zmieniono na: <b>${actualTopOffset} mm</b> (Kolizja z półką)</div>`;
+              }
+          }
+      }
+  } catch(e) {
+      console.warn("Nie udało się pobrać rzeczywistych danych o zawiasach:", e);
+  }
+  // ---------------------------------------------------------
 
   rightSidebar.innerHTML = `
     <h2>Parametry szafki ${multiCount > 1 ? `<span style="color:#2563eb;">(Edytujesz ${multiCount} obiekty)</span>` : ''}</h2>
@@ -142,13 +174,15 @@ export function initPropertiesPanel() {
     
     <div style="background: #ecfdf5; padding: 10px; border: 1px dashed #6ee7b7; border-radius: 4px; margin-top: 15px;">
       <h4 style="margin: 0 0 10px 0; color: #047857; font-size: 13px;">Wymiary Osi Zawiasów (Lokalne)</h4>
-      <div class="property-group">
+      <div class="property-group" style="margin-bottom: ${actualTopText ? '12px' : '8px'};">
         <label style="font-size: 11px;">Od góry do środka puszki (mm):</label>
         <input type="number" id="input-hinge-top" value="${fh.topOffset}" step="1" />
+        ${actualTopText}
       </div>
-      <div class="property-group">
+      <div class="property-group" style="margin-bottom: ${actualBottomText ? '12px' : '8px'};">
         <label style="font-size: 11px;">Od dołu do środka puszki (mm):</label>
         <input type="number" id="input-hinge-bottom" value="${fh.bottomOffset}" step="1" />
+        ${actualBottomText}
       </div>
       <div class="property-group">
         <label style="font-size: 11px;">Bezpieczny margines od półki (mm):</label>
@@ -175,7 +209,7 @@ function setupEventListeners() {
 
   const updateAll = () => { update3D(); updateSidebar(); };
   let typingTimer;
-  const debouncedUpdateAll = () => { clearTimeout(typingTimer); typingTimer = setTimeout(() => { updateAll(); }, 200); };
+  const debouncedUpdateAll = () => { clearTimeout(typingTimer); typingTimer = setTimeout(() => { updateAll(); initPropertiesPanel(); }, 200); }; // Odświeżamy też panel, by załadować bąbelki o kolizjach!
 
   const nameInput = document.getElementById('input-mod-name');
   if (nameInput) {
@@ -285,9 +319,8 @@ function setupEventListeners() {
             }
             if (id === 'board-thick') state.project.materials.boardThickness = val;
 
-            
             if (id === 'width') {
-              if (val < 50) return; // Sprzęgło bezpieczeństwa podczas pisania
+              if (val < 50) return; 
 
               const oldWidth = parseFloat(mod.dimensions.width) || 0;
               const delta = val - oldWidth; 
@@ -296,7 +329,6 @@ function setupEventListeners() {
               const innerOldX = oldWidth - 2 * th;
               const innerNewX = val - 2 * th;
               
-              // Stabilne przeliczanie absolutnych ułamków
               if (innerOldX > 0 && innerNewX > 0 && mod.elements) {
                   mod.elements.forEach(el => {
                       if (el.typ === 'poziom') {
@@ -326,7 +358,7 @@ function setupEventListeners() {
             }
 
             if (id === 'height') {
-              if (val < 50) return; // Sprzęgło bezpieczeństwa podczas pisania
+              if (val < 50) return; 
 
               const oldHeight = parseFloat(mod.dimensions.height) || 0;
               const th = parseFloat(state.project.materials.boardThickness) || 18;
