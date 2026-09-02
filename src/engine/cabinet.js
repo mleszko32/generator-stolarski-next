@@ -15,6 +15,9 @@ export function calculateParts() {
   parts.push(...getCorpusParts(mod, config));
   parts.push(...getBackPanelParts(mod, config));
   parts.push(...getInteriorParts(mod, config));
+  
+  // NOWOŚĆ: Generowanie formatek dla blend L-kształtnych
+  parts.push(...getFillerParts(mod, config)); 
 
   const frontsAndDrawers = getFrontsAndDrawers(mod, config);
   parts.push(...frontsAndDrawers.parts);
@@ -98,6 +101,9 @@ export function calculateAllProjectParts() {
     modParts.push(...getCorpusParts(mod, config));
     modParts.push(...getBackPanelParts(mod, config));
     modParts.push(...getInteriorParts(mod, config));
+    
+    // Blendy na liście głównej (eksport do CSV)
+    modParts.push(...getFillerParts(mod, config)); 
 
     const frontsAndDrawers = getFrontsAndDrawers(mod, config);
     modParts.push(...frontsAndDrawers.parts);
@@ -225,7 +231,6 @@ export function calculateProjectHardware() {
           hardwareList[hwKey].qty += 1;
         }
       } 
-      // Zliczanie zawiasów i prowadników
       else if (front.subtype.includes('drzwi')) {
         const side = front.subtype === 'drzwi-lp' ? (front.id.includes('-L-') ? 'left' : 'right') : (front.openingSide || 'left');
         const hinges = calculateHinges(front, board, obstacles, side);
@@ -490,4 +495,36 @@ function getFrontsAndDrawers(mod, config) {
   });
 
   return { parts, mountingData };
+}
+
+// Funkcja generująca formatki dla Blend maskujących
+function getFillerParts(mod, config) {
+  const parts = [];
+  if (!mod.fillers) return parts;
+  
+  const th = config.materials.boardThickness || 18;
+  const h = parseFloat(mod.dimensions.height);
+  const w = parseFloat(mod.dimensions.width);
+
+  if (mod.fillers.left && mod.fillers.left.active) {
+      parts.push({ name: `Blenda Lewa (Czoło)`, length: h, width: parseFloat(mod.fillers.left.width), qty: 1, category: "Front" });
+      parts.push({ name: `Blenda Lewa (Mocowanie wewn.)`, length: h, width: parseFloat(mod.fillers.left.depth) - th, qty: 1, category: "Korpus" });
+  }
+  
+  if (mod.fillers.right && mod.fillers.right.active) {
+      parts.push({ name: `Blenda Prawa (Czoło)`, length: h, width: parseFloat(mod.fillers.right.width), qty: 1, category: "Front" });
+      parts.push({ name: `Blenda Prawa (Mocowanie wewn.)`, length: h, width: parseFloat(mod.fillers.right.depth) - th, qty: 1, category: "Korpus" });
+  }
+  
+  if (mod.fillers.top && mod.fillers.top.active) {
+      // Blenda górna przykrywa ewentualne blendy boczne, więc liczymy całą szerokość zabudowy w tym segmencie
+      let topW = w;
+      if (mod.fillers.left && mod.fillers.left.active) topW += parseFloat(mod.fillers.left.width);
+      if (mod.fillers.right && mod.fillers.right.active) topW += parseFloat(mod.fillers.right.width);
+      
+      parts.push({ name: `Blenda Górna (Czoło)`, length: topW, width: parseFloat(mod.fillers.top.height), qty: 1, category: "Front" });
+      parts.push({ name: `Blenda Górna (Mocowanie wewn.)`, length: topW, width: parseFloat(mod.fillers.top.depth) - th, qty: 1, category: "Korpus" });
+  }
+  
+  return parts;
 }
