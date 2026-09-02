@@ -1548,7 +1548,32 @@ export function update3D() {
                   
                   else if (el.subtype.includes('drzwi')) {
                       if (isXrayMode) {
-                          const obstacles = mod.elements.filter(e => e.typ === 'poziom' || e.subtype === 'szuflada-wewnetrzna');
+                          // SKANOWANIE WERTYKALNE W WIDOKU 3D
+                          let obstacles = [];
+                          const modAbsX = parseFloat(mod.position.x) || 0;
+                          const modLegH = (mod.legs && mod.legs.active) ? (parseFloat(mod.legs.height) || 0) : 0;
+                          const modAbsY = (parseFloat(mod.position.y) || 0) + modLegH;
+
+                          state.project.modules.forEach(otherMod => {
+                              const otherAbsX = parseFloat(otherMod.position.x) || 0;
+                              const otherLegH = (otherMod.legs && otherMod.legs.active) ? (parseFloat(otherMod.legs.height) || 0) : 0;
+                              const otherAbsY = (parseFloat(otherMod.position.y) || 0) + otherLegH;
+
+                              if (Math.abs(modAbsX - otherAbsX) < 10) {
+                                  const dy = otherAbsY - modAbsY;
+                                  if (otherMod.elements) {
+                                      otherMod.elements.forEach(e => {
+                                          if (e.typ === 'poziom' || e.subtype === 'szuflada-wewnetrzna') {
+                                              obstacles.push({ ...e, y: e.y + dy });
+                                          }
+                                      });
+                                  }
+                                  const otherH = parseFloat(otherMod.dimensions.height);
+                                  obstacles.push({ typ: 'poziom', y: dy, h: th, isStructural: true });
+                                  obstacles.push({ typ: 'poziom', y: dy + otherH - th, h: th, isStructural: true });
+                              }
+                          });
+
                           const side = el.subtype === 'drzwi-lp' ? (el.id.endsWith('-L') ? 'left' : 'right') : (el.openingSide || 'left');
                           const hinges = calculateHinges(el, th, obstacles, side);
                           

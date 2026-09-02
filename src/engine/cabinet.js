@@ -319,7 +319,35 @@ function getFrontsAndDrawers(mod, config) {
   const parts = [];
   const mountingData = [];
   const fronts = mod.elements ? mod.elements.filter(el => el.typ === 'front') : [];
-  const obstacles = mod.elements ? mod.elements.filter(el => el.typ === 'poziom' || el.subtype === 'szuflada-wewnetrzna') : [];
+  
+  // ZAAWANSOWANE SKANOWANIE WERTYKALNE (Widzi półki w nadstawkach)
+  let obstacles = [];
+  const modAbsX = parseFloat(mod.position.x) || 0;
+  const modLegH = (mod.legs && mod.legs.active) ? (parseFloat(mod.legs.height) || 0) : 0;
+  const modAbsY = (parseFloat(mod.position.y) || 0) + modLegH;
+  const th = config.materials.boardThickness || 18;
+
+  config.modules.forEach(otherMod => {
+      const otherAbsX = parseFloat(otherMod.position.x) || 0;
+      const otherLegH = (otherMod.legs && otherMod.legs.active) ? (parseFloat(otherMod.legs.height) || 0) : 0;
+      const otherAbsY = (parseFloat(otherMod.position.y) || 0) + otherLegH;
+
+      // Jeśli szafki stoją w tym samym pionie (margines błędu 10mm)
+      if (Math.abs(modAbsX - otherAbsX) < 10) {
+          const dy = otherAbsY - modAbsY;
+          if (otherMod.elements) {
+              otherMod.elements.forEach(el => {
+                  if (el.typ === 'poziom' || el.subtype === 'szuflada-wewnetrzna') {
+                      obstacles.push({ ...el, y: el.y + dy });
+                  }
+              });
+          }
+          // Dodajemy też dolny i górny wieniec tej "innej" szafki jako twarde przeszkody
+          const otherH = parseFloat(otherMod.dimensions.height);
+          obstacles.push({ typ: 'poziom', y: dy, h: th, isStructural: true });
+          obstacles.push({ typ: 'poziom', y: dy + otherH - th, h: th, isStructural: true });
+      }
+  });
 
   if (fronts.length === 0) return { parts, mountingData };
   fronts.sort((a, b) => a.y - b.y);
