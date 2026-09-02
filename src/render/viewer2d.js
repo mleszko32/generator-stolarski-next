@@ -417,13 +417,15 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
 
           // Rysujemy puszki tylko wtedy, jeśli są zawarte w danych aktywnego modułu
           // Dzięki globalnemu skanerowi, nadstawka wie o swoich puszkach!
+          // Rysujemy WSZYSTKIE puszki na froncie, ale odpowiednio je kolorujemy
           if (isDoor && mountingData) {
             svg += `<g class="layer-holes-hinge">`;
             const doorData = mountingData.find(m => m.type === 'door' && m.frontId === front.id);
             if (doorData && doorData.hinges) {
               doorData.hinges.forEach((hinge) => {
                  
-                 if (hinge.isLocal === false) return; 
+                 // USUNIĘTO: if (hinge.isLocal === false) return; 
+                 // Na rysunku frontu chcemy widzieć wszystkie nawierty!
                  
                  const isLeft = doorData.side === 'left';
                  const cupX = isLeft ? fSvgX + hinge.cupXOffset : fSvgX + fWidth - hinge.cupXOffset;
@@ -432,12 +434,21 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
                  let drawHoleY = front.isTBF ? front.y + hinge.relY - th : front.y + hinge.relY;
                  const holeSvgY = sideH - (front.dy + drawHoleY);
 
-                 let mainColor = hinge.isAdjusted ? "#ea580c" : "#16a34a";
-                 let darkColor = hinge.isAdjusted ? "#c2410c" : "#15803d";
-                 let warnMsg = hinge.isAdjusted ? ` <tspan fill="${mainColor}" font-size="9" font-weight="bold">⚠️ AUTO-KOREKTA</tspan>` : "";
+                 // --- LOGIKA WIZUALNA (Lokalne vs Zewnętrzne) ---
+                 let mainColor = hinge.isLocal ? (hinge.isAdjusted ? "#ea580c" : "#16a34a") : "#94a3b8";
+                 let darkColor = hinge.isLocal ? (hinge.isAdjusted ? "#c2410c" : "#15803d") : "#64748b";
+                 let opacity = hinge.isLocal ? "1" : "0.5"; // Wyszarzamy zawiasy z innych modułów
+                 
+                 let warnMsg = "";
+                 if (hinge.isLocal && hinge.isAdjusted) {
+                     warnMsg = ` <tspan fill="${mainColor}" font-size="9" font-weight="bold">⚠️ AUTO-KOREKTA</tspan>`;
+                 } else if (!hinge.isLocal) {
+                     warnMsg = ` <tspan fill="${mainColor}" font-size="9" font-weight="normal">(Inny moduł)</tspan>`;
+                 }
+                 // ----------------------------------------------
 
-                 svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="17.5" fill="#fcfdfd" stroke="${mainColor}" stroke-width="1.5" />`;
-                 svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="2.5" fill="${mainColor}" />`;
+                 svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="17.5" fill="#fcfdfd" stroke="${mainColor}" stroke-width="1.5" opacity="${opacity}" />`;
+                 svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="2.5" fill="${mainColor}" opacity="${opacity}" />`;
 
                  let distBottom = hinge.relY;
                  let distTop = front.h - hinge.relY;
@@ -449,13 +460,13 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
                                  `<tspan fill="${darkColor}" font-size="9" font-weight="bold">${isBottomCloser ? 'DÓŁ' : 'GÓRA'}</tspan> ` +
                                  `<tspan fill="#94a3b8" font-size="9" font-weight="normal">(${formatVal(secondary)} ${isBottomCloser ? 'GÓRA' : 'DÓŁ'})</tspan>` + warnMsg;
 
-                 svg += `<text x="${cupX + (isLeft ? 22 : -22)}" y="${holeSvgY + 4}" text-anchor="${isLeft ? 'start' : 'end'}" font-family="sans-serif">${tspanHtml}</text>`;
+                 svg += `<text x="${cupX + (isLeft ? 22 : -22)}" y="${holeSvgY + 4}" text-anchor="${isLeft ? 'start' : 'end'}" font-family="sans-serif" opacity="${opacity}">${tspanHtml}</text>`;
               });
             }
             svg += `</g>`;
           }
-        });
-  }
+      });
+    }
 
   if (viewMode === 'all' || viewMode === 'frontInner') {
       svg += `<text x="${innerFrontX + cabWidth/2}" y="${svgTopY - 25}" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">FRONTY (Szuflady wewn.)</text>`;
