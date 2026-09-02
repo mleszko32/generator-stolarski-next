@@ -309,11 +309,16 @@ export function init3DViewer() {
           const D = parseFloat(dragModule.dimensions.depth) || 510;
           let baseOffsetY = (dragModule.legs && dragModule.legs.active) ? (parseFloat(dragModule.legs.height) || 100) : 0;
           
+          // --- FIZYKA UWZGLĘDNIAJĄCA BLENDY MASKUJĄCE ---
+          const dragLeftW = (dragModule.fillers && dragModule.fillers.left && dragModule.fillers.left.active) ? (parseFloat(dragModule.fillers.left.width) || 50) : 0;
+          const dragRightW = (dragModule.fillers && dragModule.fillers.right && dragModule.fillers.right.active) ? (parseFloat(dragModule.fillers.right.width) || 50) : 0;
+          
           let snapX = newGroupPos.x - W/2;
           let snapY = newGroupPos.y - H/2 - baseOffsetY;
           let snapZ = newGroupPos.z - D/2;
 
-          if (Math.abs(snapX) < SNAP_DIST) snapX = 0;
+          // Przyciąganie do lewej ściany (Z uwzględnieniem blendy lewej)
+          if (Math.abs(snapX - dragLeftW) < SNAP_DIST) snapX = dragLeftW;
           if (Math.abs(snapY) < SNAP_DIST) snapY = 0;
           if (Math.abs(snapZ) < SNAP_DIST) snapZ = 0;
 
@@ -326,22 +331,37 @@ export function init3DViewer() {
               const oY = parseFloat(other.position.y);
               const oZ = parseFloat(other.position.z);
 
-              if (Math.abs(snapX - (oX + oW)) < SNAP_DIST) snapX = oX + oW;
-              if (Math.abs((snapX + W) - oX) < SNAP_DIST) snapX = oX - W;
-              if (Math.abs(snapX - oX) < SNAP_DIST) snapX = oX;
+              // Wymiary "Sąsiada" poszerzone o jego blendy
+              const otherLeftW = (other.fillers && other.fillers.left && other.fillers.left.active) ? (parseFloat(other.fillers.left.width) || 50) : 0;
+              const otherRightW = (other.fillers && other.fillers.right && other.fillers.right.active) ? (parseFloat(other.fillers.right.width) || 50) : 0;
 
+              const effOX = oX - otherLeftW;
+              const effOW = oW + otherLeftW + otherRightW;
+              
+              // Wymiary szafki, którą aktualnie przesuwamy, poszerzone o jej blendy
+              let dragStartX = snapX - dragLeftW;
+              let dragEndX = snapX + W + dragRightW;
+
+              // Kolizje osi X (Boki szafek + Blendy)
+              if (Math.abs(dragStartX - (effOX + effOW)) < SNAP_DIST) snapX = effOX + effOW + dragLeftW;
+              else if (Math.abs(dragEndX - effOX) < SNAP_DIST) snapX = effOX - W - dragRightW;
+              else if (Math.abs(dragStartX - effOX) < SNAP_DIST) snapX = effOX + dragLeftW;
+
+              // Kolizje osi Y i Z (Góra/Dół, Przód/Tył)
               if (Math.abs(snapY - (oY + oH)) < SNAP_DIST) snapY = oY + oH;
-              if (Math.abs((snapY + H) - oY) < SNAP_DIST) snapY = oY - H;
-              if (Math.abs(snapY - oY) < SNAP_DIST) snapY = oY;
+              else if (Math.abs((snapY + H) - oY) < SNAP_DIST) snapY = oY - H;
+              else if (Math.abs(snapY - oY) < SNAP_DIST) snapY = oY;
 
               if (Math.abs(snapZ - (oZ + oD)) < SNAP_DIST) snapZ = oZ + oD;
-              if (Math.abs((snapZ + D) - oZ) < SNAP_DIST) snapZ = oZ - D;
-              if (Math.abs(snapZ - oZ) < SNAP_DIST) snapZ = oZ;
+              else if (Math.abs((snapZ + D) - oZ) < SNAP_DIST) snapZ = oZ - D;
+              else if (Math.abs(snapZ - oZ) < SNAP_DIST) snapZ = oZ;
           });
 
-          snapX = Math.max(0, snapX);
+          // Twarde ograniczenie - zabezpieczenie, żeby lewa blenda uderzyła w ścianę, a nie weszła w nią
+          snapX = Math.max(dragLeftW, snapX);
           snapY = Math.max(0, snapY);
           snapZ = Math.max(0, snapZ);
+          // ----------------------------------------------
 
           dragModule.position.x = Math.round(snapX);
           dragModule.position.y = Math.round(snapY);

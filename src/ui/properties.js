@@ -200,7 +200,9 @@ function setupEventListeners() {
 
   const updateAll = () => { update3D(); updateSidebar(); };
   let typingTimer;
-  const debouncedUpdateAll = () => { clearTimeout(typingTimer); typingTimer = setTimeout(() => { updateAll(); initPropertiesPanel(); }, 200); }; 
+  
+  // POPRAWKA: W trakcie wpisywania odświeża się tylko widok 3D, panel nie znika!
+  const debouncedUpdateAll = () => { clearTimeout(typingTimer); typingTimer = setTimeout(() => { updateAll(); }, 50); }; 
 
   const nameInput = document.getElementById('input-mod-name');
   if (nameInput) {
@@ -208,6 +210,7 @@ function setupEventListeners() {
           getSelectedMods().forEach(mod => { mod.name = e.target.value; });
           debouncedUpdateAll(); 
       });
+      nameInput.addEventListener('change', () => initPropertiesPanel());
   }
 
   ['left', 'right', 'top'].forEach(side => {
@@ -217,8 +220,6 @@ function setupEventListeners() {
           chk.addEventListener('change', (e) => {
               getSelectedMods().forEach(mod => { 
                   mod.fillers[side].active = e.target.checked; 
-                  
-                  // AUTOMATYCZNE PRZESUNIĘCIE SZAFKI W PRAWO PRZY DODANIU LEWEJ BLENDY
                   if (side === 'left') {
                       const fillerW = parseFloat(mod.fillers.left.width) || 50;
                       if (e.target.checked) {
@@ -226,7 +227,6 @@ function setupEventListeners() {
                       } else {
                           mod.position.x = Math.max(0, (parseFloat(mod.position.x) || 0) - fillerW);
                       }
-                      
                       const inpX = document.getElementById('input-pos-x');
                       if (inpX) inpX.value = mod.position.x;
                   }
@@ -385,6 +385,9 @@ function setupEventListeners() {
         });
         debouncedUpdateAll();
       });
+
+      // POPRAWKA: Po zakończeniu wpisywania, zaktualizuj pełen panel boczny
+      el.addEventListener('change', () => { initPropertiesPanel(); });
     }
   });
 }
