@@ -103,6 +103,8 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
         <text x="352" y="49" font-size="12" fill="#dc2626">Mocowania frontu szuflady</text>
         <circle cx="560" cy="20" r="2.5" fill="#16a34a"/>
         <text x="572" y="24" font-size="12" fill="#16a34a">Zawiasy i prowadniki zawiasów</text>
+        <circle cx="560" cy="45" r="2.5" fill="#ea580c"/>
+        <text x="572" y="49" font-size="12" font-weight="bold" fill="#ea580c">Zawias skorygowany (Ominął przeszkodę)</text>
     </g>
   `;
 
@@ -219,6 +221,9 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
     mountingData.forEach((data) => {
       if (data.type === 'door') {
         data.hinges.forEach(hinge => {
+          
+          if (hinge.isLocal === false) return; // Pomijamy prowadniki z innych szafek na boku
+          
           let calcY = isTopBottomFullWidth ? hinge.y - th : hinge.y;
           const svgY = sideH - calcY;
           
@@ -228,20 +233,24 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
           let primary = isBottomCloser ? distBottom : distTop;
           let secondary = isBottomCloser ? distTop : distBottom;
           
-          let tspanHtml = `<tspan fill="#16a34a" font-weight="bold" font-size="11">${formatVal(primary)}</tspan> ` +
-                          `<tspan fill="#15803d" font-size="9" font-weight="bold">${isBottomCloser ? 'DÓŁ' : 'GÓRA'}</tspan> ` +
-                          `<tspan fill="#94a3b8" font-size="9" font-weight="normal">(${formatVal(secondary)} ${isBottomCloser ? 'GÓRA' : 'DÓŁ'})</tspan>`;
+          let mainColor = hinge.isAdjusted ? "#ea580c" : "#16a34a";
+          let darkColor = hinge.isAdjusted ? "#c2410c" : "#15803d";
+          let warnMsg = hinge.isAdjusted ? ` <tspan fill="${mainColor}" font-size="9" font-weight="bold">⚠️ AUTO-KOREKTA</tspan>` : "";
+          
+          let tspanHtml = `<tspan fill="${mainColor}" font-weight="bold" font-size="11">${formatVal(primary)}</tspan> ` +
+                          `<tspan fill="${darkColor}" font-size="9" font-weight="bold">${isBottomCloser ? 'DÓŁ' : 'GÓRA'}</tspan> ` +
+                          `<tspan fill="#94a3b8" font-size="9" font-weight="normal">(${formatVal(secondary)} ${isBottomCloser ? 'GÓRA' : 'DÓŁ'})</tspan>` + warnMsg;
           
           svg += `<g class="layer-holes-hinge">`;
           if (data.side === 'left' && (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki')) {
             const svgX = bokLX + 37;
-            svg += `<circle cx="${svgX}" cy="${svgY - 16}" r="2.5" fill="#16a34a" />`;
-            svg += `<circle cx="${svgX}" cy="${svgY + 16}" r="2.5" fill="#16a34a" />`;
+            svg += `<circle cx="${svgX}" cy="${svgY - 16}" r="2.5" fill="${mainColor}" />`;
+            svg += `<circle cx="${svgX}" cy="${svgY + 16}" r="2.5" fill="${mainColor}" />`;
             svg += `<text x="${svgX + 8}" y="${svgY + 4}" font-family="sans-serif">${tspanHtml}</text>`;
           } else if (data.side === 'right' && (viewMode === 'all' || viewMode === 'bokR' || viewMode === 'boki')) {
             const svgX = bokRX + depth - 37;
-            svg += `<circle cx="${svgX}" cy="${svgY - 16}" r="2.5" fill="#16a34a" />`;
-            svg += `<circle cx="${svgX}" cy="${svgY + 16}" r="2.5" fill="#16a34a" />`;
+            svg += `<circle cx="${svgX}" cy="${svgY - 16}" r="2.5" fill="${mainColor}" />`;
+            svg += `<circle cx="${svgX}" cy="${svgY + 16}" r="2.5" fill="${mainColor}" />`;
             svg += `<text x="${svgX - 8}" y="${svgY + 4}" text-anchor="end" font-family="sans-serif">${tspanHtml}</text>`;
           }
           svg += `</g>`;
@@ -512,8 +521,12 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
                  let drawHoleY = isTopBottomFullWidth ? front.y + hinge.relY - th : front.y + hinge.relY;
                  const holeSvgY = viewH - drawHoleY;
 
-                 svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="17.5" fill="#fcfdfd" stroke="#16a34a" stroke-width="1.5" />`;
-                 svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="2.5" fill="#16a34a" />`;
+                 let mainColor = hinge.isAdjusted ? "#ea580c" : "#16a34a";
+                 let darkColor = hinge.isAdjusted ? "#c2410c" : "#15803d";
+                 let warnMsg = hinge.isAdjusted ? ` <tspan fill="${mainColor}" font-size="9" font-weight="bold">⚠️ AUTO-KOREKTA</tspan>` : "";
+
+                 svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="17.5" fill="#fcfdfd" stroke="${mainColor}" stroke-width="1.5" />`;
+                 svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="2.5" fill="${mainColor}" />`;
 
                  let distBottom = hinge.relY;
                  let distTop = front.h - hinge.relY;
@@ -521,9 +534,9 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
                  let primary = isBottomCloser ? distBottom : distTop;
                  let secondary = isBottomCloser ? distTop : distBottom;
                  
-                 let tspanHtml = `<tspan fill="#16a34a" font-weight="bold" font-size="11">${formatVal(primary)}</tspan> ` +
-                                 `<tspan fill="#15803d" font-size="9" font-weight="bold">${isBottomCloser ? 'DÓŁ' : 'GÓRA'}</tspan> ` +
-                                 `<tspan fill="#94a3b8" font-size="9" font-weight="normal">(${formatVal(secondary)} ${isBottomCloser ? 'GÓRA' : 'DÓŁ'})</tspan>`;
+                 let tspanHtml = `<tspan fill="${mainColor}" font-weight="bold" font-size="11">${formatVal(primary)}</tspan> ` +
+                                 `<tspan fill="${darkColor}" font-size="9" font-weight="bold">${isBottomCloser ? 'DÓŁ' : 'GÓRA'}</tspan> ` +
+                                 `<tspan fill="#94a3b8" font-size="9" font-weight="normal">(${formatVal(secondary)} ${isBottomCloser ? 'GÓRA' : 'DÓŁ'})</tspan>` + warnMsg;
 
                  svg += `<text x="${cupX + (isLeft ? 22 : -22)}" y="${holeSvgY + 4}" text-anchor="${isLeft ? 'start' : 'end'}" font-family="sans-serif">${tspanHtml}</text>`;
               });

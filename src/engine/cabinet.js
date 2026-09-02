@@ -36,19 +36,16 @@ function getGlobalHingesForModule(targetMod, config) {
   const targetH = parseFloat(targetMod.dimensions.height);
   const th = config.materials.boardThickness || 18;
 
-  // Przeszukujemy wszystkie szafki w projekcie w poszukiwaniu drzwi
   config.modules.forEach(sourceMod => {
       const sourceAbsX = parseFloat(sourceMod.position.x) || 0;
       const sourceLegH = (sourceMod.legs && sourceMod.legs.active) ? (parseFloat(sourceMod.legs.height) || 0) : 0;
       const sourceAbsY = (parseFloat(sourceMod.position.y) || 0) + sourceLegH;
 
-      // Jeśli szafki stoją w tym samym pionie
       if (Math.abs(targetAbsX - sourceAbsX) < 10) {
           if (sourceMod.elements) {
               const fronts = sourceMod.elements.filter(el => el.typ === 'front' && el.subtype.includes('drzwi'));
               fronts.forEach(front => {
                   
-                  // Budujemy listę absolutnych przeszkód (półek) dla tego pionu
                   let obstacles = [];
                   config.modules.forEach(otherMod => {
                       const otherAbsX = parseFloat(otherMod.position.x) || 0;
@@ -73,21 +70,17 @@ function getGlobalHingesForModule(targetMod, config) {
                   const side = front.subtype === 'drzwi-lp' ? (front.id.includes('-L-') ? 'left' : 'right') : (front.openingSide || 'left');
                   const hinges = calculateHinges(front, th, obstacles, side);
 
-                  // Odfiltrowujemy tylko te zawiasy, które "wpadają" do aktualnie analizowanej szafki!
-                  const validHinges = [];
-                  hinges.forEach(h => {
+                  const translatedHinges = hinges.map(h => {
                       const hingeAbsY = sourceAbsY + h.y; 
-                      const localY = hingeAbsY - targetAbsY; // Translacja wymiaru na przestrzeń nadstawki
-                      
-                      // Akceptujemy zawias, jeśli mieści się w wysokości tej konkretnej szafki (margines błędu 5mm)
-                      if (localY >= -5 && localY <= targetH + 5) {
-                          validHinges.push({ ...h, y: localY });
-                      }
+                      const localY = hingeAbsY - targetAbsY; 
+                      const isLocal = localY >= -5 && localY <= targetH + 5;
+                      return { ...h, y: localY, isLocal: isLocal };
                   });
 
-                  if (validHinges.length > 0) {
+                  // Dodajemy dane jeśli szafka ma lokalne zawiasy ALBO jest szafką-właścicielem drzwi
+                  if (translatedHinges.some(h => h.isLocal) || sourceMod.id === targetMod.id) {
                       let partName = front.subtype === 'drzwi-lp' ? `Drzwi ${side === 'left' ? 'Lewe' : 'Prawe'}` : 'Drzwi';
-                      mountingData.push({ type: 'door', name: partName, side: side, frontId: front.id, hinges: validHinges });
+                      mountingData.push({ type: 'door', name: partName, side: side, frontId: front.id, hinges: translatedHinges });
                   }
               });
           }
