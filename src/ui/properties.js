@@ -289,6 +289,25 @@ function setupEventListeners() {
               const oldWidth = parseFloat(mod.dimensions.width) || 0;
               const delta = val - oldWidth; 
               mod.dimensions.width = val;
+              
+              // --- DYNAMICZNE SKALOWANIE WNĘTRZA (PÓŁKI I PRZEGRODY) ---
+              const th = parseFloat(state.project.materials.boardThickness) || 18;
+              const innerOldX = oldWidth - 2 * th;
+              const innerNewX = val - 2 * th;
+              
+              if (innerOldX > 0 && innerNewX > 0 && mod.elements) {
+                  const scaleX = innerNewX / innerOldX;
+                  mod.elements.forEach(el => {
+                      if (el.typ === 'poziom') {
+                          el.x = th + (el.x - th) * scaleX;
+                          el.w = el.w * scaleX;
+                      } else if (el.typ === 'pion') {
+                          el.x = th + (el.x - th) * scaleX;
+                      }
+                  });
+              }
+              // ---------------------------------------------------------
+
               state.project.modules.forEach(otherMod => {
                 if (otherMod.id !== mod.id && otherMod.position.x >= (mod.position.x + oldWidth - 1)) {
                   otherMod.position.x += delta; 
@@ -296,7 +315,32 @@ function setupEventListeners() {
               });
             }
 
-            if (id === 'height') mod.dimensions.height = val;
+            if (id === 'height') {
+              const oldHeight = parseFloat(mod.dimensions.height) || 0;
+              mod.dimensions.height = val;
+
+              // --- DYNAMICZNE SKALOWANIE WNĘTRZA (OS Y) ---
+              const th = parseFloat(state.project.materials.boardThickness) || 18;
+              const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(state.project.construction || {}), ...(mod.construction || {}) };
+              let topZoneH = (cons.topType === 'trawersy_pion') ? (parseFloat(cons.traverseWidth) || 100) : th;
+              
+              const innerOldY = oldHeight - th - topZoneH;
+              const innerNewY = val - th - topZoneH;
+
+              if (innerOldY > 0 && innerNewY > 0 && mod.elements) {
+                  const scaleY = innerNewY / innerOldY;
+                  mod.elements.forEach(el => {
+                      if (el.typ === 'poziom') {
+                          el.y = th + (el.y - th) * scaleY;
+                      } else if (el.typ === 'pion') {
+                          el.y = th + (el.y - th) * scaleY;
+                          el.h = el.h * scaleY;
+                      }
+                  });
+              }
+              // -------------------------------------------
+            }
+            
             if (id === 'depth') mod.dimensions.depth = val;
 
             if (!mod.front) mod.front = {};
