@@ -1610,6 +1610,7 @@ export function update3D() {
       }
 
       // NOWOŚĆ: Generowanie 3D dla Blend L-kształtnych (ukrywają się razem z frontami)
+      // NOWOŚĆ: Generowanie 3D dla Blend L-kształtnych (ukrywają się razem z frontami)
       if (mod.fillers && isFrontsVisible) {
           const frontType = (mod.front && mod.front.type) ? mod.front.type : (state.project.front?.type || 'nakladane');
           const zForFiller = frontType === 'wpuszczane' ? posZ + D - th : posZ + D + 2;
@@ -1617,11 +1618,14 @@ export function update3D() {
           let leftW = 0;
           let rightW = 0;
 
+          // Eliminujemy błędy odczytu przy wpisywaniu wartości ujemnych lub równych 0
+          const parseVal = (val, fallback) => (val !== null && val !== undefined && val !== '') ? parseFloat(val) : fallback;
+
           if (mod.fillers.left && mod.fillers.left.active) {
               leftW = parseFloat(mod.fillers.left.width) || 50;
-              const fH = mod.fillers.left.height ? parseFloat(mod.fillers.left.height) : H;
+              const fH = parseVal(mod.fillers.left.height, H);
               const fD = parseFloat(mod.fillers.left.depth) || 80;
-              const fY = parseFloat(mod.fillers.left.offsetY) || 0;
+              const fY = parseVal(mod.fillers.left.offsetY, 0);
 
               addBox(leftW, fH, th, posX - leftW, posY + fY, zForFiller, 'front', isActive, null, innerGroup);
               addBox(th, fH, fD - th, posX - th, posY + fY, zForFiller - (fD - th), 'corpus', isActive, null, innerGroup);
@@ -1629,20 +1633,20 @@ export function update3D() {
 
           if (mod.fillers.right && mod.fillers.right.active) {
               rightW = parseFloat(mod.fillers.right.width) || 50;
-              const fH = mod.fillers.right.height ? parseFloat(mod.fillers.right.height) : H;
+              const fH = parseVal(mod.fillers.right.height, H);
               const fD = parseFloat(mod.fillers.right.depth) || 80;
-              const fY = parseFloat(mod.fillers.right.offsetY) || 0;
+              const fY = parseVal(mod.fillers.right.offsetY, 0);
 
               addBox(rightW, fH, th, posX + W, posY + fY, zForFiller, 'front', isActive, null, innerGroup);
               addBox(th, fH, fD - th, posX + W, posY + fY, zForFiller - (fD - th), 'corpus', isActive, null, innerGroup);
           }
 
           if (mod.fillers.top && mod.fillers.top.active) {
-              const fH = parseFloat(mod.fillers.top.height) || 50;
+              const fH = parseVal(mod.fillers.top.height, 50);
               const autoW = W + leftW + rightW;
-              const topW = mod.fillers.top.width ? parseFloat(mod.fillers.top.width) : autoW;
+              const topW = parseVal(mod.fillers.top.width, autoW);
               const fD = parseFloat(mod.fillers.top.depth) || 80;
-              const fY = parseFloat(mod.fillers.top.offsetY) || 0;
+              const fY = parseVal(mod.fillers.top.offsetY, 0);
 
               const startX = posX - leftW + (autoW - topW) / 2;
 

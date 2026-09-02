@@ -215,7 +215,22 @@ function setupEventListeners() {
       const opts = document.getElementById(`filler-${side}-opts`);
       if (chk && opts) {
           chk.addEventListener('change', (e) => {
-              getSelectedMods().forEach(mod => { mod.fillers[side].active = e.target.checked; });
+              getSelectedMods().forEach(mod => { 
+                  mod.fillers[side].active = e.target.checked; 
+                  
+                  // AUTOMATYCZNE PRZESUNIĘCIE SZAFKI W PRAWO PRZY DODANIU LEWEJ BLENDY
+                  if (side === 'left') {
+                      const fillerW = parseFloat(mod.fillers.left.width) || 50;
+                      if (e.target.checked) {
+                          mod.position.x = (parseFloat(mod.position.x) || 0) + fillerW;
+                      } else {
+                          mod.position.x = Math.max(0, (parseFloat(mod.position.x) || 0) - fillerW);
+                      }
+                      
+                      const inpX = document.getElementById('input-pos-x');
+                      if (inpX) inpX.value = mod.position.x;
+                  }
+              });
               opts.style.display = e.target.checked ? 'block' : 'none';
               updateAll();
           });

@@ -498,32 +498,40 @@ function getFrontsAndDrawers(mod, config) {
 }
 
 // Funkcja generująca formatki dla Blend maskujących
+// Funkcja generująca formatki dla Blend maskujących
 function getFillerParts(mod, config) {
   const parts = [];
   if (!mod.fillers) return parts;
   
   const th = config.materials.boardThickness || 18;
-  const h = parseFloat(mod.dimensions.height);
-  const w = parseFloat(mod.dimensions.width);
+  const modH = parseFloat(mod.dimensions.height);
+  const modW = parseFloat(mod.dimensions.width);
+
+  // Zabezpieczenie przed błędnym odczytem "0" i pustych pól
+  const parseVal = (val, fallback) => (val !== null && val !== undefined && val !== '') ? parseFloat(val) : fallback;
 
   if (mod.fillers.left && mod.fillers.left.active) {
-      parts.push({ name: `Blenda Lewa (Czoło)`, length: h, width: parseFloat(mod.fillers.left.width), qty: 1, category: "Front" });
-      parts.push({ name: `Blenda Lewa (Mocowanie wewn.)`, length: h, width: parseFloat(mod.fillers.left.depth) - th, qty: 1, category: "Korpus" });
+      const h = parseVal(mod.fillers.left.height, modH);
+      parts.push({ name: `Blenda Lewa (Czoło)`, length: h, width: parseFloat(mod.fillers.left.width) || 50, qty: 1, category: "Front" });
+      parts.push({ name: `Blenda Lewa (Mocowanie wewn.)`, length: h, width: (parseFloat(mod.fillers.left.depth) || 80) - th, qty: 1, category: "Korpus" });
   }
   
   if (mod.fillers.right && mod.fillers.right.active) {
-      parts.push({ name: `Blenda Prawa (Czoło)`, length: h, width: parseFloat(mod.fillers.right.width), qty: 1, category: "Front" });
-      parts.push({ name: `Blenda Prawa (Mocowanie wewn.)`, length: h, width: parseFloat(mod.fillers.right.depth) - th, qty: 1, category: "Korpus" });
+      const h = parseVal(mod.fillers.right.height, modH);
+      parts.push({ name: `Blenda Prawa (Czoło)`, length: h, width: parseFloat(mod.fillers.right.width) || 50, qty: 1, category: "Front" });
+      parts.push({ name: `Blenda Prawa (Mocowanie wewn.)`, length: h, width: (parseFloat(mod.fillers.right.depth) || 80) - th, qty: 1, category: "Korpus" });
   }
   
   if (mod.fillers.top && mod.fillers.top.active) {
-      // Blenda górna przykrywa ewentualne blendy boczne, więc liczymy całą szerokość zabudowy w tym segmencie
-      let topW = w;
-      if (mod.fillers.left && mod.fillers.left.active) topW += parseFloat(mod.fillers.left.width);
-      if (mod.fillers.right && mod.fillers.right.active) topW += parseFloat(mod.fillers.right.width);
+      let autoW = modW;
+      if (mod.fillers.left && mod.fillers.left.active) autoW += parseFloat(mod.fillers.left.width) || 50;
+      if (mod.fillers.right && mod.fillers.right.active) autoW += parseFloat(mod.fillers.right.width) || 50;
       
-      parts.push({ name: `Blenda Górna (Czoło)`, length: topW, width: parseFloat(mod.fillers.top.height), qty: 1, category: "Front" });
-      parts.push({ name: `Blenda Górna (Mocowanie wewn.)`, length: topW, width: parseFloat(mod.fillers.top.depth) - th, qty: 1, category: "Korpus" });
+      const w = parseVal(mod.fillers.top.width, autoW);
+      const h = parseVal(mod.fillers.top.height, 50);
+
+      parts.push({ name: `Blenda Górna (Czoło)`, length: w, width: h, qty: 1, category: "Front" });
+      parts.push({ name: `Blenda Górna (Mocowanie wewn.)`, length: w, width: (parseFloat(mod.fillers.top.depth) || 80) - th, qty: 1, category: "Korpus" });
   }
   
   return parts;
