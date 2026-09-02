@@ -21,8 +21,79 @@ export function calculateParts() {
   
   mountingData.push(...frontsAndDrawers.mountingData);
   mountingData.push(...getCorpusHoles(mod, config)); 
+  
+  // Skaner globalny przypisujący prowadniki zawiasów do właściwych korpusów w danym pionie
+  mountingData.push(...getGlobalHingesForModule(mod, config));
 
   return { parts, mountingData };
+}
+
+function getGlobalHingesForModule(targetMod, config) {
+  const mountingData = [];
+  const targetAbsX = parseFloat(targetMod.position.x) || 0;
+  const targetLegH = (targetMod.legs && targetMod.legs.active) ? (parseFloat(targetMod.legs.height) || 0) : 0;
+  const targetAbsY = (parseFloat(targetMod.position.y) || 0) + targetLegH;
+  const targetH = parseFloat(targetMod.dimensions.height);
+  const th = config.materials.boardThickness || 18;
+
+  // Przeszukujemy wszystkie szafki w projekcie w poszukiwaniu drzwi
+  config.modules.forEach(sourceMod => {
+      const sourceAbsX = parseFloat(sourceMod.position.x) || 0;
+      const sourceLegH = (sourceMod.legs && sourceMod.legs.active) ? (parseFloat(sourceMod.legs.height) || 0) : 0;
+      const sourceAbsY = (parseFloat(sourceMod.position.y) || 0) + sourceLegH;
+
+      // Jeśli szafki stoją w tym samym pionie
+      if (Math.abs(targetAbsX - sourceAbsX) < 10) {
+          if (sourceMod.elements) {
+              const fronts = sourceMod.elements.filter(el => el.typ === 'front' && el.subtype.includes('drzwi'));
+              fronts.forEach(front => {
+                  
+                  // Budujemy listę absolutnych przeszkód (półek) dla tego pionu
+                  let obstacles = [];
+                  config.modules.forEach(otherMod => {
+                      const otherAbsX = parseFloat(otherMod.position.x) || 0;
+                      const otherLegH = (otherMod.legs && otherMod.legs.active) ? (parseFloat(otherMod.legs.height) || 0) : 0;
+                      const otherAbsY = (parseFloat(otherMod.position.y) || 0) + otherLegH;
+                      
+                      if (Math.abs(sourceAbsX - otherAbsX) < 10) {
+                          const dy = otherAbsY - sourceAbsY;
+                          if (otherMod.elements) {
+                              otherMod.elements.forEach(el => {
+                                  if (el.typ === 'poziom' || el.subtype === 'szuflada-wewnetrzna') {
+                                      obstacles.push({ ...el, y: el.y + dy });
+                                  }
+                              });
+                          }
+                          const otherH = parseFloat(otherMod.dimensions.height);
+                          obstacles.push({ typ: 'poziom', y: dy, h: th, isStructural: true });
+                          obstacles.push({ typ: 'poziom', y: dy + otherH - th, h: th, isStructural: true });
+                      }
+                  });
+
+                  const side = front.subtype === 'drzwi-lp' ? (front.id.includes('-L-') ? 'left' : 'right') : (front.openingSide || 'left');
+                  const hinges = calculateHinges(front, th, obstacles, side);
+
+                  // Odfiltrowujemy tylko te zawiasy, które "wpadają" do aktualnie analizowanej szafki!
+                  const validHinges = [];
+                  hinges.forEach(h => {
+                      const hingeAbsY = sourceAbsY + h.y; 
+                      const localY = hingeAbsY - targetAbsY; // Translacja wymiaru na przestrzeń nadstawki
+                      
+                      // Akceptujemy zawias, jeśli mieści się w wysokości tej konkretnej szafki (margines błędu 5mm)
+                      if (localY >= -5 && localY <= targetH + 5) {
+                          validHinges.push({ ...h, y: localY });
+                      }
+                  });
+
+                  if (validHinges.length > 0) {
+                      let partName = front.subtype === 'drzwi-lp' ? `Drzwi ${side === 'left' ? 'Lewe' : 'Prawe'}` : 'Drzwi';
+                      mountingData.push({ type: 'door', name: partName, side: side, frontId: front.id, hinges: validHinges });
+                  }
+              });
+          }
+      }
+  });
+  return mountingData;
 }
 
 export function calculateAllProjectParts() {
@@ -163,7 +234,7 @@ export function calculateProjectHardware() {
       } 
       // Zliczanie zawiasów i prowadników
       else if (front.subtype.includes('drzwi')) {
-        const side = front.subtype === 'drzwi-lp' ? (front.id.endsWith('-L') ? 'left' : 'right') : (front.openingSide || 'left');
+        const side = front.subtype === 'drzwi-lp' ? (front.id.includes('-L-') ? 'left' : 'right') : (front.openingSide || 'left');
         const hinges = calculateHinges(front, board, obstacles, side);
         const hingeCount = hinges.length;
 
@@ -319,35 +390,6 @@ function getFrontsAndDrawers(mod, config) {
   const parts = [];
   const mountingData = [];
   const fronts = mod.elements ? mod.elements.filter(el => el.typ === 'front') : [];
-  
-  // ZAAWANSOWANE SKANOWANIE WERTYKALNE (Widzi półki w nadstawkach)
-  let obstacles = [];
-  const modAbsX = parseFloat(mod.position.x) || 0;
-  const modLegH = (mod.legs && mod.legs.active) ? (parseFloat(mod.legs.height) || 0) : 0;
-  const modAbsY = (parseFloat(mod.position.y) || 0) + modLegH;
-  const th = config.materials.boardThickness || 18;
-
-  config.modules.forEach(otherMod => {
-      const otherAbsX = parseFloat(otherMod.position.x) || 0;
-      const otherLegH = (otherMod.legs && otherMod.legs.active) ? (parseFloat(otherMod.legs.height) || 0) : 0;
-      const otherAbsY = (parseFloat(otherMod.position.y) || 0) + otherLegH;
-
-      // Jeśli szafki stoją w tym samym pionie (margines błędu 10mm)
-      if (Math.abs(modAbsX - otherAbsX) < 10) {
-          const dy = otherAbsY - modAbsY;
-          if (otherMod.elements) {
-              otherMod.elements.forEach(el => {
-                  if (el.typ === 'poziom' || el.subtype === 'szuflada-wewnetrzna') {
-                      obstacles.push({ ...el, y: el.y + dy });
-                  }
-              });
-          }
-          // Dodajemy też dolny i górny wieniec tej "innej" szafki jako twarde przeszkody
-          const otherH = parseFloat(otherMod.dimensions.height);
-          obstacles.push({ typ: 'poziom', y: dy, h: th, isStructural: true });
-          obstacles.push({ typ: 'poziom', y: dy + otherH - th, h: th, isStructural: true });
-      }
-  });
 
   if (fronts.length === 0) return { parts, mountingData };
   fronts.sort((a, b) => a.y - b.y);
@@ -368,7 +410,7 @@ function getFrontsAndDrawers(mod, config) {
     else if (front.subtype === 'szuflada-wewnetrzna') { drawerCount++; partName = `Front szuflady wewn. ${drawerCount}`; } 
     else if (front.subtype === 'drzwi') { doorCount++; partName = `Drzwi ${doorCount}`; } 
     else if (front.subtype === 'drzwi-lp') {
-      const side = front.id.endsWith('-L') ? 'Lewe' : 'Prawe';
+      const side = front.id.includes('-L-') ? 'Lewe' : 'Prawe';
       partName = `Drzwi ${side}`;
     }
 
@@ -452,12 +494,6 @@ function getFrontsAndDrawers(mod, config) {
         }
       }
     } 
-    else if (front.subtype.includes('drzwi')) {
-      const side = front.subtype === 'drzwi-lp' ? (front.id.includes('-L-') ? 'left' : 'right') : (front.openingSide || 'left');
-      const hinges = calculateHinges(front, board, obstacles, side);
-      mountingData.push({ type: 'door', name: partName, side: side, frontId: front.id, hinges: hinges });
-    
-    }
   });
 
   return { parts, mountingData };
