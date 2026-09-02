@@ -5,13 +5,11 @@ export function calculateHinges(front, boardThick, obstacles, side) {
   const h = Math.round(front.h); 
   const y = Math.round(front.y); 
   
-  // Szukamy modułu, do którego należy ten konkretny front, aby pobrać LOKALNE ustawienia
   const mod = state.project.modules.find(m => m.elements && m.elements.some(e => e.id === front.id));
   
   const globalHinges = state.project.front?.hinges || { topOffset: 100, bottomOffset: 100, margin: 40, forceCount: 0 };
   const localHinges = mod?.front?.hinges || {};
   
-  // Łączymy ustawienia (Lokalne nadpisują globalne)
   const hingeSettings = { ...globalHinges, ...localHinges };
   
   const topDist = Number(hingeSettings.topOffset ?? 100);
@@ -20,19 +18,16 @@ export function calculateHinges(front, boardThick, obstacles, side) {
   
   let count = 2;
   
-  // Sprawdzamy czy użytkownik wymusił ilość zawiasów ręcznie
   if (front.forceHingeCount && front.forceHingeCount > 0) {
       count = parseInt(front.forceHingeCount);
   } else if (hingeSettings.forceCount && hingeSettings.forceCount > 0) {
       count = parseInt(hingeSettings.forceCount);
   } else {
-      // Automatyczny dobór ilości
       if (h > 2000) count = 5;
       else if (h > 1600) count = 4;
       else if (h > 900) count = 3;
   }
   
-  // Minimalna ilość zawiasów to 2
   if (count < 2) count = 2;
 
   let cupRelPositions = [];
@@ -57,15 +52,15 @@ export function calculateHinges(front, boardThick, obstacles, side) {
     let absY = y + currentRelY;      
     
     let collision = true;
-    let attempts = 0;
+    let attempt = 0;
     let shift = 0;
     
-    while (collision && attempts < 15) {
+    // Zwiększony limit prób, ponieważ teraz skaczemy tylko o 1 mm
+    while (collision && attempt < 400) {
       collision = false;
       let testRelY = relY + shift;
       let testAbsY = y + testRelY; 
       
-      // Zabezpieczenie przed ucieczką puszki poza formatkę (sztywne minimum 30mm)
       if (testRelY < 30 || testRelY > h - 30) {
           collision = true;
       } else {
@@ -77,7 +72,8 @@ export function calculateHinges(front, boardThick, obstacles, side) {
               const plateHoleBottom = testAbsY - 16;
               const plateHoleTop = testAbsY + 16;
 
-              const totalMargin = customMargin + ((obs.isStructural === true) ? 0 : 32);
+              // Usunięto ukryte +32mm dla półek ruchomych - margines to czysta wartość z panelu UI
+              const totalMargin = customMargin;
 
               if ((plateHoleTop + totalMargin > shelfBottomEdge) && (plateHoleBottom - totalMargin < shelfTopEdge)) {
                 collision = true;
@@ -95,8 +91,9 @@ export function calculateHinges(front, boardThick, obstacles, side) {
       }
       
       if (collision) {
-        attempts++;
-        shift = 32 * Math.ceil(attempts / 2) * (attempts % 2 !== 0 ? 1 : -1); 
+        attempt++;
+        // Płynne przesuwanie co 1 mm (góra-dół na przemian), aż znajdzie idealne miejsce
+        shift = Math.ceil(attempt / 2) * (attempt % 2 !== 0 ? 1 : -1); 
       } else {
         absY = testAbsY;
         currentRelY = testRelY; 
@@ -112,7 +109,8 @@ export function calculateHinges(front, boardThick, obstacles, side) {
       y: Math.round(absY),             
       relY: Math.round(currentRelY),   
       side: side,
-      cupXOffset: 22.5     
+      cupXOffset: 22.5,
+      isAdjusted: Math.round(currentRelY) !== Math.round(relY)
     };
   });
 
