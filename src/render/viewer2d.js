@@ -126,26 +126,87 @@ export function generateSidePanelSVG(height, depth, mountingData = [], viewMode 
   // --- RYSOWANIE "DUCHÓW" SĄSIEDNICH SZAFEK ---
   stackModules.forEach(sm => {
       if (sm.id === mod.id) return; // Pomijamy aktywną, narysujemy ją dokładnie za chwilę
+      
       const dy = getDy(sm);
       const smH = parseFloat(sm.dimensions.height) || 720;
       const gY = sideH - (dy + smH); // Współrzędna Y dla góry sąsiada
       
-      const ghostStyle = `fill="#f1f5f9" stroke="#cbd5e1" stroke-dasharray="4,4" stroke-width="1" opacity="0.6"`;
+      const smCons = { joinType: 'boki_przelotowe', topType: 'pelny', ...config.construction, ...(sm.construction || {}) };
+      const smIsTBF = smCons.joinType === 'wience_przelotowe';
       
+      const ghostOpacity = "0.35"; // Poziom wyszarzenia dla modułów tła
+
       if (viewMode === 'all' || viewMode === 'korpus') {
-          svg += `<rect x="${cabX}" y="${gY}" width="${cabWidth}" height="${smH}" ${ghostStyle} />`;
-          svg += `<text x="${cabX + cabWidth/2}" y="${gY + smH/2}" font-size="14" fill="#94a3b8" text-anchor="middle" font-weight="bold">${sm.name}</text>`;
+          svg += `<g opacity="${ghostOpacity}">`;
+          
+          // Rysujemy zewnętrzną ramę (korpus) sąsiada
+          if (smIsTBF) {
+            svg += `<rect x="${cabX}" y="${gY}" width="${cabWidth}" height="${th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`; 
+            svg += `<rect x="${cabX}" y="${gY + smH - th}" width="${cabWidth}" height="${th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`; 
+            svg += `<rect x="${cabX}" y="${gY + th}" width="${th}" height="${smH - 2*th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`; 
+            svg += `<rect x="${cabX + cabWidth - th}" y="${gY + th}" width="${th}" height="${smH - 2*th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`; 
+          } else {
+            svg += `<rect x="${cabX}" y="${gY}" width="${th}" height="${smH}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+            svg += `<rect x="${cabX + cabWidth - th}" y="${gY}" width="${th}" height="${smH}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+            svg += `<rect x="${cabX + th}" y="${gY + smH - th}" width="${cabWidth - th*2}" height="${th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+            
+            if (smCons.topType === 'pelny' || smCons.topType === 'trawersy_poziom') {
+              svg += `<rect x="${cabX + th}" y="${gY}" width="${cabWidth - th*2}" height="${th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+            } else if (smCons.topType === 'trawersy_pion') {
+              svg += `<rect x="${cabX + th}" y="${gY}" width="${th}" height="${smCons.traverseWidth || 100}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+              svg += `<rect x="${cabX + cabWidth - th * 2}" y="${gY}" width="${th}" height="${smCons.traverseWidth || 100}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+            }
+          }
+
+          // Rysujemy wewnętrzne półki sąsiada
+          if (sm.elements) {
+            sm.elements.forEach(el => {
+              if (el.typ === 'front') return;
+              const elSvgX = cabX + el.x;
+              let drawY = smIsTBF ? el.y - th : el.y;
+              const elSvgY = (gY + smH) - drawY - el.h; 
+              let fillColor = (el.typ === 'poziom' && el.isStructural) ? '#a7f3d0' : '#cbd5e1'; 
+              svg += `<rect x="${elSvgX}" y="${elSvgY}" width="${el.w}" height="${el.h}" fill="${fillColor}" stroke="#475569" stroke-width="1.5" />`;
+            });
+          }
+          
+          svg += `<text x="${cabX + cabWidth/2}" y="${gY + smH/2}" font-size="20" fill="#475569" text-anchor="middle" font-weight="bold">${sm.name}</text>`;
+          svg += `</g>`;
       }
+      
       if (viewMode === 'all' || viewMode === 'bokL' || viewMode === 'boki') {
-          svg += `<rect x="${bokLX}" y="${gY}" width="${depth}" height="${smH}" ${ghostStyle} />`;
+          svg += `<g opacity="${ghostOpacity}">`;
+          svg += `<rect x="${bokLX}" y="${gY}" width="${depth}" height="${smH}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+          svg += `</g>`;
       }
+      
       if (viewMode === 'all' || viewMode === 'bokR' || viewMode === 'boki') {
-          svg += `<rect x="${bokRX}" y="${gY}" width="${depth}" height="${smH}" ${ghostStyle} />`;
+          svg += `<g opacity="${ghostOpacity}">`;
+          svg += `<rect x="${bokRX}" y="${gY}" width="${depth}" height="${smH}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+          svg += `</g>`;
       }
+      
       if (viewMode === 'all' || viewMode === 'frontInner') {
-          svg += `<rect x="${innerFrontX}" y="${gY}" width="${cabWidth}" height="${smH}" ${ghostStyle} />`;
+          svg += `<g opacity="${ghostOpacity}">`;
+          svg += `<rect x="${innerFrontX}" y="${gY}" width="${cabWidth}" height="${smH}" fill="none" stroke="#94a3b8" stroke-dasharray="4,4" stroke-width="1" />`;
+          
+          if (sm.elements) {
+            const innerFronts = sm.elements.filter(el => el.typ === 'front' && el.subtype === 'szuflada-wewnetrzna');
+            innerFronts.forEach(front => {
+              let drawY = smIsTBF ? front.y - th : front.y;
+              const elSvgY = (gY + smH) - drawY - front.h; 
+              let fillColor = '#fff7ed'; 
+              let strokeColor = '#ea580c';
+              const fWidth = front.w || cabWidth;
+              const fSvgX = innerFrontX + (front.x || 0);
+              svg += `<rect x="${fSvgX}" y="${elSvgY}" width="${fWidth}" height="${front.h}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5" />`;
+              svg += `<text x="${fSvgX + fWidth/2}" y="${elSvgY + front.h/2}" font-size="12" fill="#1e293b" font-weight="bold" text-anchor="middle">Szuflada Wewn.</text>`;
+            });
+          }
+          svg += `</g>`;
       }
   });
+  // ---------------------------------------------
   // ---------------------------------------------
 
   // --- RYSOWANIE AKTYWNEGO MODUŁU ---
