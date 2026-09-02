@@ -453,9 +453,10 @@ function getFrontsAndDrawers(mod, config) {
       }
     } 
     else if (front.subtype.includes('drzwi')) {
-      const side = front.subtype === 'drzwi-lp' ? (front.id.endsWith('-L') ? 'left' : 'right') : (front.openingSide || 'left');
+      const side = front.subtype === 'drzwi-lp' ? (front.id.includes('-L-') ? 'left' : 'right') : (front.openingSide || 'left');
       const hinges = calculateHinges(front, board, obstacles, side);
       mountingData.push({ type: 'door', name: partName, side: side, frontId: front.id, hinges: hinges });
+    
     }
   });
 

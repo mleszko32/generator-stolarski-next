@@ -1574,7 +1574,7 @@ export function update3D() {
                               }
                           });
 
-                          const side = el.subtype === 'drzwi-lp' ? (el.id.endsWith('-L') ? 'left' : 'right') : (el.openingSide || 'left');
+                          const side = el.subtype === 'drzwi-lp' ? (el.id.includes('-L-') ? 'left' : 'right') : (el.openingSide || 'left');
                           const hinges = calculateHinges(el, th, obstacles, side);
                           
                           hinges.forEach(h => {
