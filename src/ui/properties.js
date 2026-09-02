@@ -21,28 +21,30 @@ export function initPropertiesPanel() {
       <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #94a3b8; text-align: center; padding: 20px;">
         <span style="font-size: 40px; margin-bottom: 10px;">⚙️</span>
         <h3 style="margin: 0; color: #64748b;">Brak aktywnej szafki</h3>
-        <p style="font-size: 12px; line-height: 1.5;">Dodaj nową szafkę korzystając z lewego panelu, aby rozpocząć edycję.</p>
       </div>
     `;
     return;
   }
 
   const multiCount = state.selectedModules && state.selectedModules.size > 1 ? state.selectedModules.size : 1;
-
   if (!activeModule.legs) activeModule.legs = { active: false, height: 100, plinth: false, plinthOffset: 40 };
 
-  // Inicjalizacja struktury blend L-kształtnych
+  // Inicjalizacja struktury blend z dodanym parametrem "offsetY" (Przesunięcie pionowe)
   if (!activeModule.fillers) {
       activeModule.fillers = {
-          left: { active: false, width: 50, depth: 80 },
-          right: { active: false, width: 50, depth: 80 },
-          top: { active: false, height: 50, depth: 80 }
+          left: { active: false, width: 50, depth: 80, height: null, offsetY: 0 },
+          right: { active: false, width: 50, depth: 80, height: null, offsetY: 0 },
+          top: { active: false, height: 50, depth: 80, width: null, offsetY: 0 }
       };
+  } else {
+      // Zabezpieczenie dla wcześniej zapisanych szafek
+      if (activeModule.fillers.left.offsetY === undefined) activeModule.fillers.left.offsetY = 0;
+      if (activeModule.fillers.right.offsetY === undefined) activeModule.fillers.right.offsetY = 0;
+      if (activeModule.fillers.top.offsetY === undefined) activeModule.fillers.top.offsetY = 0;
   }
 
   const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(state.project.construction || {}), ...(activeModule.construction || {}) };
   const backP = activeModule.backPanel;
-  
   const f = { ...(state.project.front || {}), ...(activeModule.front || {}) };
   const fc = { ...(state.project.front?.clearance || {}), ...(activeModule.front?.clearance || {}) };
   const fh = { topOffset: 100, bottomOffset: 100, margin: 40, forceCount: 0, ...(state.project.front?.hinges || {}), ...(activeModule.front?.hinges || {}) };
@@ -57,11 +59,10 @@ export function initPropertiesPanel() {
           const hinges = activeDoor.hinges;
           const front = activeModule.elements.find(e => e.id === activeDoor.frontId);
           if (front) {
-              const h = Math.round(front.h);
               const bottomHinge = hinges[0];
               const topHinge = hinges[hinges.length - 1];
               if (bottomHinge.isAdjusted) actualBottomText = `<div style="color: #c2410c; font-size: 10px; margin-top: 4px; padding: 4px 6px; background: #ffedd5; border-left: 3px solid #ea580c; border-radius: 2px;">⚠️ Zmieniono na: <b>${bottomHinge.relY} mm</b> (Kolizja)</div>`;
-              if (topHinge.isAdjusted) actualTopText = `<div style="color: #c2410c; font-size: 10px; margin-top: 4px; padding: 4px 6px; background: #ffedd5; border-left: 3px solid #ea580c; border-radius: 2px;">⚠️ Zmieniono na: <b>${Math.round(h - topHinge.relY)} mm</b> (Kolizja)</div>`;
+              if (topHinge.isAdjusted) actualTopText = `<div style="color: #c2410c; font-size: 10px; margin-top: 4px; padding: 4px 6px; background: #ffedd5; border-left: 3px solid #ea580c; border-radius: 2px;">⚠️ Zmieniono na: <b>${Math.round(front.h - topHinge.relY)} mm</b> (Kolizja)</div>`;
           }
       }
   } catch(e) {}
@@ -104,6 +105,8 @@ export function initPropertiesPanel() {
         </div>
         <div id="filler-left-opts" style="display: ${fill.left.active ? 'block' : 'none'}; padding-left: 24px; margin-top: 8px;">
             <div class="property-group"><label style="font-size: 11px;">Szerokość czoła (mm):</label><input type="number" id="input-filler-left-w" value="${fill.left.width}" /></div>
+            <div class="property-group"><label style="font-size: 11px;">Wysokość (puste = szafka):</label><input type="number" id="input-filler-left-h" placeholder="${activeModule.dimensions.height}" value="${fill.left.height || ''}" /></div>
+            <div class="property-group"><label style="font-size: 11px;">Przesunięcie w pionie Y (mm):</label><input type="number" id="input-filler-left-y" value="${fill.left.offsetY ?? 0}" /></div>
             <div class="property-group" style="margin-bottom:0;"><label style="font-size: 11px;">Głęb. mocowania (mm):</label><input type="number" id="input-filler-left-d" value="${fill.left.depth}" /></div>
         </div>
       </div>
@@ -115,6 +118,8 @@ export function initPropertiesPanel() {
         </div>
         <div id="filler-right-opts" style="display: ${fill.right.active ? 'block' : 'none'}; padding-left: 24px; margin-top: 8px;">
             <div class="property-group"><label style="font-size: 11px;">Szerokość czoła (mm):</label><input type="number" id="input-filler-right-w" value="${fill.right.width}" /></div>
+            <div class="property-group"><label style="font-size: 11px;">Wysokość (puste = szafka):</label><input type="number" id="input-filler-right-h" placeholder="${activeModule.dimensions.height}" value="${fill.right.height || ''}" /></div>
+            <div class="property-group"><label style="font-size: 11px;">Przesunięcie w pionie Y (mm):</label><input type="number" id="input-filler-right-y" value="${fill.right.offsetY ?? 0}" /></div>
             <div class="property-group" style="margin-bottom:0;"><label style="font-size: 11px;">Głęb. mocowania (mm):</label><input type="number" id="input-filler-right-d" value="${fill.right.depth}" /></div>
         </div>
       </div>
@@ -126,6 +131,8 @@ export function initPropertiesPanel() {
         </div>
         <div id="filler-top-opts" style="display: ${fill.top.active ? 'block' : 'none'}; padding-left: 24px; margin-top: 8px;">
             <div class="property-group"><label style="font-size: 11px;">Wysokość czoła (mm):</label><input type="number" id="input-filler-top-h" value="${fill.top.height}" /></div>
+            <div class="property-group"><label style="font-size: 11px;">Szerokość (puste = zabudowa):</label><input type="number" id="input-filler-top-w" placeholder="Całkowita" value="${fill.top.width || ''}" /></div>
+            <div class="property-group"><label style="font-size: 11px;">Przesunięcie w pionie Y (mm):</label><input type="number" id="input-filler-top-y" value="${fill.top.offsetY ?? 0}" /></div>
             <div class="property-group" style="margin-bottom:0;"><label style="font-size: 11px;">Głęb. mocowania (mm):</label><input type="number" id="input-filler-top-d" value="${fill.top.depth}" /></div>
         </div>
       </div>
@@ -186,7 +193,9 @@ function setupEventListeners() {
     'pos-x', 'pos-y', 'traverse-width', 'board-thick', 'width', 'height', 'depth',
     'front-gap', 'front-left', 'front-right', 'front-top', 'front-bottom', 'back-offset', 'back-groove',
     'legs-height', 'plinth-offset', 'hinge-top', 'hinge-bottom', 'hinge-margin', 'hinge-count',
-    'filler-left-w', 'filler-left-d', 'filler-right-w', 'filler-right-d', 'filler-top-h', 'filler-top-d'
+    'filler-left-w', 'filler-left-h', 'filler-left-d', 'filler-left-y',
+    'filler-right-w', 'filler-right-h', 'filler-right-d', 'filler-right-y',
+    'filler-top-h', 'filler-top-w', 'filler-top-d', 'filler-top-y'
   ];
 
   const updateAll = () => { update3D(); updateSidebar(); };
@@ -201,7 +210,6 @@ function setupEventListeners() {
       });
   }
 
-  // Eventy dla Checkboxów Blend L-kształtnych
   ['left', 'right', 'top'].forEach(side => {
       const chk = document.getElementById(`input-filler-${side}-active`);
       const opts = document.getElementById(`filler-${side}-opts`);
@@ -268,13 +276,20 @@ function setupEventListeners() {
         const val = e.target.value === '' ? null : Number(e.target.value);
         getSelectedMods().forEach(mod => {
             
-            // Wartości liczbowe blend
             if (id === 'filler-left-w') mod.fillers.left.width = val;
+            if (id === 'filler-left-h') mod.fillers.left.height = val;
             if (id === 'filler-left-d') mod.fillers.left.depth = val;
+            if (id === 'filler-left-y') mod.fillers.left.offsetY = val;
+            
             if (id === 'filler-right-w') mod.fillers.right.width = val;
+            if (id === 'filler-right-h') mod.fillers.right.height = val;
             if (id === 'filler-right-d') mod.fillers.right.depth = val;
+            if (id === 'filler-right-y') mod.fillers.right.offsetY = val;
+            
             if (id === 'filler-top-h') mod.fillers.top.height = val;
+            if (id === 'filler-top-w') mod.fillers.top.width = val;
             if (id === 'filler-top-d') mod.fillers.top.depth = val;
+            if (id === 'filler-top-y') mod.fillers.top.offsetY = val;
 
             if (['hinge-top', 'hinge-bottom', 'hinge-margin', 'hinge-count'].includes(id)) {
                 if (!mod.front) mod.front = {};
