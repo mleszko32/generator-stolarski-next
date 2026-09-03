@@ -9,26 +9,33 @@ export function calculateParts() {
   if (!mod) return { parts: [], mountingData: [] };
 
   const config = state.project;
-  let parts = [];
+  let rawParts = [];
   let mountingData = [];
 
-  parts.push(...getCorpusParts(mod, config));
-  parts.push(...getBackPanelParts(mod, config));
-  parts.push(...getInteriorParts(mod, config));
-  
-  // NOWOŚĆ: Generowanie formatek dla blend L-kształtnych
-  parts.push(...getFillerParts(mod, config)); 
+  rawParts.push(...getCorpusParts(mod, config));
+  rawParts.push(...getBackPanelParts(mod, config));
+  rawParts.push(...getInteriorParts(mod, config));
+  rawParts.push(...getFillerParts(mod, config)); 
 
   const frontsAndDrawers = getFrontsAndDrawers(mod, config);
-  parts.push(...frontsAndDrawers.parts);
+  rawParts.push(...frontsAndDrawers.parts);
   
   mountingData.push(...frontsAndDrawers.mountingData);
   mountingData.push(...getCorpusHoles(mod, config)); 
-  
-  // Skaner globalny przypisujący prowadniki zawiasów do właściwych korpusów w danym pionie
   mountingData.push(...getGlobalHingesForModule(mod, config));
 
-  return { parts, mountingData };
+  // --- AGREGACJA FORMATEK DLA PANELU BOCZNEGO ---
+  const aggregated = {};
+  rawParts.forEach(part => {
+     const key = `${part.category}_${part.name}_${part.length}_${part.width}`;
+     if (aggregated[key]) {
+         aggregated[key].qty += part.qty;
+     } else {
+         aggregated[key] = { ...part };
+     }
+  });
+
+  return { parts: Object.values(aggregated), mountingData };
 }
 
 function getGlobalHingesForModule(targetMod, config) {
@@ -80,7 +87,6 @@ function getGlobalHingesForModule(targetMod, config) {
                       return { ...h, y: localY, isLocal: isLocal };
                   });
 
-                  // Dodajemy dane jeśli szafka ma lokalne zawiasy ALBO jest szafką-właścicielem drzwi
                   if (translatedHinges.some(h => h.isLocal) || sourceMod.id === targetMod.id) {
                       let partName = front.subtype === 'drzwi-lp' ? `Drzwi ${side === 'left' ? 'Lewe' : 'Prawe'}` : 'Drzwi';
                       mountingData.push({ type: 'door', name: partName, side: side, frontId: front.id, hinges: translatedHinges });
@@ -101,8 +107,6 @@ export function calculateAllProjectParts() {
     modParts.push(...getCorpusParts(mod, config));
     modParts.push(...getBackPanelParts(mod, config));
     modParts.push(...getInteriorParts(mod, config));
-    
-    // Blendy na liście głównej (eksport do CSV)
     modParts.push(...getFillerParts(mod, config)); 
 
     const frontsAndDrawers = getFrontsAndDrawers(mod, config);
@@ -370,12 +374,10 @@ function getInteriorParts(mod, config) {
   const topBottomDepth = backP.type === 'nut' ? depth - backP.offset - backThick : depth - backThick;
   const innerPartDepth = topBottomDepth - (isInset ? board : 0);
 
-  let partitionCount = 0;
-
   mod.elements.forEach(el => {
     if (el.typ === 'pion') {
-      partitionCount++;
-      parts.push({ name: `Przegroda pionowa ${partitionCount}`, length: parseFloat((el.h || 0).toFixed(1)), width: innerPartDepth, qty: 1, category: "Korpus" });
+      // Zmiana: usunięto indeks liczbowy, aby formatki o tej samej wielkości łączyły się w jedną linię z symbolem (x2), (x3) itd.
+      parts.push({ name: `Przegroda pionowa`, length: parseFloat((el.h || 0).toFixed(1)), width: innerPartDepth, qty: 1, category: "Korpus" });
     } else if (el.typ === 'poziom' && !el.isStructural) {
       parts.push({ name: `P${width}`, length: parseFloat((el.w || 0).toFixed(1)), width: innerPartDepth - 5, qty: 1, category: "Korpus" });
     }
@@ -399,14 +401,12 @@ function getFrontsAndDrawers(mod, config) {
 
   const f = { ...(config.front || {}), ...(mod.front || {}) };
 
-  let drawerCount = 0;
-  let doorCount = 0;
-
   fronts.forEach((front, index) => {
     let partName = "Front";
-    if (front.subtype === 'szuflada') { drawerCount++; partName = `Front szuflady ${drawerCount}`; } 
-    else if (front.subtype === 'szuflada-wewnetrzna') { drawerCount++; partName = `Front szuflady wewn. ${drawerCount}`; } 
-    else if (front.subtype === 'drzwi') { doorCount++; partName = `Drzwi ${doorCount}`; } 
+    // Zmiana: usunięto sztuczne numery liczników
+    if (front.subtype === 'szuflada') { partName = `Front szuflady`; } 
+    else if (front.subtype === 'szuflada-wewnetrzna') { partName = `Front szuflady wewn.`; } 
+    else if (front.subtype === 'drzwi') { partName = `Drzwi`; } 
     else if (front.subtype === 'drzwi-lp') {
       const side = front.id.includes('-L-') ? 'Lewe' : 'Prawe';
       partName = `Drzwi ${side}`;
@@ -442,7 +442,7 @@ function getFrontsAndDrawers(mod, config) {
       const sysName = f.drawerSystem || 'merivobox';
 
       if (typeof calculateDrawerHoles === 'function') {
-        const drawerHoles = calculateDrawerHoles(sysName, front.y, simulatedSpace, board, drawerCount - 1, isBottomInZone);
+        const drawerHoles = calculateDrawerHoles(sysName, front.y, simulatedSpace, board, front.frontIndex, isBottomInZone);
         if (drawerHoles) { 
           const adjustedHoles = JSON.parse(JSON.stringify(drawerHoles));
           
@@ -497,8 +497,6 @@ function getFrontsAndDrawers(mod, config) {
   return { parts, mountingData };
 }
 
-// Funkcja generująca formatki dla Blend maskujących
-// Funkcja generująca formatki dla Blend maskujących
 function getFillerParts(mod, config) {
   const parts = [];
   if (!mod.fillers) return parts;
@@ -507,7 +505,6 @@ function getFillerParts(mod, config) {
   const modH = parseFloat(mod.dimensions.height);
   const modW = parseFloat(mod.dimensions.width);
 
-  // Zabezpieczenie przed błędnym odczytem "0" i pustych pól
   const parseVal = (val, fallback) => (val !== null && val !== undefined && val !== '') ? parseFloat(val) : fallback;
 
   if (mod.fillers.left && mod.fillers.left.active) {
