@@ -279,9 +279,45 @@ export function updateSidebar() {
   if (activeMod) {
     html += `<details open style="margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">`;
     html += `<summary style="font-weight: bold; cursor: pointer; outline: none;">Lista formatek (Aktywna)</summary>`;
-    html += `<ul class="parts-list" style="margin-top: 10px; padding-left: 20px;">`;
-    parts.forEach(part => { html += `<li style="margin-bottom: 5px;"><strong>${part.name}</strong> (x${part.qty})<br><span style="color: #475569;">${part.length} mm x ${part.width} mm</span></li>`; });
-    html += `</ul></details>`;
+    
+    html += `
+      <div style="overflow-x: auto; margin-top: 10px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; background: #fff;">
+          <thead>
+            <tr style="background-color: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
+              <th style="padding: 8px; color: #334155; font-weight: bold;">Element</th>
+              <th style="padding: 8px; color: #334155; font-weight: bold;">Wymiar (mm)</th>
+              <th style="padding: 8px; text-align: center; color: #334155; font-weight: bold;">Ilość</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    if (parts && parts.length > 0) {
+        parts.forEach((part, index) => {
+            const rowBg = index % 2 === 0 ? '#ffffff' : '#f8fafc';
+            html += `
+                <tr style="background-color: ${rowBg}; border-bottom: 1px solid #e2e8f0; transition: background 0.2s;" onmouseover="this.style.backgroundColor='#eff6ff'" onmouseout="this.style.backgroundColor='${rowBg}'">
+                    <td style="padding: 8px; font-weight: 600; color: #1e293b;">${part.name}</td>
+                    <td style="padding: 8px; color: #64748b; white-space: nowrap;">${part.length} &times; ${part.width}</td>
+                    <td style="padding: 8px; text-align: center;">
+                        <span style="display: inline-block; background-color: #2563eb; color: #ffffff; font-weight: bold; padding: 2px 8px; border-radius: 12px; min-width: 14px; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.2);">
+                            ${part.qty}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        });
+    } else {
+        html += `<tr><td colspan="3" style="padding: 15px; text-align: center; color: #94a3b8;">Brak elementów</td></tr>`;
+    }
+
+    html += `
+          </tbody>
+        </table>
+      </div>
+    </details>
+    `;
 
     if (mountingData && mountingData.length > 0) {
       html += `<details style="margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;"><summary style="font-weight: bold; cursor: pointer; outline: none;">Nawierty (Aktywna)</summary><ul class="parts-list" style="margin-top: 10px; padding-left: 0; list-style: none;">`;
