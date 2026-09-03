@@ -999,38 +999,71 @@ function show3DContextMenu(event, hit, data) {
       
       const worldPos = new THREE.Vector3();
       hit.object.getWorldPosition(worldPos);
+      
+      // ODCZYT OSI X i Y kliknięcia względem bazy szafki
       const localY = hit.point.y - (parseFloat(mod.position.y) || 0) - legHeight;
+      const localX = hit.point.x - (parseFloat(mod.position.x) || 0); 
       
       const H = parseFloat(mod.dimensions.height);
       const W = parseFloat(mod.dimensions.width);
       
-      if (localY > 0 && localY < H) {
+      if (localY > 0 && localY < H && localX > 0 && localX < W) {
           let zoneMinY = th;
           let zoneMaxY = H - th;
+          let zoneMinX = th;
+          let zoneMaxX = W - th;
+
           let boundBottomId = 'cab-bottom';
           let boundTopId = 'cab-top';
+          let boundLeftId = 'cab-left';
+          let boundRightId = 'cab-right';
 
           if (mod.elements) {
+              // 1. OSI X: Skanujemy pionowe przegrody, aby znaleźć wnękę w szerokości
+              mod.elements.forEach(el => {
+                  if (el.typ === 'pion') {
+                      if (localY >= el.y && localY <= el.y + el.h) {
+                          let rightEdge = el.x + el.w;
+                          let leftEdge = el.x;
+
+                          if (rightEdge <= localX && rightEdge >= zoneMinX) {
+                              zoneMinX = rightEdge;
+                              boundLeftId = el.id;
+                          }
+                          if (leftEdge >= localX && leftEdge <= zoneMaxX) {
+                              zoneMaxX = leftEdge;
+                              boundRightId = el.id;
+                          }
+                      }
+                  }
+              });
+
+              // 2. OSI Y: Skanujemy poziome półki, ale TYLKO w obrębie znalezionej wnęki X
               mod.elements.forEach(el => {
                   if (el.typ === 'poziom') {
-                      let topEdge = el.y + el.h;
-                      let bottomEdge = el.y;
+                      if (el.x < zoneMaxX && el.x + el.w > zoneMinX) {
+                          let topEdge = el.y + el.h;
+                          let bottomEdge = el.y;
 
-                      if (topEdge <= localY && topEdge >= zoneMinY) {
-                          zoneMinY = topEdge;
-                          boundBottomId = el.id;
-                      }
-                      if (bottomEdge >= localY && bottomEdge <= zoneMaxY) {
-                          zoneMaxY = bottomEdge;
-                          boundTopId = el.id;
+                          if (topEdge <= localY && topEdge >= zoneMinY) {
+                              zoneMinY = topEdge;
+                              boundBottomId = el.id;
+                          }
+                          if (bottomEdge >= localY && bottomEdge <= zoneMaxY) {
+                              zoneMaxY = bottomEdge;
+                              boundTopId = el.id;
+                          }
                       }
                   }
               });
           }
 
+          const currentW = zoneMaxX - zoneMinX;
+          const currentH = zoneMaxY - zoneMinY;
+
           const targetBaseZone = { 
-              minX: th, maxX: W - th, minY: zoneMinY, maxY: zoneMaxY,
-              boundBottom: boundBottomId, boundTop: boundTopId, boundLeft: 'cab-left', boundRight: 'cab-right',
+              minX: zoneMinX, maxX: zoneMaxX, minY: zoneMinY, maxY: zoneMaxY,
+              boundBottom: boundBottomId, boundTop: boundTopId, boundLeft: boundLeftId, boundRight: boundRightId,
               offsetBottom: 0, offsetTop: 0 
           };
 
@@ -1045,15 +1078,15 @@ function show3DContextMenu(event, hit, data) {
           menu.appendChild(createOption(`Wstaw półkę (Wys: ${Math.round(localY)} mm)`, '➕', () => {
               mod.elements.push({
                   id: 'poziom-' + Date.now() + Math.random().toString(36).substring(2, 6),
-                  typ: 'poziom', x: th, y: localY - (th/2), w: W - (th*2), h: th, isStructural: false 
+                  typ: 'poziom', x: zoneMinX, y: localY - (th/2), w: currentW, h: th, isStructural: false 
               });
           }, '#2563eb'));
 
-          const halfY = zoneMinY + (zoneMaxY - zoneMinY) / 2;
+          const halfY = zoneMinY + currentH / 2;
           menu.appendChild(createOption('Półka (dokładnie w połowie)', '➗', () => {
               mod.elements.push({
                   id: 'poziom-half-' + Date.now() + Math.random().toString(36).substring(2, 6),
-                  typ: 'poziom', x: th, y: halfY - (th/2), w: W - (th*2), h: th, isStructural: false
+                  typ: 'poziom', x: zoneMinX, y: halfY - (th/2), w: currentW, h: th, isStructural: false
               });
           }, '#2563eb'));
 
@@ -1080,14 +1113,14 @@ function show3DContextMenu(event, hit, data) {
                   const shelfCount = parseInt(document.getElementById('inp-shelves').value, 10);
                   if (isNaN(shelfCount) || shelfCount <= 0) return;
 
-                  const internalHeight = zoneMaxY - zoneMinY;
+                  const internalHeight = currentH;
                   const newShelvesBase = autoDistributeShelves(internalHeight, th, shelfCount);
 
                   const ts = Date.now();
                   newShelvesBase.forEach((s, idx) => {
                       mod.elements.push({
                           id: 'poziom-auto-' + ts + '-' + idx,
-                          typ: 'poziom', x: th, y: zoneMinY + s.y, w: W - (th*2), h: th, isStructural: false
+                          typ: 'poziom', x: zoneMinX, y: zoneMinY + s.y, w: currentW, h: th, isStructural: false
                       });
                   });
 
@@ -1107,11 +1140,11 @@ function show3DContextMenu(event, hit, data) {
           };
           menu.appendChild(btnAutoShelves);
 
-          const halfX = th + (W - 2*th) / 2;
+          const halfX = zoneMinX + currentW / 2;
           menu.appendChild(createOption('Przegroda pionowa (w połowie)', '➕', () => {
               mod.elements.push({
                   id: 'pion-half-' + Date.now() + Math.random().toString(36).substring(2, 6),
-                  typ: 'pion', x: halfX - (th/2), y: zoneMinY, w: th, h: zoneMaxY - zoneMinY
+                  typ: 'pion', x: halfX - (th/2), y: zoneMinY, w: th, h: currentH
               });
           }, '#059669'));
 
@@ -1233,7 +1266,6 @@ function show3DContextMenu(event, hit, data) {
               mod.elements.push({ id: 'front-P-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi-lp', baseZone: fullCabBaseZone, frontCount: 2, frontIndex: 1, gap: gapLp });
           }, '#7c3aed');
           menu.appendChild(btnFullDoorLP);
-
       }
   }
 
