@@ -45,16 +45,17 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
       isReversedView: false, detailGroupId: 'detail-left'
   });
 
+  // POPRAWKA: Obie strony przegrody lądują teraz w jednej grupie (np. 'detail-part-0')
   partitions.forEach((p, i) => {
       panels.push({
           id: `part-${i}-L`, title: `PRZEGRODA ${i+1} (LEWA STRONA)`, x: p.x, w: p.w, y: p.y, h: p.h,
           isOuterLeft: false, isOuterRight: false, faceRightX: -999, faceLeftX: p.x,
-          isReversedView: true, detailGroupId: `detail-part-${i}-L`
+          isReversedView: true, detailGroupId: `detail-part-${i}`
       });
       panels.push({
           id: `part-${i}-R`, title: `PRZEGRODA ${i+1} (PRAWA STRONA)`, x: p.x, w: p.w, y: p.y, h: p.h,
           isOuterLeft: false, isOuterRight: false, faceRightX: p.x + p.w, faceLeftX: -999,
-          isReversedView: false, detailGroupId: `detail-part-${i}-R`
+          isReversedView: false, detailGroupId: `detail-part-${i}`
       });
   });
 
@@ -167,7 +168,8 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
       
       if (el.typ === 'pion') {
           let pIndex = partitions.findIndex(p => p.id === el.id);
-          svg += `<rect id="map-detail-part-${pIndex}-L" x="${elSvgX}" y="${elSvgY}" width="${el.w}" height="${el.h}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-part-${pIndex}-L')" />`;
+          // POPRAWKA: Onclick wskazuje teraz ogólną grupę przegrody, a nie konkretnie L lub R
+          svg += `<rect id="map-detail-part-${pIndex}" x="${elSvgX}" y="${elSvgY}" width="${el.w}" height="${el.h}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-part-${pIndex}')" />`;
       } else {
           let fillColor = (el.typ === 'poziom' && el.isStructural) ? '#a7f3d0' : '#cbd5e1'; 
           svg += `<rect x="${elSvgX}" y="${elSvgY}" width="${el.w}" height="${el.h}" fill="${fillColor}" stroke="#475569" stroke-width="1.5" />`;
@@ -217,11 +219,9 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
       });
   }
 
+  // POPRAWKA: Lista grup detail (Brak rozbijania na L i R w samej grupie kontenera)
   const detailGroups = ['detail-left', 'detail-right'];
-  partitions.forEach((p, i) => {
-      detailGroups.push(`detail-part-${i}-L`);
-      detailGroups.push(`detail-part-${i}-R`);
-  });
+  partitions.forEach((p, i) => detailGroups.push(`detail-part-${i}`));
 
   detailGroups.forEach(groupId => {
       svg += `<g id="${groupId}" class="detail-view" style="display:none;">`;
