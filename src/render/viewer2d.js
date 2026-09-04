@@ -114,20 +114,16 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
         
         <g transform="translate(0, 70)">
             <circle cx="0" cy="0" r="4" fill="#9333ea"/><circle cx="12" cy="0" r="1.5" fill="#9333ea"/>
-            <text x="22" y="4" font-size="12" fill="#9333ea">Wieńce / Półki stałe</text>
-            <circle cx="0" cy="25" r="2.5" fill="#ea580c"/>
-            <text x="22" y="29" font-size="12" fill="#ea580c">Podpórki półek ruchomych</text>
+            <text x="22" y="4" font-size="12" fill="#9333ea">Kołek (fi 8) + Wkręt (fi 3) - Konstrukcja</text>
             
-            <circle cx="220" cy="0" r="2.5" fill="#0284c7"/>
-            <text x="232" y="4" font-size="12" fill="#0284c7">Prowadnice szuflad</text>
-            <circle cx="220" cy="25" r="2.5" fill="#16a34a"/>
-            <text x="232" y="29" font-size="12" fill="#16a34a">Zawiasy i prowadniki</text>
-
-            <rect x="380" y="-10" width="160" height="40" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" rx="4" />
-            <circle cx="395" cy="2" r="3" fill="#334155"/>
-            <text x="405" y="6" font-size="10" fill="#334155" font-weight="bold">Wiercenie z LEWEJ str.</text>
-            <circle cx="395" cy="18" r="3.5" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
-            <text x="405" y="22" font-size="10" fill="#334155" font-weight="bold">Wiercenie z PRAWEJ str.</text>
+            <circle cx="0" cy="25" r="2.5" fill="#ea580c"/>
+            <text x="22" y="29" font-size="12" fill="#ea580c">Podpórki półek ruchomych (fi 5)</text>
+            
+            <circle cx="280" cy="0" r="2.5" fill="#0284c7"/>
+            <text x="292" y="4" font-size="12" fill="#0284c7">Prowadnice szuflad (fi 5)</text>
+            
+            <circle cx="280" cy="25" r="2.5" fill="#16a34a"/>
+            <text x="292" y="29" font-size="12" fill="#16a34a">Prowadniki zawiasów (fi 5)</text>
         </g>
     </g>
   `;
@@ -250,64 +246,57 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
           let corpusYs = new Set();
           let drawerYs = new Set();
 
-          const drawShelfHoles = (shelves, isRightFace) => {
+          const drawShelfHoles = (shelves) => {
               shelves.forEach(el => {
                   let calcY = isTopBottomFullWidth ? el.y - th : el.y;
                   const isStruct = el.isStructural;
                   const baseColor = isStruct ? '#9333ea' : '#ea580c';
                   const svgY = sideH - calcY;
 
-                  let fill = isRightFace ? '#ffffff' : baseColor;
-                  let stroke = isRightFace ? `stroke="${baseColor}" stroke-width="1.5"` : 'stroke="none"';
-
                   if (isStruct) {
-                      // Rozróżnienie rozmiarów wkręt vs kołek dla przegród
-                      let rScrew = isRightFace ? 2.5 : 1.5;
-                      let rDowel = isRightFace ? 5 : 4;
-
+                      let rScrew = 1.5; // fi 3
+                      let rDowel = 4.0; // fi 8
                       [37, depth - 37].forEach(hx => {
-                          // Wkręt / Konfirmat
-                          svg += `<circle cx="${getSvgX(hx)}" cy="${svgY - el.h/2}" r="${rScrew}" fill="${fill}" ${stroke} />`;
+                          // Wkręt
+                          svg += `<circle cx="${getSvgX(hx)}" cy="${svgY - el.h/2}" r="${rScrew}" fill="${baseColor}" />`;
                           // Kołek
                           let dowelX = hx === 37 ? hx + 32 : hx - 32;
-                          svg += `<circle cx="${getSvgX(dowelX)}" cy="${svgY - el.h/2}" r="${rDowel}" fill="${fill}" ${stroke} />`;
+                          svg += `<circle cx="${getSvgX(dowelX)}" cy="${svgY - el.h/2}" r="${rDowel}" fill="${baseColor}" />`;
                           
                           if (hx === 37) corpusYs.add(calcY + el.h/2);
                       });
                   } else {
-                      let rPin = isRightFace ? 3.5 : 2.5;
+                      let rPin = 2.5; // fi 5
                       [0, 32, -32].forEach(dy => {
                           [37, depth - 37].forEach(hx => {
-                              svg += `<circle cx="${getSvgX(hx)}" cy="${svgY - dy}" r="${rPin}" fill="${fill}" ${stroke} />`;
+                              svg += `<circle cx="${getSvgX(hx)}" cy="${svgY - dy}" r="${rPin}" fill="${baseColor}" />`;
                               if (dy === 0 && hx === 37) shelfYs.add(calcY);
                           });
                       });
                   }
               });
           };
-          drawShelfHoles(getShelvesForFace(panel.faceLeftX, false, panelCalcY, panelH), false);
-          drawShelfHoles(getShelvesForFace(panel.faceRightX, true, panelCalcY, panelH), true);
+          drawShelfHoles(getShelvesForFace(panel.faceLeftX, false, panelCalcY, panelH));
+          drawShelfHoles(getShelvesForFace(panel.faceRightX, true, panelCalcY, panelH));
 
-          const drawDrawerHoles = (drawers, isRightFace) => {
+          const drawDrawerHoles = (drawers) => {
               drawers.forEach(d => {
                   if (d.slideSideHoles && d.slideSideHoles.length > 0) {
                       let calcY = isTopBottomFullWidth ? d.slideSideHoles[0].y - th : d.slideSideHoles[0].y;
                       drawerYs.add(calcY);
                       const svgY = sideH - calcY;
-                      let fill = isRightFace ? '#ffffff' : '#0284c7';
-                      let stroke = isRightFace ? `stroke="#0284c7" stroke-width="1.5"` : 'stroke="none"';
-                      let r = isRightFace ? 3.5 : 2.5;
+                      let rDrawer = 2.5; // fi 5
 
                       d.slideSideHoles.forEach(hole => {
-                          svg += `<circle cx="${getSvgX(hole.x)}" cy="${svgY}" r="${r}" fill="${fill}" ${stroke} />`;
+                          svg += `<circle cx="${getSvgX(hole.x)}" cy="${svgY}" r="${rDrawer}" fill="#0284c7" />`;
                       });
                   }
               });
           };
-          drawDrawerHoles(getDrawersForFace(panel.faceLeftX, false, panelCalcY, panelH), false);
-          drawDrawerHoles(getDrawersForFace(panel.faceRightX, true, panelCalcY, panelH), true);
+          drawDrawerHoles(getDrawersForFace(panel.faceLeftX, false, panelCalcY, panelH));
+          drawDrawerHoles(getDrawersForFace(panel.faceRightX, true, panelCalcY, panelH));
 
-          const drawHingeHoles = (hingeData, isRightFace) => {
+          const drawHingeHoles = (hingeData) => {
               hingeData.forEach(d => {
                   d.hinges.forEach(hinge => {
                       if (hinge.isLocal === false) return;
@@ -315,12 +304,10 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
                       const svgY = sideH - calcY;
                       
                       let baseColor = hinge.isAdjusted ? "#ea580c" : "#16a34a";
-                      let fill = isRightFace ? '#ffffff' : baseColor;
-                      let stroke = isRightFace ? `stroke="${baseColor}" stroke-width="1.5"` : 'stroke="none"';
-                      let r = isRightFace ? 3.5 : 2.5;
+                      let rHinge = 2.5; // fi 5
 
-                      svg += `<circle cx="${getSvgX(37)}" cy="${svgY - 16}" r="${r}" fill="${fill}" ${stroke} />`;
-                      svg += `<circle cx="${getSvgX(37)}" cy="${svgY + 16}" r="${r}" fill="${fill}" ${stroke} />`;
+                      svg += `<circle cx="${getSvgX(37)}" cy="${svgY - 16}" r="${rHinge}" fill="${baseColor}" />`;
+                      svg += `<circle cx="${getSvgX(37)}" cy="${svgY + 16}" r="${rHinge}" fill="${baseColor}" />`;
 
                       let localHoleY = calcY - panelCalcY;
                       let tspanHtml = getDimText(localHoleY, panelH, baseColor);
@@ -331,26 +318,20 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
                   });
               });
           };
-          drawHingeHoles(getHingesForFace(panel.faceLeftX, false, panelCalcY, panelH), false);
-          drawHingeHoles(getHingesForFace(panel.faceRightX, true, panelCalcY, panelH), true);
+          drawHingeHoles(getHingesForFace(panel.faceLeftX, false, panelCalcY, panelH));
+          drawHingeHoles(getHingesForFace(panel.faceRightX, true, panelCalcY, panelH));
 
           if (panel.isOuterLeft || panel.isOuterRight) {
                const corpusHolesData = mountingData.find(d => d.type === 'corpus');
                if (corpusHolesData && corpusHolesData.holes) {
-                   // Aplikujemy logikę isRightFace również do boków zewnętrznych
-                   let isRightFace = panel.isOuterRight; 
-                   let fill = isRightFace ? '#ffffff' : '#9333ea';
-                   let stroke = isRightFace ? `stroke="#9333ea" stroke-width="1.5"` : 'stroke="none"';
-
                    corpusHolesData.holes.forEach(h => {
                        let calcY = isTopBottomFullWidth ? h.y - th : h.y;
                        if (h.holeType === 'screw') corpusYs.add(calcY);
                        
-                       let baseRadius = h.holeType === 'screw' ? 1.5 : 4;
-                       let r = isRightFace ? baseRadius + 1 : baseRadius;
+                       let r = h.holeType === 'screw' ? 1.5 : 4.0; // fi 3 wkręt, fi 8 kołek
                        let holeX = panel.isOuterRight ? (depth - h.xFromFront) : h.xFromFront;
                        
-                       svg += `<circle cx="${panel.svgX + holeX}" cy="${sideH - calcY}" r="${r}" fill="${fill}" ${stroke} />`;
+                       svg += `<circle cx="${panel.svgX + holeX}" cy="${sideH - calcY}" r="${r}" fill="#9333ea" />`;
                    });
                }
           }
@@ -425,7 +406,6 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
       svg += `</g>`;
   });
 
-  // --- WARSTWY FRONTÓW ZEWN/WEWN ---
   svg += `<g id="detail-front" class="detail-view" style="display:none;">`;
   svg += `<text x="${frontX + cabWidth/2}" y="${svgTopY - 25}" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">FRONT (Podział zewnętrzny)</text>`;
 
