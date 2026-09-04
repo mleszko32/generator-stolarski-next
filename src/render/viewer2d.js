@@ -65,23 +65,38 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   });
 
   const cabX = 80;
-  const detailStartX = cabX + cabWidth + 200; 
+  // POPRAWKA 1: Odsunięto początek detali, żeby teksty wymiarów nie wjeżdżały na szafkę
+  const detailStartX = cabX + cabWidth + 500; 
   const frontX = detailStartX; 
   const innerFrontX = detailStartX;
 
   panels.forEach(p => {
-      if (p.id.endsWith('-R')) p.svgX = detailStartX + depth + 300;
+      if (p.id.endsWith('-R')) p.svgX = detailStartX + depth + 350;
       else p.svgX = detailStartX;
   });
 
-  const marginRight = 400; 
   const marginY = 180; 
-  const svgWidth = detailStartX + (depth * 2) + 600; 
+  // POPRAWKA 2: Poszerzono obszar roboczy SVG
+  const svgWidth = detailStartX + (depth * 2) + 800; 
   
   const vBoxY = svgTopY - marginY;
   const vBoxH = totalSvgHeight + (marginY * 2);
 
   const formatVal = (val) => Number(Number(val).toFixed(1));
+
+  // POPRAWKA 3: Uniwersalna funkcja generująca tekst dla DÓŁ (GÓRA) ze wsparciem Systemu 32 (Rc)
+  function getDimText(localY, panelH, color, addRc = false) {
+      let primary = Math.min(localY, panelH - localY);
+      let secondary = Math.max(localY, panelH - localY);
+      let isBottomCloser = localY <= (panelH / 2);
+      
+      let rcText = addRc ? `<tspan fill="#059669" font-size="9" font-weight="bold"> [Rc: ${formatVal(localY - 32)}]</tspan> ` : ` `;
+
+      return `<tspan fill="${color}" font-weight="bold" font-size="11">${formatVal(primary)}</tspan> ` +
+             `<tspan fill="${color}" font-size="9" font-weight="bold">${isBottomCloser ? 'DÓŁ' : 'GÓRA'}</tspan>` +
+             rcText +
+             `<tspan fill="#94a3b8" font-size="9" font-weight="normal">(${formatVal(secondary)} ${isBottomCloser ? 'GÓRA' : 'DÓŁ'})</tspan>`;
+  }
 
   let svg = `<svg id="side-panel-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 ${vBoxY} ${svgWidth} ${vBoxH}" width="100%" height="100%" style="background-color: #f8fafc; font-family: 'Segoe UI', sans-serif; cursor: grab;">`;
 
@@ -253,7 +268,6 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
                   if (isStruct) {
                       [37, depth - 37].forEach(hx => {
                           svg += `<circle cx="${getSvgX(hx)}" cy="${svgY - el.h/2}" r="${r}" fill="${fill}" ${stroke} />`;
-                          // Zmiana: Rysujemy też otwór pod kołek dla półki konstrukcyjnej
                           let dowelX = hx === 37 ? hx + 32 : hx - 32;
                           svg += `<circle cx="${getSvgX(dowelX)}" cy="${svgY - el.h/2}" r="${r}" fill="${fill}" ${stroke} />`;
                           
@@ -307,14 +321,11 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
                       svg += `<circle cx="${getSvgX(37)}" cy="${svgY + 16}" r="${r}" fill="${fill}" ${stroke} />`;
 
                       let localHoleY = calcY - panelCalcY;
-                      let topDist = panelH - localHoleY;
+                      let tspanHtml = getDimText(localHoleY, panelH, baseColor);
 
-                      let tspanHtml = `<tspan fill="${baseColor}">${formatVal(localHoleY)}</tspan> ` +
-                                      `<tspan fill="#64748b">(${formatVal(topDist)})</tspan>`;
-
-                      let textX = isReversed ? getSvgX(37) - 8 : getSvgX(37) + 8;
+                      let textX = isReversed ? getSvgX(37) - 12 : getSvgX(37) + 12;
                       let anchor = isReversed ? 'end' : 'start';
-                      svg += `<text x="${textX}" y="${svgY + 4}" font-weight="bold" font-size="12" text-anchor="${anchor}" font-family="sans-serif">${tspanHtml}</text>`;
+                      svg += `<text x="${textX}" y="${svgY + 4}" text-anchor="${anchor}" font-family="sans-serif">${tspanHtml}</text>`;
                   });
               });
           };
@@ -338,11 +349,11 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
           const sortedCorpusYs = Array.from(corpusYs).sort((a,b) => a - b);
           const sortedShelfYs = Array.from(shelfYs).sort((a,b) => a - b);
 
-          let currentDimX = isReversed ? panel.svgX + depth + 25 : panel.svgX - 25;
+          let currentDimX = isReversed ? panel.svgX + depth + 40 : panel.svgX - 40;
+          const stepDir = isReversed ? 120 : -120; // Poszerzono odstępy dla dłuższego tekstu
           const textAnchor = isReversed ? 'start' : 'end';
-          const textOffset = isReversed ? 6 : -6;
+          const textOffset = isReversed ? 8 : -8;
 
-          // Zmiana: Szuflady wymiarowane formatem tekstowym Top/Bottom
           if (sortedDrawerYs.length > 0) {
               svg += `<g class="layer-holes-drawer">`;
               sortedDrawerYs.forEach(calcY => {
@@ -351,17 +362,16 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
                   svg += `<line x1="${edgeX}" y1="${holeSvgY}" x2="${currentDimX}" y2="${holeSvgY}" stroke="#0284c7" stroke-width="0.5" stroke-dasharray="2,2" />`;
                   
                   let localHoleY = calcY - panelCalcY;
-                  let topDist = panelH - localHoleY;
+                  let tspanHtml = getDimText(localHoleY, panelH, "#0284c7");
 
-                  svg += `<text x="${currentDimX + textOffset}" y="${holeSvgY + 4}" font-size="12" font-weight="bold" text-anchor="${textAnchor}">
-                            <tspan fill="#0284c7">${formatVal(localHoleY)}</tspan> <tspan fill="#64748b">(${formatVal(topDist)})</tspan>
+                  svg += `<text x="${currentDimX + textOffset}" y="${holeSvgY + 4}" font-family="sans-serif" text-anchor="${textAnchor}">
+                            ${tspanHtml}
                           </text>`;
               });
-              currentDimX += (isReversed ? 80 : -80);
+              currentDimX += stepDir;
               svg += `</g>`;
           }
 
-          // Zmiana: Półki konstrukcyjne i wieńce wymiarowane formatem tekstowym Top/Bottom
           if (sortedCorpusYs.length > 0) {
               svg += `<g class="layer-holes-corpus">`;
               sortedCorpusYs.forEach(calcY => {
@@ -370,17 +380,16 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
                   svg += `<line x1="${edgeX}" y1="${holeSvgY}" x2="${currentDimX}" y2="${holeSvgY}" stroke="#9333ea" stroke-width="0.5" stroke-dasharray="2,2" />`;
                   
                   let localHoleY = calcY - panelCalcY;
-                  let topDist = panelH - localHoleY;
+                  let tspanHtml = getDimText(localHoleY, panelH, "#9333ea", true);
 
-                  svg += `<text x="${currentDimX + textOffset}" y="${holeSvgY + 4}" font-size="12" font-weight="bold" text-anchor="${textAnchor}">
-                            <tspan fill="#9333ea">${formatVal(localHoleY)}</tspan> <tspan fill="#059669">[Rc: ${formatVal(localHoleY - 32)}]</tspan> <tspan fill="#64748b">(${formatVal(topDist)})</tspan>
+                  svg += `<text x="${currentDimX + textOffset}" y="${holeSvgY + 4}" font-family="sans-serif" text-anchor="${textAnchor}">
+                            ${tspanHtml}
                           </text>`;
               });
-              currentDimX += (isReversed ? 110 : -110);
+              currentDimX += stepDir;
               svg += `</g>`;
           }
 
-          // Zmiana: Półki ruchome pozbawione długiej linii bazowej, spójne z resztą
           if (sortedShelfYs.length > 0) {
               svg += `<g class="layer-holes-shelf">`;
               sortedShelfYs.forEach(calcY => {
@@ -392,14 +401,14 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
                       svg += `<line x1="${edgeX}" y1="${holeSvgY}" x2="${currentDimX}" y2="${holeSvgY}" stroke="#ea580c" stroke-width="0.5" stroke-dasharray="2,2" />`;
                       
                       let localHoleY = holeY - panelCalcY;
-                      let topDist = panelH - localHoleY;
+                      let tspanHtml = getDimText(localHoleY, panelH, "#ea580c", true);
 
-                      svg += `<text x="${currentDimX + textOffset}" y="${holeSvgY + 4}" font-size="${isCenter ? '12' : '10'}" font-weight="${isCenter ? 'bold' : 'normal'}" text-anchor="${textAnchor}" opacity="${isCenter ? '1' : '0.7'}">
-                                <tspan fill="#ea580c">${formatVal(localHoleY)}</tspan> <tspan fill="#059669">[Rc: ${formatVal(localHoleY - 32)}]</tspan> <tspan fill="#64748b">(${formatVal(topDist)})</tspan>
+                      svg += `<text x="${currentDimX + textOffset}" y="${holeSvgY + 4}" font-family="sans-serif" text-anchor="${textAnchor}" opacity="${isCenter ? '1' : '0.6'}">
+                                ${tspanHtml}
                               </text>`;
                   });
               });
-              currentDimX += (isReversed ? 110 : -110);
+              currentDimX += stepDir;
               svg += `</g>`;
           }
       });
@@ -456,6 +465,31 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
 
              svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="17.5" fill="#fcfdfd" stroke="${mainColor}" stroke-width="1.5" opacity="${opacity}" />`;
              svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="2.5" fill="${mainColor}" opacity="${opacity}" />`;
+
+             let tspanHtml = getDimText(hinge.relY, front.h, mainColor);
+             let textX = isLeft ? cupX + 22 : cupX - 22;
+             let anchor = isLeft ? 'start' : 'end';
+             svg += `<text x="${textX}" y="${holeSvgY + 4}" text-anchor="${anchor}" font-family="sans-serif" opacity="${opacity}">${tspanHtml}</text>`;
+          });
+        }
+        svg += `</g>`;
+      }
+      
+      if (isDrawer && mountingData) {
+        svg += `<g class="layer-front-holes">`;
+        const drawerData = mountingData.find(m => m.type === 'drawer' && m.frontId === front.id);
+        if (drawerData && drawerData.frontHoles) {
+          drawerData.frontHoles.forEach((hole, idx) => {
+             const xL = Number(hole.xOffsetLeft ?? hole.xOffset ?? 20.5);
+             const xR = Number(hole.xOffsetRight ?? hole.xOffset ?? 20.5);
+             const holeX_Left = fSvgX + xL;
+             const holeX_Right = fSvgX + fWidth - xR;
+             
+             let drawHoleY = front.isTBF ? front.y + hole.y - th : front.y + hole.y;
+             const holeSvgY = sideH - (front.dy + drawHoleY);
+
+             svg += `<circle cx="${holeX_Left}" cy="${holeSvgY}" r="2.5" fill="#dc2626" />`;
+             svg += `<circle cx="${holeX_Right}" cy="${holeSvgY}" r="2.5" fill="#dc2626" />`;
           });
         }
         svg += `</g>`;
