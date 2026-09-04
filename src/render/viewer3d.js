@@ -1476,22 +1476,26 @@ export function update3D() {
                       const rearHoleZ = innerZ + 37;
                       const holeZs = [frontHoleZ, rearHoleZ]; 
                       
+                      // ZMIANA: Nawierty półek czytają lokalne krawędzie przegród
+                      const leftHoleX = posX + el.x - th/2;
+                      const rightHoleX = posX + el.x + el.w + th/2;
+
                       holeZs.forEach(hz => {
                           if (isStruct) {
                               const holeY = posY + el.y + el.h / 2; 
                               const dowelZ = hz === frontHoleZ ? hz - 32 : hz + 32;
-                              addHole(2.5, th, posX + th/2, holeY, hz, 'x', innerGroup); 
-                              addHole(2.5, th, posX + W - th/2, holeY, hz, 'x', innerGroup); 
-                              addHardware('screw', posX + th/2, holeY, hz, 'x', innerGroup); 
-                              addHardware('screw', posX + W - th/2, holeY, hz, 'x', innerGroup); 
-                              addHardware('dowel', posX + th/2, holeY, dowelZ, 'x', innerGroup); 
-                              addHardware('dowel', posX + W - th/2, holeY, dowelZ, 'x', innerGroup); 
+                              addHole(2.5, th, leftHoleX, holeY, hz, 'x', innerGroup); 
+                              addHole(2.5, th, rightHoleX, holeY, hz, 'x', innerGroup); 
+                              addHardware('screw', leftHoleX, holeY, hz, 'x', innerGroup); 
+                              addHardware('screw', rightHoleX, holeY, hz, 'x', innerGroup); 
+                              addHardware('dowel', leftHoleX, holeY, dowelZ, 'x', innerGroup); 
+                              addHardware('dowel', rightHoleX, holeY, dowelZ, 'x', innerGroup); 
                           } else {
                               const supportY = posY + el.y - 2.5; 
-                              addHole(2.5, th, posX + th/2, supportY, hz, 'x', innerGroup); 
-                              addHole(2.5, th, posX + W - th/2, supportY, hz, 'x', innerGroup); 
-                              addHardware('support', posX + th + 4, supportY, hz, 'x', innerGroup); 
-                              addHardware('support', posX + W - th - 4, supportY, hz, 'x', innerGroup); 
+                              addHole(2.5, th, leftHoleX, supportY, hz, 'x', innerGroup); 
+                              addHole(2.5, th, rightHoleX, supportY, hz, 'x', innerGroup); 
+                              addHardware('support', leftHoleX + th/2 + 4, supportY, hz, 'x', innerGroup); 
+                              addHardware('support', rightHoleX - th/2 - 4, supportY, hz, 'x', innerGroup); 
                           }
                       });
                   }
@@ -1544,7 +1548,8 @@ export function update3D() {
                           const sysName = f.drawerSystem || 'merivobox';
                           const dHoles = calculateDrawerHoles(sysName, el.y, simulatedSpace, th, el.frontIndex, isBottomInZone);
                           
-                          const innerWidth = W - (th * 2);
+                          // ZMIANA: Szujflada zajmuje tylko przestrzeń między przegrodami
+                          const innerWidth = el.w; 
                           
                           let availableDepth = D - 19; 
                           if (isInternal) {
@@ -1563,7 +1568,7 @@ export function update3D() {
                               const dl = drawerComps.bottom.length;
                               const dh = drawerComps.back.height;
 
-                              const dX = posX + th + (innerWidth - dw) / 2; 
+                              const dX = posX + el.x + (innerWidth - dw) / 2; 
                               
                               let slideAbsY = el.y + 33.5; 
                               if (dHoles && dHoles.slideSideHoles && dHoles.slideSideHoles.length > 0) {
@@ -1581,11 +1586,13 @@ export function update3D() {
 
                           if (dHoles && dHoles.slideSideHoles) {
                               const slideZOffset = isInternal ? (innerFrontThick + innerSetback) : 0; 
-                              
+                              const leftHoleX = posX + el.x - th/2;
+                              const rightHoleX = posX + el.x + el.w + th/2;
+
                               dHoles.slideSideHoles.forEach(h => {
                                   let calcY = isTopBottomFull ? h.y - th : h.y;
-                                  addHole(2.5, th, posX + th/2, posY + calcY, posZ + D - h.x - slideZOffset, 'x', innerGroup); 
-                                  addHole(2.5, th, posX + W - th/2, posY + calcY, posZ + D - h.x - slideZOffset, 'x', innerGroup); 
+                                  addHole(2.5, th, leftHoleX, posY + calcY, posZ + D - h.x - slideZOffset, 'x', innerGroup); 
+                                  addHole(2.5, th, rightHoleX, posY + calcY, posZ + D - h.x - slideZOffset, 'x', innerGroup); 
                               });
                           }
                           if (dHoles && dHoles.frontHoles) {
@@ -1600,7 +1607,6 @@ export function update3D() {
                   
                   else if (el.subtype.includes('drzwi')) {
                       if (isXrayMode) {
-                          // SKANOWANIE WERTYKALNE W WIDOKU 3D
                           let obstacles = [];
                           const modAbsX = parseFloat(mod.position.x) || 0;
                           const modLegH = (mod.legs && mod.legs.active) ? (parseFloat(mod.legs.height) || 0) : 0;
@@ -1636,7 +1642,8 @@ export function update3D() {
 
                               addHole(17.5, 13, posX + cupX, posY + calcY, zForFront + 6.5, 'z', innerGroup);
 
-                              const plateX = isLeft ? posX + th/2 : posX + W - th/2;
+                              // ZMIANA: Prowadniki zawiasów lądują na lokalnej przegrodzie
+                              const plateX = isLeft ? posX + el.x - th/2 : posX + el.x + el.w + th/2;
                               addHole(2.5, th, plateX, posY + calcY - 16, posZ + D - 37, 'x', innerGroup);
                               addHole(2.5, th, plateX, posY + calcY + 16, posZ + D - 37, 'x', innerGroup);
                           });
@@ -1661,8 +1668,6 @@ export function update3D() {
           }
       }
 
-      // NOWOŚĆ: Generowanie 3D dla Blend L-kształtnych (ukrywają się razem z frontami)
-      // NOWOŚĆ: Generowanie 3D dla Blend L-kształtnych (ukrywają się razem z frontami)
       if (mod.fillers && isFrontsVisible) {
           const frontType = (mod.front && mod.front.type) ? mod.front.type : (state.project.front?.type || 'nakladane');
           const zForFiller = frontType === 'wpuszczane' ? posZ + D - th : posZ + D + 2;
@@ -1670,7 +1675,6 @@ export function update3D() {
           let leftW = 0;
           let rightW = 0;
 
-          // Eliminujemy błędy odczytu przy wpisywaniu wartości ujemnych lub równych 0
           const parseVal = (val, fallback) => (val !== null && val !== undefined && val !== '') ? parseFloat(val) : fallback;
 
           if (mod.fillers.left && mod.fillers.left.active) {
