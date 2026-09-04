@@ -24,7 +24,6 @@ export function calculateParts() {
   mountingData.push(...getCorpusHoles(mod, config)); 
   mountingData.push(...getGlobalHingesForModule(mod, config));
 
-  // --- AGREGACJA FORMATEK DLA PANELU BOCZNEGO ---
   const aggregated = {};
   rawParts.forEach(part => {
      const key = `${part.category}_${part.name}_${part.length}_${part.width}`;
@@ -44,14 +43,18 @@ function getGlobalHingesForModule(targetMod, config) {
   const targetLegH = (targetMod.legs && targetMod.legs.active) ? (parseFloat(targetMod.legs.height) || 0) : 0;
   const targetAbsY = (parseFloat(targetMod.position.y) || 0) + targetLegH;
   const targetH = parseFloat(targetMod.dimensions.height);
+  const targetW = parseFloat(targetMod.dimensions.width) || 600;
   const th = config.materials.boardThickness || 18;
 
   config.modules.forEach(sourceMod => {
       const sourceAbsX = parseFloat(sourceMod.position.x) || 0;
       const sourceLegH = (sourceMod.legs && sourceMod.legs.active) ? (parseFloat(sourceMod.legs.height) || 0) : 0;
       const sourceAbsY = (parseFloat(sourceMod.position.y) || 0) + sourceLegH;
+      const sourceW = parseFloat(sourceMod.dimensions.width) || 600;
 
-      if (Math.abs(targetAbsX - sourceAbsX) < 10) {
+      const overlapX = Math.max(0, Math.min(targetAbsX + targetW, sourceAbsX + sourceW) - Math.max(targetAbsX, sourceAbsX));
+
+      if (overlapX > 10) { 
           if (sourceMod.elements) {
               const fronts = sourceMod.elements.filter(el => el.typ === 'front' && el.subtype.includes('drzwi'));
               fronts.forEach(front => {
@@ -376,7 +379,6 @@ function getInteriorParts(mod, config) {
 
   mod.elements.forEach(el => {
     if (el.typ === 'pion') {
-      // Zmiana: usunięto indeks liczbowy, aby formatki o tej samej wielkości łączyły się w jedną linię z symbolem (x2), (x3) itd.
       parts.push({ name: `Przegroda pionowa`, length: parseFloat((el.h || 0).toFixed(1)), width: innerPartDepth, qty: 1, category: "Korpus" });
     } else if (el.typ === 'poziom' && !el.isStructural) {
       parts.push({ name: `P${width}`, length: parseFloat((el.w || 0).toFixed(1)), width: innerPartDepth - 5, qty: 1, category: "Korpus" });
@@ -403,7 +405,6 @@ function getFrontsAndDrawers(mod, config) {
 
   fronts.forEach((front, index) => {
     let partName = "Front";
-    // Zmiana: usunięto sztuczne numery liczników
     if (front.subtype === 'szuflada') { partName = `Front szuflady`; } 
     else if (front.subtype === 'szuflada-wewnetrzna') { partName = `Front szuflady wewn.`; } 
     else if (front.subtype === 'drzwi') { partName = `Drzwi`; } 
