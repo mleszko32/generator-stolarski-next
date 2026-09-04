@@ -249,20 +249,9 @@ export function updateSidebar() {
   if (state.project.modules.length > 0) {
     html += `
       <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 15px;">
-        <div style="display: flex; gap: 6px;">
-            <select id="print-view-mode" ${!activeMod ? 'disabled' : ''} style="flex: 1; padding: 6px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 11px; background: white; outline: none; cursor: pointer;">
-                <option value="all">Wszystko razem</option>
-                <option value="korpus">Tylko Korpus</option>
-                <option value="boki">Tylko Boki (L+P)</option>
-                <option value="bokL">Tylko Bok Lewy</option>
-                <option value="bokR">Tylko Bok Prawy</option>
-                <option value="front">Tylko Fronty Zewn.</option>
-                <option value="frontInner">Tylko Fronty Wewn.</option>
-            </select>
-            <button id="btn-print-2d" ${!activeMod ? 'disabled style="opacity: 0.5;"' : ''} style="flex: 1; padding: 8px; background-color: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px;">
-              📄 Drukuj 2D
-            </button>
-        </div>
+        <button id="btn-print-2d" ${!activeMod ? 'disabled style="opacity: 0.5;"' : ''} style="width: 100%; padding: 8px; background-color: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px;">
+          📄 Drukuj 2D (Rysunek Wykonawczy)
+        </button>
         <button id="btn-export-csv" style="width: 100%; padding: 8px; background-color: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px;">
           📊 Menedżer Formatek (CSV)
         </button>
@@ -601,9 +590,28 @@ export function updateSidebar() {
                         document.querySelectorAll('.detail-view').forEach(el => {
                             el.style.display = 'none';
                         });
+                        document.querySelectorAll('.clickable-rect').forEach(el => {
+                            el.classList.remove('active-part');
+                        });
+                        document.querySelectorAll('.btn-front').forEach(btn => {
+                            btn.style.background = '#fff';
+                            btn.style.borderColor = '#cbd5e1';
+                        });
+
                         if (id) {
                             const target = document.getElementById(id);
                             if (target) target.style.display = '';
+
+                            const mapRect = document.getElementById('map-' + id);
+                            if (mapRect) mapRect.classList.add('active-part');
+                            
+                            if (id.startsWith('detail-front')) {
+                                const btn = document.querySelector(\`button[onclick="showDetail('\${id}')"]\`);
+                                if (btn) {
+                                    btn.style.background = '#e0f2fe';
+                                    btn.style.borderColor = '#3b82f6';
+                                }
+                            }
                         }
                     }
                     
@@ -656,7 +664,6 @@ export function updateSidebar() {
     });
   }
 
-  // NOWA LOGIKA GENEROWANIA ESTETYCZNEGO WYDRUKU / PDF DLA OKUĆ
   const exportHardwareBtn = document.getElementById('btn-export-hardware');
   if (exportHardwareBtn) {
     exportHardwareBtn.addEventListener('click', () => {

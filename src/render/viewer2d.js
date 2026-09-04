@@ -36,32 +36,28 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   const svgBottomY = sideH - minDy;
   const totalSvgHeight = svgBottomY - svgTopY;
 
-  // --- ZBIERANIE PŁYT PIONOWYCH DO WYSYSOWANIA ---
   const partitions = (mod.elements || []).filter(el => el.typ === 'pion').sort((a, b) => a.x - b.x);
   const panels = [];
   
-  // Bok Lewy
   panels.push({
       id: 'left', title: 'BOK LEWY', x: 0, w: th, y: 0, h: sideH,
       isOuterLeft: true, isOuterRight: false, faceRightX: th, faceLeftX: -999,
       isReversedView: false, detailGroupId: 'detail-left'
   });
 
-  // Przegrody
   partitions.forEach((p, i) => {
       panels.push({
           id: `part-${i}-L`, title: `PRZEGRODA ${i+1} (LEWA STRONA)`, x: p.x, w: p.w, y: p.y, h: p.h,
           isOuterLeft: false, isOuterRight: false, faceRightX: -999, faceLeftX: p.x,
-          isReversedView: true, detailGroupId: `detail-part-${i}`
+          isReversedView: true, detailGroupId: `detail-part-${i}-L`
       });
       panels.push({
           id: `part-${i}-R`, title: `PRZEGRODA ${i+1} (PRAWA STRONA)`, x: p.x, w: p.w, y: p.y, h: p.h,
           isOuterLeft: false, isOuterRight: false, faceRightX: p.x + p.w, faceLeftX: -999,
-          isReversedView: false, detailGroupId: `detail-part-${i}`
+          isReversedView: false, detailGroupId: `detail-part-${i}-R`
       });
   });
 
-  // Bok Prawy
   panels.push({
       id: 'right', title: 'BOK PRAWY', x: cabWidth - th, w: th, y: 0, h: sideH,
       isOuterLeft: false, isOuterRight: true, faceRightX: 9999, faceLeftX: cabWidth - th,
@@ -69,7 +65,7 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   });
 
   const cabX = 80;
-  const detailStartX = cabX + cabWidth + 200; // Miejsce, gdzie pojawiają się kliknięte detale
+  const detailStartX = cabX + cabWidth + 200; 
   const frontX = detailStartX; 
   const innerFrontX = detailStartX;
 
@@ -80,7 +76,7 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
 
   const marginRight = 400; 
   const marginY = 180; 
-  const svgWidth = detailStartX + (depth * 2) + 600; // Stała szerokość SVG
+  const svgWidth = detailStartX + (depth * 2) + 600; 
   
   const vBoxY = svgTopY - marginY;
   const vBoxH = totalSvgHeight + (marginY * 2);
@@ -102,9 +98,8 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   svg += `
     <style>
       .clickable-rect { cursor: pointer; transition: all 0.2s; }
-      .clickable-rect:hover { fill: #cbd5e1 !important; stroke: #2563eb; stroke-width: 2.5px; }
-      .clickable-part { cursor: pointer; transition: all 0.2s; }
-      .clickable-part:hover { fill: #bae6fd !important; stroke: #0284c7; stroke-width: 2.5px; }
+      .clickable-rect:hover { fill: #e0f2fe !important; stroke: #3b82f6; stroke-width: 2px; }
+      .active-part { fill: #bae6fd !important; stroke: #0284c7 !important; stroke-width: 2.5px !important; }
     </style>
     <defs>
       <marker id="arrow-red" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 2 L 10 5 L 0 8 z" fill="#dc2626" /></marker>
@@ -113,7 +108,6 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
     <g transform="translate(0, 0)">
   `;
 
-  // INTERAKTYWNA LEGENDA
   svg += `
     <g transform="translate(80, ${svgTopY - 140})">
         <text x="0" y="0" font-size="16" fill="#1e3a8a" font-weight="bold">INSTRUKCJA:</text>
@@ -143,18 +137,17 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   svg += `<line x1="60" y1="${sideH}" x2="${svgWidth - 100}" y2="${sideH}" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,4" />`;
   svg += `<text x="${cabX - 10}" y="${sideH + 4}" font-size="12" fill="#1e293b" font-weight="bold" text-anchor="end">0 mm</text>`;
 
-  // --- RYSOWANIE KORPUSU (KLIKALNEGO) ---
   svg += `<text x="${cabX + cabWidth/2}" y="${svgTopY - 25}" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">KORPUS (Kliknij element)</text>`;
   
-  const bgFill = "#f1f5f9"; // Subtelne tło dla klikalnych elementów
+  const bgFill = "#f1f5f9"; 
   if (isTopBottomFullWidth) {
     svg += `<rect x="${cabX}" y="0" width="${cabWidth}" height="${th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`; 
     svg += `<rect x="${cabX}" y="${sideH - th}" width="${cabWidth}" height="${th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`; 
-    svg += `<rect x="${cabX}" y="${th}" width="${th}" height="${sideH - 2*th}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-left')" />`; 
-    svg += `<rect x="${cabX + cabWidth - th}" y="${th}" width="${th}" height="${sideH - 2*th}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-right')" />`; 
+    svg += `<rect id="map-detail-left" x="${cabX}" y="${th}" width="${th}" height="${sideH - 2*th}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-left')" />`; 
+    svg += `<rect id="map-detail-right" x="${cabX + cabWidth - th}" y="${th}" width="${th}" height="${sideH - 2*th}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-right')" />`; 
   } else {
-    svg += `<rect x="${cabX}" y="0" width="${th}" height="${sideH}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-left')" />`;
-    svg += `<rect x="${cabX + cabWidth - th}" y="0" width="${th}" height="${sideH}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-right')" />`;
+    svg += `<rect id="map-detail-left" x="${cabX}" y="0" width="${th}" height="${sideH}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-left')" />`;
+    svg += `<rect id="map-detail-right" x="${cabX + cabWidth - th}" y="0" width="${th}" height="${sideH}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-right')" />`;
     svg += `<rect x="${cabX + th}" y="${sideH - th}" width="${cabWidth - th*2}" height="${th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
     
     if (cons.topType === 'pelny') {
@@ -174,7 +167,7 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
       
       if (el.typ === 'pion') {
           let pIndex = partitions.findIndex(p => p.id === el.id);
-          svg += `<rect x="${elSvgX}" y="${elSvgY}" width="${el.w}" height="${el.h}" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.5" class="clickable-part" onclick="showDetail('detail-part-${pIndex}')" />`;
+          svg += `<rect id="map-detail-part-${pIndex}-L" x="${elSvgX}" y="${elSvgY}" width="${el.w}" height="${el.h}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-part-${pIndex}-L')" />`;
       } else {
           let fillColor = (el.typ === 'poziom' && el.isStructural) ? '#a7f3d0' : '#cbd5e1'; 
           svg += `<rect x="${elSvgX}" y="${elSvgY}" width="${el.w}" height="${el.h}" fill="${fillColor}" stroke="#475569" stroke-width="1.5" />`;
@@ -182,7 +175,6 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
     });
   }
 
-  // Pomocnicze funkcje skanujące
   function getShelvesForFace(faceX, isRightFace, pCalcY, pH) {
       return (mod.elements || []).filter(el => {
           if (el.typ !== 'poziom') return false;
@@ -225,9 +217,11 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
       });
   }
 
-  // --- GENEROWANIE SZCZEGÓŁÓW (W GRUPACH) ---
   const detailGroups = ['detail-left', 'detail-right'];
-  partitions.forEach((p, i) => detailGroups.push(`detail-part-${i}`));
+  partitions.forEach((p, i) => {
+      detailGroups.push(`detail-part-${i}-L`);
+      detailGroups.push(`detail-part-${i}-R`);
+  });
 
   detailGroups.forEach(groupId => {
       svg += `<g id="${groupId}" class="detail-view" style="display:none;">`;
@@ -262,7 +256,6 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
           let corpusYs = new Set();
           let drawerYs = new Set();
 
-          const shelvesForFace = [...getShelvesForFace(panel.faceRightX, true, panelCalcY, panelH), ...getShelvesForFace(panel.faceLeftX, false, panelCalcY, panelH)];
           const drawShelfHoles = (shelves, isRightFace) => {
               shelves.forEach(el => {
                   let calcY = isTopBottomFullWidth ? el.y - th : el.y;
