@@ -1338,3 +1338,368 @@ function addHardware(type, x, y, z, axis, parentGroup) {
   mesh.position.set(x, y, z);
   parentGroup.add(mesh);
 }
+export function update3D() {
+  if (!cabinetGroup) return;
+  
+  while(cabinetGroup.children.length > 0){ cabinetGroup.remove(cabinetGroup.children[0]); }
+
+  const th = parseFloat(state.project.materials.boardThickness) || 18;
+
+  state.project.modules.forEach(mod => {
+      recalculateLayout(mod);
+
+      const isActive = mod.id === state.activeModuleId;
+      const W = parseFloat(mod.dimensions.width);
+      const H = parseFloat(mod.dimensions.height);
+      const D = parseFloat(mod.dimensions.depth);
+      let baseOffsetY = 0;
+      if (mod.legs && mod.legs.active) baseOffsetY = parseFloat(mod.legs.height) || 100;
+      
+      const modGroup = new THREE.Group();
+      modGroup.userData = { moduleId: mod.id };
+      
+      modGroup.position.set(
+          (parseFloat(mod.position.x) || 0) + W/2,
+          (parseFloat(mod.position.y) || 0) + baseOffsetY + H/2,
+          (parseFloat(mod.position.z) || 0) + D/2
+      );
+
+      const innerGroup = new THREE.Group();
+      innerGroup.position.set(-W/2, -H/2 - baseOffsetY, -D/2);
+      modGroup.add(innerGroup);
+
+      const posX = 0; 
+      const posY = baseOffsetY; 
+      const posZ = 0; 
+
+      const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(state.project.construction || {}), ...(mod.construction || {}) };
+      const isTopBottomFull = cons.joinType === 'wience_przelotowe';
+
+      const udCorp = { moduleId: mod.id, type: 'corpus' };
+      const udBack = { moduleId: mod.id, type: 'corpus', part: 'back' }; 
+
+      const backP = mod.backPanel || { type: 'nakladane', offset: 16 };
+      const backThick = 3; 
+      
+      let sideD, tbD, backZ;
+      if (backP.type === 'nut') {
+          sideD = D;
+          tbD = D - backP.offset - backThick; 
+          backZ = posZ + backP.offset;
+      } else { 
+          sideD = D - backThick;
+          tbD = D - backThick;
+          backZ = posZ;
+      }
+
+      const sideStartZ = posZ + D - sideD;
+      const tbStartZ = posZ + D - tbD;
+
+      if (isTopBottomFull) {
+          addBox(W, th, tbD, posX, posY, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
+          addBox(W, th, tbD, posX, posY + H - th, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
+          addBox(th, H - 2*th, sideD, posX, posY + th, sideStartZ, 'corpus', isActive, udCorp, innerGroup); 
+          addBox(th, H - 2*th, sideD, posX + W - th, posY + th, sideStartZ, 'corpus', isActive, udCorp, innerGroup); 
+      } else {
+          addBox(th, H, sideD, posX, posY, sideStartZ, 'corpus', isActive, udCorp, innerGroup); 
+          addBox(th, H, sideD, posX + W - th, posY, sideStartZ, 'corpus', isActive, udCorp, innerGroup); 
+          addBox(W - 2*th, th, tbD, posX + th, posY, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
+          
+          if (cons.topType === 'pelny') {
+              addBox(W - 2*th, th, tbD, posX + th, posY + H - th, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
+          } else if (cons.topType === 'trawersy_poziom') {
+              const trW = parseFloat(cons.traverseWidth) || 100;
+              addBox(W - 2*th, th, trW, posX + th, posY + H - th, posZ + D - trW, 'corpus', isActive, udCorp, innerGroup); 
+              addBox(W - 2*th, th, trW, posX + th, posY + H - th, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
+          } else if (cons.topType === 'trawersy_pion') {
+              const trW = parseFloat(cons.traverseWidth) || 100;
+              addBox(W - 2*th, trW, th, posX + th, posY + H - trW, posZ + D - th, 'corpus', isActive, udCorp, innerGroup); 
+              addBox(W - 2*th, trW, th, posX + th, posY + H - trW, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
+          }
+      }
+
+      addBox(W - 4, H - 4, backThick, posX + 2, posY + 2, backZ, 'hdf', isActive, udBack, innerGroup);
+
+      const hwAxis = isTopBottomFull ? 'y' : 'x';
+      const jointXs = [posX + th/2, posX + W - th/2];
+      
+      jointXs.forEach(jx => {
+          const bottomY = posY + th/2;
+          const rearZ = tbStartZ + 37;
+          const rearDowelZ = tbStartZ + 69;
+          
+          addHardware('screw', jx, bottomY, posZ + D - 37, hwAxis, innerGroup);
+          addHardware('dowel', jx, bottomY, posZ + D - 69, hwAxis, innerGroup);
+          addHardware('screw', jx, bottomY, rearZ, hwAxis, innerGroup);
+          addHardware('dowel', jx, bottomY, rearDowelZ, hwAxis, innerGroup);
+          
+          if (cons.topType === 'pelny' || cons.topType === 'trawersy_poziom') {
+              const topY = posY + H - th/2;
+              addHardware('screw', jx, topY, posZ + D - 37, hwAxis, innerGroup);
+              addHardware('dowel', jx, topY, posZ + D - 69, hwAxis, innerGroup);
+              addHardware('screw', jx, topY, rearZ, hwAxis, innerGroup);
+              addHardware('dowel', jx, topY, rearDowelZ, hwAxis, innerGroup);
+          } else if (cons.topType === 'trawersy_pion') {
+              const topY = posY + H - 37;
+              const topDowelY = posY + H - 69;
+              addHardware('screw', jx, topY, posZ + D - th/2, 'x', innerGroup);
+              addHardware('dowel', jx, topDowelY, posZ + D - th/2, 'x', innerGroup);
+              addHardware('screw', jx, topY, tbStartZ + th/2, 'x', innerGroup);
+              addHardware('dowel', jx, topDowelY, tbStartZ + th/2, 'x', innerGroup);
+          }
+      });
+
+      const innerZ = backP.type === 'nut' ? backZ + backThick : posZ + backThick;
+      const shelfDepth = (posZ + D - 2) - innerZ; 
+
+      if (mod.elements) {
+          mod.elements.forEach((el) => {
+              const udElement = { moduleId: mod.id, type: el.typ === 'front' ? 'front' : 'shelf', elementId: el.id };
+
+              if (el.typ === 'poziom') {
+                  addBox(el.w, el.h, shelfDepth, posX + el.x, posY + el.y, innerZ, 'shelf', isActive, udElement, innerGroup);
+
+                  if (isXrayMode) {
+                      const isStruct = el.isStructural;
+                      const frontHoleZ = (posZ + D - 2) - 37;
+                      const rearHoleZ = innerZ + 37;
+                      const holeZs = [frontHoleZ, rearHoleZ]; 
+                      
+                      const leftHoleX = posX + el.x - th/2;
+                      const rightHoleX = posX + el.x + el.w + th/2;
+
+                      holeZs.forEach(hz => {
+                          if (isStruct) {
+                              const holeY = posY + el.y + el.h / 2; 
+                              const dowelZ = hz === frontHoleZ ? hz - 32 : hz + 32;
+                              addHole(1.5, th, leftHoleX, holeY, hz, 'x', innerGroup); 
+                              addHole(1.5, th, rightHoleX, holeY, hz, 'x', innerGroup); 
+                              addHardware('screw', leftHoleX, holeY, hz, 'x', innerGroup); 
+                              addHardware('screw', rightHoleX, holeY, hz, 'x', innerGroup); 
+                              
+                              addHole(4.0, th, leftHoleX, holeY, dowelZ, 'x', innerGroup); 
+                              addHole(4.0, th, rightHoleX, holeY, dowelZ, 'x', innerGroup); 
+                              addHardware('dowel', leftHoleX, holeY, dowelZ, 'x', innerGroup); 
+                              addHardware('dowel', rightHoleX, holeY, dowelZ, 'x', innerGroup); 
+                          } else {
+                              const supportY = posY + el.y - 2.5; 
+                              addHole(2.5, th, leftHoleX, supportY, hz, 'x', innerGroup); 
+                              addHole(2.5, th, rightHoleX, supportY, hz, 'x', innerGroup); 
+                              addHardware('support', leftHoleX + th/2 + 4, supportY, hz, 'x', innerGroup); 
+                              addHardware('support', rightHoleX - th/2 - 4, supportY, hz, 'x', innerGroup); 
+                          }
+                      });
+                  }
+              } 
+              else if (el.typ === 'pion') {
+                  addBox(el.w, el.h, shelfDepth, posX + el.x, posY + el.y, innerZ, 'shelf', isActive, udElement, innerGroup);
+              }
+              else if (el.typ === 'front') {
+                  const isInternal = el.subtype === 'szuflada-wewnetrzna';
+                  
+                  if (!isFrontsVisible && !isInternal) {
+                      return; 
+                  }
+
+                  const f = { ...(state.project.front || {}), ...(mod.front || {}) };
+                  
+                  let innerFrontThick = 18;
+                  let innerSetback = 0;
+                  let zForFront;
+                  
+                  if (isInternal) {
+                      innerFrontThick = parseFloat(el.innerFrontThickness ?? 18);
+                      innerSetback = parseFloat(el.innerSetback ?? 2);
+                      zForFront = posZ + D - innerSetback - innerFrontThick; 
+                  } else {
+                      zForFront = posZ + D + 2; 
+                  }
+                  
+                  addBox(el.w, el.h, isInternal ? innerFrontThick : 18, posX + el.x, posY + el.y, zForFront, 'front', isActive, udElement, innerGroup);
+
+                  if (el.subtype.includes('szuflada')) {
+                      if (isXrayMode) {
+                          const isBottomInZone = el.frontIndex === 0;
+                          
+                          let availableSpace = el.h;
+                          if (el.y < th) availableSpace -= th; 
+                          if (el.y + el.h > H - th) availableSpace -= th; 
+
+                          let simulatedSpace = availableSpace;
+                          if (el.forceVariant && el.forceVariant !== 'auto') {
+                              const v = el.forceVariant.toUpperCase();
+                              if (v === 'N') simulatedSpace = 85;
+                              else if (v === 'M') simulatedSpace = 115;
+                              else if (v === 'K') simulatedSpace = 150;
+                              else if (v === 'C') simulatedSpace = 195;
+                              else if (v === 'E') simulatedSpace = 240;
+                              simulatedSpace = Math.min(simulatedSpace, availableSpace);
+                          }
+
+                          const sysName = f.drawerSystem || 'merivobox';
+                          const dHoles = calculateDrawerHoles(sysName, el.y, simulatedSpace, th, el.frontIndex, isBottomInZone);
+                          
+                          const innerWidth = el.w; 
+                          
+                          let availableDepth = D - 19; 
+                          if (isInternal) {
+                              availableDepth -= (innerFrontThick + innerSetback);
+                          }
+                          
+                          if (el.forceNL && !isNaN(parseFloat(el.forceNL))) {
+                              availableDepth = parseFloat(el.forceNL) + 10;
+                          }
+
+                          const drawerComps = getDrawerComponents(sysName, innerWidth, availableDepth, simulatedSpace, el.forceVariant || 'auto');
+
+                          if (drawerComps) {
+                              const NL = drawerComps.nominalLength;
+                              const dw = drawerComps.bottom.width;
+                              const dl = drawerComps.bottom.length;
+                              const dh = drawerComps.back.height;
+
+                              const dX = posX + el.x + (innerWidth - dw) / 2; 
+                              
+                              let slideAbsY = el.y + 33.5; 
+                              if (dHoles && dHoles.slideSideHoles && dHoles.slideSideHoles.length > 0) {
+                                  slideAbsY = dHoles.slideSideHoles[0].y;
+                              }
+                              const dY = posY + slideAbsY - 33.5; 
+                              
+                              const boxStartZ = zForFront - NL;
+
+                              addBox(dw, 16, NL, dX, dY, boxStartZ, 'drawerBox', isActive, udElement, innerGroup); 
+                              addBox(drawerComps.back.width, dh, 16, dX + (dw - drawerComps.back.width)/2, dY + 16, boxStartZ, 'drawerBox', isActive, udElement, innerGroup); 
+                              addBox(16, dh, NL, dX - 16, dY + 16, boxStartZ, 'drawerBox', isActive, udElement, innerGroup); 
+                              addBox(16, dh, NL, dX + dw, dY + 16, boxStartZ, 'drawerBox', isActive, udElement, innerGroup); 
+                          }
+
+                          if (dHoles && dHoles.slideSideHoles) {
+                              const slideZOffset = isInternal ? (innerFrontThick + innerSetback) : 0; 
+                              const leftHoleX = posX + el.x - th/2;
+                              const rightHoleX = posX + el.x + el.w + th/2;
+
+                              dHoles.slideSideHoles.forEach(h => {
+                                  let calcY = isTopBottomFull ? h.y - th : h.y;
+                                  addHole(2.5, th, leftHoleX, posY + calcY, posZ + D - h.x - slideZOffset, 'x', innerGroup); 
+                                  addHole(2.5, th, rightHoleX, posY + calcY, posZ + D - h.x - slideZOffset, 'x', innerGroup); 
+                              });
+                          }
+                          if (dHoles && dHoles.frontHoles) {
+                              dHoles.frontHoles.forEach(h => {
+                                  let calcY = isTopBottomFull ? el.y + h.y - th : el.y + h.y;
+                                  addHole(2.5, 12, posX + el.x + (h.xOffsetLeft || 20.5), posY + calcY, zForFront + (isInternal ? innerFrontThick/2 : 9), 'z', innerGroup); 
+                                  addHole(2.5, 12, posX + el.x + el.w - (h.xOffsetRight || 20.5), posY + calcY, zForFront + (isInternal ? innerFrontThick/2 : 9), 'z', innerGroup); 
+                              });
+                          }
+                      }
+                  }
+                  
+                  else if (el.subtype.includes('drzwi')) {
+                      if (isXrayMode) {
+                          let obstacles = [];
+                          const modAbsX = parseFloat(mod.position.x) || 0;
+                          const modLegH = (mod.legs && mod.legs.active) ? (parseFloat(mod.legs.height) || 0) : 0;
+                          const modAbsY = (parseFloat(mod.position.y) || 0) + modLegH;
+
+                          state.project.modules.forEach(otherMod => {
+                              const otherAbsX = parseFloat(otherMod.position.x) || 0;
+                              const otherLegH = (otherMod.legs && otherMod.legs.active) ? (parseFloat(otherMod.legs.height) || 0) : 0;
+                              const otherAbsY = (parseFloat(otherMod.position.y) || 0) + otherLegH;
+
+                              if (Math.abs(modAbsX - otherAbsX) < 10) {
+                                  const dy = otherAbsY - modAbsY;
+                                  if (otherMod.elements) {
+                                      otherMod.elements.forEach(e => {
+                                          if (e.typ === 'poziom' || e.subtype === 'szuflada-wewnetrzna') {
+                                              obstacles.push({ ...e, y: e.y + dy });
+                                          }
+                                      });
+                                  }
+                                  const otherH = parseFloat(otherMod.dimensions.height);
+                                  obstacles.push({ typ: 'poziom', y: dy, h: th, isStructural: true });
+                                  obstacles.push({ typ: 'poziom', y: dy + otherH - th, h: th, isStructural: true });
+                              }
+                          });
+
+                          const side = el.subtype === 'drzwi-lp' ? (el.id.includes('-L-') ? 'left' : 'right') : (el.openingSide || 'left');
+                          const hinges = calculateHinges(el, th, obstacles, side);
+                          
+                          hinges.forEach(h => {
+                              let calcY = isTopBottomFull ? el.y + h.relY - th : el.y + h.relY;
+                              const isLeft = side === 'left';
+                              const cupX = isLeft ? el.x + h.cupXOffset : el.x + el.w - h.cupXOffset;
+
+                              addHole(17.5, 13, posX + cupX, posY + calcY, zForFront + 6.5, 'z', innerGroup);
+
+                              const plateX = isLeft ? posX + el.x - th/2 : posX + el.x + el.w + th/2;
+                              addHole(2.5, th, plateX, posY + calcY - 16, posZ + D - 37, 'x', innerGroup);
+                              addHole(2.5, th, plateX, posY + calcY + 16, posZ + D - 37, 'x', innerGroup);
+                          });
+                      }
+                  }
+              }
+          });
+      }
+
+      if (mod.legs && mod.legs.active) {
+          const legH = mod.legs.height || 100;
+          const rootY = 0; 
+          
+          addBox(30, legH, 30, posX + 50, rootY, posZ + 50, 'corpus', false, null, innerGroup);
+          addBox(30, legH, 30, posX + W - 80, rootY, posZ + 50, 'corpus', false, null, innerGroup);
+          addBox(30, legH, 30, posX + 50, rootY, posZ + D - 80, 'corpus', false, null, innerGroup);
+          addBox(30, legH, 30, posX + W - 80, rootY, posZ + D - 80, 'corpus', false, null, innerGroup);
+          
+          if (mod.legs.plinth) {
+              const offset = mod.legs.plinthOffset || 40;
+              addBox(W, legH, 18, posX, rootY, posZ + D - offset - 18, 'corpus', false, null, innerGroup);
+          }
+      }
+
+      if (mod.fillers && isFrontsVisible) {
+          const frontType = (mod.front && mod.front.type) ? mod.front.type : (state.project.front?.type || 'nakladane');
+          const zForFiller = frontType === 'wpuszczane' ? posZ + D - th : posZ + D + 2;
+
+          let leftW = 0;
+          let rightW = 0;
+
+          const parseVal = (val, fallback) => (val !== null && val !== undefined && val !== '') ? parseFloat(val) : fallback;
+
+          if (mod.fillers.left && mod.fillers.left.active) {
+              leftW = parseFloat(mod.fillers.left.width) || 50;
+              const fH = parseVal(mod.fillers.left.height, H);
+              const fD = parseFloat(mod.fillers.left.depth) || 80;
+              const fY = parseVal(mod.fillers.left.offsetY, 0);
+
+              addBox(leftW, fH, th, posX - leftW, posY + fY, zForFiller, 'front', isActive, null, innerGroup);
+              addBox(th, fH, fD - th, posX - th, posY + fY, zForFiller - (fD - th), 'corpus', isActive, null, innerGroup);
+          }
+
+          if (mod.fillers.right && mod.fillers.right.active) {
+              rightW = parseFloat(mod.fillers.right.width) || 50;
+              const fH = parseVal(mod.fillers.right.height, H);
+              const fD = parseFloat(mod.fillers.right.depth) || 80;
+              const fY = parseVal(mod.fillers.right.offsetY, 0);
+
+              addBox(rightW, fH, th, posX + W, posY + fY, zForFiller, 'front', isActive, null, innerGroup);
+              addBox(th, fH, fD - th, posX + W, posY + fY, zForFiller - (fD - th), 'corpus', isActive, null, innerGroup);
+          }
+
+          if (mod.fillers.top && mod.fillers.top.active) {
+              const fH = parseVal(mod.fillers.top.height, 50);
+              const autoW = W + leftW + rightW;
+              const topW = parseVal(mod.fillers.top.width, autoW);
+              const fD = parseFloat(mod.fillers.top.depth) || 80;
+              const fY = parseVal(mod.fillers.top.offsetY, 0);
+
+              const startX = posX - leftW + (autoW - topW) / 2;
+
+              addBox(topW, fH, th, startX, posY + H + fY, zForFiller, 'front', isActive, null, innerGroup);
+              addBox(topW, th, fD - th, startX, posY + H + fY, zForFiller - (fD - th), 'corpus', isActive, null, innerGroup);
+          }
+      }
+
+      cabinetGroup.add(modGroup);
+  });
+}
