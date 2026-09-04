@@ -544,28 +544,27 @@ export function updateSidebar() {
           const sidePanel = parts.find(p => p.name.toLowerCase().includes('bok'));
           let drawHeight = sidePanel ? sidePanel.length : (parseFloat(activeMod.dimensions.height) || 720);
           let drawDepth = sidePanel ? sidePanel.width : (parseFloat(activeMod.dimensions.depth) || 510);
-          
-          const viewModeSelect = document.getElementById('print-view-mode');
-          const viewMode = viewModeSelect ? viewModeSelect.value : 'all';
 
-          const svgContent = generateSidePanelSVG(drawHeight, drawDepth, mountingData || [], viewMode);
+          const svgContent = generateSidePanelSVG(drawHeight, drawDepth, mountingData || []);
           
           const htmlContent = `
             <!DOCTYPE html>
             <html lang="pl">
             <head>
                 <meta charset="UTF-8">
-                <title>Wydruk na produkcję</title>
+                <title>Wydruk na produkcję (Interaktywny)</title>
                 <style>
                     body { margin: 0; padding: 0; background-color: #f1f5f9; display: flex; flex-direction: column; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; } 
                     .header { background-color: #ffffff; padding: 16px 24px; border-bottom: 1px solid #cbd5e1; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); z-index: 10; display: flex; justify-content: space-between; align-items: center; } 
                     .header-text h1 { margin: 0 0 6px 0; font-size: 20px; color: #0f172a; } 
                     .header-text p { margin: 0; font-size: 13px; color: #64748b; } 
-                    .controls { display: flex; flex-wrap: wrap; gap: 12px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; font-weight: bold; color: #334155; }
+                    .controls { display: flex; flex-wrap: wrap; gap: 12px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; font-weight: bold; color: #334155; align-items: center;}
                     .controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
                     .controls input { cursor: pointer; width: 16px; height: 16px; }
                     .svg-container { flex-grow: 1; width: 100%; height: 100%; overflow: hidden; background-color: #f8fafc; cursor: grab; } 
                     .svg-container:active { cursor: grabbing; }
+                    .btn-front { padding: 6px 12px; background: #fff; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: bold; color: #1e3a8a; cursor: pointer; transition: background 0.2s;}
+                    .btn-front:hover { background: #e0f2fe; border-color: #3b82f6;}
                     @media print { 
                         body { height: auto; overflow: visible; display: block; background: white; } 
                         .header { display: none; } 
@@ -576,15 +575,17 @@ export function updateSidebar() {
             <body>
                 <div class="header">
                     <div class="header-text">
-                        <h1>Rysunek techniczny (Nawierty)</h1>
-                        <p>Wymiary liczone od krawędzi i bazy. <b>Przeciągaj LKM</b> (przesunięcie) | <b>Kółko myszy</b> (Zoom).</p>
+                        <h1>Interaktywny Rysunek Techniczny</h1>
+                        <p><b>Kliknij element na korpusie</b> by zobaczyć jego nawierty. Przeciągaj LKM (przesunięcie) | Kółko myszy (Zoom).</p>
                     </div>
                     <div class="controls">
-                        <label style="color:#9333ea;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-corpus', this)"> Konstrukcja (Wieńce/Stałe)</label>
-                        <label style="color:#f59e0b;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-shelf', this)"> Podpórki (Ruchome)</label>
-                        <label style="color:#16a34a;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-hinge', this)"> Zawiasy i Prowadniki</label>
-                        <label style="color:#0284c7;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-drawer', this)"> Prowadnice Szuflad</label>
-                        <label style="color:#dc2626;"><input type="checkbox" checked onchange="toggleLayer('layer-front-holes', this)"> Mocowania Frontów</label>
+                        <label style="color:#9333ea;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-corpus', this)"> Wieńce/Stałe</label>
+                        <label style="color:#ea580c;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-shelf', this)"> Podpórki</label>
+                        <label style="color:#16a34a;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-hinge', this)"> Zawiasy</label>
+                        <label style="color:#0284c7;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-drawer', this)"> Szuflady</label>
+                        <div style="width: 2px; height: 20px; background: #cbd5e1; margin: 0 5px;"></div>
+                        <button class="btn-front" onclick="showDetail('detail-front')">🚪 Fronty Zewn.</button>
+                        <button class="btn-front" onclick="showDetail('detail-front-inner')">📥 Fronty Wewn.</button>
                     </div>
                 </div>
                 <div class="svg-container" id="svg-viewport">
@@ -595,6 +596,20 @@ export function updateSidebar() {
                         const elements = document.querySelectorAll('.' + layerName);
                         elements.forEach(el => { el.style.display = checkbox.checked ? '' : 'none'; });
                     }
+                    
+                    function showDetail(id) {
+                        document.querySelectorAll('.detail-view').forEach(el => {
+                            el.style.display = 'none';
+                        });
+                        if (id) {
+                            const target = document.getElementById(id);
+                            if (target) target.style.display = '';
+                        }
+                    }
+                    
+                    // Inicjalizacja - pokaż lewy bok na start
+                    window.onload = () => { showDetail('detail-left'); };
+
                     const svg = document.getElementById('side-panel-svg');
                     let isPanning = false; let startPoint = { x: 0, y: 0 }; let startViewBox = { x: 0, y: 0 };
                     document.body.style.userSelect = 'none';
