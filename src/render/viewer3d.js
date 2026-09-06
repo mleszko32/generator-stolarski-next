@@ -22,6 +22,7 @@ const dragOffset = new THREE.Vector3();
 const dragPlane = new THREE.Plane();
 const SNAP_DIST = 40; 
 let dragSelectionOrigins = new Map();
+let wasSelectedOnDown = false;
 
 function recalculateLayout(mod) {
   if (!mod || !mod.elements) return;
@@ -272,15 +273,19 @@ export function init3DViewer() {
               const gId = dragModule.groupId;
               const idsToSelect = gId ? state.project.modules.filter(m => m.groupId === gId).map(m => m.id) : [dragModule.id];
 
-              if (e.shiftKey) {
-                  if (!state.selectedModules) state.selectedModules = new Set();
-                  idsToSelect.forEach(id => state.selectedModules.add(id));
-                  state.activeModuleId = dragModule.id;
-              } else {
-                  if (!state.selectedModules || !state.selectedModules.has(dragModule.id)) {
+              if (!state.selectedModules) state.selectedModules = new Set();
+              wasSelectedOnDown = state.selectedModules.has(dragModule.id);
+
+              if (!wasSelectedOnDown) {
+                  if (e.shiftKey) {
+                      idsToSelect.forEach(id => state.selectedModules.add(id));
+                  } else {
                       state.selectedModules = new Set(idsToSelect);
                   }
                   state.activeModuleId = dragModule.id;
+                  updateSidebar();
+                  initPropertiesPanel();
+                  update3D(); 
               }
 
               dragSelectionOrigins.clear();
@@ -289,9 +294,6 @@ export function init3DViewer() {
                   if (m) dragSelectionOrigins.set(id, { x: m.position.x || 0, y: m.position.y || 0, z: m.position.z || 0 });
               });
 
-              updateSidebar();
-              initPropertiesPanel();
-              update3D(); 
               dragTarget = cabinetGroup.children.find(g => g.userData.moduleId === dragModule.id);
           }
       }
@@ -592,25 +594,25 @@ function handle3DClick(event) {
       const gId = clickedMod && clickedMod.groupId;
       const idsToSelect = gId ? state.project.modules.filter(m => m.groupId === gId).map(m => m.id) : [data.moduleId];
 
-      if (event.shiftKey) {
-          if (!state.selectedModules) state.selectedModules = new Set();
-          const allSelected = idsToSelect.every(id => state.selectedModules.has(id));
-          if (allSelected) {
+      if (wasSelectedOnDown) {
+          if (event.shiftKey) {
               idsToSelect.forEach(id => state.selectedModules.delete(id));
               if (state.activeModuleId === data.moduleId) state.activeModuleId = Array.from(state.selectedModules).pop() || null;
-          } else {
-              idsToSelect.forEach(id => state.selectedModules.add(id));
+              updateSidebar();
+              initPropertiesPanel();
+              update3D();
+          } else if (state.selectedModules.size > idsToSelect.length) {
+              state.selectedModules = new Set(idsToSelect);
               state.activeModuleId = data.moduleId;
+              updateSidebar();
+              initPropertiesPanel();
+              update3D();
           }
-      } else {
-          state.selectedModules = new Set(idsToSelect);
-          state.activeModuleId = data.moduleId;
       }
 
-      updateSidebar();
-      initPropertiesPanel();
-      update3D(); 
-      show3DContextMenu(event, validHit, data);
+      if (state.selectedModules && state.selectedModules.has(data.moduleId)) {
+          show3DContextMenu(event, validHit, data);
+      }
   }
 }
 
@@ -671,7 +673,7 @@ function show3DContextMenu(event, hit, data) {
       const selectedArray = Array.from(state.selectedModules);
       const firstMod = state.project.modules.find(m => m.id === selectedArray[0]);
       const allSameGroup = firstMod && firstMod.groupId && selectedArray.every(id => {
-          const m = state.project.modules.find(md => mod.id === id);
+          const m = state.project.modules.find(md => md.id === id);
           return m && m.groupId === firstMod.groupId;
       });
 
@@ -1047,9 +1049,6 @@ function show3DContextMenu(event, hit, data) {
               }, '#991b1b'));
           }
       }
-  }
-  else if (data.type === 'corpus' && data.part !== 'back') {
-      // no-op
   }
   else if (data.type === 'corpus' && data.part === 'back') {
       const th = parseFloat(state.project.materials.boardThickness) || 18;
