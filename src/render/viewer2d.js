@@ -17,7 +17,6 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   const activeModLegH = (mod.legs && mod.legs.active) ? (parseFloat(mod.legs.height) || 0) : 0;
   const activeModAbsY = (parseFloat(mod.position.y) || 0) + activeModLegH;
 
-  // POPRAWKA 1: Szafki sąsiadujące ("widma") są wyszukiwane przez nachodzenie na siebie, a nie sztywny X
   const stackModules = state.project.modules.filter(m => {
       const mX = parseFloat(m.position.x) || 0;
       const mW = parseFloat(m.dimensions.width) || 600;
@@ -138,6 +137,53 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   svg += `<text x="${cabX - 10}" y="${sideH + 4}" font-size="12" fill="#1e293b" font-weight="bold" text-anchor="end">0 mm</text>`;
 
   svg += `<text x="${cabX + cabWidth/2}" y="${svgTopY - 25}" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">KORPUS (Kliknij element)</text>`;
+
+  // --- RYSOWANIE MODUŁÓW WIDMOWYCH NA MAPIE ---
+  const ghostOpacity = "0.35";
+  stackModules.forEach(sm => {
+      if (sm.id === mod.id) return;
+      
+      const dy = getDy(sm);
+      const smH = parseFloat(sm.dimensions.height) || 720;
+      const smW = parseFloat(sm.dimensions.width) || 600;
+      
+      const relX = (parseFloat(sm.position.x) || 0) - activeModAbsX;
+      const gX = cabX + relX;
+      const gY = sideH - (dy + smH); 
+      
+      const smCons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(config.construction || {}), ...(sm.construction || {}) };
+      const smIsTBF = smCons.joinType === 'wience_przelotowe';
+      
+      svg += `<g opacity="${ghostOpacity}">`;
+      if (smIsTBF) {
+        svg += `<rect x="${gX}" y="${gY}" width="${smW}" height="${th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`; 
+        svg += `<rect x="${gX}" y="${gY + smH - th}" width="${smW}" height="${th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`; 
+        svg += `<rect x="${gX}" y="${gY + th}" width="${th}" height="${smH - 2*th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`; 
+        svg += `<rect x="${gX + smW - th}" y="${gY + th}" width="${th}" height="${smH - 2*th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`; 
+      } else {
+        svg += `<rect x="${gX}" y="${gY}" width="${th}" height="${smH}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+        svg += `<rect x="${gX + smW - th}" y="${gY}" width="${th}" height="${smH}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+        svg += `<rect x="${gX + th}" y="${gY + smH - th}" width="${smW - th*2}" height="${th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+        if (smCons.topType === 'pelny' || smCons.topType === 'trawersy_poziom') {
+          svg += `<rect x="${gX + th}" y="${gY}" width="${smW - th*2}" height="${th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+        } else if (smCons.topType === 'trawersy_pion') {
+          svg += `<rect x="${gX + th}" y="${gY}" width="${th}" height="${smCons.traverseWidth || 100}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+          svg += `<rect x="${gX + smW - th * 2}" y="${gY}" width="${th}" height="${smCons.traverseWidth || 100}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+        }
+      }
+
+      if (sm.elements) {
+        sm.elements.forEach(el => {
+          if (el.typ === 'front') return;
+          const elSvgX = gX + el.x;
+          let drawY = smIsTBF ? el.y - th : el.y;
+          const elSvgY = (gY + smH) - drawY - el.h; 
+          let fillColor = (el.typ === 'poziom' && el.isStructural) ? '#a7f3d0' : '#cbd5e1'; 
+          svg += `<rect x="${elSvgX}" y="${elSvgY}" width="${el.w}" height="${el.h}" fill="${fillColor}" stroke="#475569" stroke-width="1.5" />`;
+        });
+      }
+      svg += `<text x="${gX + smW/2}" y="${gY + smH/2}" font-size="20" fill="#475569" text-anchor="middle" font-weight="bold">${sm.name}</text></g>`;
+  });
   
   const bgFill = "#f1f5f9"; 
   if (isTopBottomFullWidth) {
@@ -175,26 +221,24 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
     });
   }
 
-  // Funkcje skanujące
-  function getShelvesForFace(faceX, isRightFace) {
+  function getShelvesForFace(faceX, isRightFace, pCalcY, pH) {
       return (mod.elements || []).filter(el => {
           if (el.typ !== 'poziom') return false;
+          let calcY = isTopBottomFullWidth ? el.y - th : el.y;
+          if (calcY < pCalcY - 5 || calcY > pCalcY + pH + 5) return false;
           if (isRightFace) return Math.abs(el.x - faceX) < 2;
           else return Math.abs((el.x + el.w) - faceX) < 2;
       });
   }
 
-  function getDrawersForFace(faceX, isRightFace) {
+  function getDrawersForFace(faceX, isRightFace, pCalcY, pH) {
       return (mountingData || []).filter(d => {
           if (d.type !== 'drawer') return false;
           if (!d.slideSideHoles || d.slideSideHoles.length === 0) return false;
-          
-          let front = null;
-          state.project.modules.forEach(m => {
-              if (m.elements) { const f = m.elements.find(e => e.id === d.frontId); if (f) front = f; }
-          });
+          let calcY = isTopBottomFullWidth ? d.slideSideHoles[0].y - th : d.slideSideHoles[0].y;
+          if (calcY < pCalcY - 5 || calcY > pCalcY + pH + 5) return false;
+          const front = mod.elements.find(e => e.id === d.frontId);
           if (!front) return false;
-
           const fMinX = front.baseZone ? parseFloat(front.baseZone.minX) : th;
           const fMaxX = front.baseZone ? parseFloat(front.baseZone.maxX) : (cabWidth - th);
           if (isRightFace) return Math.abs(fMinX - faceX) < 2;
@@ -202,20 +246,15 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
       });
   }
 
-  // POPRAWKA 2: Globalne wyszukiwanie frontów z innych modułów dla zawiasów
-  function getHingesForFace(faceX, isRightFace) {
+  function getHingesForFace(faceX, isRightFace, pCalcY, pH) {
       return (mountingData || []).filter(d => {
           if (d.type !== 'door') return false;
-          
-          let front = null;
-          state.project.modules.forEach(m => {
-              if (m.elements) {
-                  const f = m.elements.find(e => e.id === d.frontId);
-                  if (f) front = f;
-              }
-          });
+          if (d.hinges.length > 0) {
+             let calcY = isTopBottomFullWidth ? d.hinges[0].y - th : d.hinges[0].y;
+             if (calcY < pCalcY - 5 || calcY > pCalcY + pH + 5) return false;
+          }
+          const front = mod.elements.find(e => e.id === d.frontId);
           if (!front) return false;
-
           const fMinX = front.baseZone ? parseFloat(front.baseZone.minX) : th;
           const fMaxX = front.baseZone ? parseFloat(front.baseZone.maxX) : (cabWidth - th);
           if (isRightFace && d.side === 'left') return Math.abs(fMinX - faceX) < 2;
@@ -259,24 +298,23 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
           let corpusYs = new Set();
           let drawerYs = new Set();
 
-          const drawShelfHoles = (shelves) => {
+          const drawShelfHoles = (shelves, isRightFace) => {
               shelves.forEach(el => {
                   let calcY = isTopBottomFullWidth ? el.y - th : el.y;
-                  
-                  // Limitujemy rysowanie do zakresu wysokości tej konkretnej płyty pionowej
-                  if (calcY < panelCalcY - 5 || calcY > panelCalcY + panelH + 5) return;
-
                   const isStruct = el.isStructural;
                   const baseColor = isStruct ? '#9333ea' : '#ea580c';
                   const svgY = sideH - calcY;
+
+                  let fill = isRightFace ? '#ffffff' : baseColor;
+                  let stroke = isRightFace ? `stroke="${baseColor}" stroke-width="1.5"` : 'stroke="none"';
 
                   if (isStruct) {
                       let rScrew = 1.5; 
                       let rDowel = 4.0; 
                       [37, depth - 37].forEach(hx => {
-                          svg += `<circle cx="${getSvgX(hx)}" cy="${svgY - el.h/2}" r="${rScrew}" fill="${baseColor}" />`;
+                          svg += `<circle cx="${getSvgX(hx)}" cy="${svgY - el.h/2}" r="${rScrew}" fill="${fill}" ${stroke} />`;
                           let dowelX = hx === 37 ? hx + 32 : hx - 32;
-                          svg += `<circle cx="${getSvgX(dowelX)}" cy="${svgY - el.h/2}" r="${rDowel}" fill="${baseColor}" />`;
+                          svg += `<circle cx="${getSvgX(dowelX)}" cy="${svgY - el.h/2}" r="${rDowel}" fill="${fill}" ${stroke} />`;
                           
                           if (hx === 37) corpusYs.add(calcY + el.h/2);
                       });
@@ -284,51 +322,49 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
                       let rPin = 2.5; 
                       [0, 32, -32].forEach(dy => {
                           [37, depth - 37].forEach(hx => {
-                              svg += `<circle cx="${getSvgX(hx)}" cy="${svgY - dy}" r="${rPin}" fill="${baseColor}" />`;
+                              svg += `<circle cx="${getSvgX(hx)}" cy="${svgY - dy}" r="${rPin}" fill="${fill}" ${stroke} />`;
                               if (dy === 0 && hx === 37) shelfYs.add(calcY);
                           });
                       });
                   }
               });
           };
-          drawShelfHoles(getShelvesForFace(panel.faceLeftX, false));
-          drawShelfHoles(getShelvesForFace(panel.faceRightX, true));
+          drawShelfHoles(getShelvesForFace(panel.faceLeftX, false, panelCalcY, panelH), false);
+          drawShelfHoles(getShelvesForFace(panel.faceRightX, true, panelCalcY, panelH), true);
 
-          const drawDrawerHoles = (drawers) => {
+          const drawDrawerHoles = (drawers, isRightFace) => {
               drawers.forEach(d => {
                   if (d.slideSideHoles && d.slideSideHoles.length > 0) {
                       let calcY = isTopBottomFullWidth ? d.slideSideHoles[0].y - th : d.slideSideHoles[0].y;
-                      
-                      if (calcY < panelCalcY - 5 || calcY > panelCalcY + panelH + 5) return;
-
                       drawerYs.add(calcY);
                       const svgY = sideH - calcY;
-                      let rDrawer = 2.5; 
+                      let fill = isRightFace ? '#ffffff' : '#0284c7';
+                      let stroke = isRightFace ? `stroke="#0284c7" stroke-width="1.5"` : 'stroke="none"';
+                      let r = isRightFace ? 3.5 : 2.5;
 
                       d.slideSideHoles.forEach(hole => {
-                          svg += `<circle cx="${getSvgX(hole.x)}" cy="${svgY}" r="${rDrawer}" fill="#0284c7" />`;
+                          svg += `<circle cx="${getSvgX(hole.x)}" cy="${svgY}" r="${r}" fill="${fill}" ${stroke} />`;
                       });
                   }
               });
           };
-          drawDrawerHoles(getDrawersForFace(panel.faceLeftX, false));
-          drawDrawerHoles(getDrawersForFace(panel.faceRightX, true));
+          drawDrawerHoles(getDrawersForFace(panel.faceLeftX, false, panelCalcY, panelH), false);
+          drawDrawerHoles(getDrawersForFace(panel.faceRightX, true, panelCalcY, panelH), true);
 
-          const drawHingeHoles = (hingeData) => {
+          const drawHingeHoles = (hingeData, isRightFace) => {
               hingeData.forEach(d => {
                   d.hinges.forEach(hinge => {
                       if (hinge.isLocal === false) return;
                       let calcY = isTopBottomFullWidth ? hinge.y - th : hinge.y;
-                      
-                      if (calcY < panelCalcY - 5 || calcY > panelCalcY + panelH + 5) return;
-
                       const svgY = sideH - calcY;
                       
                       let baseColor = hinge.isAdjusted ? "#ea580c" : "#16a34a";
-                      let rHinge = 2.5; 
+                      let fill = isRightFace ? '#ffffff' : baseColor;
+                      let stroke = isRightFace ? `stroke="${baseColor}" stroke-width="1.5"` : 'stroke="none"';
+                      let r = isRightFace ? 3.5 : 2.5;
 
-                      svg += `<circle cx="${getSvgX(37)}" cy="${svgY - 16}" r="${rHinge}" fill="${baseColor}" />`;
-                      svg += `<circle cx="${getSvgX(37)}" cy="${svgY + 16}" r="${rHinge}" fill="${baseColor}" />`;
+                      svg += `<circle cx="${getSvgX(37)}" cy="${svgY - 16}" r="${r}" fill="${fill}" ${stroke} />`;
+                      svg += `<circle cx="${getSvgX(37)}" cy="${svgY + 16}" r="${r}" fill="${fill}" ${stroke} />`;
 
                       let localHoleY = calcY - panelCalcY;
                       let tspanHtml = getDimText(localHoleY, panelH, baseColor);
@@ -339,23 +375,25 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
                   });
               });
           };
-          drawHingeHoles(getHingesForFace(panel.faceLeftX, false));
-          drawHingeHoles(getHingesForFace(panel.faceRightX, true));
+          drawHingeHoles(getHingesForFace(panel.faceLeftX, false, panelCalcY, panelH), false);
+          drawHingeHoles(getHingesForFace(panel.faceRightX, true, panelCalcY, panelH), true);
 
           if (panel.isOuterLeft || panel.isOuterRight) {
                const corpusHolesData = mountingData.find(d => d.type === 'corpus');
                if (corpusHolesData && corpusHolesData.holes) {
+                   let isRightFace = panel.isOuterRight; 
+                   let fill = isRightFace ? '#ffffff' : '#9333ea';
+                   let stroke = isRightFace ? `stroke="#9333ea" stroke-width="1.5"` : 'stroke="none"';
+
                    corpusHolesData.holes.forEach(h => {
                        let calcY = isTopBottomFullWidth ? h.y - th : h.y;
-                       
-                       if (calcY < panelCalcY - 5 || calcY > panelCalcY + panelH + 5) return;
-
                        if (h.holeType === 'screw') corpusYs.add(calcY);
                        
-                       let r = h.holeType === 'screw' ? 1.5 : 4.0; 
+                       let baseRadius = h.holeType === 'screw' ? 1.5 : 4.0;
+                       let r = isRightFace ? baseRadius + 1 : baseRadius;
                        let holeX = panel.isOuterRight ? (depth - h.xFromFront) : h.xFromFront;
                        
-                       svg += `<circle cx="${panel.svgX + holeX}" cy="${sideH - calcY}" r="${r}" fill="#9333ea" />`;
+                       svg += `<circle cx="${panel.svgX + holeX}" cy="${sideH - calcY}" r="${r}" fill="${fill}" ${stroke} />`;
                    });
                }
           }
@@ -430,7 +468,6 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
       svg += `</g>`;
   });
 
-  // --- WARSTWY FRONTÓW ZEWN/WEWN ---
   svg += `<g id="detail-front" class="detail-view" style="display:none;">`;
   svg += `<text x="${frontX + cabWidth/2}" y="${svgTopY - 25}" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">FRONT (Podział zewnętrzny)</text>`;
 
