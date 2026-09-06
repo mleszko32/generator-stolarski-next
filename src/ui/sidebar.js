@@ -526,7 +526,7 @@ export function updateSidebar() {
       });
   }
 
-  const printBtn = document.getElementById('btn-print-2d');
+ const printBtn = document.getElementById('btn-print-2d');
   if (printBtn && activeMod) {
     printBtn.addEventListener('click', () => {
       try {
@@ -573,8 +573,8 @@ export function updateSidebar() {
                         <label style="color:#16a34a;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-hinge', this)"> Zawiasy</label>
                         <label style="color:#0284c7;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-drawer', this)"> Szuflady</label>
                         <div style="width: 2px; height: 20px; background: #cbd5e1; margin: 0 5px;"></div>
-                        <button class="btn-front" onclick="showDetail('detail-front')">🚪 Fronty Zewn.</button>
-                        <button class="btn-front" onclick="showDetail('detail-front-inner')">📥 Fronty Wewn.</button>
+                        <button class="btn-front" onclick="toggleFront('detail-front', this)">🚪 Fronty Zewn.</button>
+                        <button class="btn-front" onclick="toggleFront('detail-front-inner', this)">📥 Fronty Wewn.</button>
                     </div>
                 </div>
                 <div class="svg-container" id="svg-viewport">
@@ -586,16 +586,29 @@ export function updateSidebar() {
                         elements.forEach(el => { el.style.display = checkbox.checked ? '' : 'none'; });
                     }
                     
+                    // ZMIANA: Niezależna funkcja do włączania i wyłączania frontów
+                    function toggleFront(id, btn) {
+                        const el = document.getElementById(id);
+                        if (el) {
+                            if (el.style.display === 'none') {
+                                el.style.display = '';
+                                btn.style.background = '#e0f2fe';
+                                btn.style.borderColor = '#3b82f6';
+                            } else {
+                                el.style.display = 'none';
+                                btn.style.background = '#fff';
+                                btn.style.borderColor = '#cbd5e1';
+                            }
+                        }
+                    }
+
+                    // Główna funkcja ukrywająca tylko warstwy szczegółów (detail-view), czyli płyty korpusu
                     function showDetail(id) {
                         document.querySelectorAll('.detail-view').forEach(el => {
                             el.style.display = 'none';
                         });
                         document.querySelectorAll('.clickable-rect').forEach(el => {
                             el.classList.remove('active-part');
-                        });
-                        document.querySelectorAll('.btn-front').forEach(btn => {
-                            btn.style.background = '#fff';
-                            btn.style.borderColor = '#cbd5e1';
                         });
 
                         if (id) {
@@ -604,14 +617,6 @@ export function updateSidebar() {
 
                             const mapRect = document.getElementById('map-' + id);
                             if (mapRect) mapRect.classList.add('active-part');
-                            
-                            if (id.startsWith('detail-front')) {
-                                const btn = document.querySelector(\`button[onclick="showDetail('\${id}')"]\`);
-                                if (btn) {
-                                    btn.style.background = '#e0f2fe';
-                                    btn.style.borderColor = '#3b82f6';
-                                }
-                            }
                         }
                     }
                     
