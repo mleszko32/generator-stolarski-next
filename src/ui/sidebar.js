@@ -1,4 +1,3 @@
-// src/ui/sidebar.js
 import { calculateParts, calculateAllProjectParts, calculateProjectHardware } from "../engine/cabinet.js";
 import { generateSidePanelSVG } from "../render/viewer2d.js"; 
 import { state, getActiveModule, addModule, deleteModule, duplicateModule } from "../core/state.js";
@@ -221,11 +220,13 @@ export function updateSidebar() {
       let icon = '🗄️';
       if (m.type === 'upper_cabinet') icon = '☁️';
       if (m.type === 'tall_cabinet') icon = '🚪';
+      
+      const groupIcon = m.groupId ? `<span title="Zgrupowana z innymi szafkami" style="color: ${isActive ? '#bae6fd' : '#ef4444'}; font-size:12px; margin-left:6px;">🔗</span>` : '';
 
       html += `
         <div class="module-item" data-id="${m.id}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; margin-bottom: 6px; background-color: ${bg}; color: ${color}; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; border: 1px solid ${border}; transition: all 0.2s;">
           <div style="flex-grow: 1; pointer-events: none;">
-            ${icon} ${m.name} <span style="font-weight: normal; font-size: 11px; opacity: 0.8;">(${m.dimensions.width}x${m.dimensions.height})</span>
+            ${icon} ${m.name} ${groupIcon} <span style="font-weight: normal; font-size: 11px; opacity: 0.8; margin-left: 2px;">(${m.dimensions.width}x${m.dimensions.height})</span>
           </div>
           <div style="display: flex; gap: 4px;">
             <button class="btn-mod-action btn-mod-dup" data-id="${m.id}" title="Kopiuj szafkę" style="background: none; border: none; cursor: pointer; padding: 2px 4px; font-size: 14px; opacity: ${isActive ? 1 : 0.6}; transition: opacity 0.2s;">📋</button>
@@ -372,18 +373,23 @@ export function updateSidebar() {
   document.querySelectorAll('.module-item').forEach(el => {
     el.addEventListener('click', (e) => {
       const id = e.currentTarget.getAttribute('data-id');
+      const clickedMod = state.project.modules.find(m => m.id === id);
+      
+      const gId = clickedMod && clickedMod.groupId;
+      const idsToSelect = gId ? state.project.modules.filter(m => m.groupId === gId).map(m => m.id) : [id];
       
       if (e.shiftKey || e.ctrlKey || e.metaKey) {
           if (!state.selectedModules) state.selectedModules = new Set();
-          if (state.selectedModules.has(id)) {
-              state.selectedModules.delete(id);
+          const allSelected = idsToSelect.every(i => state.selectedModules.has(i));
+          if (allSelected) {
+              idsToSelect.forEach(i => state.selectedModules.delete(i));
               if (state.activeModuleId === id) state.activeModuleId = Array.from(state.selectedModules).pop() || null;
           } else {
-              state.selectedModules.add(id);
+              idsToSelect.forEach(i => state.selectedModules.add(i));
               state.activeModuleId = id;
           }
       } else {
-          state.selectedModules = new Set([id]);
+          state.selectedModules = new Set(idsToSelect);
           state.activeModuleId = id;
       }
       
@@ -586,7 +592,6 @@ export function updateSidebar() {
                         elements.forEach(el => { el.style.display = checkbox.checked ? '' : 'none'; });
                     }
                     
-                    // ZMIANA: Niezależna funkcja do włączania i wyłączania frontów
                     function toggleFront(id, btn) {
                         const el = document.getElementById(id);
                         if (el) {
@@ -602,7 +607,6 @@ export function updateSidebar() {
                         }
                     }
 
-                    // Główna funkcja ukrywająca tylko warstwy szczegółów (detail-view), czyli płyty korpusu
                     function showDetail(id) {
                         document.querySelectorAll('.detail-view').forEach(el => {
                             el.style.display = 'none';
@@ -620,7 +624,6 @@ export function updateSidebar() {
                         }
                     }
                     
-                    // Inicjalizacja - pokaż lewy bok na start
                     window.onload = () => { showDetail('detail-left'); };
 
                     const svg = document.getElementById('side-panel-svg');
