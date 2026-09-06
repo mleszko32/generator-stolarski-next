@@ -305,7 +305,6 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
           const drawShelfHoles = (shelves) => {
               shelves.forEach(el => {
                   let calcY = isTopBottomFullWidth ? el.y - th : el.y;
-                  
                   if (calcY < panelCalcY - 5 || calcY > panelCalcY + panelH + 5) return;
 
                   const isStruct = el.isStructural;
@@ -316,11 +315,9 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
                       let rScrew = 1.5; 
                       let rDowel = 4.0; 
                       [37, depth - 37].forEach(hx => {
-                          // ZMIANA: Rysujemy czyste, pełne koła bez stroke
                           svg += `<circle cx="${getSvgX(hx)}" cy="${svgY - el.h/2}" r="${rScrew}" fill="${baseColor}" />`;
                           let dowelX = hx === 37 ? hx + 32 : hx - 32;
                           svg += `<circle cx="${getSvgX(dowelX)}" cy="${svgY - el.h/2}" r="${rDowel}" fill="${baseColor}" />`;
-                          
                           if (hx === 37) corpusYs.add(calcY + el.h/2);
                       });
                   } else {
@@ -341,7 +338,6 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
               drawers.forEach(d => {
                   if (d.slideSideHoles && d.slideSideHoles.length > 0) {
                       let calcY = isTopBottomFullWidth ? d.slideSideHoles[0].y - th : d.slideSideHoles[0].y;
-                      
                       if (calcY < panelCalcY - 5 || calcY > panelCalcY + panelH + 5) return;
 
                       drawerYs.add(calcY);
@@ -362,11 +358,9 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
                   d.hinges.forEach(hinge => {
                       if (hinge.isLocal === false) return;
                       let calcY = isTopBottomFullWidth ? hinge.y - th : hinge.y;
-                      
                       if (calcY < panelCalcY - 5 || calcY > panelCalcY + panelH + 5) return;
 
                       const svgY = sideH - calcY;
-                      
                       let baseColor = hinge.isAdjusted ? "#ea580c" : "#16a34a";
                       let rHinge = 2.5; 
 
@@ -375,7 +369,6 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
 
                       let localHoleY = calcY - panelCalcY;
                       let tspanHtml = getDimText(localHoleY, panelH, baseColor);
-
                       let textX = isReversed ? getSvgX(37) - 8 : getSvgX(37) + 8;
                       let anchor = isReversed ? 'end' : 'start';
                       svg += `<text x="${textX}" y="${svgY + 4}" text-anchor="${anchor}" font-family="sans-serif">${tspanHtml}</text>`;
@@ -390,14 +383,14 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
                if (corpusHolesData && corpusHolesData.holes) {
                    corpusHolesData.holes.forEach(h => {
                        let calcY = isTopBottomFullWidth ? h.y - th : h.y;
-                       
                        if (calcY < panelCalcY - 5 || calcY > panelCalcY + panelH + 5) return;
 
                        if (h.holeType === 'screw') corpusYs.add(calcY);
                        
-                       // ZMIANA: Czyste rysowanie bez względu na lewo/prawo. Korzystamy z getSvgX, co eliminuje błędy odwrócenia.
                        let r = h.holeType === 'screw' ? 1.5 : 4.0; 
-                       svg += `<circle cx="${getSvgX(h.xFromFront)}" cy="${sideH - calcY}" r="${r}" fill="#9333ea" />`;
+                       let holeX = panel.isOuterRight ? (depth - h.xFromFront) : h.xFromFront;
+                       
+                       svg += `<circle cx="${panel.svgX + holeX}" cy="${sideH - calcY}" r="${r}" fill="#9333ea" />`;
                    });
                }
           }

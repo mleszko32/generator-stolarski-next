@@ -15,13 +15,13 @@ let alignMode = { active: false, sourceMod: null, sourceEl: null, banner: null }
 let isXrayMode = true; 
 let isFrontsVisible = true; 
 
-// ZMIENNE DO SWOBODNEGO PRZECIĄGANIA (DRAG & DROP Z MAGNESEM)
 let isDragging = false;
 let dragTarget = null;
 let dragModule = null;
 const dragOffset = new THREE.Vector3();
 const dragPlane = new THREE.Plane();
 const SNAP_DIST = 40; 
+let dragSelectionOrigins = new Map();
 
 function recalculateLayout(mod) {
   if (!mod || !mod.elements) return;
@@ -269,18 +269,25 @@ export function init3DViewer() {
               dragPlane.setFromNormalAndCoplanarPoint(normal, intersects[0].point);
               dragOffset.copy(dragTarget.position).sub(intersects[0].point);
               
+              const gId = dragModule.groupId;
+              const idsToSelect = gId ? state.project.modules.filter(m => m.groupId === gId).map(m => m.id) : [dragModule.id];
+
               if (e.shiftKey) {
                   if (!state.selectedModules) state.selectedModules = new Set();
-                  if (!state.selectedModules.has(dragModule.id)) {
-                      state.selectedModules.add(dragModule.id);
-                  }
+                  idsToSelect.forEach(id => state.selectedModules.add(id));
                   state.activeModuleId = dragModule.id;
               } else {
                   if (!state.selectedModules || !state.selectedModules.has(dragModule.id)) {
-                      state.selectedModules = new Set([dragModule.id]);
+                      state.selectedModules = new Set(idsToSelect);
                   }
                   state.activeModuleId = dragModule.id;
               }
+
+              dragSelectionOrigins.clear();
+              state.selectedModules.forEach(id => {
+                  const m = state.project.modules.find(mod => mod.id === id);
+                  if (m) dragSelectionOrigins.set(id, { x: m.position.x || 0, y: m.position.y || 0, z: m.position.z || 0 });
+              });
 
               updateSidebar();
               initPropertiesPanel();
@@ -321,7 +328,8 @@ export function init3DViewer() {
           if (Math.abs(snapZ) < SNAP_DIST) snapZ = 0;
 
           state.project.modules.forEach(other => {
-              if (other.id === dragModule.id) return;
+              if (state.selectedModules && state.selectedModules.has(other.id)) return;
+
               const oW = parseFloat(other.dimensions.width);
               const oH = parseFloat(other.dimensions.height);
               const oD = parseFloat(other.dimensions.depth);
@@ -355,16 +363,37 @@ export function init3DViewer() {
           snapY = Math.max(0, snapY);
           snapZ = Math.max(0, snapZ);
 
-          dragModule.position.x = Math.round(snapX);
-          dragModule.position.y = Math.round(snapY);
-          dragModule.position.z = Math.round(snapZ);
+          const orig = dragSelectionOrigins.get(dragModule.id);
+          if (orig) {
+              const deltaX = snapX - orig.x;
+              const deltaY = snapY - orig.y;
+              const deltaZ = snapZ - orig.z;
 
-          dragTarget.position.set(
-              dragModule.position.x + W/2,
-              dragModule.position.y + baseOffsetY + H/2,
-              dragModule.position.z + D/2
-          );
-          
+              state.selectedModules.forEach(id => {
+                  const m = state.project.modules.find(mod => mod.id === id);
+                  if (!m) return;
+                  const mOrig = dragSelectionOrigins.get(id);
+                  if (mOrig) {
+                      m.position.x = Math.round(mOrig.x + deltaX);
+                      m.position.y = Math.round(mOrig.y + deltaY);
+                      m.position.z = Math.round(mOrig.z + deltaZ);
+
+                      const tTarget = cabinetGroup.children.find(g => g.userData.moduleId === id);
+                      if (tTarget) {
+                          const tW = parseFloat(m.dimensions.width) || 600;
+                          const tH = parseFloat(m.dimensions.height) || 720;
+                          const tD = parseFloat(m.dimensions.depth) || 510;
+                          const tBaseY = (m.legs && m.legs.active) ? (parseFloat(m.legs.height) || 100) : 0;
+                          tTarget.position.set(
+                              m.position.x + tW/2,
+                              m.position.y + tBaseY + tH/2,
+                              m.position.z + tD/2
+                          );
+                      }
+                  }
+              });
+          }
+
           const inpX = document.getElementById('input-pos-x');
           const inpY = document.getElementById('input-pos-y');
           if (inpX) inpX.value = dragModule.position.x;
@@ -559,19 +588,22 @@ function handle3DClick(event) {
   }
 
   if (validHit && data) {
+      const clickedMod = state.project.modules.find(m => m.id === data.moduleId);
+      const gId = clickedMod && clickedMod.groupId;
+      const idsToSelect = gId ? state.project.modules.filter(m => m.groupId === gId).map(m => m.id) : [data.moduleId];
+
       if (event.shiftKey) {
           if (!state.selectedModules) state.selectedModules = new Set();
-          if (state.selectedModules.has(data.moduleId)) {
-              state.selectedModules.delete(data.moduleId);
-              if (state.activeModuleId === data.moduleId) {
-                  state.activeModuleId = Array.from(state.selectedModules).pop() || null;
-              }
+          const allSelected = idsToSelect.every(id => state.selectedModules.has(id));
+          if (allSelected) {
+              idsToSelect.forEach(id => state.selectedModules.delete(id));
+              if (state.activeModuleId === data.moduleId) state.activeModuleId = Array.from(state.selectedModules).pop() || null;
           } else {
-              state.selectedModules.add(data.moduleId);
+              idsToSelect.forEach(id => state.selectedModules.add(id));
               state.activeModuleId = data.moduleId;
           }
       } else {
-          state.selectedModules = new Set([data.moduleId]);
+          state.selectedModules = new Set(idsToSelect);
           state.activeModuleId = data.moduleId;
       }
 
@@ -634,6 +666,37 @@ function show3DContextMenu(event, hit, data) {
 
   const mod = state.project.modules.find(m => m.id === data.moduleId);
   if (!mod) return;
+
+  if (state.selectedModules && state.selectedModules.size > 1) {
+      const selectedArray = Array.from(state.selectedModules);
+      const firstMod = state.project.modules.find(m => m.id === selectedArray[0]);
+      const allSameGroup = firstMod && firstMod.groupId && selectedArray.every(id => {
+          const m = state.project.modules.find(md => mod.id === id);
+          return m && m.groupId === firstMod.groupId;
+      });
+
+      if (!allSameGroup) {
+          menu.appendChild(createHeader('Grupowanie modułów'));
+          menu.appendChild(createOption('🔗 Połącz zaznaczone w grupę', '🔗', () => {
+              const newGroupId = 'group-' + Date.now();
+              state.selectedModules.forEach(id => {
+                  const m = state.project.modules.find(md => md.id === id);
+                  if (m) m.groupId = newGroupId;
+              });
+          }, '#0284c7'));
+      }
+  }
+
+  if (mod.groupId) {
+      menu.appendChild(createHeader('Grupowanie modułów'));
+      menu.appendChild(createOption('✂️ Rozbij grupę (Rozgrupuj)', '✂️', () => {
+          const gId = mod.groupId;
+          state.project.modules.forEach(m => {
+              if (m.groupId === gId) delete m.groupId;
+          });
+          state.selectedModules = new Set([mod.id]); 
+      }, '#dc2626'));
+  }
 
   if (data.type === 'corpus' && data.part !== 'back') {
       menu.appendChild(createHeader('Pozycja szafki (Ręczna korekta)'));
@@ -985,6 +1048,9 @@ function show3DContextMenu(event, hit, data) {
           }
       }
   }
+  else if (data.type === 'corpus' && data.part !== 'back') {
+      // no-op
+  }
   else if (data.type === 'corpus' && data.part === 'back') {
       const th = parseFloat(state.project.materials.boardThickness) || 18;
       const legHeight = mod.legs && mod.legs.active ? (parseFloat(mod.legs.height) || 0) : 0;
@@ -1326,7 +1392,7 @@ function addHardware(type, x, y, z, axis, parentGroup) {
       geo = new THREE.CylinderGeometry(2.5, 2.5, 12, 16);
       mat = new THREE.MeshStandardMaterial({color: 0x94a3b8, metalness: 0.9, roughness: 0.2}); 
   } else if (type === 'dowel') {
-      geo = new THREE.CylinderGeometry(4, 4, 30, 16);
+      geo = new THREE.CylinderGeometry(4.0, 4.0, 30, 16);
       mat = new THREE.MeshStandardMaterial({color: 0xb45309, roughness: 0.9}); 
   } else if (type === 'screw') {
       geo = new THREE.CylinderGeometry(1.5, 1.5, 45, 16);
@@ -1338,12 +1404,15 @@ function addHardware(type, x, y, z, axis, parentGroup) {
   mesh.position.set(x, y, z);
   parentGroup.add(mesh);
 }
+
 export function update3D() {
   if (!cabinetGroup) return;
   
-  while(cabinetGroup.children.length > 0){ cabinetGroup.remove(cabinetGroup.children[0]); }
+  while (cabinetGroup.children.length > 0) {
+      cabinetGroup.remove(cabinetGroup.children[0]);
+  }
 
-  const th = parseFloat(state.project.materials.boardThickness) || 18;
+  const th = parseFloat(state.project.materials?.boardThickness) || 18;
 
   state.project.modules.forEach(mod => {
       recalculateLayout(mod);
