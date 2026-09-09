@@ -28,6 +28,15 @@ function hideLoading() {
 
 function openCsvEditorModal(partsList) {
     const catOrder = { 'Korpus': 1, 'Front': 2, 'Szuflada': 3, 'Plecy': 4, 'Inne': 5 };
+    const displayFilters = [
+        { value: 'all', label: 'Wszystko' },
+        { value: 'Korpus', label: 'Korpus' },
+        { value: 'Front', label: 'Fronty' },
+        { value: 'Plecy', label: 'Plecy' },
+        { value: 'Szuflada', label: 'Szuflady' }
+    ];
+    let displayFilter = 'all';
+
     partsList.sort((a, b) => (catOrder[a.category] || 99) - (catOrder[b.category] || 99));
 
     const overlay = document.createElement('div');
@@ -45,7 +54,11 @@ function openCsvEditorModal(partsList) {
     });
 
     const header = document.createElement('div');
-    header.innerHTML = `<h2 style="margin:0 0 15px 0; color:#1e293b;">Menedżer formatek (Pre-flight)</h2>`;
+    header.innerHTML = `
+        <h2 style="margin:0 0 12px 0; color:#1e293b;">Menedżer formatek (Pre-flight)</h2>
+        <div id="csv-display-filters" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;"></div>
+        <div id="csv-filter-count" style="font-size:12px; color:#64748b; margin-bottom:8px;"></div>
+    `;
     
     const tableContainer = document.createElement('div');
     Object.assign(tableContainer.style, { overflowY: 'auto', flexGrow: '1', marginBottom: '15px' });
@@ -74,8 +87,8 @@ function openCsvEditorModal(partsList) {
         if(p.category === 'Plecy') catColor = '#10b981';
 
         tableHtml += `
-          <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-            <td style="padding: 6px;"><input type="text" value="${p.category || 'Inne'}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px; font-weight:bold; color:${catColor};"></td>
+          <tr data-category="${p.category || 'Inne'}" style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
+            <td style="padding: 6px;"><input type="text" class="csv-cat-input" value="${p.category || 'Inne'}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px; font-weight:bold; color:${catColor};"></td>
             <td style="padding: 6px;"><input type="text" value="${p.name}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
             <td style="padding: 6px;"><input type="number" value="${p.length}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
             <td style="padding: 6px;"><input type="number" value="${p.width}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
@@ -95,13 +108,6 @@ function openCsvEditorModal(partsList) {
     footer.innerHTML = `
         <button id="csv-btn-add" style="background:#3b82f6; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">➕ Dodaj pusty wiersz</button>
         <div style="display: flex; gap: 10px; align-items: center;">
-            <select id="csv-export-filter" style="padding: 9px; border-radius: 5px; border: 1px solid #cbd5e1; font-weight: bold; color: #1e293b; cursor: pointer; background: #f8fafc; outline: none;">
-                <option value="all">Zapisz wszystko (Całość)</option>
-                <option value="Korpus">Tylko Korpusy</option>
-                <option value="Front">Tylko Fronty</option>
-                <option value="Szuflada">Tylko Szuflady</option>
-                <option value="Plecy">Tylko Plecy (HDF)</option>
-            </select>
             <button id="csv-btn-cancel" style="background:#94a3b8; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">Anuluj</button>
             <button id="csv-btn-save" style="background:#10b981; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold; box-shadow:0 2px 4px rgba(0,0,0,0.1);">💾 Pobierz plik CSV</button>
         </div>
@@ -113,12 +119,62 @@ function openCsvEditorModal(partsList) {
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
 
+    function getRowCategory(tr) {
+        const catInput = tr.querySelector('.csv-cat-input');
+        return (catInput ? catInput.value : tr.getAttribute('data-category') || 'Inne').trim();
+    }
+
+    function applyDisplayFilter() {
+        const rows = document.querySelectorAll('#csv-editor-tbody tr');
+        let visible = 0;
+        rows.forEach(tr => {
+            const cat = getRowCategory(tr);
+            tr.setAttribute('data-category', cat);
+            const show = displayFilter === 'all' || cat === displayFilter;
+            tr.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+
+        const countEl = document.getElementById('csv-filter-count');
+        if (countEl) {
+            const label = displayFilters.find(f => f.value === displayFilter)?.label || 'Wszystko';
+            countEl.textContent = visible === 0
+                ? `Brak formatek w widoku: ${label}`
+                : `Widoczne formatki: ${visible} (${label})`;
+        }
+
+        document.querySelectorAll('#csv-display-filters .csv-filter-btn').forEach(btn => {
+            const active = btn.getAttribute('data-filter') === displayFilter;
+            btn.style.background = active ? '#1e293b' : '#f8fafc';
+            btn.style.color = active ? '#ffffff' : '#334155';
+            btn.style.borderColor = active ? '#1e293b' : '#cbd5e1';
+        });
+    }
+
+    function renderFilterButtons() {
+        const wrap = document.getElementById('csv-display-filters');
+        wrap.innerHTML = displayFilters.map(f => `
+            <button type="button" class="csv-filter-btn" data-filter="${f.value}"
+                style="padding:7px 12px; border-radius:999px; border:1px solid #cbd5e1; background:#f8fafc; color:#334155; cursor:pointer; font-weight:bold; font-size:12px;">
+                ${f.label}
+            </button>
+        `).join('');
+        wrap.querySelectorAll('.csv-filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                displayFilter = btn.getAttribute('data-filter');
+                applyDisplayFilter();
+            });
+        });
+    }
+
     document.getElementById('csv-btn-add').addEventListener('click', () => {
         const tbody = document.getElementById('csv-editor-tbody');
+        const defaultCat = displayFilter === 'all' ? 'Inne' : displayFilter;
         const tr = document.createElement('tr');
+        tr.setAttribute('data-category', defaultCat);
         tr.style.borderBottom = "1px solid #e2e8f0";
         tr.innerHTML = `
-            <td style="padding: 6px;"><input type="text" value="Inne" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px; font-weight:bold; color:#ef4444;"></td>
+            <td style="padding: 6px;"><input type="text" class="csv-cat-input" value="${defaultCat}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px; font-weight:bold; color:#ef4444;"></td>
             <td style="padding: 6px;"><input type="text" value="Nowa formatka" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
             <td style="padding: 6px;"><input type="number" value="0" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
             <td style="padding: 6px;"><input type="number" value="0" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
@@ -127,20 +183,32 @@ function openCsvEditorModal(partsList) {
             <td style="padding: 6px; text-align:center;"><button class="btn-del-row" style="background:#ef4444; color:white; border:none; border-radius:3px; cursor:pointer; padding:4px 8px;">❌</button></td>
         `;
         tbody.appendChild(tr);
-        attachDeleteEvents();
+        attachRowEvents();
+        applyDisplayFilter();
     });
 
-    function attachDeleteEvents() {
+    function attachRowEvents() {
         document.querySelectorAll('.btn-del-row').forEach(btn => {
-            btn.onclick = function() { this.closest('tr').remove(); };
+            btn.onclick = function() {
+                this.closest('tr').remove();
+                applyDisplayFilter();
+            };
+        });
+        document.querySelectorAll('.csv-cat-input').forEach(inp => {
+            inp.onchange = function() {
+                this.closest('tr').setAttribute('data-category', this.value.trim());
+                applyDisplayFilter();
+            };
         });
     }
-    attachDeleteEvents();
+    renderFilterButtons();
+    attachRowEvents();
+    applyDisplayFilter();
 
     document.getElementById('csv-btn-cancel').addEventListener('click', () => { document.body.removeChild(overlay); });
 
     document.getElementById('csv-btn-save').addEventListener('click', () => {
-        const filterMode = document.getElementById('csv-export-filter').value;
+        const filterMode = displayFilter;
         let csvContent = "\uFEFFKategoria;Nazwa;Dlugosc(mm);Szerokosc(mm);Ilosc;Zrodlo\n";
         
         const rows = document.querySelectorAll('#csv-editor-tbody tr');
