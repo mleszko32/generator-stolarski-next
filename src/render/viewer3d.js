@@ -1717,17 +1717,21 @@ export function update3D() {
           const legH = parseFloat(mod.legs.height) || 100;
           const rootY = 0.5;
           const udPlinth = { moduleId: mod.id, type: 'plinth' };
+          const parsedOffset = parseFloat(mod.legs.plinthOffset);
+          const offset = Number.isFinite(parsedOffset) ? parsedOffset : 40;
+          const plinthThick = th;
+          const frontFaceZ = posZ + D;
+          const frontLegZ = mod.legs.plinth
+              ? frontFaceZ - offset - plinthThick - 30
+              : frontFaceZ - 80;
+          const clampedFrontLegZ = Math.max(posZ + 90, frontLegZ);
           
           addBox(30, legH, 30, posX + 50, rootY, posZ + 50, 'corpus', false, udPlinth, innerGroup);
           addBox(30, legH, 30, posX + W - 80, rootY, posZ + 50, 'corpus', false, udPlinth, innerGroup);
-          addBox(30, legH, 30, posX + 50, rootY, posZ + D - 80, 'corpus', false, udPlinth, innerGroup);
-          addBox(30, legH, 30, posX + W - 80, rootY, posZ + D - 80, 'corpus', false, udPlinth, innerGroup);
+          addBox(30, legH, 30, posX + 50, rootY, clampedFrontLegZ, 'corpus', false, udPlinth, innerGroup);
+          addBox(30, legH, 30, posX + W - 80, rootY, clampedFrontLegZ, 'corpus', false, udPlinth, innerGroup);
           
           if (mod.legs.plinth) {
-              const parsedOffset = parseFloat(mod.legs.plinthOffset);
-              const offset = Number.isFinite(parsedOffset) ? parsedOffset : 40;
-              const plinthThick = th;
-              const frontFaceZ = posZ + D;
               addBox(W, legH, plinthThick, posX, rootY, frontFaceZ - offset - plinthThick, 'plinth', isActive, udPlinth, innerGroup);
           }
       }
