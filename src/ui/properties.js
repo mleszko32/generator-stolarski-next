@@ -317,8 +317,14 @@ function setupEventListeners() {
 
             if (id === 'pos-x') mod.position.x = val;
             if (id === 'pos-y') mod.position.y = val;
-            if (id === 'legs-height') mod.legs.height = val;
-            if (id === 'plinth-offset') mod.legs.plinthOffset = val;
+            if (id === 'legs-height') {
+              if (!mod.legs) mod.legs = { active: true, height: 100, plinth: true, plinthOffset: 40 };
+              mod.legs.height = val;
+            }
+            if (id === 'plinth-offset') {
+              if (!mod.legs) mod.legs = { active: true, height: 100, plinth: true, plinthOffset: 40 };
+              mod.legs.plinthOffset = val === null ? 0 : val;
+            }
             if (id === 'traverse-width') { mod.construction = mod.construction || {}; mod.construction.traverseWidth = val; }
             if (id === 'board-thick') state.project.materials.boardThickness = val;
 

@@ -1333,14 +1333,16 @@ const mats = {
       front: new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.5, metalness: 0.1 }),  
       shelf: new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.7, metalness: 0.0 }),   
       drawerBox: new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.8, metalness: 0.0 }),
-      hdf: new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.9, metalness: 0.0 })
+      hdf: new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.9, metalness: 0.0 }),
+      plinth: new THREE.MeshStandardMaterial({ color: 0x44403c, roughness: 0.85, metalness: 0.05 })
   },
   xray: {
       corpus: new THREE.MeshStandardMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.15, depthWrite: false }),
       front: new THREE.MeshStandardMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.15, depthWrite: false }),
       shelf: new THREE.MeshStandardMaterial({ color: 0x64748b, transparent: true, opacity: 0.3, depthWrite: false }),
       drawerBox: new THREE.MeshStandardMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.4, depthWrite: false }),
-      hdf: new THREE.MeshStandardMaterial({ color: 0x475569, transparent: true, opacity: 0.3, depthWrite: false })
+      hdf: new THREE.MeshStandardMaterial({ color: 0x475569, transparent: true, opacity: 0.3, depthWrite: false }),
+      plinth: new THREE.MeshStandardMaterial({ color: 0x1c1917, transparent: true, opacity: 0.7, depthWrite: true })
   }
 };
 const holeMat = new THREE.MeshBasicMaterial({ color: 0xdc2626 }); 
@@ -1352,7 +1354,8 @@ function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, parentG
   if (type === 'front') mat = matObj.front;
   if (type === 'shelf') mat = matObj.shelf;
   if (type === 'drawerBox') mat = matObj.drawerBox;
-  if (type === 'hdf') mat = matObj.hdf; 
+  if (type === 'hdf') mat = matObj.hdf;
+  if (type === 'plinth') mat = matObj.plinth; 
 
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(x + w/2, y + h/2, z + d/2);
@@ -1711,17 +1714,21 @@ export function update3D() {
       }
 
       if (mod.legs && mod.legs.active) {
-          const legH = mod.legs.height || 100;
-          const rootY = 0; 
+          const legH = parseFloat(mod.legs.height) || 100;
+          const rootY = 0.5;
+          const udPlinth = { moduleId: mod.id, type: 'plinth' };
           
-          addBox(30, legH, 30, posX + 50, rootY, posZ + 50, 'corpus', false, null, innerGroup);
-          addBox(30, legH, 30, posX + W - 80, rootY, posZ + 50, 'corpus', false, null, innerGroup);
-          addBox(30, legH, 30, posX + 50, rootY, posZ + D - 80, 'corpus', false, null, innerGroup);
-          addBox(30, legH, 30, posX + W - 80, rootY, posZ + D - 80, 'corpus', false, null, innerGroup);
+          addBox(30, legH, 30, posX + 50, rootY, posZ + 50, 'corpus', false, udPlinth, innerGroup);
+          addBox(30, legH, 30, posX + W - 80, rootY, posZ + 50, 'corpus', false, udPlinth, innerGroup);
+          addBox(30, legH, 30, posX + 50, rootY, posZ + D - 80, 'corpus', false, udPlinth, innerGroup);
+          addBox(30, legH, 30, posX + W - 80, rootY, posZ + D - 80, 'corpus', false, udPlinth, innerGroup);
           
           if (mod.legs.plinth) {
-              const offset = mod.legs.plinthOffset || 40;
-              addBox(W, legH, 18, posX, rootY, posZ + D - offset - 18, 'corpus', false, null, innerGroup);
+              const parsedOffset = parseFloat(mod.legs.plinthOffset);
+              const offset = Number.isFinite(parsedOffset) ? parsedOffset : 40;
+              const plinthThick = th;
+              const frontFaceZ = posZ + D;
+              addBox(W, legH, plinthThick, posX, rootY, frontFaceZ - offset - plinthThick, 'plinth', isActive, udPlinth, innerGroup);
           }
       }
 
