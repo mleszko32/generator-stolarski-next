@@ -3,6 +3,7 @@ import { state, getActiveModule } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
 import { calculateParts } from "../engine/cabinet.js";
+import { escapeHtml } from "../utils/dom.js";
 
 function getSelectedMods() {
     if (state.selectedModules && state.selectedModules.size > 0) {
@@ -72,7 +73,7 @@ export function initPropertiesPanel() {
 
     <div class="property-group" style="background: #f8fafc; padding: 10px; border-radius: 4px; border: 1px solid #cbd5e1; margin-bottom: 15px;">
       <label style="font-weight: bold; color: #0f172a;">Nazwa szafki:</label>
-      <input type="text" id="input-mod-name" value="${activeModule.name}" style="font-weight: bold; color: #1e293b;" />
+      <input type="text" id="input-mod-name" value="${escapeHtml(activeModule.name)}" style="font-weight: bold; color: #1e293b;" />
     </div>
     
     <h3>Wymiary Modułu</h3>

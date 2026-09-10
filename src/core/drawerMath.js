@@ -19,47 +19,10 @@ export function calculateNominalLength(internalDepth) {
 }
 
 export function getDrawerVariant(availableSpace, systemId, forceVariant = 'auto') {
-  const CATALOG_DATA = {
-    'merivobox': {
-      bardzoniska:  { type: 'N', height: 60.5,  minSpace: 85.5 },
-      niska:        { type: 'M', height: 83,    minSpace: 108 },
-      srednia:      { type: 'K', height: 121,   minSpace: 146 },
-      wysoka:       { type: 'E', height: 184,   minSpace: 209 }
-    },
-    'antaro': {
-      bardzoniska:  { type: 'N', height: 69,    minSpace: 82.5 },
-      niska:        { type: 'M', height: 84,    minSpace: 98.5 },
-      srednia:      { type: 'K', height: 116,   minSpace: 130.5 },
-      wysoka:       { type: 'C', height: 167,   minSpace: 192 }, 
-      bardzowysoka: { type: 'D', height: 199,   minSpace: 224 }
-    },
-    'tandembox': {
-      bardzoniska:  { type: 'N', height: 69,    minSpace: 82.5 },
-      niska:        { type: 'M', height: 84,    minSpace: 98.5 },
-      srednia:      { type: 'K', height: 116,   minSpace: 130.5 },
-      wysoka:       { type: 'C', height: 167,   minSpace: 192 },
-      bardzowysoka: { type: 'D', height: 199,   minSpace: 224 }
-    },
-    'legrabox': {
-      bardzoniska:  { type: 'N', height: 39,    minSpace: 80 },
-      niska:        { type: 'M', height: 63,    minSpace: 106 }, 
-      srednia:      { type: 'K', height: 101,   minSpace: 144 }, 
-      wysoka:       { type: 'C', height: 148,   minSpace: 193 } 
-    },
-    'gtv_axis_16': {
-      niska:   { type: 'A', height: 84,  minSpace: 105 },
-      srednia: { type: 'B', height: 116, minSpace: 138 },
-      wysoka:  { type: 'C', height: 167, minSpace: 195 } 
-    },
-    'gtv_axis_18': {
-      niska:   { type: 'A', height: 84,  minSpace: 105 },
-      srednia: { type: 'B', height: 116, minSpace: 138 },
-      wysoka:  { type: 'C', height: 167, minSpace: 195 }
-    }
-  };
-
+  // Dane wariantów wysokości boku pobierane są z jedynego wspólnego katalogu
+  // (drawerSystems.js), żeby uniknąć rozjazdu wartości między plikami.
   const safeSystemId = systemId ? systemId.toLowerCase() : 'merivobox';
-  const systemData = CATALOG_DATA[safeSystemId] || CATALOG_DATA['merivobox'];
+  const systemData = (drawerSystems[safeSystemId] || drawerSystems['merivobox']).variants;
 
   if (forceVariant && forceVariant !== 'auto' && systemData[forceVariant]) {
     if (availableSpace >= systemData[forceVariant].minSpace) {
@@ -124,17 +87,10 @@ export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick
   const leftGap = Number(config.front.clearance.left ?? config.front.clearance.sides ?? 1.5);
   const rightGap = Number(config.front.clearance.right ?? config.front.clearance.sides ?? 1.5);
 
-  const HARDWARE_OFFSETS = {
-    'merivobox': { railOffset: 54, frontHolesBase: 33.5, frontHolesXBase: 20.5 },
-    'legrabox': { railOffset: 38, frontHolesBase: 25, frontHolesXBase: 21.5 }, 
-    'tandembox': { railOffset: 33, frontHolesBase: 22, frontHolesXBase: 15.5 },
-    'antaro': { railOffset: 33, frontHolesBase: 22, frontHolesXBase: 15.5 },
-    'gtv_axis_16': { railOffset: 33, frontHolesBase: 22, frontHolesXBase: 15.5 },
-    'gtv_axis_18': { railOffset: 33, frontHolesBase: 22, frontHolesXBase: 15.5 }
-  };
-
+  // Offsety montażowe pobierane są z jedynego wspólnego katalogu
+  // (drawerSystems.js), żeby uniknąć rozjazdu wartości między plikami.
   const safeSystemId = systemId ? systemId.toLowerCase() : 'merivobox';
-  const systemParams = HARDWARE_OFFSETS[safeSystemId] || HARDWARE_OFFSETS['merivobox'];
+  const systemParams = (drawerSystems[safeSystemId] || drawerSystems['merivobox']).mounting;
 
   let slideY;
   if (isBottom) {

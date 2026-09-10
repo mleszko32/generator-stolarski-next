@@ -1,5 +1,6 @@
 // src/render/viewer2d.js
 import { state } from '../core/state.js';
+import { escapeHtml } from '../utils/dom.js';
 
 export function generateSidePanelSVG(height, depth, mountingData = []) {
   const mod = state.project.modules.find(m => m.id === state.activeModuleId) || state.project.modules[0];
@@ -181,7 +182,7 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
           svg += `<rect x="${elSvgX}" y="${elSvgY}" width="${el.w}" height="${el.h}" fill="${fillColor}" stroke="#475569" stroke-width="1.5" />`;
         });
       }
-      svg += `<text x="${gX + smW/2}" y="${gY + smH/2}" font-size="20" fill="#475569" text-anchor="middle" font-weight="bold">${sm.name}</text></g>`;
+      svg += `<text x="${gX + smW/2}" y="${gY + smH/2}" font-size="20" fill="#475569" text-anchor="middle" font-weight="bold">${escapeHtml(sm.name)}</text></g>`;
   });
   
   const bgFill = "#f1f5f9"; 
@@ -496,7 +497,7 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
       svg += `<rect x="${fSvgX}" y="${elSvgY}" width="${fWidth}" height="${front.h}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5" ${strokeDash} />`;
 
       let labelText = isDrawer ? `Szuflada` : `Drzwi`;
-      if (isForeign) labelText += ` (z: ${front.sourceModName})`;
+      if (isForeign) labelText += ` (z: ${escapeHtml(front.sourceModName)})`;
       svg += `<text x="${fSvgX + fWidth/2}" y="${elSvgY + front.h/2}" font-size="12" fill="${isForeign ? '#94a3b8' : '#1e293b'}" font-weight="bold" text-anchor="middle">${labelText}</text>`;
 
       if (isDoor && mountingData) {

@@ -4,6 +4,7 @@ import { initLayout } from "./ui/layout.js";
 import { initPropertiesPanel } from "./ui/properties.js";
 import { updateSidebar } from "./ui/sidebar.js";
 import { init3DViewer, update3D } from "./render/viewer3d.js"; 
+import { escapeHtml } from "./utils/dom.js";
 
 
 // ZMIANA: Importujemy funkcję do usuwania projektów oraz customowy dialog
@@ -76,7 +77,7 @@ if (btnLoad) {
       row.style.gap = '6px';
 
       const btn = document.createElement('button');
-      btn.innerHTML = `📁 <b>${projName}</b>`;
+      btn.innerHTML = `📁 <b>${escapeHtml(projName)}</b>`;
       Object.assign(btn.style, {
         flexGrow: '1', padding: '12px', backgroundColor: '#f8fafc', border: '1px solid #cbd5e1',
         borderRadius: '6px', cursor: 'pointer', textAlign: 'left', color: '#334155', fontSize: '14px'

@@ -3,6 +3,7 @@ import { generateSidePanelSVG } from "../render/viewer2d.js";
 import { state, getActiveModule, addModule, deleteModule, duplicateModule } from "../core/state.js";
 import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel } from "./properties.js";
+import { escapeHtml } from "../utils/dom.js";
 
 function showLoading(msg) {
     let l = document.getElementById('ai-loader');
@@ -87,13 +88,13 @@ function openCsvEditorModal(partsList) {
         if(p.category === 'Plecy') catColor = '#10b981';
 
         tableHtml += `
-          <tr data-category="${p.category || 'Inne'}" style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-            <td style="padding: 6px;"><input type="text" class="csv-cat-input" value="${p.category || 'Inne'}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px; font-weight:bold; color:${catColor};"></td>
-            <td style="padding: 6px;"><input type="text" value="${p.name}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
+          <tr data-category="${escapeHtml(p.category || 'Inne')}" style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
+            <td style="padding: 6px;"><input type="text" class="csv-cat-input" value="${escapeHtml(p.category || 'Inne')}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px; font-weight:bold; color:${catColor};"></td>
+            <td style="padding: 6px;"><input type="text" value="${escapeHtml(p.name)}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
             <td style="padding: 6px;"><input type="number" value="${p.length}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
             <td style="padding: 6px;"><input type="number" value="${p.width}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
             <td style="padding: 6px;"><input type="number" value="${p.qty}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
-            <td style="padding: 6px;"><input type="text" value="${p.modules.join(' + ')}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px; font-size:11px; color:#64748b;"></td>
+            <td style="padding: 6px;"><input type="text" value="${escapeHtml(p.modules.join(' + '))}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px; font-size:11px; color:#64748b;"></td>
             <td style="padding: 6px; text-align:center;"><button class="btn-del-row" style="background:#ef4444; color:white; border:none; border-radius:3px; cursor:pointer; padding:4px 8px;">❌</button></td>
           </tr>
         `;
@@ -294,7 +295,7 @@ export function updateSidebar() {
       html += `
         <div class="module-item" data-id="${m.id}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; margin-bottom: 6px; background-color: ${bg}; color: ${color}; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; border: 1px solid ${border}; transition: all 0.2s;">
           <div style="flex-grow: 1; pointer-events: none;">
-            ${icon} ${m.name} ${groupIcon} <span style="font-weight: normal; font-size: 11px; opacity: 0.8; margin-left: 2px;">(${m.dimensions.width}x${m.dimensions.height})</span>
+            ${icon} ${escapeHtml(m.name)} ${groupIcon} <span style="font-weight: normal; font-size: 11px; opacity: 0.8; margin-left: 2px;">(${m.dimensions.width}x${m.dimensions.height})</span>
           </div>
           <div style="display: flex; gap: 4px;">
             <button class="btn-mod-action btn-mod-dup" data-id="${m.id}" title="Kopiuj szafkę" style="background: none; border: none; cursor: pointer; padding: 2px 4px; font-size: 14px; opacity: ${isActive ? 1 : 0.6}; transition: opacity 0.2s;">📋</button>
@@ -356,7 +357,7 @@ export function updateSidebar() {
             const rowBg = index % 2 === 0 ? '#ffffff' : '#f8fafc';
             html += `
                 <tr style="background-color: ${rowBg}; border-bottom: 1px solid #e2e8f0; transition: background 0.2s;" onmouseover="this.style.backgroundColor='#eff6ff'" onmouseout="this.style.backgroundColor='${rowBg}'">
-                    <td style="padding: 8px; font-weight: 600; color: #1e293b;">${part.name}</td>
+                    <td style="padding: 8px; font-weight: 600; color: #1e293b;">${escapeHtml(part.name)}</td>
                     <td style="padding: 8px; color: #64748b; white-space: nowrap;">${part.length} &times; ${part.width}</td>
                     <td style="padding: 8px; text-align: center;">
                         <span style="display: inline-block; background-color: #2563eb; color: #ffffff; font-weight: bold; padding: 2px 8px; border-radius: 12px; min-width: 14px; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.2);">
@@ -384,7 +385,7 @@ export function updateSidebar() {
         if (item.type === 'door') {
           const sidePl = item.side === 'left' ? 'Lewe' : 'Prawe';
           const holesHtml = item.hinges.map(h => `Oś Y: <b>${h.y.toFixed(1)} mm</b>`).join('<br>');
-          html += `<li style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #cbd5e1;"><strong>${item.name} (${sidePl})</strong><br><div style="margin-top: 4px; color: #1e293b;">Liczba zawiasów: <b>${item.hinges.length} szt.</b></div><div style="margin-top: 6px; font-size: 0.9em; padding-left: 10px; border-left: 3px solid #cbd5e1;"><b>Prowadniki:</b><br>${holesHtml}</div></li>`;
+          html += `<li style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #cbd5e1;"><strong>${escapeHtml(item.name)} (${sidePl})</strong><br><div style="margin-top: 4px; color: #1e293b;">Liczba zawiasów: <b>${item.hinges.length} szt.</b></div><div style="margin-top: 6px; font-size: 0.9em; padding-left: 10px; border-left: 3px solid #cbd5e1;"><b>Prowadniki:</b><br>${holesHtml}</div></li>`;
         } else if (item.type === 'drawer') {
           let slideY = item.slideSideHoles && item.slideSideHoles.length > 0 ? item.slideSideHoles[0].y : "Brak";
           let frontHolesHtml = item.frontHoles ? item.frontHoles.map(h => `Y: <b>${Number(h.y).toFixed(1)} mm</b>`).join('<br>') : "";
@@ -405,7 +406,7 @@ export function updateSidebar() {
       html += `<li style="font-size: 11px; color: #b45309;">Brak zdefiniowanych okuć w projekcie.</li>`;
     } else {
       projectHardware.forEach(hw => {
-        html += `<li style="margin-bottom: 6px; font-size: 12px; color: #78350f;"><strong>${hw.name}</strong><br><span style="color: #92400e;">Ilość: <b>${hw.qty} ${hw.unit}</b></span></li>`;
+        html += `<li style="margin-bottom: 6px; font-size: 12px; color: #78350f;"><strong>${escapeHtml(hw.name)}</strong><br><span style="color: #92400e;">Ilość: <b>${hw.qty} ${escapeHtml(hw.unit)}</b></span></li>`;
       });
     }
     html += `</ul></details>`;
@@ -755,7 +756,7 @@ export function updateSidebar() {
         <html lang="pl">
         <head>
             <meta charset="UTF-8">
-            <title>Lista Zakupów - ${state.project.name}</title>
+            <title>Lista Zakupów - ${escapeHtml(state.project.name)}</title>
             <style>
                 body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1e293b; max-width: 900px; margin: 0 auto; }
                 .header { border-bottom: 2px solid #cbd5e1; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
@@ -786,7 +787,7 @@ export function updateSidebar() {
             <div class="header">
                 <div>
                     <h1>Lista Zakupów: Okucia</h1>
-                    <p>Projekt: <strong style="color: #0f172a;">${state.project.name}</strong></p>
+                    <p>Projekt: <strong style="color: #0f172a;">${escapeHtml(state.project.name)}</strong></p>
                 </div>
                 <div style="text-align: right; color: #64748b; font-size: 14px;">
                     Data wygenerowania: <strong>${dateStr}</strong>
@@ -806,9 +807,9 @@ export function updateSidebar() {
       projectHardware.forEach(hw => {
           htmlContent += `
             <tr>
-                <td>${hw.name}</td>
+                <td>${escapeHtml(hw.name)}</td>
                 <td class="qty">${hw.qty}</td>
-                <td class="unit">${hw.unit}</td>
+                <td class="unit">${escapeHtml(hw.unit)}</td>
             </tr>
           `;
       });
