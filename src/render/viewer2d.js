@@ -108,6 +108,69 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
              `<tspan fill="#94a3b8" font-size="9" font-weight="normal">(${formatVal(secondary)} ${isBottomCloser ? 'GÓRA' : 'DÓŁ'})</tspan>`;
   }
 
+  // Wymiarowanie łańcuchowe dla pionowego panelu (bok / przegroda).
+  //   features: [{ y, color, layer }] — y w mm liczone od DOŁU panelu (0..panelH)
+  // Rysuje jedną pionową linię wymiarową: dół (0) -> każdy otwór po kolei -> góra
+  // (panelH). W prześwitach różnice między sąsiednimi otworami (m.in. rozstaw
+  // środkowych otworów pod półki), z boku suma całkowita. Zastępuje wcześniejsze
+  // trzy osobne kolumny gęstych opisów.
+  function chainDimension(features, panelH, toSvgY, edgeX, dimLineX, isReversed) {
+    if (!features.length) return "";
+
+    // scal otwory pokrywające się w pionie (< 1.5 mm) — jeden węzeł łańcucha
+    const pts = features
+      .slice()
+      .sort((a, b) => a.y - b.y)
+      .filter((f, i, arr) => i === 0 || Math.abs(f.y - arr[i - 1].y) >= 1.5);
+
+    const nodes = [{ y: 0, datum: true }, ...pts, { y: panelH, datum: true }];
+    const dir = isReversed ? 1 : -1;
+    const anchor = isReversed ? "start" : "end";
+    const tick = 5;
+    const deltaX = dimLineX + dir * 10;
+    const totX = dimLineX + dir * 52;
+
+    let s = `<g class="dim-chain">`;
+
+    // spina wymiarowa + linia sumy całkowitej z ćwiekami na dole i górze
+    s += `<line x1="${dimLineX}" y1="${toSvgY(0)}" x2="${dimLineX}" y2="${toSvgY(panelH)}" stroke="#475569" stroke-width="1" />`;
+    s += `<line x1="${totX}" y1="${toSvgY(0)}" x2="${totX}" y2="${toSvgY(panelH)}" stroke="#cbd5e1" stroke-width="1" />`;
+    [0, panelH].forEach(v => {
+      s += `<line x1="${dimLineX - tick}" y1="${toSvgY(v)}" x2="${dimLineX + tick}" y2="${toSvgY(v)}" stroke="#475569" stroke-width="1.4" />`;
+      s += `<line x1="${totX - tick}" y1="${toSvgY(v)}" x2="${totX + tick}" y2="${toSvgY(v)}" stroke="#cbd5e1" stroke-width="1.4" />`;
+    });
+    const midAll = (toSvgY(0) + toSvgY(panelH)) / 2;
+    const totLabelX = totX + dir * 9;
+    s += `<text x="${totLabelX}" y="${midAll}" font-size="10" font-weight="bold" fill="#64748b" text-anchor="middle" font-family="sans-serif" transform="rotate(-90 ${totLabelX} ${midAll})">&#931; ${formatVal(panelH)}</text>`;
+
+    // odnośnik + ćwiek dla każdego otworu, pogrupowane wg warstwy filtra (checkboxy)
+    const byLayer = {};
+    pts.forEach(f => { (byLayer[f.layer] = byLayer[f.layer] || []).push(f); });
+    Object.entries(byLayer).forEach(([layer, arr]) => {
+      s += `<g class="${layer}">`;
+      arr.forEach(f => {
+        const y = toSvgY(f.y);
+        s += `<line x1="${edgeX}" y1="${y}" x2="${dimLineX}" y2="${y}" stroke="${f.color}" stroke-width="0.6" stroke-dasharray="3,2" />`;
+        s += `<line x1="${dimLineX - tick}" y1="${y}" x2="${dimLineX + tick}" y2="${y}" stroke="${f.color}" stroke-width="1.8" />`;
+      });
+      s += `</g>`;
+    });
+
+    // różnice w prześwitach — segmenty między dwoma otworami pogrubione,
+    // odcinki do krawędzi panelu (datum) drobne i szare
+    for (let i = 0; i < nodes.length - 1; i++) {
+      const a = nodes[i], b = nodes[i + 1];
+      const d = b.y - a.y;
+      if (d < 0.5) continue;
+      const midY = (toSvgY(a.y) + toSvgY(b.y)) / 2;
+      const edge = a.datum || b.datum;
+      s += `<text x="${deltaX}" y="${midY + 3.5}" font-size="${edge ? 9 : 12}" font-weight="${edge ? "normal" : "bold"}" fill="${edge ? "#94a3b8" : "#0f172a"}" text-anchor="${anchor}" font-family="sans-serif">${formatVal(d)}</text>`;
+    }
+
+    s += `</g>`;
+    return s;
+  }
+
   let svg = `<svg id="side-panel-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 ${vBoxY} ${svgWidth} ${vBoxH}" width="100%" height="100%" style="background-color: #f8fafc; font-family: 'Segoe UI', sans-serif; cursor: grab;">`;
 
   svg += `
@@ -313,6 +376,8 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
           let shelfYs = new Set();
           let corpusYs = new Set();
           let drawerYs = new Set();
+          let hingeYs = new Set();
+          let adjustedHingeYs = new Set();
 
           const drawShelfHoles = (shelves) => {
               shelves.forEach(el => {
@@ -374,16 +439,16 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
 
                       const svgY = sideH - calcY;
                       let baseColor = hinge.isAdjusted ? "#ea580c" : "#16a34a";
-                      let rHinge = 2.5; 
+                      let rHinge = 2.5;
 
+                      svg += `<g class="layer-holes-hinge">`;
                       svg += `<circle cx="${getSvgX(37)}" cy="${svgY - 16}" r="${rHinge}" fill="${baseColor}" />`;
                       svg += `<circle cx="${getSvgX(37)}" cy="${svgY + 16}" r="${rHinge}" fill="${baseColor}" />`;
+                      svg += `</g>`;
 
-                      let localHoleY = calcY - panelCalcY;
-                      let tspanHtml = getDimText(localHoleY, panelH, baseColor);
-                      let textX = isReversed ? getSvgX(37) - 8 : getSvgX(37) + 8;
-                      let anchor = isReversed ? 'end' : 'start';
-                      svg += `<text x="${textX}" y="${svgY + 4}" text-anchor="${anchor}" font-family="sans-serif">${tspanHtml}</text>`;
+                      // środek zawiasu wchodzi do wspólnego łańcucha wymiarowego
+                      hingeYs.add(calcY);
+                      if (hinge.isAdjusted) adjustedHingeYs.add(calcY);
                   });
               });
           };
@@ -407,72 +472,22 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
                }
           }
 
-          const sortedDrawerYs = Array.from(drawerYs).sort((a,b) => a - b);
-          const sortedCorpusYs = Array.from(corpusYs).sort((a,b) => a - b);
-          const sortedShelfYs = Array.from(shelfYs).sort((a,b) => a - b);
+          // --- WYMIAROWANIE ŁAŃCUCHOWE ---
+          // Wszystkie rzędy nawiertów (prowadnice, konfirmaty/półki stałe,
+          // zawiasy, podpórki półek ruchomych) trafiają do jednego pionowego
+          // łańcucha: dół panelu -> kolejno każdy otwór -> góra panelu.
+          const toSvgY = (localY) => sideH - panelCalcY - localY;
+          const edgeX = isReversed ? panel.svgX + depth : panel.svgX;
+          const dimLineX = isReversed ? panel.svgX + depth + 82 : panel.svgX - 82;
 
-          let currentDimX = isReversed ? panel.svgX + depth + 40 : panel.svgX - 40;
-          const stepDir = isReversed ? 120 : -120;
-          const textAnchor = isReversed ? 'start' : 'end';
-          const textOffset = isReversed ? 8 : -8;
+          const chainFeatures = [
+              ...Array.from(drawerYs).map(cy => ({ y: cy - panelCalcY, color: "#0284c7", layer: "layer-holes-drawer" })),
+              ...Array.from(corpusYs).map(cy => ({ y: cy - panelCalcY, color: "#9333ea", layer: "layer-holes-corpus" })),
+              ...Array.from(hingeYs).map(cy => ({ y: cy - panelCalcY, color: adjustedHingeYs.has(cy) ? "#ea580c" : "#16a34a", layer: "layer-holes-hinge" })),
+              ...Array.from(shelfYs).map(cy => ({ y: cy - panelCalcY, color: "#ea580c", layer: "layer-holes-shelf" })),
+          ].filter(f => f.y > -2 && f.y < panelH + 2);
 
-          if (sortedDrawerYs.length > 0) {
-              svg += `<g class="layer-holes-drawer">`;
-              sortedDrawerYs.forEach(calcY => {
-                  let holeSvgY = sideH - calcY;
-                  let edgeX = isReversed ? panel.svgX + depth : panel.svgX;
-                  svg += `<line x1="${edgeX}" y1="${holeSvgY}" x2="${currentDimX}" y2="${holeSvgY}" stroke="#0284c7" stroke-width="0.5" stroke-dasharray="2,2" />`;
-                  
-                  let localHoleY = calcY - panelCalcY;
-                  let tspanHtml = getDimText(localHoleY, panelH, "#0284c7");
-
-                  svg += `<text x="${currentDimX + textOffset}" y="${holeSvgY + 4}" font-size="12" font-family="sans-serif" text-anchor="${textAnchor}">
-                            ${tspanHtml}
-                          </text>`;
-              });
-              currentDimX += stepDir;
-              svg += `</g>`;
-          }
-
-          if (sortedCorpusYs.length > 0) {
-              svg += `<g class="layer-holes-corpus">`;
-              sortedCorpusYs.forEach(calcY => {
-                  let holeSvgY = sideH - calcY;
-                  let edgeX = isReversed ? panel.svgX + depth : panel.svgX;
-                  svg += `<line x1="${edgeX}" y1="${holeSvgY}" x2="${currentDimX}" y2="${holeSvgY}" stroke="#9333ea" stroke-width="0.5" stroke-dasharray="2,2" />`;
-                  
-                  let localHoleY = calcY - panelCalcY;
-                  let tspanHtml = getDimText(localHoleY, panelH, "#9333ea", true);
-
-                  svg += `<text x="${currentDimX + textOffset}" y="${holeSvgY + 4}" font-size="12" font-family="sans-serif" text-anchor="${textAnchor}">
-                            ${tspanHtml}
-                          </text>`;
-              });
-              currentDimX += stepDir;
-              svg += `</g>`;
-          }
-
-          if (sortedShelfYs.length > 0) {
-              svg += `<g class="layer-holes-shelf">`;
-              sortedShelfYs.forEach(calcY => {
-                  [32, 0, -32].forEach(dy => {
-                      let holeY = calcY + dy;
-                      let holeSvgY = sideH - holeY;
-                      let isCenter = dy === 0;
-                      let edgeX = isReversed ? panel.svgX + depth : panel.svgX;
-                      svg += `<line x1="${edgeX}" y1="${holeSvgY}" x2="${currentDimX}" y2="${holeSvgY}" stroke="#ea580c" stroke-width="0.5" stroke-dasharray="2,2" />`;
-                      
-                      let localHoleY = holeY - panelCalcY;
-                      let tspanHtml = getDimText(localHoleY, panelH, "#ea580c", true);
-
-                      svg += `<text x="${currentDimX + textOffset}" y="${holeSvgY + 4}" font-family="sans-serif" text-anchor="${textAnchor}" opacity="${isCenter ? '1' : '0.6'}">
-                                ${tspanHtml}
-                              </text>`;
-                  });
-              });
-              currentDimX += stepDir;
-              svg += `</g>`;
-          }
+          svg += chainDimension(chainFeatures, panelH, toSvgY, edgeX, dimLineX, isReversed);
       });
       svg += `</g>`;
   });
