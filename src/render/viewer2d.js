@@ -72,16 +72,23 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
 
   const cabX = 80;
   const detailStartX = cabX + cabWidth + 500; 
-  const frontX = detailStartX; 
-  const innerFrontX = detailStartX;
 
   panels.forEach(p => {
       if (p.id.endsWith('-R')) p.svgX = detailStartX + depth + 350;
       else p.svgX = detailStartX;
   });
 
+  // NAPRAWA: Kolumny frontu (zewnętrzny i wewnętrzny) muszą stać OBOK paneli
+  // z nawiertami (detail-left/right/part-N), a nie na tej samej współrzędnej X.
+  // Wcześniej frontX/innerFrontX = detailStartX pokrywały się dokładnie
+  // z panelem boków/przegród, więc włączenie widoczności frontu (toggleFront)
+  // zasłaniało aktualnie wybrany panel zamiast wyświetlić się obok niego.
+  const panelsRightEdge = detailStartX + depth + 350 + depth; 
+  const frontX = panelsRightEdge + 350; 
+  const innerFrontX = frontX + cabWidth + 350; 
+
   const marginY = 180; 
-  const svgWidth = detailStartX + (depth * 2) + 800; 
+  const svgWidth = innerFrontX + cabWidth + 400; 
   
   const vBoxY = svgTopY - marginY;
   const vBoxH = totalSvgHeight + (marginY * 2);
@@ -196,7 +203,11 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
     svg += `<rect id="map-detail-right" x="${cabX + cabWidth - th}" y="0" width="${th}" height="${sideH}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-right')" />`;
     svg += `<rect x="${cabX + th}" y="${sideH - th}" width="${cabWidth - th*2}" height="${th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
     
-    if (cons.topType === 'pelny') {
+    if (cons.topType === 'pelny' || cons.topType === 'trawersy_poziom') {
+      // Patrząc od przodu (widok szerokość x wysokość), trawersy poziome
+      // (przedni + tylny) różnią się od pełnego wieńca tylko głębokością,
+      // która nie jest widoczna z tego kąta - dlatego rysujemy identycznie
+      // jak pełny wieniec (analogicznie do "duchów" sąsiednich modułów, patrz wyżej).
       svg += `<rect x="${cabX + th}" y="0" width="${cabWidth - th*2}" height="${th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
     } else if (cons.topType === 'trawersy_pion') {
       svg += `<rect x="${cabX + th}" y="0" width="${th}" height="${cons.traverseWidth}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
