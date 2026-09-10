@@ -142,7 +142,7 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   `;
 
   svg += `<line x1="60" y1="${sideH}" x2="${svgWidth - 100}" y2="${sideH}" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,4" />`;
-  svg += `<text x="${cabX - 10}" y="${sideH + 4}" font-size="12" fill="#1e293b" font-weight="bold" text-anchor="end">0 mm</text>`;
+  svg += `<text x="${cabX - 10}" y="${sideH + 4}" font-size="12" fill="#1e293b" font-weight="bold" text-anchor="end">0 mm (Baza modułu)</text>`;
 
   svg += `<text x="${cabX + cabWidth/2}" y="${svgTopY - 25}" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">KORPUS (Kliknij element)</text>`;
 
@@ -233,35 +233,46 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   }
 
   // ==== WYMIAROWANIE ZARYSU CAŁEGO MEBLA (widok KORPUS) ====
-  // Pionowa oś przez środek zarysu: prześwity "w świetle" między wieńcami
-  // i poziomami (aktywny moduł + moduły w stosie) oraz gabaryt wysokości.
-  // Pozioma linia przez środek: gabaryt szerokości całego zarysu.
+  // Pionowy łańcuch przez środek zarysu: strzałkowe segmenty prześwitów
+  // "w świetle" między wieńcami i poziomami (aktywny moduł + moduły w stosie),
+  // etykiety osi "Oś: N" / "Oś wieńca: N" (wysokość osi od bazy modułu) oraz
+  // gabaryty wysokości i szerokości.
   {
     const dimX = cabX + cabWidth / 2;
 
-    // Powierzchnie poziome (SVG Y) dla pojedynczego modułu
-    const collectFaces = (mTopY, mH, elements, isTBF) => {
-      const faces = [mTopY + th, mTopY + mH - th];
+    // Dzielniki poziome: oś (SVG Y) + połowa grubości + rodzaj, dla jednego modułu
+    const collectDividers = (mTopY, mH, elements, isTBF) => {
+      const out = [
+        { axis: mTopY + th / 2, half: th / 2, kind: 'wieniec' },
+        { axis: mTopY + mH - th / 2, half: th / 2, kind: 'wieniec' },
+      ];
       (elements || []).filter(el => el.typ === 'poziom' && Number.isFinite(el.y)).forEach(el => {
         const drawY = isTBF ? el.y - th : el.y;
         const elSvgY = (mTopY + mH) - drawY - el.h;
-        faces.push(elSvgY, elSvgY + el.h);
+        out.push({ axis: elSvgY + el.h / 2, half: el.h / 2, kind: 'poziom' });
       });
-      return faces;
+      return out;
     };
 
-    let allFaces = collectFaces(0, sideH, mod.elements, isTopBottomFullWidth);
+    let dividers = collectDividers(0, sideH, mod.elements, isTopBottomFullWidth);
     stackModules.forEach(sm => {
       if (sm.id === mod.id) return;
       const dy = getDy(sm);
       const smH = parseFloat(sm.dimensions.height) || 720;
       const gY = sideH - (dy + smH);
       const smCons = { joinType: 'boki_przelotowe', ...(config.construction || {}), ...(sm.construction || {}) };
-      allFaces = allFaces.concat(collectFaces(gY, smH, sm.elements, smCons.joinType === 'wience_przelotowe'));
+      dividers = dividers.concat(collectDividers(gY, smH, sm.elements, smCons.joinType === 'wience_przelotowe'));
     });
-    allFaces = Array.from(new Set(allFaces.map(v => Math.round(v * 10) / 10)))
-      .filter(v => Number.isFinite(v))
-      .sort((a, b) => a - b);
+
+    // Scal pokrywające się dzielniki (styk wieńców sąsiednich modułów) — wieniec ma priorytet
+    const byKey = new Map();
+    dividers.forEach(d => {
+      if (!Number.isFinite(d.axis)) return;
+      const key = Math.round(d.axis);
+      const prev = byKey.get(key);
+      if (!prev || (prev.kind !== 'wieniec' && d.kind === 'wieniec')) byKey.set(key, d);
+    });
+    dividers = Array.from(byKey.values()).sort((a, b) => a.axis - b.axis);
 
     // Gabaryt szerokości: zasięg X całego zarysu (aktywny moduł + "duchy")
     let outlineMinX = cabX;
@@ -275,37 +286,47 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
     });
     const outlineWidthMM = outlineMaxX - outlineMinX;
 
+    svg += `<defs><marker id="korpus-dim-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155" /></marker></defs>`;
     svg += `<g class="layer-dim-outline">`;
-    svg += `<text x="${dimX}" y="${svgTopY - 8}" font-size="10" fill="#0f766e" text-anchor="middle" font-family="sans-serif">prześwity w świetle · gabaryt [mm]</text>`;
 
-    // Pionowa oś wymiarowa przez środek zarysu + gabaryt wysokości całkowitej
-    svg += `<line x1="${dimX}" y1="${svgTopY}" x2="${dimX}" y2="${svgBottomY}" stroke="#0f766e" stroke-width="1" />`;
-    svg += `<line x1="${dimX - 9}" y1="${svgTopY}" x2="${dimX + 9}" y2="${svgTopY}" stroke="#1e3a8a" stroke-width="1.8" />`;
-    svg += `<line x1="${dimX - 9}" y1="${svgBottomY}" x2="${dimX + 9}" y2="${svgBottomY}" stroke="#1e3a8a" stroke-width="1.8" />`;
-    svg += `<rect x="${dimX - 30}" y="${svgTopY + 6}" width="60" height="18" fill="#f8fafc" opacity="0.9" stroke="#1e3a8a" stroke-width="0.5" />`;
-    svg += `<text x="${dimX}" y="${svgTopY + 19}" font-size="13" font-weight="bold" fill="#1e3a8a" text-anchor="middle" font-family="sans-serif">${formatVal(totalSvgHeight)}</text>`;
+    // Etykiety osi + strzałkowe segmenty prześwitów między kolejnymi dzielnikami
+    const leaderStartX = dimX - 78;
+    dividers.forEach((d, i) => {
+      const axisY = d.axis;
+      const mmFromBase = formatVal(sideH - axisY);
+      const isW = d.kind === 'wieniec';
+      svg += `<line x1="${leaderStartX}" y1="${axisY}" x2="${dimX - 3}" y2="${axisY}" stroke="#94a3b8" stroke-width="0.6" stroke-dasharray="3,2" />`;
+      svg += `<text x="${leaderStartX - 4}" y="${axisY + 3}" font-size="10" fill="#1e3a8a" text-anchor="end" font-family="sans-serif" font-weight="${isW ? 'bold' : 'normal'}">${isW ? 'Oś wieńca' : 'Oś'}: ${mmFromBase}</text>`;
 
-    // Prześwity między kolejnymi powierzchniami poziomymi
-    for (let i = 0; i < allFaces.length - 1; i++) {
-      const yA = allFaces[i];
-      const yB = allFaces[i + 1];
-      const gap = yB - yA;
-      if (gap < 30) continue; // pomiń grubości materiału / styki wieńców
-      const midY = (yA + yB) / 2;
-      svg += `<line x1="${dimX - 6}" y1="${yA}" x2="${dimX + 6}" y2="${yA}" stroke="#0f766e" stroke-width="1.2" />`;
-      svg += `<line x1="${dimX - 6}" y1="${yB}" x2="${dimX + 6}" y2="${yB}" stroke="#0f766e" stroke-width="1.2" />`;
-      svg += `<rect x="${dimX - 19}" y="${midY - 8}" width="38" height="14" fill="#f8fafc" opacity="0.82" />`;
-      svg += `<text x="${dimX}" y="${midY + 3}" font-size="11" font-weight="bold" fill="#0f766e" text-anchor="middle" font-family="sans-serif">${formatVal(gap)}</text>`;
-    }
+      if (i < dividers.length - 1) {
+        const next = dividers[i + 1];
+        const yTop = axisY + d.half;
+        const yBot = next.axis - next.half;
+        const gap = yBot - yTop;
+        if (gap < 8) return;
+        const midY = (yTop + yBot) / 2;
+        svg += `<line x1="${dimX}" y1="${yTop}" x2="${dimX}" y2="${yBot}" stroke="#334155" stroke-width="1" marker-start="url(#korpus-dim-arrow)" marker-end="url(#korpus-dim-arrow)" />`;
+        svg += `<rect x="${dimX - 19}" y="${midY - 8}" width="38" height="15" fill="#f8fafc" stroke="#cbd5e1" stroke-width="0.5" />`;
+        svg += `<text x="${dimX}" y="${midY + 3}" font-size="11" font-weight="bold" fill="#0f766e" text-anchor="middle" font-family="sans-serif">${formatVal(gap)}</text>`;
+      }
+    });
+
+    // Gabaryt wysokości całkowitej — cienka oś odsunięta w prawo od łańcucha
+    const ghX = dimX + 40;
+    svg += `<line x1="${ghX}" y1="${svgTopY}" x2="${ghX}" y2="${svgBottomY}" stroke="#1e3a8a" stroke-width="1" marker-start="url(#korpus-dim-arrow)" marker-end="url(#korpus-dim-arrow)" />`;
+    svg += `<line x1="${ghX - 7}" y1="${svgTopY}" x2="${ghX + 7}" y2="${svgTopY}" stroke="#1e3a8a" stroke-width="1.6" />`;
+    svg += `<line x1="${ghX - 7}" y1="${svgBottomY}" x2="${ghX + 7}" y2="${svgBottomY}" stroke="#1e3a8a" stroke-width="1.6" />`;
+    svg += `<rect x="${ghX - 26}" y="${svgTopY + 8}" width="52" height="16" fill="#f8fafc" stroke="#1e3a8a" stroke-width="0.5" />`;
+    svg += `<text x="${ghX}" y="${svgTopY + 20}" font-size="12" font-weight="bold" fill="#1e3a8a" text-anchor="middle" font-family="sans-serif">${formatVal(totalSvgHeight)}</text>`;
 
     // Gabaryt szerokości — pozioma linia przez środek zarysu
     const dimY = (svgTopY + svgBottomY) / 2;
     const midX = (outlineMinX + outlineMaxX) / 2;
-    svg += `<line x1="${outlineMinX}" y1="${dimY}" x2="${outlineMaxX}" y2="${dimY}" stroke="#1e3a8a" stroke-width="1" stroke-dasharray="6,3" />`;
-    svg += `<line x1="${outlineMinX}" y1="${dimY - 9}" x2="${outlineMinX}" y2="${dimY + 9}" stroke="#1e3a8a" stroke-width="1.8" />`;
-    svg += `<line x1="${outlineMaxX}" y1="${dimY - 9}" x2="${outlineMaxX}" y2="${dimY + 9}" stroke="#1e3a8a" stroke-width="1.8" />`;
-    svg += `<rect x="${midX - 34}" y="${dimY - 20}" width="68" height="16" fill="#f8fafc" opacity="0.92" stroke="#1e3a8a" stroke-width="0.5" />`;
-    svg += `<text x="${midX}" y="${dimY - 8}" font-size="13" font-weight="bold" fill="#1e3a8a" text-anchor="middle" font-family="sans-serif">${formatVal(outlineWidthMM)}</text>`;
+    svg += `<line x1="${outlineMinX}" y1="${dimY}" x2="${outlineMaxX}" y2="${dimY}" stroke="#1e3a8a" stroke-width="1" stroke-dasharray="6,3" marker-start="url(#korpus-dim-arrow)" marker-end="url(#korpus-dim-arrow)" />`;
+    svg += `<line x1="${outlineMinX}" y1="${dimY - 9}" x2="${outlineMinX}" y2="${dimY + 9}" stroke="#1e3a8a" stroke-width="1.6" />`;
+    svg += `<line x1="${outlineMaxX}" y1="${dimY - 9}" x2="${outlineMaxX}" y2="${dimY + 9}" stroke="#1e3a8a" stroke-width="1.6" />`;
+    svg += `<rect x="${midX - 34}" y="${dimY - 24}" width="68" height="16" fill="#f8fafc" opacity="0.95" stroke="#1e3a8a" stroke-width="0.5" />`;
+    svg += `<text x="${midX}" y="${dimY - 12}" font-size="12" font-weight="bold" fill="#1e3a8a" text-anchor="middle" font-family="sans-serif">${formatVal(outlineWidthMM)}</text>`;
     svg += `</g>`;
   }
 
