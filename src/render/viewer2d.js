@@ -461,7 +461,7 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
                       let isCenter = dy === 0;
                       let edgeX = isReversed ? panel.svgX + depth : panel.svgX;
                       svg += `<line x1="${edgeX}" y1="${holeSvgY}" x2="${currentDimX}" y2="${holeSvgY}" stroke="#ea580c" stroke-width="0.5" stroke-dasharray="2,2" />`;
-                      
+
                       let localHoleY = holeY - panelCalcY;
                       let tspanHtml = getDimText(localHoleY, panelH, "#ea580c", true);
 
@@ -470,6 +470,25 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
                               </text>`;
                   });
               });
+
+              // Wymiar oś-w-oś między środkowymi otworami sąsiednich półek
+              // ruchomych (rozstaw półek). Rysowany tuż przy krawędzi panelu,
+              // w osobnym pionowym łańcuszku, żeby nie kolidował z opisami
+              // pojedynczych otworów.
+              if (sortedShelfYs.length > 1) {
+                  const shelfEdgeX = isReversed ? panel.svgX + depth : panel.svgX;
+                  const pitchX = shelfEdgeX + (isReversed ? 26 : -26);
+                  for (let i = 0; i < sortedShelfYs.length - 1; i++) {
+                      const yA = sideH - sortedShelfYs[i];
+                      const yB = sideH - sortedShelfYs[i + 1];
+                      const gap = formatVal(Math.abs(sortedShelfYs[i + 1] - sortedShelfYs[i]));
+                      svg += `<line x1="${pitchX}" y1="${yA}" x2="${pitchX}" y2="${yB}" stroke="#c2410c" stroke-width="1" />`;
+                      svg += `<line x1="${pitchX - 4}" y1="${yA}" x2="${pitchX + 4}" y2="${yA}" stroke="#c2410c" stroke-width="1.4" />`;
+                      svg += `<line x1="${pitchX - 4}" y1="${yB}" x2="${pitchX + 4}" y2="${yB}" stroke="#c2410c" stroke-width="1.4" />`;
+                      svg += `<text x="${pitchX + (isReversed ? 7 : -7)}" y="${(yA + yB) / 2 + 4}" font-size="12" font-weight="bold" fill="#c2410c" text-anchor="${textAnchor}" font-family="sans-serif">${gap}<tspan font-size="9" font-weight="normal" fill="#9a3412"> oś-oś</tspan></text>`;
+                  }
+              }
+
               currentDimX += stepDir;
               svg += `</g>`;
           }
