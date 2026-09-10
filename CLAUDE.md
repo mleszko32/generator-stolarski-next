@@ -126,7 +126,15 @@ window event (dispatched by 3D drag) to re-render the properties panel.
 `saveProjectToCloud` / `loadProjectFromCloud` / `deleteProjectFromCloud` /
 `getSavedProjectsList`. Also exports `showCustomDialog(type, title, msg, ...)` — a
 promise-based modal used instead of native `confirm` / `prompt`. The Firebase web config is
-committed inline in this file.
+committed inline (it is public by design).
+
+**Auth**: single-owner. Google sign-in (`signInWithGoogle` / `signOutUser` / `onAuthChange`
+/ `getCurrentUser`, wired in `main.js`, button in `layout.js`). Every cloud function bails
+via `requireOwner()` unless `auth.currentUser.email === OWNER_EMAIL`. The real gate is
+`firestore.rules` (same email) — see `FIREBASE.md` for the one-time console setup (enable
+Google provider, publish rules). The client check is only for a readable error message.
+Changing owner = edit `OWNER_EMAIL` in `storage.js` **and** the condition in
+`firestore.rules`, then republish rules.
 
 ### AI sketch import
 

@@ -1,0 +1,36 @@
+rules_version = '2';
+
+// Reguły bezpieczeństwa Firestore dla "Generator Stolarski Next".
+//
+// Konfiguracja Firebase w kodzie klienta (src/core/storage.js) jest publiczna i
+// sama z siebie NICZEGO nie chroni. To ten plik jest jedyną realną barierą.
+//
+// Model: aplikacji używa jedna osoba. Dostęp do wszystkich projektów ma
+// wyłącznie zalogowany właściciel, identyfikowany po zweryfikowanym adresie
+// e-mail konta Google. Ten sam adres jest w storage.js jako OWNER_EMAIL.
+//
+// Zamiast e-maila możesz oprzeć się na UID (stabilniejsze, jeśli kiedyś
+// zmienisz adres): podmień warunek na
+//   request.auth.uid == 'TWOJ_UID'
+// UID znajdziesz w konsoli Firebase → Authentication → Users.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner() {
+      return request.auth != null
+          && request.auth.token.email_verified == true
+          && request.auth.token.email == 'mleszko32@gmail.com';
+    }
+
+    // Zapisane projekty. Dokument = jeden projekt, id = nazwa projektu.
+    match /projects/{projectId} {
+      allow read, write: if isOwner();
+    }
+
+    // Wszystko poza tym jest zamknięte na głucho.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

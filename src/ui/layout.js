@@ -4,7 +4,9 @@ export function initLayout() {
   app.innerHTML = `
     <div class="top-nav">
       <div class="logo">Generator Stolarski Next</div>
-      <div class="nav-actions">
+      <div class="nav-actions" style="display: flex; align-items: center; gap: 8px;">
+          <span id="auth-status" style="color: #e2e8f0; font-size: 13px;"></span>
+          <button id="btn-auth" class="btn-primary" style="background: #3b82f6; color: white;">🔑 Zaloguj</button>
           <button id="btn-save-cloud" class="btn-primary" style="background: #f59e0b; color: white;">☁️ Zapisz projekt</button>
           <button id="btn-load-cloud" class="btn-primary" style="background: #10b981; color: white;">📥 Wczytaj projekt</button>
       </div>

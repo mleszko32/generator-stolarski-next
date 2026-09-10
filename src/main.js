@@ -9,6 +9,7 @@ import { escapeHtml } from "./utils/dom.js";
 
 // ZMIANA: Importujemy funkcję do usuwania projektów oraz customowy dialog
 import { saveProjectToCloud, loadProjectFromCloud, getSavedProjectsList, deleteProjectFromCloud, showCustomDialog } from "./core/storage.js";
+import { onAuthChange, signInWithGoogle, signOutUser, getCurrentUser } from "./core/storage.js";
 
 console.log("Generator Stolarski Next uruchomiony");
 
@@ -21,6 +22,35 @@ init3DViewer();
 // --- OBSŁUGA PRZYCISKÓW CHMURY ---
 const btnSave = document.getElementById('btn-save-cloud');
 const btnLoad = document.getElementById('btn-load-cloud');
+
+// --- LOGOWANIE (Google) ---
+// Chmura działa tylko dla zalogowanego właściciela. Przyciski zapisu/wczytania
+// są nieaktywne, dopóki nie ma sesji.
+const btnAuth = document.getElementById('btn-auth');
+const authStatus = document.getElementById('auth-status');
+const cloudButtons = [btnSave, btnLoad].filter(Boolean);
+
+function reflectAuth(user) {
+  const signedIn = !!user;
+  if (authStatus) authStatus.innerText = signedIn ? `✓ ${user.email}` : 'niezalogowany';
+  if (btnAuth) btnAuth.innerText = signedIn ? '🚪 Wyloguj' : '🔑 Zaloguj (Google)';
+  cloudButtons.forEach(b => {
+    b.disabled = !signedIn;
+    b.style.opacity = signedIn ? '1' : '0.5';
+    b.style.cursor = signedIn ? 'pointer' : 'not-allowed';
+  });
+}
+
+if (btnAuth) {
+  btnAuth.addEventListener('click', async () => {
+    btnAuth.disabled = true;
+    if (getCurrentUser()) await signOutUser();
+    else await signInWithGoogle();
+    btnAuth.disabled = false;
+  });
+}
+
+onAuthChange(reflectAuth); // odpala się od razu ze stanem początkowym (null lub sesja z localStorage)
 
 if (btnSave) {
   btnSave.addEventListener('click', async () => {

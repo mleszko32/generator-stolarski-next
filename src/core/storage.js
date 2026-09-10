@@ -1,9 +1,18 @@
 // src/core/storage.js
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from "firebase/firestore";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged,
+} from "firebase/auth";
 import { state } from "./state.js";
 
-// ⚠️ UWAGA: WKLEJ TUTAJ Z POWROTEM SWOJE KLUCZE FIREBASE! ⚠️
+// Konfiguracja klienta Firebase jest z założenia publiczna (leci do przeglądarki)
+// i sama z siebie niczego nie chroni. Realną barierą są reguły Firestore w
+// firestore.rules — wpuszczają wyłącznie zalogowanego właściciela (OWNER_EMAIL).
 const firebaseConfig = {
   apiKey: "AIzaSyDnv-wvIpfM7Idlsiqaj8LTDLw9Zmtm3cg",
   authDomain: "generator-stolarski-next.firebaseapp.com",
@@ -15,6 +24,68 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+
+// Jedyne konto z dostępem do chmury. TEN SAM adres musi być w firestore.rules —
+// tutaj to tylko wygodny check po stronie klienta (czytelny komunikat zamiast
+// surowego błędu "permission denied"), tam jest właściwe zabezpieczenie.
+export const OWNER_EMAIL = "mleszko32@gmail.com";
+
+// --- AUTORYZACJA ---
+export function onAuthChange(callback) {
+  return onAuthStateChanged(auth, callback);
+}
+
+export function getCurrentUser() {
+  return auth.currentUser;
+}
+
+export function isOwner() {
+  const u = auth.currentUser;
+  return !!u && u.email === OWNER_EMAIL;
+}
+
+export async function signInWithGoogle() {
+  try {
+    const { user } = await signInWithPopup(auth, provider);
+    if (user.email !== OWNER_EMAIL) {
+      await signOut(auth);
+      alert(`Zalogowano jako ${user.email}, ale dostęp ma tylko ${OWNER_EMAIL}. Wylogowano.`);
+      return null;
+    }
+    return user;
+  } catch (err) {
+    if (err?.code === "auth/popup-closed-by-user" || err?.code === "auth/cancelled-popup-request") {
+      return null;
+    }
+    console.error("Błąd logowania:", err);
+    alert("❌ Nie udało się zalogować:\n" + (err?.message || err));
+    return null;
+  }
+}
+
+export async function signOutUser() {
+  try {
+    await signOut(auth);
+  } catch (err) {
+    console.error("Błąd wylogowania:", err);
+  }
+}
+
+// Bramka dla operacji chmurowych. Nie jest zabezpieczeniem (to robią reguły
+// Firestore) — daje tylko od razu zrozumiały komunikat.
+function requireOwner() {
+  if (!auth.currentUser) {
+    alert("🔒 Zaloguj się (przycisk w prawym górnym rogu), aby korzystać z chmury.");
+    return false;
+  }
+  if (!isOwner()) {
+    alert(`🔒 Dostęp do chmury ma tylko konto ${OWNER_EMAIL}.`);
+    return false;
+  }
+  return true;
+}
 
 // --- WŁASNY SYSTEM MODALI (Uniwersalny z możliwością zmiany nazw przycisków) ---
 export function showCustomDialog(type, title, message, defaultValue = "", okText = "OK", cancelText = "Anuluj") {
@@ -98,6 +169,7 @@ export function showCustomDialog(type, title, message, defaultValue = "", okText
 
 // ZAPISYWANIE
 export async function saveProjectToCloud(projectId = null) {
+  if (!requireOwner()) return;
   try {
     let targetId = projectId;
 
@@ -148,7 +220,8 @@ export async function saveProjectToCloud(projectId = null) {
 // WCZYTYWANIE
 export async function loadProjectFromCloud(projectId) {
   if (!projectId) return false;
-  
+  if (!requireOwner()) return false;
+
   try {
     const projectRef = doc(db, "projects", projectId);
     const docSnap = await getDoc(projectRef);
@@ -171,6 +244,7 @@ export async function loadProjectFromCloud(projectId) {
 
 // NOWOŚĆ: USUWANIE PROJEKTU Z BAZY
 export async function deleteProjectFromCloud(projectId) {
+  if (!requireOwner()) return false;
   try {
     const projectRef = doc(db, "projects", projectId);
     await deleteDoc(projectRef);
@@ -190,6 +264,7 @@ export async function deleteProjectFromCloud(projectId) {
 
 // POBIERANIE LISTY
 export async function getSavedProjectsList() {
+  if (!requireOwner()) return [];
   try {
     const projectsRef = collection(db, "projects");
     const snapshot = await getDocs(projectsRef);
