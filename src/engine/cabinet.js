@@ -1,9 +1,14 @@
 // src/engine/cabinet.js
 import { state } from "../core/state.js";
 import { calculateDrawerHoles, getDrawerComponents } from "../core/drawerMath.js";
-import { calculateHinges } from "../core/hingeMath.js"; 
+import { calculateHinges } from "../core/hingeMath.js";
+import { recalculateAllLayouts } from "../core/layout.js";
 
 export function calculateParts() {
+  // Fronty muszą mieć aktualne el.x/y/w/h zanim policzymy z nich formatki.
+  // Nie zakładamy, że update3D() (render) pobiegł wcześniej.
+  recalculateAllLayouts();
+
   const activeModuleId = state.activeModuleId;
   const mod = state.project.modules.find(m => m.id === activeModuleId);
   if (!mod) return { parts: [], mountingData: [] };
@@ -102,6 +107,8 @@ function getGlobalHingesForModule(targetMod, config) {
 }
 
 export function calculateAllProjectParts() {
+  recalculateAllLayouts();
+
   const config = state.project;
   let allParts = [];
 
@@ -180,6 +187,8 @@ export function calculateAllProjectParts() {
 }
 
 export function calculateProjectHardware() {
+  recalculateAllLayouts();
+
   const config = state.project;
   const hardwareList = {};
 
