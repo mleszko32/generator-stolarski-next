@@ -232,6 +232,83 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
     });
   }
 
+  // ==== WYMIAROWANIE ZARYSU CAŁEGO MEBLA (widok KORPUS) ====
+  // Pionowa oś przez środek zarysu: prześwity "w świetle" między wieńcami
+  // i poziomami (aktywny moduł + moduły w stosie) oraz gabaryt wysokości.
+  // Pozioma linia przez środek: gabaryt szerokości całego zarysu.
+  {
+    const dimX = cabX + cabWidth / 2;
+
+    // Powierzchnie poziome (SVG Y) dla pojedynczego modułu
+    const collectFaces = (mTopY, mH, elements, isTBF) => {
+      const faces = [mTopY + th, mTopY + mH - th];
+      (elements || []).filter(el => el.typ === 'poziom' && Number.isFinite(el.y)).forEach(el => {
+        const drawY = isTBF ? el.y - th : el.y;
+        const elSvgY = (mTopY + mH) - drawY - el.h;
+        faces.push(elSvgY, elSvgY + el.h);
+      });
+      return faces;
+    };
+
+    let allFaces = collectFaces(0, sideH, mod.elements, isTopBottomFullWidth);
+    stackModules.forEach(sm => {
+      if (sm.id === mod.id) return;
+      const dy = getDy(sm);
+      const smH = parseFloat(sm.dimensions.height) || 720;
+      const gY = sideH - (dy + smH);
+      const smCons = { joinType: 'boki_przelotowe', ...(config.construction || {}), ...(sm.construction || {}) };
+      allFaces = allFaces.concat(collectFaces(gY, smH, sm.elements, smCons.joinType === 'wience_przelotowe'));
+    });
+    allFaces = Array.from(new Set(allFaces.map(v => Math.round(v * 10) / 10)))
+      .filter(v => Number.isFinite(v))
+      .sort((a, b) => a - b);
+
+    // Gabaryt szerokości: zasięg X całego zarysu (aktywny moduł + "duchy")
+    let outlineMinX = cabX;
+    let outlineMaxX = cabX + cabWidth;
+    stackModules.forEach(sm => {
+      if (sm.id === mod.id) return;
+      const gX = cabX + ((parseFloat(sm.position.x) || 0) - activeModAbsX);
+      const smW = parseFloat(sm.dimensions.width) || 600;
+      outlineMinX = Math.min(outlineMinX, gX);
+      outlineMaxX = Math.max(outlineMaxX, gX + smW);
+    });
+    const outlineWidthMM = outlineMaxX - outlineMinX;
+
+    svg += `<g class="layer-dim-outline">`;
+    svg += `<text x="${dimX}" y="${svgTopY - 8}" font-size="10" fill="#0f766e" text-anchor="middle" font-family="sans-serif">prześwity w świetle · gabaryt [mm]</text>`;
+
+    // Pionowa oś wymiarowa przez środek zarysu + gabaryt wysokości całkowitej
+    svg += `<line x1="${dimX}" y1="${svgTopY}" x2="${dimX}" y2="${svgBottomY}" stroke="#0f766e" stroke-width="1" />`;
+    svg += `<line x1="${dimX - 9}" y1="${svgTopY}" x2="${dimX + 9}" y2="${svgTopY}" stroke="#1e3a8a" stroke-width="1.8" />`;
+    svg += `<line x1="${dimX - 9}" y1="${svgBottomY}" x2="${dimX + 9}" y2="${svgBottomY}" stroke="#1e3a8a" stroke-width="1.8" />`;
+    svg += `<rect x="${dimX - 30}" y="${svgTopY + 6}" width="60" height="18" fill="#f8fafc" opacity="0.9" stroke="#1e3a8a" stroke-width="0.5" />`;
+    svg += `<text x="${dimX}" y="${svgTopY + 19}" font-size="13" font-weight="bold" fill="#1e3a8a" text-anchor="middle" font-family="sans-serif">${formatVal(totalSvgHeight)}</text>`;
+
+    // Prześwity między kolejnymi powierzchniami poziomymi
+    for (let i = 0; i < allFaces.length - 1; i++) {
+      const yA = allFaces[i];
+      const yB = allFaces[i + 1];
+      const gap = yB - yA;
+      if (gap < 30) continue; // pomiń grubości materiału / styki wieńców
+      const midY = (yA + yB) / 2;
+      svg += `<line x1="${dimX - 6}" y1="${yA}" x2="${dimX + 6}" y2="${yA}" stroke="#0f766e" stroke-width="1.2" />`;
+      svg += `<line x1="${dimX - 6}" y1="${yB}" x2="${dimX + 6}" y2="${yB}" stroke="#0f766e" stroke-width="1.2" />`;
+      svg += `<rect x="${dimX - 19}" y="${midY - 8}" width="38" height="14" fill="#f8fafc" opacity="0.82" />`;
+      svg += `<text x="${dimX}" y="${midY + 3}" font-size="11" font-weight="bold" fill="#0f766e" text-anchor="middle" font-family="sans-serif">${formatVal(gap)}</text>`;
+    }
+
+    // Gabaryt szerokości — pozioma linia przez środek zarysu
+    const dimY = (svgTopY + svgBottomY) / 2;
+    const midX = (outlineMinX + outlineMaxX) / 2;
+    svg += `<line x1="${outlineMinX}" y1="${dimY}" x2="${outlineMaxX}" y2="${dimY}" stroke="#1e3a8a" stroke-width="1" stroke-dasharray="6,3" />`;
+    svg += `<line x1="${outlineMinX}" y1="${dimY - 9}" x2="${outlineMinX}" y2="${dimY + 9}" stroke="#1e3a8a" stroke-width="1.8" />`;
+    svg += `<line x1="${outlineMaxX}" y1="${dimY - 9}" x2="${outlineMaxX}" y2="${dimY + 9}" stroke="#1e3a8a" stroke-width="1.8" />`;
+    svg += `<rect x="${midX - 34}" y="${dimY - 20}" width="68" height="16" fill="#f8fafc" opacity="0.92" stroke="#1e3a8a" stroke-width="0.5" />`;
+    svg += `<text x="${midX}" y="${dimY - 8}" font-size="13" font-weight="bold" fill="#1e3a8a" text-anchor="middle" font-family="sans-serif">${formatVal(outlineWidthMM)}</text>`;
+    svg += `</g>`;
+  }
+
   function getShelvesForFace(faceX, isRightFace) {
       return (mod.elements || []).filter(el => {
           if (el.typ !== 'poziom') return false;
