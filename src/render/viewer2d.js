@@ -232,11 +232,14 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
     });
   }
 
-  // ==== WYMIAROWANIE ZARYSU CAŁEGO MEBLA (widok KORPUS) ====
-  // Pionowy łańcuch przez środek zarysu: strzałkowe segmenty prześwitów
-  // "w świetle" między wieńcami i poziomami (aktywny moduł + moduły w stosie),
-  // etykiety osi "Oś: N" / "Oś wieńca: N" (wysokość osi od bazy modułu) oraz
-  // gabaryty wysokości i szerokości.
+  // ==== WYMIAROWANIE PRZESTRZENI KORPUSU (widok KORPUS) ====
+  // Wyłącznie wymiary WEWNĄTRZ zarysu mebla — świadomie bez żadnego gabarytu
+  // zewnętrznego (użytkownik: "poza szafką żadnych wymiarów"):
+  //   - pionowy łańcuch przez środek zarysu: strzałkowe segmenty prześwitów
+  //     "w świetle" między wieńcami i poziomami (aktywny moduł + moduły w
+  //     stosie) + etykiety osi "Oś: N" / "Oś wieńca: N" (od bazy modułu),
+  //   - poziome światło (wewnętrzna szerokość) każdej przestrzeni/kolumny
+  //     wyznaczonej przez przegrody pionowe — ten sam styl, w poprzek.
   {
     const dimX = cabX + cabWidth / 2;
 
@@ -274,18 +277,6 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
     });
     dividers = Array.from(byKey.values()).sort((a, b) => a.axis - b.axis);
 
-    // Gabaryt szerokości: zasięg X całego zarysu (aktywny moduł + "duchy")
-    let outlineMinX = cabX;
-    let outlineMaxX = cabX + cabWidth;
-    stackModules.forEach(sm => {
-      if (sm.id === mod.id) return;
-      const gX = cabX + ((parseFloat(sm.position.x) || 0) - activeModAbsX);
-      const smW = parseFloat(sm.dimensions.width) || 600;
-      outlineMinX = Math.min(outlineMinX, gX);
-      outlineMaxX = Math.max(outlineMaxX, gX + smW);
-    });
-    const outlineWidthMM = outlineMaxX - outlineMinX;
-
     svg += `<defs><marker id="korpus-dim-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155" /></marker></defs>`;
     svg += `<g class="layer-dim-outline">`;
 
@@ -311,28 +302,12 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
       }
     });
 
-    // Gabaryt wysokości całkowitej — cienka oś odsunięta w prawo od łańcucha
-    const ghX = dimX + 40;
-    svg += `<line x1="${ghX}" y1="${svgTopY}" x2="${ghX}" y2="${svgBottomY}" stroke="#1e3a8a" stroke-width="1" marker-start="url(#korpus-dim-arrow)" marker-end="url(#korpus-dim-arrow)" />`;
-    svg += `<line x1="${ghX - 7}" y1="${svgTopY}" x2="${ghX + 7}" y2="${svgTopY}" stroke="#1e3a8a" stroke-width="1.6" />`;
-    svg += `<line x1="${ghX - 7}" y1="${svgBottomY}" x2="${ghX + 7}" y2="${svgBottomY}" stroke="#1e3a8a" stroke-width="1.6" />`;
-    svg += `<rect x="${ghX - 26}" y="${svgTopY + 8}" width="52" height="16" fill="#f8fafc" stroke="#1e3a8a" stroke-width="0.5" />`;
-    svg += `<text x="${ghX}" y="${svgTopY + 20}" font-size="12" font-weight="bold" fill="#1e3a8a" text-anchor="middle" font-family="sans-serif">${formatVal(totalSvgHeight)}</text>`;
-
-    // Gabaryt szerokości — pozioma linia przez środek zarysu
-    const dimY = (svgTopY + svgBottomY) / 2;
-    const midX = (outlineMinX + outlineMaxX) / 2;
-    svg += `<line x1="${outlineMinX}" y1="${dimY}" x2="${outlineMaxX}" y2="${dimY}" stroke="#1e3a8a" stroke-width="1" stroke-dasharray="6,3" marker-start="url(#korpus-dim-arrow)" marker-end="url(#korpus-dim-arrow)" />`;
-    svg += `<line x1="${outlineMinX}" y1="${dimY - 9}" x2="${outlineMinX}" y2="${dimY + 9}" stroke="#1e3a8a" stroke-width="1.6" />`;
-    svg += `<line x1="${outlineMaxX}" y1="${dimY - 9}" x2="${outlineMaxX}" y2="${dimY + 9}" stroke="#1e3a8a" stroke-width="1.6" />`;
-    svg += `<rect x="${midX - 34}" y="${dimY - 24}" width="68" height="16" fill="#f8fafc" opacity="0.95" stroke="#1e3a8a" stroke-width="0.5" />`;
-    svg += `<text x="${midX}" y="${dimY - 12}" font-size="12" font-weight="bold" fill="#1e3a8a" text-anchor="middle" font-family="sans-serif">${formatVal(outlineWidthMM)}</text>`;
-
-    // Światło (wewnętrzna szerokość) każdej przestrzeni aktywnego modułu —
-    // odpowiednik pionowych świateł powyżej, ale w poziomie. Jedna kolumna =
-    // cały korpus gdy nie ma przegród pionowych; każda przegroda (pion) dzieli
-    // zarys na kolejne przestrzenie o własnej szerokości. Rysowane w osobnym
-    // rzędzie pod zarysem, żeby nie kolidować z łańcuchem osi ani z gabarytami.
+    // Poziome światło (wewnętrzna szerokość) każdej przestrzeni/kolumny
+    // wyznaczonej przez przegrody pionowe — poziomy odpowiednik łańcucha
+    // powyżej, tym samym stylem (strzałki + boxowana wartość). Jedna kolumna
+    // = cała szerokość korpusu, gdy nie ma przegród pionowych. Rysowane W
+    // ŚRODKU zarysu, w najbardziej otwartym prześwicie (żeby nie wylądować na
+    // półce) — celowo nigdy poza obrysem mebla.
     const columns = [];
     {
       let cur = th;
@@ -343,18 +318,24 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
       columns.push({ left: cur, right: cabWidth - th });
     }
 
-    const widthDimY = sideH + 45;
+    let widthDimY = sideH / 2;
+    let bestGap = -1;
+    for (let i = 0; i < dividers.length - 1; i++) {
+      const a = dividers[i], b = dividers[i + 1];
+      const yTop = a.axis + a.half, yBot = b.axis - b.half;
+      const gap = yBot - yTop;
+      if (gap > bestGap) { bestGap = gap; widthDimY = (yTop + yBot) / 2; }
+    }
+
     columns.forEach(col => {
       const xL = cabX + col.left;
       const xR = cabX + col.right;
-      if (xR - xL < 5) return;
+      if (xR - xL < 8) return;
       const colMidX = (xL + xR) / 2;
       const w = formatVal(col.right - col.left);
-      svg += `<line x1="${xL}" y1="${widthDimY}" x2="${xR}" y2="${widthDimY}" stroke="#0f766e" stroke-width="1" marker-start="url(#korpus-dim-arrow)" marker-end="url(#korpus-dim-arrow)" />`;
-      svg += `<line x1="${xL}" y1="${widthDimY - 6}" x2="${xL}" y2="${widthDimY + 6}" stroke="#0f766e" stroke-width="1.4" />`;
-      svg += `<line x1="${xR}" y1="${widthDimY - 6}" x2="${xR}" y2="${widthDimY + 6}" stroke="#0f766e" stroke-width="1.4" />`;
-      svg += `<rect x="${colMidX - 24}" y="${widthDimY + 6}" width="48" height="16" fill="#f8fafc" stroke="#0f766e" stroke-width="0.5" />`;
-      svg += `<text x="${colMidX}" y="${widthDimY + 18}" font-size="11" font-weight="bold" fill="#0f766e" text-anchor="middle" font-family="sans-serif">${w}</text>`;
+      svg += `<line x1="${xL}" y1="${widthDimY}" x2="${xR}" y2="${widthDimY}" stroke="#334155" stroke-width="1" marker-start="url(#korpus-dim-arrow)" marker-end="url(#korpus-dim-arrow)" />`;
+      svg += `<rect x="${colMidX - 24}" y="${widthDimY - 8}" width="48" height="15" fill="#f8fafc" stroke="#cbd5e1" stroke-width="0.5" />`;
+      svg += `<text x="${colMidX}" y="${widthDimY + 4}" font-size="11" font-weight="bold" fill="#0f766e" text-anchor="middle" font-family="sans-serif">${w}</text>`;
     });
 
     svg += `</g>`;
