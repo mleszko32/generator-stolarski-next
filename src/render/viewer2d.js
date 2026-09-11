@@ -233,63 +233,18 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   }
 
   // ==== WYMIAROWANIE PRZESTRZENI KORPUSU (widok KORPUS) ====
-  // Wyłącznie wymiary WEWNĄTRZ zarysu AKTYWNEGO MODUŁU — świadomie ani poza
-  // szafką (żadnego gabarytu zewnętrznego), ani w sąsiednich modułach "duchach"
-  // ze stosu. Duchy mają zwykle inną wysokość bazową (dy != 0) i mogą być
-  // oddalone od aktywnego modułu sporą przerwą (np. szczelina na blat) — scalanie
-  // ich dzielników z aktywnym modułem dawało bezsensowne osie (ujemne wartości)
-  // i olbrzymie, przypadkowe "prześwity" w tej dziurze między modułami.
-  //   - pionowy łańcuch przez środek zarysu: strzałkowe segmenty prześwitów
-  //     "w świetle" między wieńcami i poziomami TEGO modułu + etykiety osi
-  //     "Oś: N" / "Oś wieńca: N" (od bazy tego modułu),
-  //   - poziome światło (wewnętrzna szerokość) każdej przestrzeni/kolumny
-  //     wyznaczonej przez przegrody pionowe — ten sam styl, w poprzek.
+  // Wyłącznie wymiary WEWNĄTRZ zarysu AKTYWNEGO MODUŁU, NIEZALEŻNIE dla
+  // każdej kolumny wyznaczonej przez przegrody pionowe (piony) — bez piony to
+  // jedna kolumna na całą szerokość. Świadomie ani poza szafką (żadnego
+  // gabarytu zewnętrznego), ani w sąsiednich modułach "duchach" ze stosu
+  // (inna baza Y, czasem spora przerwa — scalanie dawało bezsensowne osie i
+  // przypadkowe "prześwity" w dziurze między modułami), ani mieszając ze sobą
+  // półki z różnych kolumn (dawało wymiary nieodpowiadające żadnej realnej
+  // przestrzeni, bo środkowy łańcuch nie trafiał w żadną z nich).
+  // Każda kolumna dostaje WŁASNY, niezależny łańcuch: pionowe światła między
+  // jej wieńcami/półkami + etykiety osi, oraz jej własne poziome światło
+  // (szerokość) w największym z jej własnych prześwitów.
   {
-    const dimX = cabX + cabWidth / 2;
-
-    // Dzielniki poziome: oś (SVG Y) + połowa grubości + rodzaj, tylko dla aktywnego modułu
-    const dividers = [
-      { axis: th / 2, half: th / 2, kind: 'wieniec' },
-      { axis: sideH - th / 2, half: th / 2, kind: 'wieniec' },
-    ];
-    (mod.elements || []).filter(el => el.typ === 'poziom' && Number.isFinite(el.y)).forEach(el => {
-      const drawY = isTopBottomFullWidth ? el.y - th : el.y;
-      const elSvgY = sideH - drawY - el.h;
-      dividers.push({ axis: elSvgY + el.h / 2, half: el.h / 2, kind: 'poziom' });
-    });
-    dividers.sort((a, b) => a.axis - b.axis);
-
-    svg += `<defs><marker id="korpus-dim-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155" /></marker></defs>`;
-    svg += `<g class="layer-dim-outline">`;
-
-    // Etykiety osi + strzałkowe segmenty prześwitów między kolejnymi dzielnikami
-    const leaderStartX = dimX - 78;
-    dividers.forEach((d, i) => {
-      const axisY = d.axis;
-      const mmFromBase = formatVal(sideH - axisY);
-      const isW = d.kind === 'wieniec';
-      svg += `<line x1="${leaderStartX}" y1="${axisY}" x2="${dimX - 3}" y2="${axisY}" stroke="#94a3b8" stroke-width="0.6" stroke-dasharray="3,2" />`;
-      svg += `<text x="${leaderStartX - 4}" y="${axisY + 3}" font-size="10" fill="#1e3a8a" text-anchor="end" font-family="sans-serif" font-weight="${isW ? 'bold' : 'normal'}">${isW ? 'Oś wieńca' : 'Oś'}: ${mmFromBase}</text>`;
-
-      if (i < dividers.length - 1) {
-        const next = dividers[i + 1];
-        const yTop = axisY + d.half;
-        const yBot = next.axis - next.half;
-        const gap = yBot - yTop;
-        if (gap < 8) return;
-        const midY = (yTop + yBot) / 2;
-        svg += `<line x1="${dimX}" y1="${yTop}" x2="${dimX}" y2="${yBot}" stroke="#334155" stroke-width="1" marker-start="url(#korpus-dim-arrow)" marker-end="url(#korpus-dim-arrow)" />`;
-        svg += `<rect x="${dimX - 19}" y="${midY - 8}" width="38" height="15" fill="#f8fafc" stroke="#cbd5e1" stroke-width="0.5" />`;
-        svg += `<text x="${dimX}" y="${midY + 3}" font-size="11" font-weight="bold" fill="#0f766e" text-anchor="middle" font-family="sans-serif">${formatVal(gap)}</text>`;
-      }
-    });
-
-    // Poziome światło (wewnętrzna szerokość) każdej przestrzeni/kolumny
-    // wyznaczonej przez przegrody pionowe — poziomy odpowiednik łańcucha
-    // powyżej, tym samym stylem (strzałki + boxowana wartość). Jedna kolumna
-    // = cała szerokość korpusu, gdy nie ma przegród pionowych. Rysowane W
-    // ŚRODKU zarysu, w najbardziej otwartym prześwicie (żeby nie wylądować na
-    // półce) — celowo nigdy poza obrysem mebla.
     const columns = [];
     {
       let cur = th;
@@ -300,24 +255,73 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
       columns.push({ left: cur, right: cabWidth - th });
     }
 
-    let widthDimY = sideH / 2;
-    let bestGap = -1;
-    for (let i = 0; i < dividers.length - 1; i++) {
-      const a = dividers[i], b = dividers[i + 1];
-      const yTop = a.axis + a.half, yBot = b.axis - b.half;
-      const gap = yBot - yTop;
-      if (gap > bestGap) { bestGap = gap; widthDimY = (yTop + yBot) / 2; }
-    }
+    svg += `<defs><marker id="korpus-dim-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155" /></marker></defs>`;
+    svg += `<g class="layer-dim-outline">`;
 
     columns.forEach(col => {
-      const xL = cabX + col.left;
-      const xR = cabX + col.right;
-      if (xR - xL < 8) return;
-      const colMidX = (xL + xR) / 2;
-      const w = formatVal(col.right - col.left);
+      const colWidthMM = col.right - col.left;
+      if (colWidthMM < 8) return;
+      const colDimX = cabX + (col.left + col.right) / 2;
+      const isNarrow = colWidthMM < 260;
+
+      // Dzielniki TYLKO tej kolumny: wieńce (pełna wys. modułu) + półki, których
+      // zasięg X faktycznie nachodzi na tę kolumnę (>5mm), żeby nie pożyczać
+      // dzielników z sąsiedniej przestrzeni po drugiej stronie przegrody.
+      const dividers = [
+        { axis: th / 2, half: th / 2, kind: 'wieniec' },
+        { axis: sideH - th / 2, half: th / 2, kind: 'wieniec' },
+      ];
+      (mod.elements || []).filter(el =>
+        el.typ === 'poziom' && Number.isFinite(el.y) &&
+        Math.min(el.x + el.w, col.right) - Math.max(el.x, col.left) > 5
+      ).forEach(el => {
+        const drawY = isTopBottomFullWidth ? el.y - th : el.y;
+        const elSvgY = sideH - drawY - el.h;
+        dividers.push({ axis: elSvgY + el.h / 2, half: el.h / 2, kind: 'poziom' });
+      });
+      dividers.sort((a, b) => a.axis - b.axis);
+
+      // Etykiety osi + strzałkowe segmenty prześwitów — odsunięcie odnośnika
+      // skalowane do szerokości KOLUMNY, żeby nie wchodzić na sąsiednią przestrzeń.
+      const leaderLen = isNarrow ? Math.min(30, colWidthMM * 0.28) : Math.min(78, colWidthMM * 0.42);
+      const leaderStartX = colDimX - leaderLen;
+      const axisFontSize = isNarrow ? 8 : 10;
+      let bestGapTop = th, bestGapBot = sideH - th, bestGap = -1;
+
+      dividers.forEach((d, i) => {
+        const axisY = d.axis;
+        const mmFromBase = formatVal(sideH - axisY);
+        const isW = d.kind === 'wieniec';
+        const axisLabel = isNarrow ? `${mmFromBase}` : `${isW ? 'Oś wieńca' : 'Oś'}: ${mmFromBase}`;
+        svg += `<line x1="${leaderStartX}" y1="${axisY}" x2="${colDimX - 3}" y2="${axisY}" stroke="#94a3b8" stroke-width="0.6" stroke-dasharray="3,2" />`;
+        svg += `<text x="${leaderStartX - 4}" y="${axisY + 3}" font-size="${axisFontSize}" fill="#1e3a8a" text-anchor="end" font-family="sans-serif" font-weight="${isW ? 'bold' : 'normal'}">${axisLabel}</text>`;
+
+        if (i < dividers.length - 1) {
+          const next = dividers[i + 1];
+          const yTop = axisY + d.half;
+          const yBot = next.axis - next.half;
+          const gap = yBot - yTop;
+          if (gap < 8) return;
+          const midY = (yTop + yBot) / 2;
+          if (gap > bestGap) { bestGap = gap; bestGapTop = yTop; bestGapBot = yBot; }
+          svg += `<line x1="${colDimX}" y1="${yTop}" x2="${colDimX}" y2="${yBot}" stroke="#334155" stroke-width="1" marker-start="url(#korpus-dim-arrow)" marker-end="url(#korpus-dim-arrow)" />`;
+          svg += `<rect x="${colDimX - 19}" y="${midY - 8}" width="38" height="15" fill="#f8fafc" stroke="#cbd5e1" stroke-width="0.5" />`;
+          svg += `<text x="${colDimX}" y="${midY + 3}" font-size="11" font-weight="bold" fill="#0f766e" text-anchor="middle" font-family="sans-serif">${formatVal(gap)}</text>`;
+        }
+      });
+
+      // Poziome światło (wewnętrzna szerokość) TEJ kolumny — w jej własnym
+      // największym prześwicie, żeby nie wylądować na półce. Celowo NIE na
+      // środku tego prześwitu (tam pionowy łańcuch już rysuje swój box z
+      // wartością prześwitu — nałożyłyby się dokładnie na siebie), tylko
+      // przesunięte w górną część prześwitu.
+      const gapSize = Math.max(bestGapBot - bestGapTop, 1);
+      const widthDimY = bestGapTop + Math.max(4, Math.min(gapSize * 0.3, gapSize - 16));
+      const xL = cabX + col.left, xR = cabX + col.right;
+      const w = formatVal(colWidthMM);
       svg += `<line x1="${xL}" y1="${widthDimY}" x2="${xR}" y2="${widthDimY}" stroke="#334155" stroke-width="1" marker-start="url(#korpus-dim-arrow)" marker-end="url(#korpus-dim-arrow)" />`;
-      svg += `<rect x="${colMidX - 24}" y="${widthDimY - 8}" width="48" height="15" fill="#f8fafc" stroke="#cbd5e1" stroke-width="0.5" />`;
-      svg += `<text x="${colMidX}" y="${widthDimY + 4}" font-size="11" font-weight="bold" fill="#0f766e" text-anchor="middle" font-family="sans-serif">${w}</text>`;
+      svg += `<rect x="${colDimX - 24}" y="${widthDimY - 8}" width="48" height="15" fill="#f8fafc" stroke="#cbd5e1" stroke-width="0.5" />`;
+      svg += `<text x="${colDimX}" y="${widthDimY + 4}" font-size="11" font-weight="bold" fill="#0f766e" text-anchor="middle" font-family="sans-serif">${w}</text>`;
     });
 
     svg += `</g>`;
