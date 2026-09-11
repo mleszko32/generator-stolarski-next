@@ -233,49 +233,31 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   }
 
   // ==== WYMIAROWANIE PRZESTRZENI KORPUSU (widok KORPUS) ====
-  // Wyłącznie wymiary WEWNĄTRZ zarysu mebla — świadomie bez żadnego gabarytu
-  // zewnętrznego (użytkownik: "poza szafką żadnych wymiarów"):
+  // Wyłącznie wymiary WEWNĄTRZ zarysu AKTYWNEGO MODUŁU — świadomie ani poza
+  // szafką (żadnego gabarytu zewnętrznego), ani w sąsiednich modułach "duchach"
+  // ze stosu. Duchy mają zwykle inną wysokość bazową (dy != 0) i mogą być
+  // oddalone od aktywnego modułu sporą przerwą (np. szczelina na blat) — scalanie
+  // ich dzielników z aktywnym modułem dawało bezsensowne osie (ujemne wartości)
+  // i olbrzymie, przypadkowe "prześwity" w tej dziurze między modułami.
   //   - pionowy łańcuch przez środek zarysu: strzałkowe segmenty prześwitów
-  //     "w świetle" między wieńcami i poziomami (aktywny moduł + moduły w
-  //     stosie) + etykiety osi "Oś: N" / "Oś wieńca: N" (od bazy modułu),
+  //     "w świetle" między wieńcami i poziomami TEGO modułu + etykiety osi
+  //     "Oś: N" / "Oś wieńca: N" (od bazy tego modułu),
   //   - poziome światło (wewnętrzna szerokość) każdej przestrzeni/kolumny
   //     wyznaczonej przez przegrody pionowe — ten sam styl, w poprzek.
   {
     const dimX = cabX + cabWidth / 2;
 
-    // Dzielniki poziome: oś (SVG Y) + połowa grubości + rodzaj, dla jednego modułu
-    const collectDividers = (mTopY, mH, elements, isTBF) => {
-      const out = [
-        { axis: mTopY + th / 2, half: th / 2, kind: 'wieniec' },
-        { axis: mTopY + mH - th / 2, half: th / 2, kind: 'wieniec' },
-      ];
-      (elements || []).filter(el => el.typ === 'poziom' && Number.isFinite(el.y)).forEach(el => {
-        const drawY = isTBF ? el.y - th : el.y;
-        const elSvgY = (mTopY + mH) - drawY - el.h;
-        out.push({ axis: elSvgY + el.h / 2, half: el.h / 2, kind: 'poziom' });
-      });
-      return out;
-    };
-
-    let dividers = collectDividers(0, sideH, mod.elements, isTopBottomFullWidth);
-    stackModules.forEach(sm => {
-      if (sm.id === mod.id) return;
-      const dy = getDy(sm);
-      const smH = parseFloat(sm.dimensions.height) || 720;
-      const gY = sideH - (dy + smH);
-      const smCons = { joinType: 'boki_przelotowe', ...(config.construction || {}), ...(sm.construction || {}) };
-      dividers = dividers.concat(collectDividers(gY, smH, sm.elements, smCons.joinType === 'wience_przelotowe'));
+    // Dzielniki poziome: oś (SVG Y) + połowa grubości + rodzaj, tylko dla aktywnego modułu
+    const dividers = [
+      { axis: th / 2, half: th / 2, kind: 'wieniec' },
+      { axis: sideH - th / 2, half: th / 2, kind: 'wieniec' },
+    ];
+    (mod.elements || []).filter(el => el.typ === 'poziom' && Number.isFinite(el.y)).forEach(el => {
+      const drawY = isTopBottomFullWidth ? el.y - th : el.y;
+      const elSvgY = sideH - drawY - el.h;
+      dividers.push({ axis: elSvgY + el.h / 2, half: el.h / 2, kind: 'poziom' });
     });
-
-    // Scal pokrywające się dzielniki (styk wieńców sąsiednich modułów) — wieniec ma priorytet
-    const byKey = new Map();
-    dividers.forEach(d => {
-      if (!Number.isFinite(d.axis)) return;
-      const key = Math.round(d.axis);
-      const prev = byKey.get(key);
-      if (!prev || (prev.kind !== 'wieniec' && d.kind === 'wieniec')) byKey.set(key, d);
-    });
-    dividers = Array.from(byKey.values()).sort((a, b) => a.axis - b.axis);
+    dividers.sort((a, b) => a.axis - b.axis);
 
     svg += `<defs><marker id="korpus-dim-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155" /></marker></defs>`;
     svg += `<g class="layer-dim-outline">`;
