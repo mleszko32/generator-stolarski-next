@@ -327,6 +327,36 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
     svg += `<line x1="${outlineMaxX}" y1="${dimY - 9}" x2="${outlineMaxX}" y2="${dimY + 9}" stroke="#1e3a8a" stroke-width="1.6" />`;
     svg += `<rect x="${midX - 34}" y="${dimY - 24}" width="68" height="16" fill="#f8fafc" opacity="0.95" stroke="#1e3a8a" stroke-width="0.5" />`;
     svg += `<text x="${midX}" y="${dimY - 12}" font-size="12" font-weight="bold" fill="#1e3a8a" text-anchor="middle" font-family="sans-serif">${formatVal(outlineWidthMM)}</text>`;
+
+    // Światło (wewnętrzna szerokość) każdej przestrzeni aktywnego modułu —
+    // odpowiednik pionowych świateł powyżej, ale w poziomie. Jedna kolumna =
+    // cały korpus gdy nie ma przegród pionowych; każda przegroda (pion) dzieli
+    // zarys na kolejne przestrzenie o własnej szerokości. Rysowane w osobnym
+    // rzędzie pod zarysem, żeby nie kolidować z łańcuchem osi ani z gabarytami.
+    const columns = [];
+    {
+      let cur = th;
+      partitions.forEach(p => {
+        columns.push({ left: cur, right: p.x });
+        cur = p.x + p.w;
+      });
+      columns.push({ left: cur, right: cabWidth - th });
+    }
+
+    const widthDimY = sideH + 45;
+    columns.forEach(col => {
+      const xL = cabX + col.left;
+      const xR = cabX + col.right;
+      if (xR - xL < 5) return;
+      const colMidX = (xL + xR) / 2;
+      const w = formatVal(col.right - col.left);
+      svg += `<line x1="${xL}" y1="${widthDimY}" x2="${xR}" y2="${widthDimY}" stroke="#0f766e" stroke-width="1" marker-start="url(#korpus-dim-arrow)" marker-end="url(#korpus-dim-arrow)" />`;
+      svg += `<line x1="${xL}" y1="${widthDimY - 6}" x2="${xL}" y2="${widthDimY + 6}" stroke="#0f766e" stroke-width="1.4" />`;
+      svg += `<line x1="${xR}" y1="${widthDimY - 6}" x2="${xR}" y2="${widthDimY + 6}" stroke="#0f766e" stroke-width="1.4" />`;
+      svg += `<rect x="${colMidX - 24}" y="${widthDimY + 6}" width="48" height="16" fill="#f8fafc" stroke="#0f766e" stroke-width="0.5" />`;
+      svg += `<text x="${colMidX}" y="${widthDimY + 18}" font-size="11" font-weight="bold" fill="#0f766e" text-anchor="middle" font-family="sans-serif">${w}</text>`;
+    });
+
     svg += `</g>`;
   }
 
