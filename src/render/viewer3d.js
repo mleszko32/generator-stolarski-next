@@ -1432,8 +1432,14 @@ export function update3D() {
           }
       });
 
+      const modFront = { ...(state.project.front || {}), ...(mod.front || {}) };
+      const isInsetFront = modFront.type === 'wpuszczane';
+
       const innerZ = backP.type === 'nut' ? backZ + backThick : posZ + backThick;
-      const shelfDepth = (posZ + D - 2) - innerZ; 
+      // Front wpuszczany wjeżdża w głąb korpusu o swoją grubość (th), więc półki/przegrody
+      // muszą się przed nim zatrzymać — inaczej kolidowałyby z nim w tym samym miejscu, gdzie
+      // engine/cabinet.js (getInteriorParts) już skraca ich formatki o tę samą wartość.
+      const shelfDepth = (posZ + D - 2 - (isInsetFront ? th : 0)) - innerZ;
 
       if (mod.elements) {
           mod.elements.forEach((el) => {
@@ -1484,18 +1490,22 @@ export function update3D() {
                       return; 
                   }
 
-                  const f = { ...(state.project.front || {}), ...(mod.front || {}) };
-                  
+                  const f = modFront;
+
                   let innerFrontThick = 18;
                   let innerSetback = 0;
                   let zForFront;
-                  
+
                   if (isInternal) {
                       innerFrontThick = parseFloat(el.innerFrontThickness ?? 18);
                       innerSetback = parseFloat(el.innerSetback ?? 2);
-                      zForFront = posZ + D - innerSetback - innerFrontThick; 
+                      zForFront = posZ + D - innerSetback - innerFrontThick;
+                  } else if (isInsetFront) {
+                      // Front wpuszczany siedzi W otworze korpusu (lico w linii z bokami),
+                      // a nie przed nim jak nakładany — cofnięty o własną grubość (th).
+                      zForFront = posZ + D - th;
                   } else {
-                      zForFront = posZ + D + 2; 
+                      zForFront = posZ + D + 2;
                   }
                   
                   addBox(el.w, el.h, isInternal ? innerFrontThick : 18, posX + el.x, posY + el.y, zForFront, 'front', isActive, udElement, innerGroup);

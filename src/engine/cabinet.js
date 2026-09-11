@@ -411,6 +411,7 @@ function getFrontsAndDrawers(mod, config) {
   const topBottomDepth = backP.type === 'nut' ? depth - backP.offset - config.materials.backThickness : depth - config.materials.backThickness;
 
   const f = { ...(config.front || {}), ...(mod.front || {}) };
+  const isInset = (f.type || 'nakladane') === 'wpuszczane';
 
   fronts.forEach((front, index) => {
     let partName = "Front";
@@ -487,6 +488,10 @@ function getFrontsAndDrawers(mod, config) {
         let availableDepth = topBottomDepth;
         if (front.subtype === 'szuflada-wewnetrzna') {
             availableDepth -= (innerThick + innerSetback);
+        } else if (isInset) {
+            // Front wpuszczany wjeżdża w głąb korpusu o swoją grubość (patrz też
+            // getInteriorParts() wyżej) — o tyle mniej miejsca zostaje na prowadnice i dno szuflady.
+            availableDepth -= board;
         }
 
         if (front.forceNL && !isNaN(parseFloat(front.forceNL))) {
