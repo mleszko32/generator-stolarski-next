@@ -9,15 +9,84 @@ import { escapeHtml } from "./utils/dom.js";
 
 // ZMIANA: Importujemy funkcję do usuwania projektów oraz customowy dialog
 import { saveProjectToCloud, loadProjectFromCloud, getSavedProjectsList, deleteProjectFromCloud, showCustomDialog } from "./core/storage.js";
-import { onAuthChange, signInWithGoogle, signOutUser, getCurrentUser } from "./core/storage.js";
+import { onAuthChange, signInWithGoogle, signOutUser, getCurrentUser, saveProjectSilently } from "./core/storage.js";
+import { undo, redo, onHistoryChange, resetHistory } from "./core/history.js";
 
 console.log("Generator Stolarski Next uruchomiony");
 
 initLayout();
 initPropertiesPanel();
 updateSidebar();
-init3DViewer(); 
- 
+init3DViewer();
+resetHistory(); // punkt zerowy historii cofnij/wprzód, po pierwszym renderze
+
+// --- COFNIJ / WPRZÓD ---
+const btnUndo = document.getElementById('btn-undo');
+const btnRedo = document.getElementById('btn-redo');
+
+// Po cofnięciu/ponowieniu state.project bywa całkiem inną migawką (inne
+// moduły, inne id) — tak jak po wczytaniu projektu z chmury odświeżamy
+// wszystkie trzy panele, a nie tylko ten, w którym coś kliknięto.
+function refreshAfterHistoryJump() {
+  initPropertiesPanel();
+  updateSidebar();
+  update3D();
+}
+
+if (btnUndo) btnUndo.addEventListener('click', () => { if (undo()) refreshAfterHistoryJump(); });
+if (btnRedo) btnRedo.addEventListener('click', () => { if (redo()) refreshAfterHistoryJump(); });
+
+onHistoryChange(({ canUndo, canRedo }) => {
+  [[btnUndo, canUndo], [btnRedo, canRedo]].forEach(([btn, enabled]) => {
+    if (!btn) return;
+    btn.disabled = !enabled;
+    btn.style.opacity = enabled ? '1' : '0.5';
+    btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+  });
+});
+
+// Skróty klawiszowe Ctrl+Z / Ctrl+Y (Ctrl+Shift+Z jako alternatywa dla redo).
+// Pomijamy pola tekstowe, żeby nie podbierać natywnego cofania w inputach.
+window.addEventListener('keydown', (e) => {
+  if (!e.ctrlKey && !e.metaKey) return;
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement?.isContentEditable) return;
+
+  const key = e.key.toLowerCase();
+  if (key === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    if (undo()) refreshAfterHistoryJump();
+  } else if (key === 'y' || (key === 'z' && e.shiftKey)) {
+    e.preventDefault();
+    if (redo()) refreshAfterHistoryJump();
+  }
+});
+
+// --- AUTOZAPIS ---
+// Cichy zapis co 2 minuty, tylko dla zalogowanego właściciela i tylko gdy
+// jest już ustalona nazwa projektu (patrz saveProjectSilently w storage.js)
+// oraz coś realnie się zmieniło od ostatniego zapisu.
+const AUTOSAVE_INTERVAL_MS = 2 * 60 * 1000;
+const autosaveStatusEl = document.getElementById('autosave-status');
+let autosaveTimer = null;
+
+async function runAutosave() {
+  const result = await saveProjectSilently();
+  if (!autosaveStatusEl || result !== 'saved') return;
+  const t = new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+  autosaveStatusEl.innerText = `💾 Autozapis ${t}`;
+}
+
+function startAutosave() {
+  if (autosaveTimer) return;
+  autosaveTimer = setInterval(runAutosave, AUTOSAVE_INTERVAL_MS);
+}
+
+function stopAutosave() {
+  if (autosaveTimer) { clearInterval(autosaveTimer); autosaveTimer = null; }
+  if (autosaveStatusEl) autosaveStatusEl.innerText = '';
+}
+
 
 // --- OBSŁUGA PRZYCISKÓW CHMURY ---
 const btnSave = document.getElementById('btn-save-cloud');
@@ -39,6 +108,7 @@ function reflectAuth(user) {
     b.style.opacity = signedIn ? '1' : '0.5';
     b.style.cursor = signedIn ? 'pointer' : 'not-allowed';
   });
+  if (signedIn) startAutosave(); else stopAutosave();
 }
 
 if (btnAuth) {

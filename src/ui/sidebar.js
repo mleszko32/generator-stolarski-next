@@ -4,6 +4,8 @@ import { state, getActiveModule, addModule, deleteModule, duplicateModule } from
 import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel } from "./properties.js";
 import { escapeHtml } from "../utils/dom.js";
+import { scheduleCheckpoint } from "../core/history.js";
+import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
 
 function showLoading(msg) {
     let l = document.getElementById('ai-loader');
@@ -247,6 +249,8 @@ function openCsvEditorModal(partsList) {
 }
 
 export function updateSidebar() {
+  scheduleCheckpoint(); // patrz core/history.js — debounce'owany checkpoint historii cofnij/wprzód
+  renderInteriorEditorIfVisible(); // patrz ui/interiorEditor.js
   const leftSidebar = document.querySelector(".sidebar-left");
   const { parts, mountingData } = calculateParts(); 
   const activeMod = getActiveModule();

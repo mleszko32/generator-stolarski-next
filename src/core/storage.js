@@ -9,6 +9,7 @@ import {
   onAuthStateChanged,
 } from "firebase/auth";
 import { state } from "./state.js";
+import { resetHistory } from "./history.js";
 
 // Konfiguracja klienta Firebase jest z założenia publiczna (leci do przeglądarki)
 // i sama z siebie niczego nie chroni. Realną barierą są reguły Firestore w
@@ -167,6 +168,13 @@ export function showCustomDialog(type, title, message, defaultValue = "", okText
   });
 }
 
+// Ostatnia treść projektu zapisana w chmurze (ręcznie lub automatycznie) —
+// pozwala autozapisowi pominąć zapis, gdy nic się nie zmieniło.
+let lastSavedSnapshot = null;
+function markSaved() {
+  lastSavedSnapshot = JSON.stringify(state.project);
+}
+
 // ZAPISYWANIE
 export async function saveProjectToCloud(projectId = null) {
   if (!requireOwner()) return;
@@ -206,10 +214,11 @@ export async function saveProjectToCloud(projectId = null) {
     dataToSave.name = targetId; 
     
     await setDoc(projectRef, dataToSave);
-    
+
     state.loadedProjectId = targetId;
-    state.project.name = targetId; 
-    
+    state.project.name = targetId;
+    markSaved();
+
     alert(`✅ Projekt "${targetId}" został zapisany pomyślnie!`);
   } catch (error) {
     console.error("Szczegóły błędu Firebase:", error);
@@ -230,7 +239,9 @@ export async function loadProjectFromCloud(projectId) {
       state.project = docSnap.data();
       state.activeModuleId = state.project.modules.length > 0 ? state.project.modules[0].id : null;
       state.loadedProjectId = projectId;
-      return true; 
+      markSaved();
+      resetHistory(); // cofanie między dwoma różnymi wczytanymi projektami nie ma sensu
+      return true;
     } else {
       alert("⚠️ Nie znaleziono takiego projektu w bazie.");
       return false;
@@ -277,5 +288,32 @@ export async function getSavedProjectsList() {
     console.error("Błąd podczas pobierania listy projektów:", error);
     alert("❌ Nie udało się pobrać listy projektów z chmury.");
     return [];
+  }
+}
+
+// AUTOZAPIS — bez alertów/promptów (wołane cyklicznie w tle, patrz main.js).
+// Celowo NIE zakłada nazwy projektu: dopóki użytkownik choć raz nie zapisze
+// ręcznie (i tym samym nie ustali state.loadedProjectId), nie ma dokąd cicho
+// zapisywać — inaczej autozapis co chwilę tworzyłby nowe, bezimienne projekty.
+// Zwraca 'saved' | 'no-changes' | 'no-project' | 'not-signed-in' | 'error'.
+export async function saveProjectSilently() {
+  if (!auth.currentUser || !isOwner()) return "not-signed-in";
+  if (!state.loadedProjectId) return "no-project";
+
+  const current = JSON.stringify(state.project);
+  if (current === lastSavedSnapshot) return "no-changes";
+
+  try {
+    const targetId = state.loadedProjectId;
+    const projectRef = doc(db, "projects", targetId);
+    const dataToSave = JSON.parse(current);
+    dataToSave.name = targetId;
+
+    await setDoc(projectRef, dataToSave);
+    lastSavedSnapshot = current;
+    return "saved";
+  } catch (error) {
+    console.error("Błąd autozapisu:", error);
+    return "error";
   }
 }

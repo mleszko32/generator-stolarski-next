@@ -2,12 +2,15 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { state, duplicateModule, deleteModule } from '../core/state.js';
 
 import { getDrawerComponents, calculateDrawerHoles } from '../core/drawerMath.js';
 import { calculateHinges } from '../core/hingeMath.js';
 import { autoDistributeShelves } from '../core/shelfMath.js';
 import { recalculateLayout } from '../core/layout.js';
+import { scheduleCheckpoint } from '../core/history.js';
+import { toggleInteriorEditor, renderInteriorEditorIfVisible } from '../ui/interiorEditor.js';
 
 import { updateSidebar } from '../ui/sidebar.js';
 import { initPropertiesPanel } from '../ui/properties.js';
@@ -48,9 +51,14 @@ export function init3DViewer() {
   renderer.setSize(container.clientWidth, container.clientHeight);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  
-  container.innerHTML = ''; 
-  container.style.position = 'relative'; 
+  // Bez tego PBR-owe materiały (MeshStandardMaterial) wyglądają płasko —
+  // ACES daje bardziej filmowe wygaszanie świateł zamiast liniowego "wypalania".
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+  container.innerHTML = '';
+  container.style.position = 'relative';
   container.appendChild(renderer.domElement);
 
   controls = new OrbitControls(camera, renderer.domElement);
@@ -58,45 +66,59 @@ export function init3DViewer() {
   controls.dampingFactor = 0.05;
   controls.target.set(500, 500, 0);
 
-  const hemiLight = new THREE.HemisphereLight(0xffffff, 0x94a3b8, 0.6); 
+  // Miękkie oświetlenie otoczenia (IBL) z gotowej "pokojowej" sceny three.js —
+  // bez tego płyty korpusu (MeshStandardMaterial) odbijają światło tylko z
+  // dwóch kierunkowych lamp i wyglądają matowo-plastikowo. Z environment
+  // dostają delikatne, realistyczne doświetlenie ze wszystkich stron.
+  const pmremGenerator = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.035).texture;
+  pmremGenerator.dispose();
+
+  // Intensywności świateł kierunkowych trochę niższe niż wcześniej — teraz
+  // dokładają się do doświetlenia z environment, a nie muszą same za nie odpowiadać.
+  const hemiLight = new THREE.HemisphereLight(0xfff7ed, 0x94a3b8, 0.45);
   scene.add(hemiLight);
 
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.85); 
+  const dirLight = new THREE.DirectionalLight(0xfff4e6, 0.75);
   dirLight.position.set(4000, 5000, 6000);
   dirLight.castShadow = true;
-  dirLight.shadow.mapSize.width = 2048; 
+  dirLight.shadow.mapSize.width = 2048;
   dirLight.shadow.mapSize.height = 2048;
   const d = 8000;
   dirLight.shadow.camera.left = -d; dirLight.shadow.camera.right = d;
   dirLight.shadow.camera.top = d; dirLight.shadow.camera.bottom = -d;
   dirLight.shadow.camera.far = 20000;
-  dirLight.shadow.bias = -0.0005; 
+  dirLight.shadow.bias = -0.0005;
   scene.add(dirLight);
 
-  const backLight = new THREE.DirectionalLight(0xffffff, 0.4); 
+  const backLight = new THREE.DirectionalLight(0xe0f2fe, 0.3);
   backLight.position.set(-2000, 2000, -3000);
   scene.add(backLight);
+
+  scene.fog = new THREE.Fog(0xf1f5f9, 9000, 24000); // wtapia ściany/podłogę w tło zamiast twardej krawędzi
 
   const roomGroup = new THREE.Group();
   scene.add(roomGroup);
 
   const floorGeo = new THREE.PlaneGeometry(25000, 25000);
-  const floorMat = new THREE.ShadowMaterial({ opacity: 0.07 }); 
+  const floorMat = new THREE.ShadowMaterial({ opacity: 0.12 });
   const floor = new THREE.Mesh(floorGeo, floorMat);
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = 0;
   floor.receiveShadow = true;
   roomGroup.add(floor);
 
-  const wallMat = new THREE.MeshLambertMaterial({ color: 0xffffff }); 
-  
+  // MeshStandardMaterial zamiast Lambert — ściany też reagują na environment
+  // i tone mapping, więc nie odcinają się płaskim, zimnym bielem od mebli.
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xf7f5f1, roughness: 0.95, metalness: 0 });
+
   const backWall = new THREE.Mesh(new THREE.BoxGeometry(10000, 3500, 20), wallMat);
-  backWall.position.set(5000, 1750, -10); 
+  backWall.position.set(5000, 1750, -10);
   backWall.receiveShadow = true;
   roomGroup.add(backWall);
 
   const leftWall = new THREE.Mesh(new THREE.BoxGeometry(20, 3500, 5000), wallMat);
-  leftWall.position.set(-10, 1750, 2500); 
+  leftWall.position.set(-10, 1750, 2500);
   leftWall.receiveShadow = true;
   roomGroup.add(leftWall);
 
@@ -323,9 +345,36 @@ export function init3DViewer() {
       update3D();
   };
 
+  const toggleInteriorBtn = document.createElement('button');
+  toggleInteriorBtn.innerText = '🗂️ Wnętrze 2D';
+  toggleInteriorBtn.title = 'Klikalny edytor wnęk — dziel/obsadzaj fronty bez trafiania w 3D';
+  Object.assign(toggleInteriorBtn.style, {
+      padding: '10px 16px', background: '#0f766e', color: '#fff', border: 'none',
+      borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px',
+      boxShadow: '0 4px 6px rgba(0,0,0,0.1)', transition: 'background 0.2s'
+  });
+  toggleInteriorBtn.onclick = () => {
+      toggleInteriorEditor();
+      const showingInterior = document.getElementById('editor-interior-container')?.style.display !== 'none';
+      toggleInteriorBtn.innerText = showingInterior ? '🧊 Podgląd 3D' : '🗂️ Wnętrze 2D';
+      toggleInteriorBtn.style.background = showingInterior ? '#475569' : '#0f766e';
+      if (!showingInterior && container) {
+          // #editor-3d-container był ukryty (display:none) — jego clientWidth/Height mogły
+          // w tym czasie wynosić 0 i "zatrzasnąć się" w renderze/kamerze (patrz resize listener
+          // niżej). Wymuś przeliczenie teraz, gdy kontener już ma prawdziwy rozmiar.
+          camera.aspect = container.clientWidth / container.clientHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(container.clientWidth, container.clientHeight);
+      }
+  };
+
   uiOverlay.appendChild(toggleBtn);
   uiOverlay.appendChild(toggleFrontsBtn);
-  container.appendChild(uiOverlay);
+  uiOverlay.appendChild(toggleInteriorBtn);
+  // NAPRAWA: overlay wpięty w .center-panel (nie w #editor-3d-container), bo
+  // przełącznik "Wnętrze 2D" chowa cały #editor-3d-container display:none —
+  // gdyby overlay był jego dzieckiem, przycisk powrotu do 3D zniknąłby razem z nim.
+  (container.parentElement || container).appendChild(uiOverlay);
 
   window.addEventListener('resize', () => {
       if (!container) return;
@@ -1187,12 +1236,15 @@ function show3DContextMenu(event, hit, data) {
 
 const mats = {
   solid: {
-      corpus: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, metalness: 0.1 }), 
-      front: new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.5, metalness: 0.1 }),  
-      shelf: new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.7, metalness: 0.0 }),   
-      drawerBox: new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.8, metalness: 0.0 }),
-      hdf: new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.9, metalness: 0.0 }),
-      plinth: new THREE.MeshStandardMaterial({ color: 0x44403c, roughness: 0.85, metalness: 0.05 })
+      // Metalness w okolicach 0 — to płyta meblowa, nie blacha; przy metalness
+      // >0 environment map dawała nieprzyjemny, plastikowo-metaliczny połysk.
+      // Kolory lekko ocieplone (surowa płyta biała ma podtón kremowy, nie czysty biel).
+      corpus: new THREE.MeshStandardMaterial({ color: 0xfaf8f4, roughness: 0.62, metalness: 0.0 }),
+      front: new THREE.MeshStandardMaterial({ color: 0x9aa5b1, roughness: 0.42, metalness: 0.0 }),
+      shelf: new THREE.MeshStandardMaterial({ color: 0xfbfaf7, roughness: 0.7, metalness: 0.0 }),
+      drawerBox: new THREE.MeshStandardMaterial({ color: 0xe6e2d9, roughness: 0.78, metalness: 0.0 }),
+      hdf: new THREE.MeshStandardMaterial({ color: 0xf4f2ed, roughness: 0.9, metalness: 0.0 }),
+      plinth: new THREE.MeshStandardMaterial({ color: 0x3a3532, roughness: 0.8, metalness: 0.0 })
   },
   xray: {
       corpus: new THREE.MeshStandardMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.15, depthWrite: false }),
@@ -1266,8 +1318,10 @@ function addHardware(type, x, y, z, axis, parentGroup) {
 }
 
 export function update3D() {
+  scheduleCheckpoint(); // patrz core/history.js — debounce'owany checkpoint historii cofnij/wprzód
+  renderInteriorEditorIfVisible(); // patrz ui/interiorEditor.js — odświeża się tylko, gdy jest widoczny
   if (!cabinetGroup) return;
-  
+
   while (cabinetGroup.children.length > 0) {
       cabinetGroup.remove(cabinetGroup.children[0]);
   }
