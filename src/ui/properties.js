@@ -37,7 +37,7 @@ export function initPropertiesPanel() {
     rightSidebar.innerHTML = `
       <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #94a3b8; text-align: center; padding: 20px;">
         <span style="font-size: 40px; margin-bottom: 10px;">⚙️</span>
-        <h3 style="margin: 0; color: #64748b;">Brak aktywnej szafki</h3>
+        <h3 style="margin: 0; color: #64748b; text-transform: none; letter-spacing: normal; border-bottom: none; font-size: 15px;">Brak aktywnej szafki</h3>
       </div>
     `;
     return;
@@ -212,7 +212,7 @@ export function initPropertiesPanel() {
 
     ${tabContent("zawiasy", `
       <div style="background: #ecfdf5; padding: 10px; border: 1px dashed #6ee7b7; border-radius: 4px;">
-        <h4 style="margin: 0 0 10px 0; color: #047857; font-size: 13px;">Wymiary Osi Zawiasów (Lokalne)</h4>
+        <h3 style="color: #047857;">Wymiary Osi Zawiasów (Lokalne)</h3>
         <div class="property-group" style="margin-bottom: ${actualTopText ? '12px' : '8px'};"><label style="font-size: 11px;">Od góry do środka puszki (mm):</label><input type="number" id="input-hinge-top" value="${fh.topOffset}" step="1" />${actualTopText}</div>
         <div class="property-group" style="margin-bottom: ${actualBottomText ? '12px' : '8px'};"><label style="font-size: 11px;">Od dołu do środka puszki (mm):</label><input type="number" id="input-hinge-bottom" value="${fh.bottomOffset}" step="1" />${actualBottomText}</div>
         <div class="property-group"><label style="font-size: 11px;">Bezpieczny margines od półki (mm):</label><input type="number" id="input-hinge-margin" value="${fh.margin}" step="1" /></div>

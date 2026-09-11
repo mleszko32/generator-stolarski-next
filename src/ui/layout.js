@@ -5,14 +5,14 @@ export function initLayout() {
     <div class="top-nav">
       <div class="logo">Generator Stolarski Next</div>
       <div class="nav-actions" style="display: flex; align-items: center; gap: 8px;">
-          <button id="btn-undo" class="btn-primary" style="background: #64748b; color: white;" title="Cofnij (Ctrl+Z)">↩️ Cofnij</button>
-          <button id="btn-redo" class="btn-primary" style="background: #64748b; color: white;" title="Wprzód (Ctrl+Y)">↪️ Wprzód</button>
+          <button id="btn-undo" class="btn btn-neutral btn-sm" title="Cofnij (Ctrl+Z)">↩️ Cofnij</button>
+          <button id="btn-redo" class="btn btn-neutral btn-sm" title="Wprzód (Ctrl+Y)">↪️ Wprzód</button>
           <div style="width: 1px; height: 22px; background: rgba(255,255,255,0.3); margin: 0 4px;"></div>
           <span id="autosave-status" style="color: #cbd5e1; font-size: 12px;"></span>
           <span id="auth-status" style="color: #e2e8f0; font-size: 13px;"></span>
-          <button id="btn-auth" class="btn-primary" style="background: #3b82f6; color: white;">🔑 Zaloguj</button>
-          <button id="btn-save-cloud" class="btn-primary" style="background: #f59e0b; color: white;">☁️ Zapisz projekt</button>
-          <button id="btn-load-cloud" class="btn-primary" style="background: #10b981; color: white;">📥 Wczytaj projekt</button>
+          <button id="btn-auth" class="btn btn-primary btn-sm">🔑 Zaloguj</button>
+          <button id="btn-save-cloud" class="btn btn-warning btn-sm">☁️ Zapisz projekt</button>
+          <button id="btn-load-cloud" class="btn btn-success btn-sm">📥 Wczytaj projekt</button>
       </div>
     </div>
     

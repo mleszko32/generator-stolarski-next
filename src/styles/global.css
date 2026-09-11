@@ -16,26 +16,8 @@ body {
   background: #f3f5f7;
 }
 
-/* Główny kontener aplikacji */
-.app-container {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
-}
-
-/* Pasek górny */
-.topbar {
-  background: #2c3e50;
-  color: white;
-  padding: 10px 20px;
-  height: 50px;
-  display: flex;
-  align-items: center;
-}
-
 /* Obszar roboczy - podzielony na 3 kolumny */
-.main-workspace, .main-content {
+.main-content {
   display: flex;
   flex: 1;
   overflow: hidden;
@@ -55,23 +37,11 @@ body {
   border-left: 1px solid #ddd;
 }
 
-.viewport-3d, .center-panel {
+.center-panel {
   flex: 1;
   background: #e2e8f0;
   padding: 15px;
   position: relative;
-}
-
-/* Pasek statusu */
-.statusbar {
-  background: #ecf0f1;
-  border-top: 1px solid #ddd;
-  padding: 5px 20px;
-  font-size: 12px;
-  color: #7f8c8d;
-  height: 30px;
-  display: flex;
-  align-items: center;
 }
 
 /* Style dla panelu parametrów */
@@ -121,20 +91,132 @@ body {
 }
 
 /* =========================================
-   RESPONSYWNOŚĆ - WIDOK DLA SMARTFONÓW 
+   SYSTEM PRZYCISKÓW — wspólny dla top-nav, sidebar.js, properties.js
+   i pływającego paska w viewer3d.js, żeby wyglądały tak samo niezależnie
+   od tego, w którym pliku/panelu są tworzone.
+   ========================================= */
+:root {
+  --color-primary: #2563eb;
+  --color-success: #059669;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+  --color-neutral: #64748b;
+  --color-purple: #7c3aed;
+  --color-teal: #0f766e;
+  --radius: 6px;
+  --shadow-btn: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border: none;
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-weight: bold;
+  font-size: 13px;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: var(--shadow-btn);
+  transition: filter 0.15s, opacity 0.15s, transform 0.1s;
+  white-space: nowrap;
+}
+.btn:hover { filter: brightness(1.08); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
+
+.btn-block { width: 100%; }
+.btn-sm { padding: 6px 10px; font-size: 11px; }
+
+.btn-primary { background: var(--color-primary); }
+.btn-success { background: var(--color-success); }
+.btn-warning { background: var(--color-warning); }
+.btn-danger  { background: var(--color-danger); }
+.btn-neutral { background: var(--color-neutral); }
+.btn-purple  { background: var(--color-purple); }
+.btn-teal    { background: var(--color-teal); }
+
+.btn-outline {
+  background: #fff;
+  color: #1e293b;
+  border: 1px solid #cbd5e1;
+  box-shadow: none;
+}
+.btn-outline:hover { background: #f1f5f9; filter: none; }
+.btn-outline.active { background: #1e293b; color: #fff; border-color: #1e293b; }
+
+/* Górny pasek — wcześniej klasy .top-nav/.status-bar nie miały ŻADNYCH
+   reguł CSS (tylko fragmentaryczne style inline w layout.js), więc górny
+   pasek renderował się z domyślnym wyglądem przeglądarki i wyraźnie odstawał
+   od reszty (kolorowe, zaokrąglone przyciski w sidebar.js/properties.js). */
+.top-nav {
+  background: #1e293b;
+  color: #fff;
+  height: 56px;
+  min-height: 56px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+}
+.top-nav .logo { font-weight: bold; font-size: 15px; letter-spacing: 0.2px; }
+
+.status-bar {
+  background: #f1f5f9;
+  border-top: 1px solid #cbd5e1;
+  padding: 0 20px;
+  font-size: 12px;
+  color: #64748b;
+  height: 28px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Nagłówki sekcji w obu bocznych panelach — ujednolicone, żeby lewy
+   ("Lista Szafek") i prawy ("Parametry szafki") panel wyglądały jak części
+   tej samej aplikacji, a nie dwa osobno stylowane widoki. Kolor ustawiany
+   inline w properties.js (np. h3 "Pozycja w przestrzeni") nadal działa —
+   inline zawsze wygrywa z regułą klasy, nadpisuje się tu tylko rozmiar/
+   odstępy/obramowanie, nie kolor. */
+.sidebar-left h2,
+.sidebar-right h2 {
+  font-size: 14px;
+  margin: 0 0 10px 0;
+  color: #1e293b;
+  font-weight: 700;
+}
+.sidebar-left h3,
+.sidebar-right h3 {
+  font-size: 12px;
+  margin: 18px 0 10px 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #1e293b;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* =========================================
+   RESPONSYWNOŚĆ - WIDOK DLA SMARTFONÓW
    ========================================= */
 @media (max-width: 768px) {
   /* Złamanie sztywnego układu poziomego na pionowy */
-  .main-workspace, 
   .main-content {
       flex-direction: column !important;
-      height: auto !important; 
+      height: auto !important;
       overflow-y: auto !important;
       display: flex !important;
   }
 
   /* 1. WIDOK 3D NA SAMEJ GÓRZE */
-  .viewport-3d, 
   .center-panel {
       order: 1 !important; /* Wypycha 3D na górę ekranu */
       width: 100% !important;

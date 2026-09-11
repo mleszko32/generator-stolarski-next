@@ -263,7 +263,7 @@ export function updateSidebar() {
 
   html += `
       <div style="margin-bottom: 15px;">
-          <button id="btn-import-ai" style="width: 100%; padding: 12px; background: linear-gradient(135deg, #9333ea, #6366f1); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.15); transition: transform 0.1s;">
+          <button id="btn-import-ai" class="btn btn-block" style="background: linear-gradient(135deg, #9333ea, #6366f1);">
               🪄 Zbuduj projekt ze zdjęcia (AI)
           </button>
           <input type="file" id="input-ai-image" accept="image/png, image/jpeg" style="display: none;" />
@@ -312,9 +312,9 @@ export function updateSidebar() {
 
   html += `
       <div style="display: flex; gap: 4px; margin-top: 8px;">
-        <button id="btn-add-base" style="flex: 1; padding: 6px; background-color: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold;" title="Szafka dolna">➕ Dolna</button>
-        <button id="btn-add-upper" style="flex: 1; padding: 6px; background-color: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold;" title="Szafka wisząca">➕ Wisząca</button>
-        <button id="btn-add-tall" style="flex: 1; padding: 6px; background-color: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold;" title="Słupek">➕ Słupek</button>
+        <button id="btn-add-base" class="btn btn-success btn-sm" style="flex: 1;" title="Szafka dolna">➕ Dolna</button>
+        <button id="btn-add-upper" class="btn btn-primary btn-sm" style="flex: 1;" title="Szafka wisząca">➕ Wisząca</button>
+        <button id="btn-add-tall" class="btn btn-purple btn-sm" style="flex: 1;" title="Słupek">➕ Słupek</button>
       </div>
     </div>
     <hr style="margin: 15px 0; border: 0; border-top: 1px dashed #cbd5e1;">
@@ -323,13 +323,13 @@ export function updateSidebar() {
   if (state.project.modules.length > 0) {
     html += `
       <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 15px;">
-        <button id="btn-print-2d" ${!activeMod ? 'disabled style="opacity: 0.5;"' : ''} style="width: 100%; padding: 8px; background-color: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px;">
+        <button id="btn-print-2d" class="btn btn-primary btn-block btn-sm" ${!activeMod ? 'disabled' : ''}>
           📄 Drukuj 2D (Rysunek Wykonawczy)
         </button>
-        <button id="btn-export-csv" style="width: 100%; padding: 8px; background-color: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px;">
+        <button id="btn-export-csv" class="btn btn-success btn-block btn-sm">
           📊 Menedżer Formatek (CSV)
         </button>
-        <button id="btn-export-hardware" style="width: 100%; padding: 9px; background-color: #d97706; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <button id="btn-export-hardware" class="btn btn-warning btn-block btn-sm">
           🛒 Wydrukuj / PDF (Lista Zakupów)
         </button>
       </div>
