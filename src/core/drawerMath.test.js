@@ -19,6 +19,15 @@ describe("calculateNominalLength", () => {
     expect(calculateNominalLength(100)).toBe(270);
     expect(calculateNominalLength(274)).toBe(270);
   });
+
+  it("respektuje własną serię NL systemu zamiast domyślnej (Blum) listy", () => {
+    // GTV Axis Pro: 250-600, bez 650 mimo bardzo głębokiej szafki
+    expect(calculateNominalLength(1000, "gtv_axis_16")).toBe(600);
+    // i z dolnym progiem 250, nie 270 jak w domyślnej (Blumowej) serii
+    expect(calculateNominalLength(100, "gtv_axis_16")).toBe(250);
+    // Merivobox: kończy na 600, nie ma wariantu 650
+    expect(calculateNominalLength(1000, "merivobox")).toBe(600);
+  });
 });
 
 describe("getDrawerVariant", () => {

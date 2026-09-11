@@ -2,9 +2,18 @@
 import { drawerSystems } from './drawerSystems.js';
 import { state } from './state.js';
 
-export function calculateNominalLength(internalDepth) {
-  const standardNLs = [270, 300, 350, 400, 450, 500, 550, 600, 650];
-  const safetyClearance = 5; 
+// Domyślna, "Blumowa" seria NL — używana gdy system nie podaje własnej
+// (nlSeries w drawerSystems.js). Różni producenci mają różne maksima (np.
+// Merivobox i Legrabox kończą na 600, GTV Axis Pro na 600, tylko antaro/
+// tandembox mają 650) — dobór NL musi to respektować, inaczej dla głębokiej
+// szafki może wyjść długość prowadnicy, której dany system w ogóle nie oferuje.
+const DEFAULT_NL_SERIES = [270, 300, 350, 400, 450, 500, 550, 600, 650];
+
+export function calculateNominalLength(internalDepth, systemId) {
+  const safeSystemId = systemId ? systemId.toLowerCase() : null;
+  const system = safeSystemId ? drawerSystems[safeSystemId] : null;
+  const standardNLs = (system && system.nlSeries) || DEFAULT_NL_SERIES;
+  const safetyClearance = 5;
   const maxAvailableSpace = internalDepth - safetyClearance;
 
   let selectedNL = 0;
@@ -15,7 +24,7 @@ export function calculateNominalLength(internalDepth) {
     }
   }
 
-  return selectedNL > 0 ? selectedNL : 270; 
+  return selectedNL > 0 ? selectedNL : standardNLs[0];
 }
 
 export function getDrawerVariant(availableSpace, systemId, forceVariant = 'auto') {
@@ -61,7 +70,7 @@ export function getDrawerComponents(systemId, internalWidth, internalDepth, avai
     return null;
   }
 
-  const nl = calculateNominalLength(internalDepth);
+  const nl = calculateNominalLength(internalDepth, systemId);
   const variant = getDrawerVariant(availableSpace, systemId, forceVariant);
 
   const bottomWidth = internalWidth - system.bottomWidthDeduct;
