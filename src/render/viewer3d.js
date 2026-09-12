@@ -979,7 +979,14 @@ export function update3D() {
                           const isBottomOuter = el.baseZone && parseFloat(el.baseZone.minY) <= th + 0.5;
                           const dHoles = calculateDrawerHoles(sysName, el.y, simulatedSpace, th, el.frontIndex, isBottomInZone && isBottomOuter && !isInsetFront);
                           
-                          const innerWidth = el.w; 
+                          // NAPRAWA: el.w to szerokość FRONTU (kurczy się dla wpuszczanego,
+                          // patrz core/layout.js - front wpuszczany nie "zjeżdża" na boki o
+                          // grubość płyty jak nakładany). Realne dno/tył szuflady liczone są
+                          // od szerokości KORPUSU (engine/cabinet.js: width - board*2), stałej
+                          // niezależnie od stylu frontu - użycie tu el.w rysowało węższe pudło
+                          // szuflady w 3D niż w rzeczywistej liście formatek dla frontu
+                          // wpuszczanego, mimo że cutlist się nie zmieniał.
+                          const innerWidth = W - (th * 2);
                           
                           let availableDepth = D - 19; 
                           if (isInternal) {
@@ -1000,7 +1007,12 @@ export function update3D() {
                               const dl = drawerComps.bottom.length;
                               const dh = drawerComps.back.height;
 
-                              const dX = posX + el.x + (innerWidth - dw) / 2;
+                              // NAPRAWA: analogicznie do innerWidth wyżej - el.x to lewa krawędź
+                              // FRONTU, która też przesuwa się między nakładanym a wpuszczanym
+                              // (core/layout.js). Pudło szuflady centrujemy względem wnętrza
+                              // KORPUSU (posX + th), nie względem frontu, żeby się nie przesuwało
+                              // w bok przy samej zmianie stylu frontu.
+                              const dX = posX + th + (innerWidth - dw) / 2;
 
                               // NAPRAWA: dno szuflady ma siedzieć tuż nad wieńcem dolnym korpusu
                               // (albo tuż nad frontem szuflady niżej w stosie), nie kilkanaście mm
