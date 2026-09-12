@@ -44,6 +44,14 @@ export const drawerSystems = {
     },
     mounting: { railOffset: 33, frontHolesBase: 22, frontHolesXBase: 15.5 }
   },
+  // height = wysokość DREWNIANEJ ŚCIANKI TYLNEJ (formatka "tył"), NIE wysokość
+  // boku szuflady (profil metalowy) — w katalogu Blum to dwie różne liczby dla
+  // tego samego oznaczenia N/M/K/E (np. dla N: bok 68.5mm, ale tył tylko 60.5mm,
+  // patrz katalog "Szuflada standardowa - N", sekcja "Wymiar - elementy dla
+  // płyty 16mm", pole B "Drewniana ścianka tylna"). Formatki tnie się na
+  // wysokość tyłu, więc TE liczby (60.5/83/121/184) są poprawne - potwierdzone
+  // zrzutem ekranu z oficjalnego katalogu Blum. Nie mylić z "Drawer side
+  // heights" (68.5/91/129/192) — to inny wymiar, tu nieużywany.
   'merivobox': {
     name: 'Blum MERIVOBOX',
     bottomWidthDeduct: 51,   // LW - 51 mm
@@ -60,6 +68,12 @@ export const drawerSystems = {
     },
     mounting: { railOffset: 54, frontHolesBase: 33.5, frontHolesXBase: 20.5 }
   },
+  // ZWERYFIKOWANE z oficjalnymi instrukcjami Blum LEGRABOX (d2.blum.com "Drawer
+  // Component Preparation" + dakotahardwoods.com "F Height Drawer"): N/M/K/C
+  // (39/63/101/148) już były poprawne — dopisany brakujący najwyższy wariant F
+  // (wysokość tyłu 212mm, min. miejsce w szafce 257mm; UWAGA: 212mm to wysokość
+  // CIĘCIA tyłu, nie mylić z "wysokością profilu szuflady" 241mm, którą część
+  // źródeł też nazywa "F height" — to inny wymiar, nieużywany w tym katalogu).
   'legrabox': {
     name: 'Blum LEGRABOX',
     bottomWidthDeduct: 35,   // LW - 35 mm
@@ -69,10 +83,11 @@ export const drawerSystems = {
     minClearanceBottom: 2,
     nlSeries: [270, 300, 350, 400, 450, 500, 550, 600], // katalog Blum, profil 750 (40kg): bez wariantu 650
     variants: {
-      bardzoniska: { type: 'N', height: 39,  minSpace: 80 },
-      niska:       { type: 'M', height: 63,  minSpace: 106 },
-      srednia:     { type: 'K', height: 101, minSpace: 144 },
-      wysoka:      { type: 'C', height: 148, minSpace: 193 }
+      bardzoniska:  { type: 'N', height: 39,  minSpace: 80 },
+      niska:        { type: 'M', height: 63,  minSpace: 106 },
+      srednia:      { type: 'K', height: 101, minSpace: 144 },
+      wysoka:       { type: 'C', height: 148, minSpace: 193 },
+      bardzowysoka: { type: 'F', height: 212, minSpace: 257 }
     },
     mounting: { railOffset: 38, frontHolesBase: 25, frontHolesXBase: 21.5 }
   },

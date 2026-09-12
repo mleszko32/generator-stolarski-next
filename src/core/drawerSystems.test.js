@@ -56,4 +56,27 @@ describe("drawerSystems catalog", () => {
       });
     });
   }
+
+  // Regresja: height = wysokość DREWNIANEJ ŚCIANKI TYLNEJ (formatka "tył"), nie
+  // wysokość boku szuflady (profil metalowy) - to dwie różne liczby w katalogu
+  // Blum dla tego samego oznaczenia N/M/K/E (np. N: bok 68.5mm, ale tył tylko
+  // 60.5mm - zweryfikowane zrzutem ekranu z katalogu "Szuflada standardowa - N",
+  // pole "Drewniana ścianka tylna"). Formatki tnie się na wysokość tyłu.
+  it("Merivobox: wysokości tyłu (nie boku!) zgodne z katalogiem Blum", () => {
+    const v = drawerSystems.merivobox.variants;
+    expect(v.bardzoniska.height).toBe(60.5);
+    expect(v.niska.height).toBe(83);
+    expect(v.srednia.height).toBe(121);
+    expect(v.wysoka.height).toBe(184);
+  });
+
+  // Regresja: brakował najwyższy wariant Legrabox (F) - zweryfikowany z
+  // oficjalnymi instrukcjami Blum (d2.blum.com "Drawer Component Preparation",
+  // dakotahardwoods.com "F Height Drawer"). 212mm to wysokość CIĘCIA tyłu, nie
+  // mylić z "wysokością profilu szuflady" 241mm, którą część źródeł też
+  // nazywa "F height" - to inny, niewykorzystywany tu wymiar.
+  it("Legrabox: ma najwyższy wariant F (212mm, min. miejsce 257mm)", () => {
+    const v = drawerSystems.legrabox.variants;
+    expect(v.bardzowysoka).toMatchObject({ type: "F", height: 212, minSpace: 257 });
+  });
 });
