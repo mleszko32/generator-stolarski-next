@@ -3,13 +3,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { state, duplicateModule, deleteModule, DEFAULT_ROOM } from '../core/state.js';
+import { state, DEFAULT_ROOM } from '../core/state.js';
 
 import { getDrawerComponents, calculateDrawerHoles } from '../core/drawerMath.js';
-import { drawerSystems, DRAWER_VARIANT_ORDER, DRAWER_VARIANT_LABELS } from '../core/drawerSystems.js';
+import { drawerSystems } from '../core/drawerSystems.js';
 import { calculateHinges } from '../core/hingeMath.js';
-import { autoDistributeShelves } from '../core/shelfMath.js';
 import { recalculateLayout, getTraverseConfig, getWorldFootprint, clampModuleToRoom } from '../core/layout.js';
+import { buildZoneTree, moveSplit } from '../core/zoneTree.js';
 import { scheduleCheckpoint } from '../core/history.js';
 import { toggleInteriorEditor, renderInteriorEditorIfVisible } from '../ui/interiorEditor.js';
 
@@ -354,9 +354,26 @@ export function init3DViewer() {
 
           const orig = dragSelectionOrigins.get(dragModule.id);
           if (orig) {
-              const deltaX = snapX - orig.x;
+              let deltaX = snapX - orig.x;
               const deltaY = snapY - orig.y;
-              const deltaZ = snapZ - orig.z;
+              let deltaZ = snapZ - orig.z;
+
+              // Twardy limit do wnętrza pokoju - liczony na WSPÓLNEJ delcie całego
+              // zaznaczenia (np. grupy), nie osobno dla każdego modułu. Osobne
+              // przycinanie każdego modułu do własnych granic rozjeżdżało grupę
+              // (jeden człon zatrzymywał się przy ścianie wcześniej niż reszta,
+              // więc grupa traciła sztywny, wzajemny odstęp) - stąd zgłoszony bug
+              // z modułami "przenikającymi" się i ścianami przy grupach.
+              state.selectedModules.forEach(id => {
+                  const m = state.project.modules.find(mod => mod.id === id);
+                  const mOrig = dragSelectionOrigins.get(id);
+                  if (!m || !mOrig) return;
+                  const { worldW: mW, worldD: mD } = getWorldFootprint(m);
+                  const maxDeltaX = Math.max(0, room.width - mW) - mOrig.x;
+                  const maxDeltaZ = Math.max(0, room.depth - mD) - mOrig.z;
+                  deltaX = Math.min(Math.max(deltaX, -mOrig.x), maxDeltaX);
+                  deltaZ = Math.min(Math.max(deltaZ, -mOrig.z), maxDeltaZ);
+              });
 
               state.selectedModules.forEach(id => {
                   const m = state.project.modules.find(mod => mod.id === id);
@@ -366,10 +383,6 @@ export function init3DViewer() {
                       m.position.x = Math.round(mOrig.x + deltaX);
                       m.position.y = Math.round(mOrig.y + deltaY);
                       m.position.z = Math.round(mOrig.z + deltaZ);
-                      // Twardy limit - nawet gdy snap "przeoczy" ścianę (za szybki/za
-                      // daleki ruch myszy, poza SNAP_DIST), moduł nie może fizycznie
-                      // wystawać poza pokój.
-                      clampModuleToRoom(m);
 
                       const tTarget = cabinetGroup.children.find(g => g.userData.moduleId === id);
                       if (tTarget) {
@@ -409,13 +422,6 @@ export function init3DViewer() {
   renderer.domElement.addEventListener('pointerup', (e) => {
       if (Math.abs(e.clientX - pointerDownPos.x) < 5 && Math.abs(e.clientY - pointerDownPos.y) < 5) {
           handle3DClick(e);
-      }
-  });
-
-  window.addEventListener('pointerdown', (e) => {
-      const existingMenu = document.getElementById('context-menu-3d');
-      if (existingMenu && !existingMenu.contains(e.target) && e.target !== renderer.domElement) {
-          existingMenu.remove();
       }
   });
 
@@ -506,7 +512,7 @@ function animate() {
   renderer.render(scene, camera);
 }
 
-function enterAlignMode(mod, el) {
+export function enterAlignMode(mod, el) {
   alignMode.active = true;
   alignMode.sourceMod = mod;
   alignMode.sourceEl = el;
@@ -529,7 +535,12 @@ function enterAlignMode(mod, el) {
       exitAlignMode();
   };
 
-  document.getElementById('viewer-3d-container').appendChild(banner);
+  // NAPRAWA: 'viewer-3d-container' nie istnieje w DOM (jedyny prawdziwy kontener
+  // to '#editor-3d-container', patrz init3DViewer) - appendChild na null rzucał
+  // błąd i tryb wyrównania nigdy nie pokazywał banera. Ta funkcja jest teraz
+  // wołana tylko gdy widok 3D jest aktywny (patrz ui/interiorEditor.js), więc
+  // `container` (moduł-scope, ustawiany w init3DViewer) jest zawsze widoczny.
+  (container || document.body).appendChild(banner);
   alignMode.banner = banner;
 }
 
@@ -541,6 +552,20 @@ function exitAlignMode() {
       alignMode.banner.remove();
       alignMode.banner = null;
   }
+}
+
+// Szuka w drzewie stref (core/zoneTree.js) węzła "split", którego dzielnik to
+// dokładnie ten element (po id) - potrzebne, żeby wyrównanie międzymodułowe
+// (enterAlignMode) mogło przesunąć półkę przez moveSplit() zamiast bezpośrednio
+// nadpisywać el.y, co pozwalało wypchnąć ją poza bezpieczny zakres (patrz NAPRAWA
+// przy alignMode.active niżej).
+function findDividerNode(node, el) {
+  if (!node) return null;
+  if (node.type === 'split') {
+    if (node.divider.id === el.id) return node;
+    return findDividerNode(node.a, el) || findDividerNode(node.b, el);
+  }
+  return null;
 }
 
 function handle3DClick(event) {
@@ -562,9 +587,6 @@ function handle3DClick(event) {
           break;
       }
   }
-
-  const existingMenu = document.getElementById('context-menu-3d');
-  if (existingMenu) existingMenu.remove();
 
   if (!validHit) {
       if (!event.shiftKey) {
@@ -598,7 +620,19 @@ function handle3DClick(event) {
           const newLocalY = targetAbsoluteBottomY - sourceModAbsoluteY;
 
           if (newLocalY > 0 && newLocalY < parseFloat(sourceMod.dimensions.height)) {
-              alignMode.sourceEl.y = newLocalY;
+              // NAPRAWA: samo `sourceEl.y = newLocalY` pozwalało wyrównać półkę
+              // tak blisko góry/dołu szafki, że zoneTree.js przestawało ją
+              // rozpoznawać jako prawidłowy podział (traciła "widoczność" we
+              // Wnętrzu 2D, mimo że dane w mod.elements zostawały). moveSplit
+              // z tego samego pliku co Wnętrze 2D pilnuje tego samego, bezpiecznego
+              // zakresu (MIN_GAP) i przelicza resztę wnęki spójnie.
+              const tree = buildZoneTree(sourceMod);
+              const node = findDividerNode(tree, alignMode.sourceEl);
+              if (node) {
+                  moveSplit(sourceMod, node, newLocalY);
+              } else {
+                  alignMode.sourceEl.y = newLocalY;
+              }
               update3D();
               updateSidebar();
           } else {
@@ -629,751 +663,7 @@ function handle3DClick(event) {
               update3D();
           }
       }
-
-      if (state.selectedModules && state.selectedModules.has(data.moduleId)) {
-          show3DContextMenu(event, validHit, data);
-      }
   }
-}
-
-function show3DContextMenu(event, hit, data) {
-  const menu = document.createElement('div');
-  menu.id = 'context-menu-3d';
-  Object.assign(menu.style, {
-      position: 'fixed', left: `${event.clientX}px`, top: `${event.clientY}px`,
-      backgroundColor: '#ffffff', border: '1px solid #cbd5e1', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-      borderRadius: '6px', padding: '4px', zIndex: '1000', minWidth: '220px', fontFamily: 'sans-serif'
-  });
-
-  const createOption = (text, icon, callback, color = '#1e293b') => {
-      const btn = document.createElement('div');
-      btn.innerHTML = `${icon} <span style="margin-left: 6px;">${text}</span>`;
-      Object.assign(btn.style, {
-          padding: '8px 12px', cursor: 'pointer', fontSize: '13px', color: color,
-          borderRadius: '4px', transition: 'background 0.1s', fontWeight: 'bold'
-      });
-      btn.onmouseenter = () => btn.style.backgroundColor = color === '#dc2626' ? '#fee2e2' : '#f1f5f9';
-      btn.onmouseleave = () => btn.style.backgroundColor = 'transparent';
-      
-      if (callback) {
-          btn.onclick = (e) => {
-              e.stopPropagation();
-              callback();
-              menu.remove();
-              update3D(); 
-              updateSidebar();
-          };
-      }
-      return btn;
-  };
-
-  const createHeader = (text) => {
-      const hdr = document.createElement('div');
-      hdr.innerText = text;
-      Object.assign(hdr.style, {
-        fontSize: '11px', color: '#64748b', textTransform: 'uppercase',
-        margin: '8px 8px 4px 8px', fontWeight: 'bold'
-      });
-      return hdr;
-  };
-
-  const createInputRow = (labelTxt, val) => {
-      const row = document.createElement('div');
-      row.style.display = 'flex'; row.style.justifyContent = 'space-between'; row.style.alignItems = 'center'; row.style.marginBottom = '6px';
-      const lbl = document.createElement('span'); lbl.innerText = labelTxt; lbl.style.fontSize = '12px'; lbl.style.color = '#475569';
-      const inp = document.createElement('input'); inp.type = 'number'; inp.value = val;
-      Object.assign(inp.style, { width: '60px', padding: '4px', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold' });
-      row.appendChild(lbl); row.appendChild(inp); return { row, inp };
-  };
-
-  const mod = state.project.modules.find(m => m.id === data.moduleId);
-  if (!mod) return;
-
-  if (state.selectedModules && state.selectedModules.size > 1) {
-      const selectedArray = Array.from(state.selectedModules);
-      const firstMod = state.project.modules.find(m => m.id === selectedArray[0]);
-      const allSameGroup = firstMod && firstMod.groupId && selectedArray.every(id => {
-          const m = state.project.modules.find(md => md.id === id);
-          return m && m.groupId === firstMod.groupId;
-      });
-
-      if (!allSameGroup) {
-          menu.appendChild(createHeader('Grupowanie modułów'));
-          menu.appendChild(createOption('🔗 Połącz zaznaczone w grupę', '🔗', () => {
-              const newGroupId = 'group-' + Date.now();
-              state.selectedModules.forEach(id => {
-                  const m = state.project.modules.find(md => md.id === id);
-                  if (m) m.groupId = newGroupId;
-              });
-          }, '#0284c7'));
-      }
-  }
-
-  if (mod.groupId) {
-      menu.appendChild(createHeader('Grupowanie modułów'));
-      menu.appendChild(createOption('✂️ Rozbij grupę (Rozgrupuj)', '✂️', () => {
-          const gId = mod.groupId;
-          state.project.modules.forEach(m => {
-              if (m.groupId === gId) delete m.groupId;
-          });
-          state.selectedModules = new Set([mod.id]); 
-      }, '#dc2626'));
-  }
-
-  if (data.type === 'corpus' && data.part !== 'back') {
-      menu.appendChild(createHeader('Pozycja szafki (Ręczna korekta)'));
-      
-      const posWrap = document.createElement('div');
-      Object.assign(posWrap.style, { padding: '8px', backgroundColor: '#f8fafc', borderRadius: '4px', marginBottom: '6px' });
-      
-      const createPosControl = (axis, label, val) => {
-          const row = document.createElement('div');
-          row.style.display = 'flex'; row.style.alignItems = 'center'; row.style.justifyContent = 'space-between'; row.style.marginBottom = '6px';
-          
-          const lbl = document.createElement('span'); lbl.innerText = label; lbl.style.fontSize = '12px'; lbl.style.fontWeight = 'bold'; lbl.style.color = '#334155';
-          
-          const controls = document.createElement('div'); controls.style.display = 'flex'; controls.style.gap = '4px';
-          
-          const btnMinus = document.createElement('button'); btnMinus.innerText = '-'; 
-          const btnPlus = document.createElement('button'); btnPlus.innerText = '+';
-          const inp = document.createElement('input'); inp.type = 'number'; inp.value = val; inp.style.width = '55px'; inp.style.textAlign = 'center';
-          
-          [btnMinus, btnPlus].forEach(b => Object.assign(b.style, { width: '28px', height: '28px', cursor: 'pointer', border: '1px solid #cbd5e1', background: '#fff', borderRadius: '4px', fontWeight: 'bold', color: '#0ea5e9' }));
-          
-          const updatePos = (newVal) => {
-              mod.position[axis] = parseFloat(newVal) || 0;
-              if (axis === 'x' || axis === 'z') clampModuleToRoom(mod);
-              inp.value = mod.position[axis];
-              update3D();
-              updateSidebar();
-              initPropertiesPanel();
-          };
-          
-          btnMinus.onclick = (e) => { e.stopPropagation(); updatePos(mod.position[axis] - 10); };
-          btnPlus.onclick = (e) => { e.stopPropagation(); updatePos(mod.position[axis] + 10); };
-          inp.onchange = (e) => { e.stopPropagation(); updatePos(e.target.value); };
-          
-          controls.appendChild(btnMinus); controls.appendChild(inp); controls.appendChild(btnPlus);
-          row.appendChild(lbl); row.appendChild(controls);
-          return row;
-      };
-      
-      posWrap.appendChild(createPosControl('x', '↔️ Oś X', mod.position.x));
-      posWrap.appendChild(createPosControl('y', '↕️ Oś Y', mod.position.y));
-      posWrap.appendChild(createPosControl('z', '↗️ Oś Z', mod.position.z || 0));
-      menu.appendChild(posWrap);
-
-      menu.appendChild(createHeader('Obrót (co 90°)'));
-      const rotWrap = document.createElement('div');
-      Object.assign(rotWrap.style, { display: 'flex', gap: '4px', padding: '0 8px 8px 8px' });
-      [0, 90, 180, 270].forEach(rot => {
-          const active = (mod.rotation || 0) === rot;
-          const b = document.createElement('button');
-          b.innerText = `${rot}°`;
-          Object.assign(b.style, {
-              flex: '1', padding: '6px 2px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer',
-              borderRadius: '4px', border: `1px solid ${active ? '#2563eb' : '#cbd5e1'}`,
-              background: active ? '#2563eb' : '#fff', color: active ? '#fff' : '#334155'
-          });
-          b.onclick = (e) => {
-              e.stopPropagation();
-              mod.rotation = rot;
-              clampModuleToRoom(mod);
-              update3D();
-              updateSidebar();
-              initPropertiesPanel();
-              menu.remove();
-          };
-          rotWrap.appendChild(b);
-      });
-      menu.appendChild(rotWrap);
-
-      menu.appendChild(createHeader('Akcje korpusu'));
-      menu.appendChild(createOption('Klonuj szafkę obok', '📋', () => { duplicateModule(mod.id); }, '#059669'));
-      menu.appendChild(createOption('Usuń całą szafkę', '🗑️', () => { deleteModule(mod.id); state.activeModuleId = null; }, '#dc2626'));
-  }
-
-  if (data.type === 'shelf') {
-      const el = mod.elements.find(e => e.id === data.elementId);
-      if (el) {
-          const isStruct = el.isStructural;
-          const isPoziom = el.typ === 'poziom';
-
-          const th = parseFloat(state.project.materials.boardThickness) || 18;
-          const H = parseFloat(mod.dimensions.height);
-          const W = parseFloat(mod.dimensions.width);
-          const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(state.project.construction || {}), ...(mod.construction || {}) };
-          const hasTraverses = cons.topType.includes('trawersy');
-          const isVerticalTraverse = cons.topType === 'trawersy_pion';
-          const traverseWidth = cons.traverseWidth || 100;
-          const topZoneY = (hasTraverses && isVerticalTraverse) ? H - traverseWidth : H - th;
-          const topZoneH = (hasTraverses && isVerticalTraverse) ? traverseWidth : th;
-
-          const obstacles = [
-              ...mod.elements.filter(e => e.typ === 'poziom' && e.id !== el.id),
-              { id: 'cab-left', x: 0, y: 0, w: th, h: H },
-              { id: 'cab-right', x: W - th, y: 0, w: th, h: H },
-              { id: 'cab-bottom', x: 0, y: 0, w: W, h: th },
-              { id: 'cab-top', x: 0, y: topZoneY, w: W, h: topZoneH }
-          ];
-
-          let boundMin = 0; let boundMax = isPoziom ? H : W;
-
-          if (isPoziom) {
-              obstacles.forEach(obs => {
-                  if (obs.x < el.x + el.w && obs.x + obs.w > el.x) {
-                      if (obs.y + (obs.h||th) <= el.y && obs.y + (obs.h||th) > boundMin) boundMin = obs.y + (obs.h||th);
-                      if (obs.y >= el.y + el.h && obs.y < boundMax) boundMax = obs.y;
-                  }
-              });
-          } else {
-              obstacles.forEach(obs => {
-                  if (obs.y < el.y + el.h && obs.y + obs.h > el.y) {
-                      if (obs.x + obs.w <= el.x && obs.x + obs.w > boundMin) boundMin = obs.x + obs.w;
-                      if (obs.x >= el.x + el.w && obs.x < boundMax) boundMax = obs.x;
-                  }
-              });
-          }
-
-          const currentSpace1 = Math.round((isPoziom ? el.y : el.x) - boundMin);
-          const currentSpace2 = Math.round(boundMax - ((isPoziom ? el.y : el.x) + (isPoziom ? el.h : el.w)));
-          const maxSpace = currentSpace1 + currentSpace2;
-
-          const moveWrap = document.createElement('div');
-          Object.assign(moveWrap.style, {
-              padding: '10px', borderBottom: '1px solid #e2e8f0', marginBottom: '4px',
-              backgroundColor: '#f8fafc', borderRadius: '4px 4px 0 0'
-          });
-          moveWrap.innerHTML = `<div style="font-size:11px; font-weight:bold; color:#334155; margin-bottom:10px; text-transform: uppercase;">Regulacja światła [mm]</div>`;
-
-          const inp1Data = createInputRow(isPoziom ? '↕️ Światło pod:' : '↔️ Światło z lewej:', currentSpace1);
-          const inp2Data = createInputRow(isPoziom ? '↕️ Światło nad:' : '↔️ Światło z prawej:', currentSpace2);
-          
-          const inp1 = inp1Data.inp; const inp2 = inp2Data.inp;
-          inp1.oninput = () => { const v = parseFloat(inp1.value); if(!isNaN(v)) inp2.value = maxSpace - v; };
-          inp2.oninput = () => { const v = parseFloat(inp2.value); if(!isNaN(v)) inp1.value = maxSpace - v; };
-
-          const applyBtn = document.createElement('button'); applyBtn.innerText = 'Zatwierdź pozycję';
-          Object.assign(applyBtn.style, { width: '100%', padding: '6px', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginTop: '4px' });
-
-          const applyPosition = (evt) => {
-              evt.stopPropagation(); 
-              const newVal1 = parseFloat(inp1.value);
-              if (!isNaN(newVal1) && newVal1 >= 0 && newVal1 <= maxSpace) { 
-                  if (isPoziom) el.y = boundMin + newVal1; else el.x = boundMin + newVal1; 
-                  menu.remove();
-                  update3D();
-                  updateSidebar();
-              } else {
-                  alert('Wartość wykracza poza wnękę!');
-              }
-          };
-
-          applyBtn.onclick = applyPosition; 
-          inp1.onkeydown = (evt) => { if (evt.key === 'Enter') applyPosition(evt); }; 
-          inp2.onkeydown = (evt) => { if (evt.key === 'Enter') applyPosition(evt); };
-
-          moveWrap.appendChild(inp2Data.row); moveWrap.appendChild(inp1Data.row); moveWrap.appendChild(applyBtn); 
-          menu.appendChild(moveWrap);
-
-          menu.appendChild(createHeader('Narzędzia precyzyjne'));
-          if (isPoziom) {
-              menu.appendChild(createOption('Wyrównaj do innego elementu', '🧲', () => {
-                  enterAlignMode(mod, el);
-              }, '#0284c7'));
-          }
-
-          menu.appendChild(createHeader('Parametry elementu'));
-          if (isPoziom) {
-              menu.appendChild(createOption(isStruct ? 'Zmień na ruchomą' : 'Zmień na konstrukcyjną', '🔩', () => { el.isStructural = !isStruct; }, isStruct ? '#059669' : '#1e293b'));
-          }
-          menu.appendChild(createOption('Usuń element', '🗑️', () => { mod.elements = mod.elements.filter(e => e.id !== el.id); }, '#dc2626'));
-          
-          setTimeout(() => inp1.focus(), 50);
-      }
-  }
-  else if (data.type === 'front') {
-      const el = mod.elements.find(e => e.id === data.elementId);
-      if (el) {
-          
-          menu.appendChild(createHeader('Korekta Ręczna Frontu'));
-          const overrideWrap = document.createElement('div');
-          Object.assign(overrideWrap.style, { padding: '10px', backgroundColor: '#f8fafc', borderRadius: '4px', marginBottom: '6px', border: '1px solid #e2e8f0' });
-          
-          const info = document.createElement('div');
-          info.innerHTML = `Aktualne: <b>${(el.w||0).toFixed(1)} x ${(el.h||0).toFixed(1)}</b> mm`;
-          Object.assign(info.style, { fontSize: '10px', color: '#64748b', marginBottom: '8px', textAlign: 'center' });
-          overrideWrap.appendChild(info);
-
-          const rowH = createInputRow('Wymuś Wys. [mm]:', el.forceH || '');
-          rowH.inp.placeholder = 'Auto';
-          const rowW = createInputRow('Wymuś Szer. [mm]:', el.forceW || '');
-          rowW.inp.placeholder = 'Auto';
-          const rowY = createInputRow('Przesuń Y ↕ [mm]:', el.forceOffsetY || '0');
-          const rowX = createInputRow('Przesuń X ↔ [mm]:', el.forceOffsetX || '0');
-
-          const btnApplyOverride = document.createElement('button');
-          btnApplyOverride.innerText = 'Zastosuj korektę';
-          Object.assign(btnApplyOverride.style, { width: '100%', padding: '6px', backgroundColor: '#8b5cf6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginTop: '4px' });
-
-          btnApplyOverride.onclick = (evt) => {
-              evt.stopPropagation();
-              el.forceH = rowH.inp.value !== '' ? parseFloat(rowH.inp.value) : null;
-              el.forceW = rowW.inp.value !== '' ? parseFloat(rowW.inp.value) : null;
-              el.forceOffsetY = rowY.inp.value !== '' ? parseFloat(rowY.inp.value) : 0;
-              el.forceOffsetX = rowX.inp.value !== '' ? parseFloat(rowX.inp.value) : 0;
-              menu.remove();
-              update3D();
-              updateSidebar();
-          };
-
-          overrideWrap.appendChild(rowH.row);
-          overrideWrap.appendChild(rowW.row);
-          overrideWrap.appendChild(rowY.row);
-          overrideWrap.appendChild(rowX.row);
-          overrideWrap.appendChild(btnApplyOverride);
-          menu.appendChild(overrideWrap);
-
-          if (el.subtype.includes('szuflada')) {
-              menu.appendChild(createHeader('Opcje pudła szuflady'));
-              const boxWrap = document.createElement('div');
-              Object.assign(boxWrap.style, {
-                  padding: '10px', borderBottom: '1px solid #e2e8f0', marginBottom: '4px', backgroundColor: '#f8fafc', borderRadius: '4px'
-              });
-
-              // NAPRAWA: front.forceVariant to klucz katalogu systemu szuflad (np. "srednia"),
-              // nie litera typu — różne systemy różnie nazywają literą ten sam klucz (patrz
-              // core/drawerSystems.js), więc stała lista liter N/M/K/E/C nigdy się nie
-              // zgadzała i wymuszenie po cichu nie działało. Lista opcji jest teraz budowana
-              // z realnych wariantów wybranego systemu szuflad tej szafki.
-              const fMerged = { ...(state.project.front || {}), ...(mod.front || {}) };
-              const sysNameForMenu = (fMerged.drawerSystem || 'merivobox').toLowerCase();
-              const sysVariants = (drawerSystems[sysNameForMenu] || drawerSystems.merivobox).variants;
-              const variantOptionsHtml = DRAWER_VARIANT_ORDER.filter(k => sysVariants[k]).map(k =>
-                  `<option value="${k}" ${el.forceVariant === k ? 'selected' : ''}>${DRAWER_VARIANT_LABELS[k]} (${sysVariants[k].type}, ${sysVariants[k].height}mm)</option>`
-              ).join('');
-
-              const rowVar = document.createElement('div');
-              rowVar.style.display = 'flex'; rowVar.style.justifyContent = 'space-between'; rowVar.style.alignItems = 'center'; rowVar.style.marginBottom = '6px';
-              rowVar.innerHTML = `<label style="font-size:11px; color:#475569;">Wariant boku:</label>
-                  <select id="inp-var" style="padding:4px; border:1px solid #cbd5e1; border-radius:4px; font-size:11px; width:150px;">
-                      <option value="auto" ${(!el.forceVariant || el.forceVariant === 'auto') ? 'selected' : ''}>Auto (Maks.)</option>
-                      ${variantOptionsHtml}
-                  </select>`;
-              
-              const rowNL = document.createElement('div');
-              rowNL.style.display = 'flex'; rowNL.style.justifyContent = 'space-between'; rowNL.style.alignItems = 'center'; rowNL.style.marginBottom = '6px';
-              rowNL.innerHTML = `<label style="font-size:11px; color:#475569;">Wymuś głębokość (NL):</label>
-                  <input type="number" id="inp-nl" placeholder="Auto" value="${el.forceNL || ''}" style="width:100px; padding:4px; border:1px solid #cbd5e1; border-radius:4px; font-size:11px; text-align:center;">`;
-
-              const applyBoxBtn = document.createElement('button'); applyBoxBtn.innerText = 'Zastosuj do szuflady';
-              Object.assign(applyBoxBtn.style, { width: '100%', padding: '6px', backgroundColor: '#d97706', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' });
-
-              applyBoxBtn.onclick = (evt) => {
-                  evt.stopPropagation();
-                  el.forceVariant = document.getElementById('inp-var').value;
-                  const nlVal = document.getElementById('inp-nl').value;
-                  el.forceNL = nlVal ? parseFloat(nlVal) : null;
-                  menu.remove();
-                  update3D();
-                  updateSidebar();
-              };
-
-              boxWrap.appendChild(rowVar);
-              boxWrap.appendChild(rowNL);
-              boxWrap.appendChild(applyBoxBtn);
-              menu.appendChild(boxWrap);
-              
-              menu.appendChild(createOption('➕ Dodaj szufladę wewn. nad tą', '📥', () => {
-                  let boxHeight = el.h;
-                  if (el.forceVariant && el.forceVariant !== 'auto' && sysVariants[el.forceVariant]) {
-                      boxHeight = sysVariants[el.forceVariant].height;
-                  }
-                  
-                  const newInnerBottomY = el.y + boxHeight + 5;
-                  const newInnerTopY = el.y + el.h;
-                  
-                  if (newInnerBottomY + 40 > newInnerTopY) {
-                      alert("Za mało miejsca nad pudłem! Zmniejsz wariant boku tej szuflady (np. na M lub K) i zapisz, aby zrobić miejsce.");
-                      return;
-                  }
-
-                  const baseMinY = parseFloat(el.baseZone.minY) || 18;
-                  const baseMaxY = parseFloat(el.baseZone.maxY) || parseFloat(mod.dimensions.height);
-                  
-                  const newOffsetBottom = newInnerBottomY - baseMinY;
-                  const newOffsetTop = baseMaxY - newInnerTopY;
-
-                  mod.elements.push({
-                      id: 'front-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
-                      typ: 'front', 
-                      subtype: 'szuflada-wewnetrzna', 
-                      baseZone: { 
-                          ...el.baseZone, 
-                          offsetBottom: Math.max(0, newOffsetBottom), 
-                          offsetTop: Math.max(0, newOffsetTop) 
-                      },
-                      frontCount: 1, distribution: "1", frontIndex: 0, gap: parseFloat(state.project.front?.gap || 3),
-                      intGapX: 15, intGapY: 5, forceVariant: 'auto', forceNL: null,
-                      innerFrontThickness: 18, innerSetback: 2
-                  });
-
-                  menu.remove();
-                  update3D();
-                  updateSidebar();
-              }, '#059669'));
-          }
-
-          if (el.subtype === 'szuflada-wewnetrzna') {
-              menu.appendChild(createHeader('Front wewn. i prowadnice'));
-              const pWrap = document.createElement('div');
-              Object.assign(pWrap.style, {
-                  padding: '10px', borderBottom: '1px solid #e2e8f0', marginBottom: '4px',
-                  backgroundColor: '#f8fafc', borderRadius: '4px 4px 0 0'
-              });
-
-              const inpThickData = createInputRow('Grubość frontu [mm]:', el.innerFrontThickness ?? 18);
-              const inpSetbackData = createInputRow('Luz do krawędzi [mm]:', el.innerSetback ?? 2);
-              
-              const applyBtn2 = document.createElement('button'); applyBtn2.innerText = 'Zapisz parametry frontu';
-              Object.assign(applyBtn2.style, { width: '100%', padding: '6px', backgroundColor: '#d97706', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginTop: '4px' });
-
-              applyBtn2.onclick = (evt) => {
-                  evt.stopPropagation(); 
-                  el.innerFrontThickness = parseFloat(inpThickData.inp.value) || 18; 
-                  el.innerSetback = parseFloat(inpSetbackData.inp.value) || 0; 
-                  menu.remove();
-                  update3D();
-                  updateSidebar();
-              };
-
-              pWrap.appendChild(inpThickData.row); pWrap.appendChild(inpSetbackData.row); pWrap.appendChild(applyBtn2); 
-              menu.appendChild(pWrap);
-              
-              if (el.baseZone) {
-                  menu.appendChild(createHeader('Marginesy Bloku (np. na zawias)'));
-                  const bWrap = document.createElement('div');
-                  Object.assign(bWrap.style, {
-                      padding: '10px', borderBottom: '1px solid #e2e8f0', marginBottom: '4px', backgroundColor: '#f8fafc'
-                  });
-
-                  const inpBotData = createInputRow('Wolne miejsce od dołu:', el.baseZone.offsetBottom || 0);
-                  const inpTopData = createInputRow('Wolne miejsce od góry:', el.baseZone.offsetTop || 0);
-
-                  const applyMargBtn = document.createElement('button'); applyMargBtn.innerText = 'Zapisz omijanie';
-                  Object.assign(applyMargBtn.style, { width: '100%', padding: '6px', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginTop: '4px' });
-
-                  applyMargBtn.onclick = (evt) => {
-                      evt.stopPropagation();
-                      mod.elements.forEach(sibling => {
-                          if (sibling.typ === 'front' && sibling.baseZone && sibling.baseZone.minY === el.baseZone.minY && sibling.baseZone.maxY === el.baseZone.maxY) {
-                              sibling.baseZone.offsetBottom = parseFloat(inpBotData.inp.value) || 0;
-                              sibling.baseZone.offsetTop = parseFloat(inpTopData.inp.value) || 0;
-                          }
-                      });
-                      menu.remove();
-                      update3D();
-                      updateSidebar();
-                  };
-
-                  bWrap.appendChild(inpBotData.row); bWrap.appendChild(inpTopData.row); bWrap.appendChild(applyMargBtn);
-                  menu.appendChild(bWrap);
-              }
-          }
-
-          if (el.subtype === 'drzwi') {
-              menu.appendChild(createHeader('Kierunek otwierania'));
-              const isLeft = (el.openingSide === 'left' || !el.openingSide);
-              menu.appendChild(createOption(isLeft ? 'Zmień na Prawe (Zawias z prawej)' : 'Zmień na Lewe (Zawias z lewej)', '🔄', () => {
-                  el.openingSide = isLeft ? 'right' : 'left';
-              }, '#0284c7'));
-          }
-
-          menu.appendChild(createHeader('Zarządzanie bloku'));
-          menu.appendChild(createOption('Usuń ten front/szufladę', '🗑️', () => { mod.elements = mod.elements.filter(e => e.id !== el.id); }, '#dc2626'));
-          
-          if (el.baseZone) {
-              menu.appendChild(createOption('Wyczyść całą wnękę', '🧹', () => {
-                  mod.elements = mod.elements.filter(e => !(e.typ === 'front' && e.baseZone && e.baseZone.minY === el.baseZone.minY && e.baseZone.maxY === el.baseZone.maxY));
-              }, '#991b1b'));
-          }
-      }
-  }
-  else if (data.type === 'corpus' && data.part === 'back') {
-      const th = parseFloat(state.project.materials.boardThickness) || 18;
-      const legHeight = mod.legs && mod.legs.active ? (parseFloat(mod.legs.height) || 0) : 0;
-      
-      const worldPos = new THREE.Vector3();
-      hit.object.getWorldPosition(worldPos);
-      
-      const localY = hit.point.y - (parseFloat(mod.position.y) || 0) - legHeight;
-      const localX = hit.point.x - (parseFloat(mod.position.x) || 0); 
-      
-      const H = parseFloat(mod.dimensions.height);
-      const W = parseFloat(mod.dimensions.width);
-      
-      if (localY > 0 && localY < H && localX > 0 && localX < W) {
-          let zoneMinY = th;
-          let zoneMaxY = H - th;
-          let zoneMinX = th;
-          let zoneMaxX = W - th;
-
-          let boundBottomId = 'cab-bottom';
-          let boundTopId = 'cab-top';
-          let boundLeftId = 'cab-left';
-          let boundRightId = 'cab-right';
-
-          if (mod.elements) {
-              mod.elements.forEach(el => {
-                  if (el.typ === 'pion') {
-                      if (localY >= el.y && localY <= el.y + el.h) {
-                          let rightEdge = el.x + el.w;
-                          let leftEdge = el.x;
-
-                          if (rightEdge <= localX && rightEdge >= zoneMinX) {
-                              zoneMinX = rightEdge;
-                              boundLeftId = el.id;
-                          }
-                          if (leftEdge >= localX && leftEdge <= zoneMaxX) {
-                              zoneMaxX = leftEdge;
-                              boundRightId = el.id;
-                          }
-                      }
-                  }
-              });
-
-              mod.elements.forEach(el => {
-                  if (el.typ === 'poziom') {
-                      if (el.x < zoneMaxX && el.x + el.w > zoneMinX) {
-                          let topEdge = el.y + el.h;
-                          let bottomEdge = el.y;
-
-                          if (topEdge <= localY && topEdge >= zoneMinY) {
-                              zoneMinY = topEdge;
-                              boundBottomId = el.id;
-                          }
-                          if (bottomEdge >= localY && bottomEdge <= zoneMaxY) {
-                              zoneMaxY = bottomEdge;
-                              boundTopId = el.id;
-                          }
-                      }
-                  }
-              });
-          }
-
-          const currentW = zoneMaxX - zoneMinX;
-          const currentH = zoneMaxY - zoneMinY;
-
-          const targetBaseZone = { 
-              minX: zoneMinX, maxX: zoneMaxX, minY: zoneMinY, maxY: zoneMaxY,
-              boundBottom: boundBottomId, boundTop: boundTopId, boundLeft: boundLeftId, boundRight: boundRightId,
-              offsetBottom: 0, offsetTop: 0 
-          };
-
-          const fullCabBaseZone = {
-              minX: th, maxX: W - th, minY: th, maxY: H - th,
-              boundBottom: 'cab-bottom', boundTop: 'cab-top', boundLeft: 'cab-left', boundRight: 'cab-right',
-              offsetBottom: 0, offsetTop: 0
-          };
-
-          menu.appendChild(createHeader('Dodaj elementy konstrukcyjne'));
-          
-          menu.appendChild(createOption(`Wstaw półkę (Wys: ${Math.round(localY)} mm)`, '➕', () => {
-              mod.elements.push({
-                  id: 'poziom-' + Date.now() + Math.random().toString(36).substring(2, 6),
-                  typ: 'poziom', x: zoneMinX, y: localY - (th/2), w: currentW, h: th, isStructural: false 
-              });
-          }, '#2563eb'));
-
-          const halfY = zoneMinY + currentH / 2;
-          menu.appendChild(createOption('Półka (dokładnie w połowie)', '➗', () => {
-              mod.elements.push({
-                  id: 'poziom-half-' + Date.now() + Math.random().toString(36).substring(2, 6),
-                  typ: 'poziom', x: zoneMinX, y: halfY - (th/2), w: currentW, h: th, isStructural: false
-              });
-          }, '#2563eb'));
-
-          const btnAutoShelves = createOption('Półki (rozmieść równomiernie)', '📚', null, '#2563eb');
-          btnAutoShelves.onclick = (e) => {
-              e.stopPropagation();
-              menu.innerHTML = '';
-              menu.style.width = '240px';
-              menu.style.padding = '12px';
-
-              const title = document.createElement('div');
-              title.innerText = 'Równomierne półki';
-              title.style.fontWeight = 'bold'; title.style.marginBottom = '10px';
-
-              const wrap = document.createElement('div');
-              wrap.innerHTML = `<label style="font-size:11px;">Podaj ilość półek:</label><br><input type="number" id="inp-shelves" value="2" min="1" style="width:100%; padding:6px; margin-top:4px; border:1px solid #ccc; border-radius:4px;">`;
-
-              const btnApply = document.createElement('button');
-              btnApply.innerText = 'Wstaw półki';
-              Object.assign(btnApply.style, { width: '100%', marginTop: '12px', padding: '8px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' });
-
-              btnApply.onclick = (ev) => {
-                  ev.stopPropagation();
-                  const shelfCount = parseInt(document.getElementById('inp-shelves').value, 10);
-                  if (isNaN(shelfCount) || shelfCount <= 0) return;
-
-                  const internalHeight = currentH;
-                  const newShelvesBase = autoDistributeShelves(internalHeight, th, shelfCount);
-
-                  const ts = Date.now();
-                  newShelvesBase.forEach((s, idx) => {
-                      mod.elements.push({
-                          id: 'poziom-auto-' + ts + '-' + idx,
-                          typ: 'poziom', x: zoneMinX, y: zoneMinY + s.y, w: currentW, h: th, isStructural: false
-                      });
-                  });
-
-                  menu.remove();
-                  update3D();
-                  updateSidebar();
-              };
-
-              menu.appendChild(title);
-              menu.appendChild(wrap);
-              menu.appendChild(btnApply);
-              
-              setTimeout(() => {
-                  const inp = document.getElementById('inp-shelves');
-                  if (inp) inp.focus();
-              }, 50);
-          };
-          menu.appendChild(btnAutoShelves);
-
-          const halfX = zoneMinX + currentW / 2;
-          menu.appendChild(createOption('Przegroda pionowa (w połowie)', '➕', () => {
-              mod.elements.push({
-                  id: 'pion-half-' + Date.now() + Math.random().toString(36).substring(2, 6),
-                  typ: 'pion', x: halfX - (th/2), y: zoneMinY, w: th, h: currentH
-              });
-          }, '#059669'));
-
-          menu.appendChild(createHeader('Zabuduj wybraną wnękę'));
-
-          const showDrawerMenu = (e, subtype, titleTxt) => {
-              e.stopPropagation();
-              menu.innerHTML = '';
-              menu.style.width = '260px';
-              menu.style.padding = '12px';
-
-              const title = document.createElement('div');
-              title.innerText = titleTxt;
-              title.style.fontWeight = 'bold'; title.style.marginBottom = '10px';
-
-              const wrapDist = document.createElement('div');
-              wrapDist.innerHTML = `<label style="font-size:11px;">Podział (np. 3 lub 200:200):</label><br><input type="text" id="inp-dist" value="3" style="width:100%; padding:6px; margin-top:4px; border:1px solid #ccc; border-radius:4px;">`;
-
-              const wrapGap = document.createElement('div');
-              wrapGap.innerHTML = `<label style="font-size:11px;">Szczelina między frontami [mm]:</label><br><input type="number" id="inp-gap" value="${state.project.front?.gap || 3}" style="width:100%; padding:6px; margin-top:4px; border:1px solid #ccc; border-radius:4px;">`;
-
-              const wrapOffsets = document.createElement('div');
-              if (subtype === 'szuflada-wewnetrzna') {
-                  wrapOffsets.innerHTML = `
-                      <div style="display:flex; gap:10px; margin-top:8px;">
-                          <div style="flex:1;">
-                              <label style="font-size:10px;">Odsunięcie od Dołu (np. zawias):</label>
-                              <input type="number" id="inp-bot" value="0" style="width:100%; padding:4px; margin-top:2px; border:1px solid #ccc; border-radius:4px;">
-                          </div>
-                          <div style="flex:1;">
-                              <label style="font-size:10px;">Odsunięcie od Góry (np. zawias):</label>
-                              <input type="number" id="inp-top" value="0" style="width:100%; padding:4px; margin-top:2px; border:1px solid #ccc; border-radius:4px;">
-                          </div>
-                      </div>
-                  `;
-              }
-
-              const btnApply = document.createElement('button');
-              btnApply.innerText = 'Zastosuj i dodaj';
-              Object.assign(btnApply.style, { width: '100%', marginTop: '12px', padding: '8px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' });
-
-              btnApply.onclick = (ev) => {
-                  ev.stopPropagation();
-                  const distStr = document.getElementById('inp-dist').value.trim() || "1";
-                  const gapValInput = parseFloat(document.getElementById('inp-gap').value) || 0;
-                  
-                  const botOffset = document.getElementById('inp-bot') ? (parseFloat(document.getElementById('inp-bot').value) || 0) : 0;
-                  const topOffset = document.getElementById('inp-top') ? (parseFloat(document.getElementById('inp-top').value) || 0) : 0;
-
-                  let genCount = 1;
-                  if (!distStr.includes(':') && !distStr.includes(',') && !isNaN(distStr)) {
-                      genCount = parseInt(distStr, 10) || 1;
-                  } else {
-                      genCount = distStr.split(distStr.includes(':') ? ':' : ',').length;
-                  }
-
-                  const ts = Date.now();
-                  for(let i = 0; i < genCount; i++) {
-                      mod.elements.push({
-                          id: 'front-' + ts + '-' + Math.random().toString(36).substring(2, 6),
-                          typ: 'front', subtype: subtype, 
-                          baseZone: { ...targetBaseZone, offsetBottom: botOffset, offsetTop: topOffset },
-                          frontCount: genCount, distribution: distStr, frontIndex: i, gap: gapValInput,
-                          intGapX: subtype === 'szuflada-wewnetrzna' ? 15 : 0, intGapY: subtype === 'szuflada-wewnetrzna' ? 5 : 0,
-                          forceVariant: 'auto',
-                          forceNL: null
-                      });
-                  }
-                  menu.remove();
-                  update3D();       
-                  updateSidebar();
-              };
-
-              menu.appendChild(title);
-              menu.appendChild(wrapDist);
-              menu.appendChild(wrapGap);
-              if (subtype === 'szuflada-wewnetrzna') menu.appendChild(wrapOffsets);
-              menu.appendChild(btnApply);
-          };
-
-          const btnDrawers = createOption('Szuflady zewnętrzne', '📦', null, '#d97706');
-          btnDrawers.onclick = (e) => showDrawerMenu(e, 'szuflada', 'Szuflady zewnętrzne');
-          menu.appendChild(btnDrawers);
-
-          const btnIntDrawers = createOption('Szuflady wewnętrzne', '📥', null, '#d97706');
-          btnIntDrawers.onclick = (e) => showDrawerMenu(e, 'szuflada-wewnetrzna', 'Szuflady wewnętrzne');
-          menu.appendChild(btnIntDrawers);
-
-          const btnDoor = createOption('Drzwi pojedyncze', '🚪', () => {
-              mod.elements.push({
-                  id: 'front-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
-                  typ: 'front', subtype: 'drzwi', baseZone: targetBaseZone, openingSide: 'left', 
-                  frontCount: 1, frontIndex: 0, gap: parseFloat(state.project.front?.gap) || 3
-              });
-          }, '#1e40af');
-          menu.appendChild(btnDoor);
-          
-          const btnDoorLP = createOption('Drzwi podwójne (L/P)', '🚪', () => {
-              const gapLp = parseFloat(state.project.front?.gap) || 3;
-              mod.elements.push({ id: 'front-L-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi-lp', baseZone: targetBaseZone, frontCount: 2, frontIndex: 0, gap: gapLp });
-              mod.elements.push({ id: 'front-P-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi-lp', baseZone: targetBaseZone, frontCount: 2, frontIndex: 1, gap: gapLp });
-          }, '#1e40af');
-          menu.appendChild(btnDoorLP);
-
-          menu.appendChild(createHeader('Zabudowa całej szafki (Zasłania półki)'));
-
-          const btnFullDoor = createOption('Drzwi pojedyncze (Całość)', '🚪', () => {
-              mod.elements.push({
-                  id: 'front-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
-                  typ: 'front', subtype: 'drzwi', baseZone: fullCabBaseZone, openingSide: 'left',
-                  frontCount: 1, frontIndex: 0, gap: parseFloat(state.project.front?.gap) || 3
-              });
-          }, '#7c3aed');
-          menu.appendChild(btnFullDoor);
-
-          const btnFullDoorLP = createOption('Drzwi podwójne (Całość)', '🚪', () => {
-              const gapLp = parseFloat(state.project.front?.gap) || 3;
-              mod.elements.push({ id: 'front-L-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi-lp', baseZone: fullCabBaseZone, frontCount: 2, frontIndex: 0, gap: gapLp });
-              mod.elements.push({ id: 'front-P-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi-lp', baseZone: fullCabBaseZone, frontCount: 2, frontIndex: 1, gap: gapLp });
-          }, '#7c3aed');
-          menu.appendChild(btnFullDoorLP);
-
-      }
-  }
-
-  if (menu.children.length > 0) document.body.appendChild(menu);
 }
 
 const mats = {

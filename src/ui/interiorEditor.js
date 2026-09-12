@@ -18,9 +18,10 @@ import {
   assignFront,
   moveSplit,
 } from "../core/zoneTree.js";
-import { update3D } from "../render/viewer3d.js";
+import { update3D, enterAlignMode } from "../render/viewer3d.js";
 import { updateSidebar } from "./sidebar.js";
 import { initPropertiesPanel } from "./properties.js";
+import { autoDistributeShelves } from "../core/shelfMath.js";
 
 const FRONT_LABELS = {
   drzwi: "Drzwi",
@@ -335,6 +336,7 @@ function selectNode(node, anchorEl, stage, px, mode) {
     });
     appendDrawerPicker(toolbar, mod, "szuflada", "📦 Szuflady zewn.");
     appendDrawerPicker(toolbar, mod, "szuflada-wewnetrzna", "📥 Szuflady wewn.");
+    appendAutoShelvesPicker(toolbar, mod, selectedNode);
   } else if (mode === "occupied") {
     const subtype = selectedNode.fronts[0]?.subtype;
     const label = FRONT_LABELS[subtype] || subtype;
@@ -342,6 +344,14 @@ function selectNode(node, anchorEl, stage, px, mode) {
     info.innerText = `${label} × ${selectedNode.fronts.length}`;
     Object.assign(info.style, { color: "#cbd5e1", fontSize: "11px", padding: "6px 4px", fontFamily: "sans-serif" });
     toolbar.appendChild(info);
+    if (subtype === "drzwi") {
+      const door = selectedNode.fronts[0];
+      const isLeft = door.openingSide === "left" || !door.openingSide;
+      addBtn(isLeft ? "🔄 Zawias z prawej" : "🔄 Zawias z lewej", "Zmienia kierunek otwierania drzwi", () => {
+        door.openingSide = isLeft ? "right" : "left";
+        refreshAfterEdit();
+      });
+    }
     addBtn("🗑️ Usuń front", "Usuwa front, wnęka zostaje pusta", () => {
       // usunięcie frontu = przypisanie "pustego" -> wystarczy usunąć elementy z fronts
       const ids = new Set(selectedNode.fronts.map((f) => f.id));
@@ -356,6 +366,12 @@ function selectNode(node, anchorEl, stage, px, mode) {
         "Konstrukcyjna = na stałe wkręcona, ruchoma = na podpórkach",
         () => { toggleStructural(selectedNode); refreshAfterEdit(); }
       );
+      addBtn("🧲 Wyrównaj do innej szafki", "Przełącza na widok 3D i pozwala kliknąć wieniec/półkę innej szafki, do której wyrównać tę półkę", () => {
+        const divider = selectedNode.divider;
+        closeToolbar();
+        toggleInteriorEditor();
+        enterAlignMode(mod, divider);
+      });
     }
     addBtn("🗑️ Usuń podział", "Usuwa dzielnik i wszystko, co jest w obu powstałych z niego wnękach", () => {
       removeSplit(mod, selectedNode);
@@ -394,6 +410,50 @@ function appendDrawerPicker(toolbar, mod, subtype, label) {
     e.stopPropagation();
     const count = Math.max(1, parseInt(input.value, 10) || 1);
     assignFront(mod, selectedNode, subtype, { distribution: String(count) });
+    refreshAfterEdit();
+  });
+
+  wrap.appendChild(lbl);
+  wrap.appendChild(input);
+  wrap.appendChild(go);
+  toolbar.appendChild(wrap);
+}
+
+// Port 1:1 z menu kontekstowego 3D (render/viewer3d.js) - rozmieszcza N półek
+// równomiernie w pustej wnęce, licząc odstępy przez core/shelfMath.js.
+function appendAutoShelvesPicker(toolbar, mod, node) {
+  const wrap = document.createElement("div");
+  Object.assign(wrap.style, { display: "flex", alignItems: "center", gap: "4px", background: "#334155", borderRadius: "5px", padding: "3px 3px 3px 9px" });
+
+  const lbl = document.createElement("span");
+  lbl.innerText = "📚 Półki równo";
+  Object.assign(lbl.style, { fontFamily: "sans-serif", fontSize: "11.5px", fontWeight: "bold", color: "#fff" });
+
+  const input = document.createElement("input");
+  input.type = "number";
+  input.min = "1";
+  input.value = "2";
+  input.title = "Ile półek rozmieścić równomiernie w tej wnęce";
+  Object.assign(input.style, { width: "34px", padding: "5px 3px", border: "none", borderRadius: "4px", textAlign: "center", fontSize: "11px" });
+  input.addEventListener("click", (e) => e.stopPropagation());
+
+  const go = document.createElement("button");
+  go.type = "button";
+  go.innerText = "+";
+  Object.assign(go.style, { width: "22px", height: "22px", border: "none", borderRadius: "4px", background: "#0284c7", color: "#fff", fontWeight: "bold", cursor: "pointer" });
+  go.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const count = Math.max(1, parseInt(input.value, 10) || 1);
+    const th = parseFloat(state.project.materials?.boardThickness) || 18;
+    const { minX, maxX, minY, maxY } = node.rect;
+    const shelves = autoDistributeShelves(maxY - minY, th, count);
+    const ts = Date.now();
+    shelves.forEach((s, idx) => {
+      mod.elements.push({
+        id: "poziom-auto-" + ts + "-" + idx,
+        typ: "poziom", x: minX, y: minY + s.y, w: maxX - minX, h: th, isStructural: false,
+      });
+    });
     refreshAfterEdit();
   });
 

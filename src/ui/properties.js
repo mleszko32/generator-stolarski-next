@@ -6,6 +6,7 @@ import { calculateParts } from "../engine/cabinet.js";
 import { calculateHinges } from "../core/hingeMath.js";
 import { getTraverseConfig, clampModuleToRoom } from "../core/layout.js";
 import { drawerSystems, DRAWER_VARIANT_ORDER, DRAWER_VARIANT_LABELS } from "../core/drawerSystems.js";
+import { getDrawerVariant } from "../core/drawerMath.js";
 import { escapeHtml } from "../utils/dom.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
@@ -130,6 +131,21 @@ export function initPropertiesPanel() {
           label: `Szuflada ${idx + 1}${front.subtype === 'szuflada-wewnetrzna' ? ' (wewn.)' : ''}`,
       }));
 
+  // Grupowanie modułów — dotąd edytowalne tylko z menu kontekstowego 3D
+  // (render/viewer3d.js), teraz też tutaj (patrz plan przeniesienia okienek 3D
+  // do panelu bocznego). "Można połączyć w grupę" tylko gdy zaznaczenie ma
+  // >1 element i NIE są już wszystkie w tej samej grupie.
+  const selectedIdsForGroup = state.selectedModules && state.selectedModules.size > 1
+      ? Array.from(state.selectedModules)
+      : [];
+  const canCombineIntoGroup = selectedIdsForGroup.length > 1 && !(() => {
+      const first = state.project.modules.find(m => m.id === selectedIdsForGroup[0]);
+      return first && first.groupId && selectedIdsForGroup.every(id => {
+          const m = state.project.modules.find(md => md.id === id);
+          return m && m.groupId === first.groupId;
+      });
+  })();
+
   if (!TABS.some(t => t.id === activeTab)) activeTab = "wymiary";
 
   const tabBar = TABS.map(t => `
@@ -178,6 +194,14 @@ export function initPropertiesPanel() {
         }).join('')}
       </div>
       <div style="font-size: 10px; color: #94a3b8; margin-top: 4px;">Skrót: klawisz R obraca aktywną szafkę o +90°.</div>
+
+      ${(canCombineIntoGroup || activeModule.groupId) ? `
+        <h3 style="color: #0284c7;">Grupowanie</h3>
+        <div class="property-group" style="display: flex; flex-direction: column; gap: 6px;">
+          ${canCombineIntoGroup ? `<button type="button" id="btn-group-combine" class="btn btn-sm" style="background: #e0f2fe; color: #0284c7; border: 1px solid #7dd3fc; font-weight: bold; cursor: pointer; padding: 8px; border-radius: 4px;">🔗 Połącz zaznaczone w grupę</button>` : ''}
+          ${activeModule.groupId ? `<button type="button" id="btn-group-split" class="btn btn-sm" style="background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; font-weight: bold; cursor: pointer; padding: 8px; border-radius: 4px;">✂️ Rozbij grupę</button>` : ''}
+        </div>
+      ` : ''}
     `)}
 
     ${tabContent("front", `
@@ -203,6 +227,8 @@ export function initPropertiesPanel() {
           const variantOptionsHtml = DRAWER_VARIANT_ORDER.filter(k => drawerSysVariants[k]).map(k =>
               `<option value="${k}" ${front.forceVariant === k ? 'selected' : ''}>${DRAWER_VARIANT_LABELS[k]} (${drawerSysVariants[k].type}, ${drawerSysVariants[k].height}mm)</option>`
           ).join('');
+          const isInner = front.subtype === 'szuflada-wewnetrzna';
+          const bz = front.baseZone || {};
           return `
           <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px; margin-bottom: 10px;">
             <div style="font-weight: bold; font-size: 12px; color: #b45309; margin-bottom: 8px;">📦 ${escapeHtml(label)}</div>
@@ -213,10 +239,58 @@ export function initPropertiesPanel() {
                 ${variantOptionsHtml}
               </select>
             </div>
-            <div class="property-group" style="margin-bottom: 0;">
+            <div class="property-group" style="margin-bottom: 8px;">
               <label style="font-size: 11px;">Wymuszona głębokość (NL, mm):</label>
               <input type="number" class="input-drawer-force-nl" data-front-id="${front.id}" placeholder="Auto" value="${front.forceNL || ''}" />
             </div>
+
+            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+              <div class="property-group" style="flex: 1; margin-bottom: 0;">
+                <label style="font-size: 11px;">Wymuś wys. [mm]:</label>
+                <input type="number" class="input-front-force-h" data-front-id="${front.id}" placeholder="Auto" value="${front.forceH || ''}" />
+              </div>
+              <div class="property-group" style="flex: 1; margin-bottom: 0;">
+                <label style="font-size: 11px;">Wymuś szer. [mm]:</label>
+                <input type="number" class="input-front-force-w" data-front-id="${front.id}" placeholder="Auto" value="${front.forceW || ''}" />
+              </div>
+            </div>
+            <div style="display: flex; gap: 6px; margin-bottom: ${isInner ? '8px' : '0'};">
+              <div class="property-group" style="flex: 1; margin-bottom: 0;">
+                <label style="font-size: 11px;">Przesuń Y ↕ [mm]:</label>
+                <input type="number" class="input-front-force-offset-y" data-front-id="${front.id}" value="${front.forceOffsetY || 0}" />
+              </div>
+              <div class="property-group" style="flex: 1; margin-bottom: 0;">
+                <label style="font-size: 11px;">Przesuń X ↔ [mm]:</label>
+                <input type="number" class="input-front-force-offset-x" data-front-id="${front.id}" value="${front.forceOffsetX || 0}" />
+              </div>
+            </div>
+
+            ${isInner ? `
+              <hr style="margin: 8px 0; border: 0; border-top: 1px dashed #fde68a;">
+              <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                <div class="property-group" style="flex: 1; margin-bottom: 0;">
+                  <label style="font-size: 11px;">Grubość frontu wewn. [mm]:</label>
+                  <input type="number" class="input-inner-front-thickness" data-front-id="${front.id}" value="${front.innerFrontThickness ?? 18}" />
+                </div>
+                <div class="property-group" style="flex: 1; margin-bottom: 0;">
+                  <label style="font-size: 11px;">Luz do krawędzi [mm]:</label>
+                  <input type="number" class="input-inner-front-setback" data-front-id="${front.id}" value="${front.innerSetback ?? 2}" />
+                </div>
+              </div>
+              <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                <div class="property-group" style="flex: 1; margin-bottom: 0;">
+                  <label style="font-size: 11px;">Wolne miejsce od dołu:</label>
+                  <input type="number" class="input-inner-basezone-bottom" data-front-id="${front.id}" value="${bz.offsetBottom || 0}" />
+                </div>
+                <div class="property-group" style="flex: 1; margin-bottom: 0;">
+                  <label style="font-size: 11px;">Wolne miejsce od góry:</label>
+                  <input type="number" class="input-inner-basezone-top" data-front-id="${front.id}" value="${bz.offsetTop || 0}" />
+                </div>
+              </div>
+            ` : `
+              <button type="button" class="btn-add-inner-drawer" data-front-id="${front.id}" style="width: 100%; padding: 6px; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; margin-top: 4px;">➕ Dodaj szufladę wewnętrzną nad tą</button>
+            `}
+            <button type="button" class="btn-delete-front" data-front-id="${front.id}" style="width: 100%; padding: 6px; background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; margin-top: 6px;">🗑️ Usuń tę szufladę</button>
           </div>
         `;
       }).join('')}
@@ -616,6 +690,121 @@ function setupEventListeners() {
     });
   });
 
+  // Korekta ręczna frontu (dawniej tylko w menu kontekstowym 3D, patrz
+  // render/viewer3d.js) - wysokość/szerokość/przesunięcie wymuszone per front.
+  const wireFrontNumberOverride = (className, field) => {
+    document.querySelectorAll(`.${className}`).forEach(inp => {
+      inp.addEventListener('change', (e) => {
+        const front = findFront(inp.dataset.frontId);
+        if (front) {
+          const val = e.target.value === '' ? null : Number(e.target.value);
+          front[field] = (val === null || isNaN(val)) ? (field.startsWith('forceOffset') ? 0 : null) : val;
+        }
+        updateAll();
+        initPropertiesPanel();
+      });
+    });
+  };
+  wireFrontNumberOverride('input-front-force-h', 'forceH');
+  wireFrontNumberOverride('input-front-force-w', 'forceW');
+  wireFrontNumberOverride('input-front-force-offset-y', 'forceOffsetY');
+  wireFrontNumberOverride('input-front-force-offset-x', 'forceOffsetX');
+
+  document.querySelectorAll('.input-inner-front-thickness').forEach(inp => {
+    inp.addEventListener('change', (e) => {
+      const front = findFront(inp.dataset.frontId);
+      if (front) front.innerFrontThickness = parseFloat(e.target.value) || 18;
+      updateAll();
+      initPropertiesPanel();
+    });
+  });
+  document.querySelectorAll('.input-inner-front-setback').forEach(inp => {
+    inp.addEventListener('change', (e) => {
+      const front = findFront(inp.dataset.frontId);
+      if (front) front.innerSetback = parseFloat(e.target.value) || 0;
+      updateAll();
+      initPropertiesPanel();
+    });
+  });
+  document.querySelectorAll('.input-inner-basezone-bottom').forEach(inp => {
+    inp.addEventListener('change', (e) => {
+      const front = findFront(inp.dataset.frontId);
+      if (front && front.baseZone) front.baseZone.offsetBottom = parseFloat(e.target.value) || 0;
+      updateAll();
+      initPropertiesPanel();
+    });
+  });
+  document.querySelectorAll('.input-inner-basezone-top').forEach(inp => {
+    inp.addEventListener('change', (e) => {
+      const front = findFront(inp.dataset.frontId);
+      if (front && front.baseZone) front.baseZone.offsetTop = parseFloat(e.target.value) || 0;
+      updateAll();
+      initPropertiesPanel();
+    });
+  });
+
+  document.querySelectorAll('.btn-delete-front').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mod = getActiveModule();
+      if (!mod) return;
+      mod.elements = mod.elements.filter(e => e.id !== btn.dataset.frontId);
+      updateAll();
+      initPropertiesPanel();
+    });
+  });
+
+  // "Dodaj szufladę wewnętrzną nad tą" - port 1:1 z menu kontekstowego 3D
+  // (render/viewer3d.js), żeby liczyć dokładnie to samo boxHeight/baseZone.
+  document.querySelectorAll('.btn-add-inner-drawer').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mod = getActiveModule();
+      const front = findFront(btn.dataset.frontId);
+      if (!mod || !front || !front.baseZone) return;
+
+      const fMerged = { ...(state.project.front || {}), ...(mod.front || {}) };
+      const sysName = (fMerged.drawerSystem || 'merivobox').toLowerCase();
+
+      // NAPRAWA: w oryginale (menu 3D) boxHeight w trybie "Auto" zakładał całą
+      // wysokość frontu (front.h), więc "za mało miejsca nad pudłem" wychodziło
+      // prawie zawsze - silnik szuflad w praktyce dobiera dużo niższy wariant.
+      // Liczymy tu dokładnie to, co dobrałby getDrawerComponents (core/drawerMath.js),
+      // żeby sprawdzać miejsce nad RZECZYWISTYM, a nie zawyżonym, pudłem.
+      const { backHeight } = getDrawerVariant(front.h, sysName, front.forceVariant || 'auto');
+      const boxHeight = backHeight;
+
+      const newInnerBottomY = front.y + boxHeight + 5;
+      const newInnerTopY = front.y + front.h;
+
+      if (newInnerBottomY + 40 > newInnerTopY) {
+        alert("Za mało miejsca nad pudłem! Zmniejsz wariant boku tej szuflady (np. na M lub K) i zapisz, aby zrobić miejsce.");
+        return;
+      }
+
+      const baseMinY = parseFloat(front.baseZone.minY) || 18;
+      const baseMaxY = parseFloat(front.baseZone.maxY) || parseFloat(mod.dimensions.height);
+
+      const newOffsetBottom = newInnerBottomY - baseMinY;
+      const newOffsetTop = baseMaxY - newInnerTopY;
+
+      mod.elements.push({
+        id: 'front-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+        typ: 'front',
+        subtype: 'szuflada-wewnetrzna',
+        baseZone: {
+          ...front.baseZone,
+          offsetBottom: Math.max(0, newOffsetBottom),
+          offsetTop: Math.max(0, newOffsetTop)
+        },
+        frontCount: 1, distribution: "1", frontIndex: 0, gap: parseFloat(state.project.front?.gap || 3),
+        intGapX: 15, intGapY: 5, forceVariant: 'auto', forceNL: null,
+        innerFrontThickness: 18, innerSetback: 2
+      });
+
+      updateAll();
+      initPropertiesPanel();
+    });
+  });
+
   numberInputs.forEach(id => {
     const el = document.getElementById(`input-${id}`);
     if(el) {
@@ -748,4 +937,31 @@ function setupEventListeners() {
       initPropertiesPanel();
     });
   });
+
+  const btnGroupCombine = document.getElementById('btn-group-combine');
+  if (btnGroupCombine) {
+    btnGroupCombine.addEventListener('click', () => {
+      const newGroupId = 'group-' + Date.now();
+      state.selectedModules.forEach(id => {
+        const m = state.project.modules.find(md => md.id === id);
+        if (m) m.groupId = newGroupId;
+      });
+      updateAll();
+      initPropertiesPanel();
+    });
+  }
+  const btnGroupSplit = document.getElementById('btn-group-split');
+  if (btnGroupSplit) {
+    btnGroupSplit.addEventListener('click', () => {
+      const mod = getActiveModule();
+      if (!mod || !mod.groupId) return;
+      const gId = mod.groupId;
+      state.project.modules.forEach(m => {
+        if (m.groupId === gId) delete m.groupId;
+      });
+      state.selectedModules = new Set([mod.id]);
+      updateAll();
+      initPropertiesPanel();
+    });
+  }
 }
