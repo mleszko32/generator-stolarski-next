@@ -28,6 +28,12 @@ const TABS = [
 ];
 let activeTab = "wymiary";
 
+// Kolejność i znaczenie indeksów 0-3 MUSI się zgadzać z kolejnością addBox()
+// dla nóżek w render/viewer3d.js oraz z pętlą w engine/cabinet.js
+// (calculateProjectHardware) — wszystkie trzy miejsca czytają
+// mod.legs.heightOverrides[i] pod tym samym indeksem.
+const LEG_LABELS = ["Tył lewa", "Tył prawa", "Przód lewa", "Przód prawa"];
+
 export function initPropertiesPanel() {
   scheduleCheckpoint(); // patrz core/history.js — debounce'owany checkpoint historii cofnij/wprzód
   renderInteriorEditorIfVisible();
@@ -181,6 +187,28 @@ export function initPropertiesPanel() {
         <div class="property-group" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;"><input type="checkbox" id="input-plinth-active" ${activeModule.legs.plinth ? 'checked' : ''} style="width: 14px; height: 14px;" /><label style="font-size: 12px; color: #9a3412;">Generuj cokół przedni</label></div>
         <div class="property-group" style="margin-bottom: 0;"><label style="font-size: 11px; color: #9a3412;">Cofnięcie cokołu (mm):</label><input type="number" id="input-plinth-offset" value="${activeModule.legs.plinthOffset}" style="border-color: #fed7aa;" /></div>
       </div>
+
+      ${activeModule.legs.active ? `
+        <h3 style="color: #ea580c;">Nóżki — wysokości ręczne</h3>
+        <div style="background: #fff7ed; border: 1px solid #fdba74; border-radius: 6px; padding: 10px; margin-bottom: 15px;">
+          ${LEG_LABELS.map((label, i) => {
+              const overrideVal = activeModule.legs.heightOverrides ? activeModule.legs.heightOverrides[i] : undefined;
+              const overridden = overrideVal !== undefined && overrideVal !== null && overrideVal !== '';
+              const shownVal = overridden ? overrideVal : activeModule.legs.height;
+              return `
+              <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 6px;">
+                <span style="width: 76px; flex-shrink: 0; font-size: 11px; color: #9a3412; font-weight: bold;">${label}:</span>
+                <input type="number" class="input-leg-height-override" data-leg-index="${i}" value="${shownVal}" step="1" style="flex: 1; min-width: 0;${overridden ? ' border-color:#f97316; background:#ffedd5;' : ' border-color:#fed7aa;'}" />
+                <span style="font-size: 10px; color: #9a3412; flex-shrink: 0;">mm</span>
+                ${overridden
+                    ? `<button type="button" class="btn-leg-reset" data-leg-index="${i}" title="Wróć do wspólnej wysokości" style="border: none; background: #ffedd5; color: #9a3412; border-radius: 4px; width: 24px; height: 24px; cursor: pointer; font-weight: bold; flex-shrink: 0;">↺</button>`
+                    : '<span style="width: 24px; flex-shrink: 0;"></span>'
+                }
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : ''}
 
       <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
 
@@ -400,6 +428,34 @@ function setupEventListeners() {
       const front = findFront(btn.dataset.frontId);
       const idx = parseInt(btn.dataset.hingeIndex, 10);
       if (front && front.hingeOverrides) delete front.hingeOverrides[idx];
+      updateAll();
+      initPropertiesPanel();
+    });
+  });
+
+  document.querySelectorAll('.input-leg-height-override').forEach(inp => {
+    inp.addEventListener('change', (e) => {
+      const idx = parseInt(inp.dataset.legIndex, 10);
+      getSelectedMods().forEach(mod => {
+        if (!mod.legs) return;
+        const val = e.target.value === '' ? null : Number(e.target.value);
+        if (val === null || isNaN(val)) {
+          if (mod.legs.heightOverrides) delete mod.legs.heightOverrides[idx];
+        } else {
+          if (!mod.legs.heightOverrides) mod.legs.heightOverrides = {};
+          mod.legs.heightOverrides[idx] = val;
+        }
+      });
+      updateAll();
+      initPropertiesPanel();
+    });
+  });
+  document.querySelectorAll('.btn-leg-reset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.legIndex, 10);
+      getSelectedMods().forEach(mod => {
+        if (mod.legs && mod.legs.heightOverrides) delete mod.legs.heightOverrides[idx];
+      });
       updateAll();
       initPropertiesPanel();
     });

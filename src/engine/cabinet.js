@@ -204,10 +204,18 @@ export function calculateProjectHardware() {
     const fc = { ...(config.front?.clearance || {}), ...(mod.front?.clearance || {}) };
 
     if (mod.legs && mod.legs.active) {
-      const legH = mod.legs.height || 100;
-      const legKey = `Nóżka regulowana H-${legH}`;
-      if (!hardwareList[legKey]) hardwareList[legKey] = { name: legKey, qty: 0, unit: 'szt.' };
-      hardwareList[legKey].qty += 4; 
+      const legH = parseFloat(mod.legs.height) || 100;
+      const legOverrides = mod.legs.heightOverrides || {};
+      // Każda nóżka liczona osobno wg swojej (ew. nadpisanej) wysokości — patrz
+      // ui/properties.js "Nóżki — wysokości ręczne" — żeby lista zakupów odzwierciedlała
+      // realny komplet (np. 3x H-100 + 1x H-90), a nie zawsze 4x ten sam model.
+      for (let i = 0; i < 4; i++) {
+        const ov = legOverrides[i];
+        const h = (ov !== undefined && ov !== null && ov !== '') ? (parseFloat(ov) || legH) : legH;
+        const legKey = `Nóżka regulowana H-${h}`;
+        if (!hardwareList[legKey]) hardwareList[legKey] = { name: legKey, qty: 0, unit: 'szt.' };
+        hardwareList[legKey].qty += 1;
+      }
     }
 
     const joinKey = `Złącze korpusowe (Kołek 8x30 + Konfirmat)`;

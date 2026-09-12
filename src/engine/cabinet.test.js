@@ -103,6 +103,17 @@ describe("calculateProjectHardware", () => {
     expect(hw.find((h) => h.name.startsWith("Złącze korpusowe"))).toMatchObject({ qty: 8 });
   });
 
+  it("nóżka z ręcznie nadpisaną wysokością liczy się osobno od pozostałych trzech", () => {
+    const mod = baseModule({
+      legs: { active: true, height: 100, plinth: true, plinthOffset: 40, heightOverrides: { 0: 90 } },
+    });
+    setProject(freshProject({ modules: [mod] }));
+    const hw = calculateProjectHardware();
+
+    expect(hw.find((h) => h.name === "Nóżka regulowana H-100")).toMatchObject({ qty: 3 });
+    expect(hw.find((h) => h.name === "Nóżka regulowana H-90")).toMatchObject({ qty: 1 });
+  });
+
   it("dokłada komplet prowadnic dla szafki z szufladą", () => {
     const mod = baseModule({
       elements: [
