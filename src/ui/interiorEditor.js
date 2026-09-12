@@ -8,7 +8,7 @@
 // pozwala go przeciągnąć albo usunąć. Logika podziału/scalania siedzi w
 // core/zoneTree.js (czysta, testowana) — ten plik tylko rysuje i obsługuje
 // wejście.
-import { state, getActiveModule } from "../core/state.js";
+import { getActiveModule } from "../core/state.js";
 import {
   buildZoneTree,
   splitZoneHorizontal,
@@ -17,11 +17,12 @@ import {
   toggleStructural,
   assignFront,
   moveSplit,
+  addEvenShelves,
+  removeShelves,
 } from "../core/zoneTree.js";
 import { update3D, enterAlignMode } from "../render/viewer3d.js";
 import { updateSidebar } from "./sidebar.js";
 import { initPropertiesPanel } from "./properties.js";
-import { autoDistributeShelves } from "../core/shelfMath.js";
 
 const FRONT_LABELS = {
   drzwi: "Drzwi",
@@ -218,6 +219,31 @@ function renderLeaf(node, stage, px) {
       stage.appendChild(box);
     });
   }
+
+  // Wolne półki (isDivider: false, patrz core/zoneTree.js) - rysowane zawsze
+  // NA WIERZCHU wnęki (nawet obsadzonej frontem), bo w przeciwieństwie do
+  // dzielników nie tworzą osobnych węzłów drzewa do narysowania rekurencją.
+  node.shelves.forEach((shelf) => {
+    const line = document.createElement("div");
+    Object.assign(line.style, {
+      position: "absolute",
+      left: px.toPxX(shelf.x) + "px",
+      top: px.toPxY(shelf.y + shelf.h) + "px",
+      width: px.toPxLen(shelf.w) + "px",
+      height: Math.max(px.toPxLen(shelf.h), 3) + "px",
+      background: shelf.isStructural ? "#a7f3d0" : "#e2e8f0",
+      border: "1px solid #64748b",
+      boxSizing: "border-box",
+      cursor: "pointer",
+      zIndex: "1",
+    });
+    line.title = shelf.isStructural ? "Półka konstrukcyjna" : "Półka ruchoma";
+    line.addEventListener("click", (e) => {
+      e.stopPropagation();
+      selectNode({ type: "shelf", shelf }, line, stage, px, "shelf");
+    });
+    stage.appendChild(line);
+  });
 }
 
 function renderDividerHandle(node, stage, px) {
@@ -373,6 +399,12 @@ function selectNode(node, anchorEl, stage, px, mode) {
     appendDrawerPicker(toolbar, mod, "szuflada", "📦 Szuflady zewn.");
     appendDrawerPicker(toolbar, mod, "szuflada-wewnetrzna", "📥 Szuflady wewn.");
     appendAutoShelvesPicker(toolbar, mod, selectedNode);
+    if (selectedNode.shelves.length > 0) {
+      addBtn(`🗑️ Usuń półki (${selectedNode.shelves.length})`, "Usuwa wszystkie wolne półki tej wnęki", () => {
+        removeShelves(mod, selectedNode);
+        refreshAfterEdit();
+      }, true);
+    }
   } else if (mode === "occupied") {
     const subtype = selectedNode.fronts[0]?.subtype;
     const label = FRONT_LABELS[subtype] || subtype;
@@ -387,6 +419,16 @@ function selectNode(node, anchorEl, stage, px, mode) {
         door.openingSide = isLeft ? "right" : "left";
         refreshAfterEdit();
       });
+    }
+    // Wolne półki (patrz core/zoneTree.js: addEvenShelves) NIE dzielą wnęki,
+    // więc w odróżnieniu od "Podziel poziomo" można je dodać także tutaj,
+    // za już przypisanym frontem, bez jego usuwania.
+    appendAutoShelvesPicker(toolbar, mod, selectedNode);
+    if (selectedNode.shelves.length > 0) {
+      addBtn(`🗑️ Usuń półki (${selectedNode.shelves.length})`, "Usuwa wszystkie wolne półki tej wnęki", () => {
+        removeShelves(mod, selectedNode);
+        refreshAfterEdit();
+      }, true);
     }
     addBtn("🗑️ Usuń front", "Usuwa front, wnęka zostaje pusta", () => {
       // usunięcie frontu = przypisanie "pustego" -> wystarczy usunąć elementy z fronts
@@ -411,6 +453,17 @@ function selectNode(node, anchorEl, stage, px, mode) {
     }
     addBtn("🗑️ Usuń podział", "Usuwa dzielnik i wszystko, co jest w obu powstałych z niego wnękach", () => {
       removeSplit(mod, selectedNode);
+      refreshAfterEdit();
+    }, true);
+  } else if (mode === "shelf") {
+    const shelf = selectedNode.shelf;
+    addBtn(
+      shelf.isStructural ? "🔩 Zmień na ruchomą" : "🔩 Zmień na konstrukcyjną",
+      "Konstrukcyjna = na stałe wkręcona, ruchoma = na podpórkach",
+      () => { shelf.isStructural = !shelf.isStructural; refreshAfterEdit(); }
+    );
+    addBtn("🗑️ Usuń tę półkę", "Usuwa tę wolną półkę", () => {
+      mod.elements = mod.elements.filter((el) => el.id !== shelf.id);
       refreshAfterEdit();
     }, true);
   }
@@ -462,8 +515,9 @@ function appendDrawerPicker(toolbar, mod, subtype, label) {
   toolbar.appendChild(wrap);
 }
 
-// Port 1:1 z menu kontekstowego 3D (render/viewer3d.js) - rozmieszcza N półek
-// równomiernie w pustej wnęce, licząc odstępy przez core/shelfMath.js.
+// Rozmieszcza N wolnych półek równomiernie w wnęce (pustej albo już obsadzonej
+// frontem - patrz core/zoneTree.js: addEvenShelves) - odstępy liczone przez
+// core/shelfMath.js.
 function appendAutoShelvesPicker(toolbar, mod, node) {
   const wrap = document.createElement("div");
   Object.assign(wrap.style, { display: "flex", alignItems: "center", gap: "4px", background: "#334155", borderRadius: "5px", padding: "3px 3px 3px 9px" });
@@ -487,16 +541,7 @@ function appendAutoShelvesPicker(toolbar, mod, node) {
   go.addEventListener("click", (e) => {
     e.stopPropagation();
     const count = Math.max(1, parseInt(input.value, 10) || 1);
-    const th = parseFloat(state.project.materials?.boardThickness) || 18;
-    const { minX, maxX, minY, maxY } = node.rect;
-    const shelves = autoDistributeShelves(maxY - minY, th, count);
-    const ts = Date.now();
-    shelves.forEach((s, idx) => {
-      mod.elements.push({
-        id: "poziom-auto-" + ts + "-" + idx,
-        typ: "poziom", x: minX, y: minY + s.y, w: maxX - minX, h: th, isStructural: false,
-      });
-    });
+    addEvenShelves(mod, node, count);
     refreshAfterEdit();
   });
 

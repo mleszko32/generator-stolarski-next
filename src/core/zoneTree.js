@@ -14,6 +14,7 @@
 // pełni rozpinającego bieżący prostokąt jest deterministyczna i działa na
 // każdych danych wygenerowanych tym generatorem.
 import { state } from "./state.js";
+import { autoDistributeShelves } from "./shelfMath.js";
 
 const EPS = 2; // mm tolerancji przy porównaniach geometrycznych (zaokrąglenia)
 
@@ -56,6 +57,24 @@ function frontsMatchingZone(mod, rect) {
   );
 }
 
+// Półki "wolne" (isDivider: false, patrz partition() niżej) nie dzielą drzewa,
+// więc dowolna ich liczba może leżeć wewnątrz jednej wnęki - obojętnie, czy ma
+// ona już przypisany front, czy nie. Zwracamy je posortowane od dołu do góry,
+// żeby dało się je narysować/policzyć w stałej kolejności.
+function shelvesMatchingZone(mod, rect) {
+  return (mod.elements || [])
+    .filter(
+      (el) =>
+        el.typ === "poziom" &&
+        el.isDivider === false &&
+        el.y > rect.minY - EPS &&
+        el.y + el.h < rect.maxY + EPS &&
+        Math.abs(el.x - rect.minX) < EPS &&
+        Math.abs(el.x + el.w - rect.maxX) < EPS
+    )
+    .sort((a, b) => a.y - b.y);
+}
+
 // Buduje drzewo BSP wnętrza aktywnego modułu.
 // Węzeł 'split': { type:'split', axis:'v'|'h', divider: <element poziom/pion>, rect, a, b }
 //   'v' = podział przegrodą pionową (a = lewa kolumna, b = prawa)
@@ -87,6 +106,12 @@ export function buildZoneTree(mod) {
     const poziomCandidates = poziomy
       .filter(
         (p) =>
+          // isDivider: false = "wolna" półka (patrz appendAutoShelvesPicker w
+          // ui/interiorEditor.js) - fizycznie leży w wnęce, ale NIE dzieli jej
+          // na dwie niezależne, osobno obsadzalne frontem strefy. Bez tego
+          // wyjątku każda dodana półka rozcinałaby drzewo, przez co nie dało
+          // się mieć jednego frontu na całą wysokość ORAZ półek za nim.
+          p.isDivider !== false &&
           p.y > rect.minY + EPS &&
           p.y + p.h < rect.maxY - EPS &&
           p.x <= rect.minX + EPS &&
@@ -109,6 +134,7 @@ export function buildZoneTree(mod) {
       boundBottomId,
       boundTopId,
       fronts: frontsMatchingZone(mod, rect),
+      shelves: shelvesMatchingZone(mod, rect),
     };
   }
 
@@ -142,6 +168,7 @@ export function splitZoneHorizontal(mod, node) {
     w: maxX - minX,
     h: th,
     isStructural: false,
+    isDivider: true, // dzieli wnękę na dwie niezależne, osobno obsadzalne strefy
   };
   mod.elements.push(shelf);
   return shelf;
@@ -254,6 +281,38 @@ export function assignFront(mod, node, subtype, opts = {}) {
       });
     }
   }
+}
+
+// Rozmieszcza N "wolnych" półek (isDivider: false) równomiernie w danej
+// wnęce - w odróżnieniu od splitZoneHorizontal, DZIAŁA także na wnęce już
+// obsadzonej frontem (nie usuwa go) i nie dzieli drzewa (patrz partition()
+// wyżej), więc front nadal obejmuje całą wnękę, a te półki są za nim.
+export function addEvenShelves(mod, node, count) {
+  if (node.type !== "leaf" || count < 1) return [];
+  const th = getBoardThickness();
+  const { minX, maxX, minY, maxY } = node.rect;
+  const offsets = autoDistributeShelves(maxY - minY, th, count);
+  const ts = Date.now();
+  const shelves = offsets.map((o, idx) => ({
+    id: "poziom-shelf-" + ts + "-" + idx + "-" + randomSuffix(),
+    typ: "poziom",
+    x: minX,
+    y: minY + o.y,
+    w: maxX - minX,
+    h: th,
+    isStructural: false,
+    isDivider: false,
+  }));
+  shelves.forEach((s) => mod.elements.push(s));
+  return shelves;
+}
+
+// Usuwa wszystkie "wolne" półki danej wnęki (patrz addEvenShelves) - nie rusza
+// frontu ani dzielników.
+export function removeShelves(mod, node) {
+  if (node.type !== "leaf" || node.shelves.length === 0) return;
+  const ids = new Set(node.shelves.map((s) => s.id));
+  mod.elements = mod.elements.filter((el) => !ids.has(el.id));
 }
 
 // Przeskalowuje WSZYSTKIE poziomy/piony zagnieżdżone w poddrzewie tak, by ich

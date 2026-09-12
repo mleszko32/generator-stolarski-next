@@ -8,6 +8,8 @@ import {
   toggleStructural,
   assignFront,
   moveSplit,
+  addEvenShelves,
+  removeShelves,
 } from "./zoneTree.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
 import { recalculateLayout } from "./layout.js";
@@ -199,6 +201,54 @@ describe("removeSplit", () => {
     const tree = buildZoneTree(mod);
     expect(tree).toMatchObject({ type: "leaf", rect: INNER, fronts: [] });
     expect(mod.elements).toHaveLength(0);
+  });
+});
+
+describe("addEvenShelves", () => {
+  it("dodaje wolne półki do PUSTEJ wnęki bez dzielenia drzewa (nie blokuje późniejszego frontu na całość)", () => {
+    const mod = setup();
+    const root = buildZoneTree(mod);
+    addEvenShelves(mod, root, 2);
+
+    const tree = buildZoneTree(mod);
+    expect(tree.type).toBe("leaf"); // wolne półki NIE tworzą węzłów 'split'
+    expect(tree.shelves).toHaveLength(2);
+
+    // front na całą wnękę nadal możliwy mimo obecnych półek
+    assignFront(mod, tree, "drzwi");
+    const after = buildZoneTree(mod);
+    expect(after.fronts).toHaveLength(1);
+    expect(after.shelves).toHaveLength(2);
+  });
+
+  it("dodaje wolne półki do wnęki JUŻ obsadzonej frontem, nie usuwając go", () => {
+    const mod = setup();
+    let root = buildZoneTree(mod);
+    assignFront(mod, root, "drzwi");
+    root = buildZoneTree(mod);
+
+    addEvenShelves(mod, root, 3);
+
+    const tree = buildZoneTree(mod);
+    expect(tree.fronts).toHaveLength(1); // front przetrwał
+    expect(tree.shelves).toHaveLength(3);
+  });
+});
+
+describe("removeShelves", () => {
+  it("usuwa wolne półki wnęki, zostawiając front nietknięty", () => {
+    const mod = setup();
+    let root = buildZoneTree(mod);
+    assignFront(mod, root, "drzwi");
+    root = buildZoneTree(mod);
+    addEvenShelves(mod, root, 2);
+    root = buildZoneTree(mod);
+
+    removeShelves(mod, root);
+
+    const tree = buildZoneTree(mod);
+    expect(tree.shelves).toHaveLength(0);
+    expect(tree.fronts).toHaveLength(1);
   });
 });
 
