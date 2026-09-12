@@ -127,6 +127,40 @@ describe("Trawersy górne (przedni/tylny)", () => {
   });
 });
 
+describe("front.forceVariant wymusza realny wariant systemu (klucz katalogu, nie litera typu)", () => {
+  it("wymuszona bardzo niska wysokość ogranicza otwory frontu mimo dużej dostępnej przestrzeni", () => {
+    const mod = baseModule({
+      front: { drawerSystem: "antaro" },
+      elements: [
+        {
+          id: "f0",
+          typ: "front",
+          subtype: "szuflada",
+          frontIndex: 0,
+          gap: 3,
+          distribution: "1",
+          forceVariant: "bardzoniska", // antaro: bardzoniska = 69mm < 200mm
+          baseZone: { minX: 18, maxX: 582, minY: 18, maxY: 702, offsetBottom: 0, offsetTop: 0 },
+        },
+      ],
+    });
+    setProject(freshProject({ modules: [mod] }));
+
+    const { parts, mountingData } = calculateParts();
+    const drawer = mountingData.find((m) => m.type === "drawer");
+    // Front ma pełną wysokość wnęki (~684mm) - bez uwzględnienia forceVariant
+    // dostałby 3 otwory (próg to 200mm); z nim: tylko 2.
+    expect(drawer.frontHoles).toHaveLength(2);
+
+    // I samo wymuszenie faktycznie dotarło do getDrawerComponents (a nie zostało
+    // po drodze odrzucone jako "za mało miejsca") - tył szuflady ma wysokość
+    // bardzoniskiego wariantu antaro (typ N, 69mm), a nie auto-dobranego wyższego.
+    const tyl = parts.find((p) => p.name.startsWith("Tył W600"));
+    expect(tyl.name).toBe("Tył W600 (N)");
+    expect(tyl.width).toBe(69);
+  });
+});
+
 describe("calculateProjectHardware", () => {
   it("liczy nóżki (4/szafkę) i złącza korpusowe (8/szafkę)", () => {
     setProject(freshProject({ modules: [baseModule()] }));

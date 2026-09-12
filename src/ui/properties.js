@@ -5,6 +5,7 @@ import { update3D } from "../render/viewer3d.js";
 import { calculateParts } from "../engine/cabinet.js";
 import { calculateHinges } from "../core/hingeMath.js";
 import { getTraverseConfig } from "../core/layout.js";
+import { drawerSystems, DRAWER_VARIANT_ORDER, DRAWER_VARIANT_LABELS } from "../core/drawerSystems.js";
 import { escapeHtml } from "../utils/dom.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
@@ -23,6 +24,7 @@ function getSelectedMods() {
 const TABS = [
   { id: "wymiary", label: "📐 Wymiary" },
   { id: "front", label: "🚪 Front" },
+  { id: "szuflady", label: "📦 Szuflady" },
   { id: "konstrukcja", label: "🧱 Konstrukcja" },
   { id: "nogi", label: "🦵 Nóżki / Blendy" },
   { id: "zawiasy", label: "🔩 Zawiasy" },
@@ -112,6 +114,22 @@ export function initPropertiesPanel() {
       })
       .sort((a, b) => (parseFloat(a.front.y) || 0) - (parseFloat(b.front.y) || 0));
 
+  // Lista szuflad aktywnej szafki (zewn. i wewn.) — do ręcznego wymuszenia wariantu
+  // wysokości boku i/lub głębokości (NL) dla konkretnej sztuki, zamiast tylko dla
+  // całej szafki naraz (patrz zakładka "Szuflady"). front.forceVariant/forceNL
+  // istniały już wcześniej w danych i były edytowalne tylko z prawoklik-menu w
+  // widoku 3D (render/viewer3d.js) — to jest ten sam mechanizm, tylko widoczny
+  // też w panelu właściwości.
+  const drawerSysName = (f.drawerSystem || 'merivobox').toLowerCase();
+  const drawerSysVariants = (drawerSystems[drawerSysName] || drawerSystems.merivobox).variants;
+  const drawerFrontsList = (activeModule.elements || [])
+      .filter(el => el.typ === 'front' && el.subtype && el.subtype.includes('szuflada'))
+      .sort((a, b) => (parseFloat(a.y) || 0) - (parseFloat(b.y) || 0))
+      .map((front, idx) => ({
+          front,
+          label: `Szuflada ${idx + 1}${front.subtype === 'szuflada-wewnetrzna' ? ' (wewn.)' : ''}`,
+      }));
+
   if (!TABS.some(t => t.id === activeTab)) activeTab = "wymiary";
 
   const tabBar = TABS.map(t => `
@@ -153,16 +171,45 @@ export function initPropertiesPanel() {
     `)}
 
     ${tabContent("front", `
-      <h3 style="color: #059669;">Ustawienia Frontów i Szuflad</h3>
+      <h3 style="color: #059669;">Ustawienia Frontów</h3>
       <div id="group-front-clearance">
         <div class="property-group"><label>Typ frontów:</label><select id="input-front-type"><option value="nakladane" ${(!f.type || f.type === 'nakladane') ? 'selected' : ''}>Nakładane</option><option value="wpuszczane" ${f.type === 'wpuszczane' ? 'selected' : ''}>Wpuszczane</option></select></div>
-        <div class="property-group"><label>System szuflad:</label><select id="input-drawer-system"><option value="merivobox" ${f.drawerSystem === 'merivobox' ? 'selected' : ''}>Blum Merivobox</option><option value="legrabox" ${f.drawerSystem === 'legrabox' ? 'selected' : ''}>Blum Legrabox</option><option value="tandembox" ${f.drawerSystem === 'tandembox' ? 'selected' : ''}>Blum TANDEMBOX</option><option value="antaro" ${f.drawerSystem === 'antaro' ? 'selected' : ''}>Blum TANDEMBOX antaro</option><option value="gtv_axis_16" ${f.drawerSystem === 'gtv_axis_16' ? 'selected' : ''}>GTV Axis Pro (płyta 16mm)</option><option value="gtv_axis_18" ${f.drawerSystem === 'gtv_axis_18' ? 'selected' : ''}>GTV Axis Pro (płyta 18mm)</option></select></div>
         <div class="property-group"><label>Przerwa między frontami (mm):</label><input type="number" id="input-front-gap" value="${f.gap ?? 3}" step="0.5" /></div>
         <div class="property-group"><label>Luz lewy (mm):</label><input type="number" id="input-front-left" value="${fc.left ?? 1.5}" step="0.5" /></div>
         <div class="property-group"><label>Luz prawy (mm):</label><input type="number" id="input-front-right" value="${fc.right ?? 1.5}" step="0.5" /></div>
         <div class="property-group"><label>Luz góra (mm):</label><input type="number" id="input-front-top" value="${fc.top ?? 2}" step="0.5" /></div>
         <div class="property-group"><label>Luz dół (mm):</label><input type="number" id="input-front-bottom" value="${fc.bottom ?? 2}" step="0.5" /></div>
       </div>
+    `)}
+
+    ${tabContent("szuflady", `
+      <h3 style="color: #b45309;">Ustawienia Szuflad</h3>
+      <div class="property-group"><label>System szuflad:</label><select id="input-drawer-system"><option value="merivobox" ${f.drawerSystem === 'merivobox' ? 'selected' : ''}>Blum Merivobox</option><option value="legrabox" ${f.drawerSystem === 'legrabox' ? 'selected' : ''}>Blum Legrabox</option><option value="tandembox" ${f.drawerSystem === 'tandembox' ? 'selected' : ''}>Blum TANDEMBOX</option><option value="antaro" ${f.drawerSystem === 'antaro' ? 'selected' : ''}>Blum TANDEMBOX antaro</option><option value="gtv_axis_16" ${f.drawerSystem === 'gtv_axis_16' ? 'selected' : ''}>GTV Axis Pro (płyta 16mm)</option><option value="gtv_axis_18" ${f.drawerSystem === 'gtv_axis_18' ? 'selected' : ''}>GTV Axis Pro (płyta 18mm)</option></select></div>
+
+      <h3 style="color: #b45309;">Szuflady — ustawienia ręczne</h3>
+      ${drawerFrontsList.length === 0 ? `
+        <div style="font-size: 11px; color: #94a3b8;">Ta szafka nie ma jeszcze żadnych szuflad.</div>
+      ` : drawerFrontsList.map(({ front, label }) => {
+          const variantOptionsHtml = DRAWER_VARIANT_ORDER.filter(k => drawerSysVariants[k]).map(k =>
+              `<option value="${k}" ${front.forceVariant === k ? 'selected' : ''}>${DRAWER_VARIANT_LABELS[k]} (${drawerSysVariants[k].type}, ${drawerSysVariants[k].height}mm)</option>`
+          ).join('');
+          return `
+          <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px; margin-bottom: 10px;">
+            <div style="font-weight: bold; font-size: 12px; color: #b45309; margin-bottom: 8px;">📦 ${escapeHtml(label)}</div>
+            <div class="property-group" style="margin-bottom: 8px;">
+              <label style="font-size: 11px;">Wymuszony wariant boku:</label>
+              <select class="input-drawer-force-variant" data-front-id="${front.id}">
+                <option value="auto" ${(!front.forceVariant || front.forceVariant === 'auto') ? 'selected' : ''}>Auto (maksymalny)</option>
+                ${variantOptionsHtml}
+              </select>
+            </div>
+            <div class="property-group" style="margin-bottom: 0;">
+              <label style="font-size: 11px;">Wymuszona głębokość (NL, mm):</label>
+              <input type="number" class="input-drawer-force-nl" data-front-id="${front.id}" placeholder="Auto" value="${front.forceNL || ''}" />
+            </div>
+          </div>
+        `;
+      }).join('')}
     `)}
 
     ${tabContent("konstrukcja", `
@@ -534,6 +581,26 @@ function setupEventListeners() {
       getSelectedMods().forEach(mod => {
         if (mod.construction?.traverses?.[side]) delete mod.construction.traverses[side].width;
       });
+      updateAll();
+      initPropertiesPanel();
+    });
+  });
+
+  document.querySelectorAll('.input-drawer-force-variant').forEach(sel => {
+    sel.addEventListener('change', (e) => {
+      const front = findFront(sel.dataset.frontId);
+      if (front) front.forceVariant = e.target.value;
+      updateAll();
+      initPropertiesPanel();
+    });
+  });
+  document.querySelectorAll('.input-drawer-force-nl').forEach(inp => {
+    inp.addEventListener('change', (e) => {
+      const front = findFront(inp.dataset.frontId);
+      if (front) {
+        const val = e.target.value === '' ? null : Number(e.target.value);
+        front.forceNL = (val === null || isNaN(val)) ? null : val;
+      }
       updateAll();
       initPropertiesPanel();
     });

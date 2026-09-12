@@ -120,3 +120,17 @@ export const drawerSystems = {
     mounting: { railOffset: 33, frontHolesBase: 22, frontHolesXBase: 15.5 }
   }
 };
+
+// Klucze wariantów wysokości (od najniższego) i ich polskie etykiety — wspólne dla
+// UI, żeby lista rozwijana "wymuszony wariant" (ui/properties.js zakładka Szuflady,
+// render/viewer3d.js menu kontekstowe szuflady) zawsze pokazywała tylko warianty,
+// które dany system faktycznie ma (patrz front.forceVariant — to klucz stąd, NIE
+// litera "type" z systemData, która różni się między systemami dla tego samego klucza).
+export const DRAWER_VARIANT_ORDER = ['bardzoniska', 'niska', 'srednia', 'wysoka', 'bardzowysoka'];
+export const DRAWER_VARIANT_LABELS = {
+  bardzoniska: 'Bardzo niska',
+  niska: 'Niska',
+  srednia: 'Średnia',
+  wysoka: 'Wysoka',
+  bardzowysoka: 'Bardzo wysoka',
+};

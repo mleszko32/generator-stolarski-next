@@ -6,6 +6,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { state, duplicateModule, deleteModule } from '../core/state.js';
 
 import { getDrawerComponents, calculateDrawerHoles } from '../core/drawerMath.js';
+import { drawerSystems, DRAWER_VARIANT_ORDER, DRAWER_VARIANT_LABELS } from '../core/drawerSystems.js';
 import { calculateHinges } from '../core/hingeMath.js';
 import { autoDistributeShelves } from '../core/shelfMath.js';
 import { recalculateLayout, getTraverseConfig } from '../core/layout.js';
@@ -802,16 +803,24 @@ function show3DContextMenu(event, hit, data) {
                   padding: '10px', borderBottom: '1px solid #e2e8f0', marginBottom: '4px', backgroundColor: '#f8fafc', borderRadius: '4px'
               });
 
+              // NAPRAWA: front.forceVariant to klucz katalogu systemu szuflad (np. "srednia"),
+              // nie litera typu — różne systemy różnie nazywają literą ten sam klucz (patrz
+              // core/drawerSystems.js), więc stała lista liter N/M/K/E/C nigdy się nie
+              // zgadzała i wymuszenie po cichu nie działało. Lista opcji jest teraz budowana
+              // z realnych wariantów wybranego systemu szuflad tej szafki.
+              const fMerged = { ...(state.project.front || {}), ...(mod.front || {}) };
+              const sysNameForMenu = (fMerged.drawerSystem || 'merivobox').toLowerCase();
+              const sysVariants = (drawerSystems[sysNameForMenu] || drawerSystems.merivobox).variants;
+              const variantOptionsHtml = DRAWER_VARIANT_ORDER.filter(k => sysVariants[k]).map(k =>
+                  `<option value="${k}" ${el.forceVariant === k ? 'selected' : ''}>${DRAWER_VARIANT_LABELS[k]} (${sysVariants[k].type}, ${sysVariants[k].height}mm)</option>`
+              ).join('');
+
               const rowVar = document.createElement('div');
               rowVar.style.display = 'flex'; rowVar.style.justifyContent = 'space-between'; rowVar.style.alignItems = 'center'; rowVar.style.marginBottom = '6px';
               rowVar.innerHTML = `<label style="font-size:11px; color:#475569;">Wariant boku:</label>
-                  <select id="inp-var" style="padding:4px; border:1px solid #cbd5e1; border-radius:4px; font-size:11px; width:110px;">
+                  <select id="inp-var" style="padding:4px; border:1px solid #cbd5e1; border-radius:4px; font-size:11px; width:150px;">
                       <option value="auto" ${(!el.forceVariant || el.forceVariant === 'auto') ? 'selected' : ''}>Auto (Maks.)</option>
-                      <option value="N" ${el.forceVariant === 'N' ? 'selected' : ''}>Wariant N</option>
-                      <option value="M" ${el.forceVariant === 'M' ? 'selected' : ''}>Wariant M</option>
-                      <option value="K" ${el.forceVariant === 'K' ? 'selected' : ''}>Wariant K</option>
-                      <option value="E" ${el.forceVariant === 'E' ? 'selected' : ''}>Wariant E</option>
-                      <option value="C" ${el.forceVariant === 'C' ? 'selected' : ''}>Wariant C</option>
+                      ${variantOptionsHtml}
                   </select>`;
               
               const rowNL = document.createElement('div');
@@ -839,13 +848,8 @@ function show3DContextMenu(event, hit, data) {
               
               menu.appendChild(createOption('➕ Dodaj szufladę wewn. nad tą', '📥', () => {
                   let boxHeight = el.h;
-                  if (el.forceVariant && el.forceVariant !== 'auto') {
-                      const v = el.forceVariant.toUpperCase();
-                      if (v === 'N') boxHeight = 85;
-                      else if (v === 'M') boxHeight = 115;
-                      else if (v === 'K') boxHeight = 150;
-                      else if (v === 'C') boxHeight = 195;
-                      else if (v === 'E') boxHeight = 240;
+                  if (el.forceVariant && el.forceVariant !== 'auto' && sysVariants[el.forceVariant]) {
+                      boxHeight = sysVariants[el.forceVariant].height;
                   }
                   
                   const newInnerBottomY = el.y + boxHeight + 5;
@@ -1519,18 +1523,17 @@ export function update3D() {
                           if (el.y < th) availableSpace -= th; 
                           if (el.y + el.h > H - th) availableSpace -= th; 
 
+                          const sysName = (f.drawerSystem || 'merivobox').toLowerCase();
+
+                          // NAPRAWA: forceVariant to klucz katalogu (np. "srednia"), nie litera
+                          // typu ("K") — różne systemy różnie nazywają literą ten sam klucz
+                          // (patrz core/drawerSystems.js). Porównanie po literze nigdy się nie
+                          // zgadzało, więc wymuszony wariant był tu po cichu ignorowany.
                           let simulatedSpace = availableSpace;
                           if (el.forceVariant && el.forceVariant !== 'auto') {
-                              const v = el.forceVariant.toUpperCase();
-                              if (v === 'N') simulatedSpace = 85;
-                              else if (v === 'M') simulatedSpace = 115;
-                              else if (v === 'K') simulatedSpace = 150;
-                              else if (v === 'C') simulatedSpace = 195;
-                              else if (v === 'E') simulatedSpace = 240;
-                              simulatedSpace = Math.min(simulatedSpace, availableSpace);
+                              const variantData = (drawerSystems[sysName] || drawerSystems.merivobox).variants[el.forceVariant];
+                              if (variantData) simulatedSpace = Math.min(variantData.height, availableSpace);
                           }
-
-                          const sysName = f.drawerSystem || 'merivobox';
                           const dHoles = calculateDrawerHoles(sysName, el.y, simulatedSpace, th, el.frontIndex, isBottomInZone);
                           
                           const innerWidth = el.w; 
@@ -1544,7 +1547,9 @@ export function update3D() {
                               availableDepth = parseFloat(el.forceNL) + 10;
                           }
 
-                          const drawerComps = getDrawerComponents(sysName, innerWidth, availableDepth, simulatedSpace, el.forceVariant || 'auto');
+                          // Pełne availableSpace, nie simulatedSpace — patrz analogiczny komentarz
+                          // w engine/cabinet.js (getFrontsAndDrawers).
+                          const drawerComps = getDrawerComponents(sysName, innerWidth, availableDepth, availableSpace, el.forceVariant || 'auto');
 
                           if (drawerComps) {
                               const NL = drawerComps.nominalLength;

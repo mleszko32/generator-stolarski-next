@@ -1,6 +1,7 @@
 // src/engine/cabinet.js
 import { state } from "../core/state.js";
 import { calculateDrawerHoles, getDrawerComponents } from "../core/drawerMath.js";
+import { drawerSystems } from "../core/drawerSystems.js";
 import { calculateHinges } from "../core/hingeMath.js";
 import { recalculateAllLayouts, getTraverseConfig } from "../core/layout.js";
 
@@ -456,18 +457,20 @@ function getFrontsAndDrawers(mod, config) {
       if (front.y < board) availableSpace -= board; 
       if (front.y + front.h > height - board) availableSpace -= board; 
 
+      const sysName = (f.drawerSystem || 'merivobox').toLowerCase();
+
+      // NAPRAWA: front.forceVariant to klucz katalogu (np. "srednia"), nie litera
+      // typu ("K") — to litera jest tym, co dany system pokazuje jako nazwę
+      // (patrz drawerSystems.js: różne systemy różnie nazywają ten sam klucz,
+      // np. "wysoka" to E w Merivoboxie, ale C w Legraboxie/antaro/GTV). Wcześniej
+      // porównanie po literze nigdy się nie zgadzało, więc wymuszony wariant był
+      // po cichu ignorowany w tym podglądzie (patrz ui/properties.js, zakładka
+      // Szuflady, gdzie ten sam front.forceVariant jest teraz edytowalny).
       let simulatedSpace = availableSpace;
       if (front.forceVariant && front.forceVariant !== 'auto') {
-          const v = front.forceVariant.toUpperCase();
-          if (v === 'N') simulatedSpace = 85;
-          else if (v === 'M') simulatedSpace = 115;
-          else if (v === 'K') simulatedSpace = 150;
-          else if (v === 'C') simulatedSpace = 195;
-          else if (v === 'E') simulatedSpace = 240;
-          simulatedSpace = Math.min(simulatedSpace, availableSpace); 
+          const variantData = (drawerSystems[sysName] || drawerSystems.merivobox).variants[front.forceVariant];
+          if (variantData) simulatedSpace = Math.min(variantData.height, availableSpace);
       }
-
-      const sysName = f.drawerSystem || 'merivobox';
 
       if (typeof calculateDrawerHoles === 'function') {
         const drawerHoles = calculateDrawerHoles(sysName, front.y, simulatedSpace, board, front.frontIndex, isBottomInZone);
@@ -516,7 +519,12 @@ function getFrontsAndDrawers(mod, config) {
         }
 
         const userForcedVariant = front.forceVariant || 'auto';
-        const drawerComps = getDrawerComponents(sysName, width - (board * 2), availableDepth, simulatedSpace, userForcedVariant);
+        // Uwaga: tu celowo pełne availableSpace, nie simulatedSpace (przycięte do
+        // wysokości wymuszonego wariantu) — getDrawerComponents/getDrawerVariant
+        // same sprawdzają, czy w realnej dostępnej przestrzeni mieści się wymuszony
+        // wariant (próg minSpace jest zawsze większy niż sama wysokość wariantu).
+        // Podanie tu simulatedSpace gwarantowałoby odrzucenie wymuszenia.
+        const drawerComps = getDrawerComponents(sysName, width - (board * 2), availableDepth, availableSpace, userForcedVariant);
         
         if (drawerComps) {
           parts.push({ name: `Dno W${width} NL${drawerComps.nominalLength}`, length: parseFloat((drawerComps.bottom.length || 0).toFixed(1)), width: parseFloat((drawerComps.bottom.width || 0).toFixed(1)), qty: 1, category: "Szuflada" });
