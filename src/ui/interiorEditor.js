@@ -146,8 +146,13 @@ function renderLeaf(node, stage, px) {
   const { minX, maxX, minY, maxY } = node.rect;
   const el = document.createElement("div");
   const isOccupied = node.fronts.length > 0;
+  const isMultiFront = node.fronts.length > 1;
   const colors = isOccupied ? FRONT_COLORS[node.fronts[0].subtype] || { fill: "#f1f5f9", border: "#94a3b8" } : null;
 
+  // Przy kilku frontach w jednej wnęce (np. 3 szuflady jedna nad drugą) sam
+  // prostokąt wnęki zostaje tylko celem kliknięcia (cała grupa to jeden front
+  // w sensie "Usuń front"/kierunek otwierania) - realny podział rysują
+  // osobne, nieklikalne boksy niżej, każdy na własnej pozycji z layoutu.
   Object.assign(el.style, {
     position: "absolute",
     left: px.toPxX(minX) + "px",
@@ -155,8 +160,8 @@ function renderLeaf(node, stage, px) {
     width: px.toPxLen(maxX - minX) + "px",
     height: px.toPxLen(maxY - minY) + "px",
     boxSizing: "border-box",
-    border: isOccupied ? `1.5px solid ${colors.border}` : "1px dashed #cbd5e1",
-    background: isOccupied ? colors.fill : "#f8fafc",
+    border: isOccupied ? (isMultiFront ? `1px dashed ${colors.border}` : `1.5px solid ${colors.border}`) : "1px dashed #cbd5e1",
+    background: isOccupied ? (isMultiFront ? "transparent" : colors.fill) : "#f8fafc",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -167,10 +172,9 @@ function renderLeaf(node, stage, px) {
   });
   el.dataset.leaf = "1";
 
-  if (isOccupied) {
-    const names = [...new Set(node.fronts.map((f) => FRONT_LABELS[f.subtype] || f.subtype))];
-    el.innerText = node.fronts.length > 1 ? `${names[0]} ×${node.fronts.length}` : names[0];
-  } else {
+  if (isOccupied && !isMultiFront) {
+    el.innerText = FRONT_LABELS[node.fronts[0].subtype] || node.fronts[0].subtype;
+  } else if (!isOccupied) {
     el.innerText = "+ pusta wnęka";
   }
 
@@ -182,6 +186,38 @@ function renderLeaf(node, stage, px) {
   });
 
   stage.appendChild(el);
+
+  if (isMultiFront) {
+    node.fronts.forEach((front) => {
+      const fx = parseFloat(front.x);
+      const fy = parseFloat(front.y);
+      const fw = parseFloat(front.w);
+      const fh = parseFloat(front.h);
+      if ([fx, fy, fw, fh].some((v) => isNaN(v))) return;
+
+      const box = document.createElement("div");
+      Object.assign(box.style, {
+        position: "absolute",
+        left: px.toPxX(fx) + "px",
+        top: px.toPxY(fy + fh) + "px",
+        width: px.toPxLen(fw) + "px",
+        height: px.toPxLen(fh) + "px",
+        boxSizing: "border-box",
+        border: `1.5px solid ${colors.border}`,
+        background: colors.fill,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+        whiteSpace: "nowrap",
+        fontSize: "10px",
+        color: colors.border,
+        pointerEvents: "none",
+      });
+      box.innerText = FRONT_LABELS[front.subtype] || front.subtype;
+      stage.appendChild(box);
+    });
+  }
 }
 
 function renderDividerHandle(node, stage, px) {
