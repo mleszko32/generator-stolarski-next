@@ -11,7 +11,7 @@
 // po wczytaniu projektu z chmury, gdy initPropertiesPanel() biegło przed
 // update3D()). Nie ma tu żadnej zależności od Three.js — czysta matematyka na
 // obiekcie state.
-import { state } from "./state.js";
+import { state, DEFAULT_ROOM } from "./state.js";
 
 // Przelicza layout wszystkich modułów projektu. Wołaj przed każdym liczeniem
 // formatek/okuć całego projektu — fronty z sąsiednich modułów też muszą mieć
@@ -33,6 +33,22 @@ export function getWorldFootprint(mod) {
   const rot = ((parseFloat(mod.rotation) || 0) % 360 + 360) % 360;
   const swapped = rot === 90 || rot === 270;
   return { worldW: swapped ? D : W, worldD: swapped ? W : D, rotation: rot };
+}
+
+// Twarde ograniczenie pozycji modułu do wnętrza pokoju (na podstawie odcisku
+// z getWorldFootprint, więc uwzględnia obrót). Bez tego przeciągnięcie za daleko
+// (poza próg przyciągania SNAP_DIST w render/viewer3d.js) albo obrót szafki
+// stojącej tuż przy ścianie potrafił zostawić ją "przebijającą" ścianę - ściany
+// same w sobie stoją na zewnątrz odcisku pokoju (patrz WALL_THICKNESS w
+// viewer3d.js), więc to jedyne miejsce, które faktycznie trzyma szafkę w środku.
+// Wołane po każdej zmianie position.x/z lub rotation (drag, obrót, ręczne pola).
+export function clampModuleToRoom(mod) {
+  const room = state.project.room || DEFAULT_ROOM;
+  const { worldW, worldD } = getWorldFootprint(mod);
+  const maxX = Math.max(0, room.width - worldW);
+  const maxZ = Math.max(0, room.depth - worldD);
+  mod.position.x = Math.min(Math.max(parseFloat(mod.position.x) || 0, 0), maxX);
+  mod.position.z = Math.min(Math.max(parseFloat(mod.position.z) || 0, 0), maxZ);
 }
 
 // Rozwiązuje konfigurację dwóch górnych trawersów (przedni/tylny) z opcjonalnym

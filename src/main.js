@@ -7,6 +7,7 @@ import { init3DViewer, update3D } from "./render/viewer3d.js";
 import { escapeHtml } from "./utils/dom.js";
 import { state, ensureRoomDefaults, getActiveModule } from "./core/state.js";
 import { openRoomSettingsModal } from "./ui/roomPanel.js";
+import { clampModuleToRoom } from "./core/layout.js";
 
 
 // ZMIANA: Importujemy funkcję do usuwania projektów oraz customowy dialog
@@ -77,6 +78,7 @@ window.addEventListener('keydown', (e) => {
   if (!mod) return;
   e.preventDefault();
   mod.rotation = ((mod.rotation || 0) + 90) % 360;
+  clampModuleToRoom(mod);
   update3D();
   updateSidebar();
   initPropertiesPanel();

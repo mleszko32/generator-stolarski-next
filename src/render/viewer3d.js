@@ -9,7 +9,7 @@ import { getDrawerComponents, calculateDrawerHoles } from '../core/drawerMath.js
 import { drawerSystems, DRAWER_VARIANT_ORDER, DRAWER_VARIANT_LABELS } from '../core/drawerSystems.js';
 import { calculateHinges } from '../core/hingeMath.js';
 import { autoDistributeShelves } from '../core/shelfMath.js';
-import { recalculateLayout, getTraverseConfig, getWorldFootprint } from '../core/layout.js';
+import { recalculateLayout, getTraverseConfig, getWorldFootprint, clampModuleToRoom } from '../core/layout.js';
 import { scheduleCheckpoint } from '../core/history.js';
 import { toggleInteriorEditor, renderInteriorEditorIfVisible } from '../ui/interiorEditor.js';
 
@@ -366,6 +366,10 @@ export function init3DViewer() {
                       m.position.x = Math.round(mOrig.x + deltaX);
                       m.position.y = Math.round(mOrig.y + deltaY);
                       m.position.z = Math.round(mOrig.z + deltaZ);
+                      // Twardy limit - nawet gdy snap "przeoczy" ścianę (za szybki/za
+                      // daleki ruch myszy, poza SNAP_DIST), moduł nie może fizycznie
+                      // wystawać poza pokój.
+                      clampModuleToRoom(m);
 
                       const tTarget = cabinetGroup.children.find(g => g.userData.moduleId === id);
                       if (tTarget) {
@@ -738,6 +742,7 @@ function show3DContextMenu(event, hit, data) {
           
           const updatePos = (newVal) => {
               mod.position[axis] = parseFloat(newVal) || 0;
+              if (axis === 'x' || axis === 'z') clampModuleToRoom(mod);
               inp.value = mod.position[axis];
               update3D();
               updateSidebar();
@@ -773,6 +778,7 @@ function show3DContextMenu(event, hit, data) {
           b.onclick = (e) => {
               e.stopPropagation();
               mod.rotation = rot;
+              clampModuleToRoom(mod);
               update3D();
               updateSidebar();
               initPropertiesPanel();

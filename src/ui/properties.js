@@ -4,7 +4,7 @@ import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
 import { calculateParts } from "../engine/cabinet.js";
 import { calculateHinges } from "../core/hingeMath.js";
-import { getTraverseConfig } from "../core/layout.js";
+import { getTraverseConfig, clampModuleToRoom } from "../core/layout.js";
 import { drawerSystems, DRAWER_VARIANT_ORDER, DRAWER_VARIANT_LABELS } from "../core/drawerSystems.js";
 import { escapeHtml } from "../utils/dom.js";
 import { scheduleCheckpoint } from "../core/history.js";
@@ -726,14 +726,24 @@ function setupEventListeners() {
       });
 
       // POPRAWKA: Po zakończeniu wpisywania, zaktualizuj pełen panel boczny
-      el.addEventListener('change', () => { initPropertiesPanel(); });
+      el.addEventListener('change', () => {
+        // Ręczne wpisanie pozycji/wymiaru mogło wystawić szafkę poza pokój - dopiero
+        // po skończeniu wpisywania (nie na każdy znak), żeby nie "walczyć" z użytkownikiem.
+        if (['pos-x', 'pos-z', 'width', 'depth'].includes(id)) {
+          getSelectedMods().forEach(mod => clampModuleToRoom(mod));
+        }
+        initPropertiesPanel();
+      });
     }
   });
 
   document.querySelectorAll('.btn-rotate').forEach(btn => {
     btn.addEventListener('click', () => {
       const rot = parseInt(btn.dataset.rot, 10);
-      getSelectedMods().forEach(mod => { mod.rotation = rot; });
+      getSelectedMods().forEach(mod => {
+        mod.rotation = rot;
+        clampModuleToRoom(mod); // obrót zamienia W/D odcisku - szafka przy ścianie mogła by teraz z niej wystawać
+      });
       updateAll();
       initPropertiesPanel();
     });

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { recalculateLayout, recalculateAllLayouts, getTraverseConfig, getWorldFootprint } from "./layout.js";
+import { recalculateLayout, recalculateAllLayouts, getTraverseConfig, getWorldFootprint, clampModuleToRoom } from "./layout.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
 
 // Pełny korpus 600 x 720, płyta 18 -> wnętrze baseZone 18..582 / 18..702.
@@ -138,5 +138,36 @@ describe("getWorldFootprint", () => {
 
   it("brak pola rotation traktowany jak 0 (stare moduły sprzed tej funkcji)", () => {
     expect(getWorldFootprint({ dimensions: dims })).toEqual({ worldW: 600, worldD: 513, rotation: 0 });
+  });
+});
+
+describe("clampModuleToRoom", () => {
+  beforeEach(() => setProject(freshProject({ room: { width: 3500, height: 2600, depth: 3000 } })));
+
+  it("nie rusza modułu, który mieści się w pokoju", () => {
+    const mod = baseModule({ position: { x: 100, y: 0, z: 200 } });
+    clampModuleToRoom(mod);
+    expect(mod.position.x).toBe(100);
+    expect(mod.position.z).toBe(200);
+  });
+
+  it("ścina pozycję, gdy moduł wystaje poza daleką ścianę (X/Z)", () => {
+    const mod = baseModule({ position: { x: 5000, y: 0, z: 5000 } });
+    clampModuleToRoom(mod);
+    expect(mod.position.x).toBe(3500 - 600); // room.width - worldW
+    expect(mod.position.z).toBe(3000 - 513); // room.depth - worldD
+  });
+
+  it("ścina ujemną pozycję do 0 (np. po ręcznym wpisaniu)", () => {
+    const mod = baseModule({ position: { x: -200, y: 0, z: -50 } });
+    clampModuleToRoom(mod);
+    expect(mod.position.x).toBe(0);
+    expect(mod.position.z).toBe(0);
+  });
+
+  it("uwzględnia obrót - odcisk 90° zamienia W/D przy liczeniu granicy", () => {
+    const mod = baseModule({ position: { x: 5000, y: 0, z: 0 }, rotation: 90 });
+    clampModuleToRoom(mod);
+    expect(mod.position.x).toBe(3500 - 513); // worldW po obrocie = lokalna głębokość (513)
   });
 });
