@@ -1557,14 +1557,18 @@ export function update3D() {
                               const dl = drawerComps.bottom.length;
                               const dh = drawerComps.back.height;
 
-                              const dX = posX + el.x + (innerWidth - dw) / 2; 
-                              
-                              let slideAbsY = el.y + 33.5; 
-                              if (dHoles && dHoles.slideSideHoles && dHoles.slideSideHoles.length > 0) {
-                                  slideAbsY = dHoles.slideSideHoles[0].y;
-                              }
-                              const dY = posY + slideAbsY - 33.5; 
-                              
+                              const dX = posX + el.x + (innerWidth - dw) / 2;
+
+                              // NAPRAWA: dno szuflady ma siedzieć tuż nad wieńcem dolnym korpusu
+                              // (albo tuż nad frontem szuflady niżej w stosie), nie kilkanaście mm
+                              // wyżej. Poprzednia wersja liczyła to od wysokości otworu montażowego
+                              // prowadnicy (dHoles) pomniejszonej o stałe 33.5mm — ta liczba to w
+                              // rzeczywistości pozycja śrub mocujących FRONT (frontHolesBase z
+                              // core/drawerSystems.js), skopiowana tu przez pomyłkę i bez związku
+                              // z wysokością samej prowadnicy. Efekt: szuflada renderowała się
+                              // zawyżona względem realnie dostępnego miejsca w korpusie.
+                              const dY = posY + el.y + (isBottomInZone ? th : 0);
+
                               const boxStartZ = zForFront - NL;
 
                               addBox(dw, 16, NL, dX, dY, boxStartZ, 'drawerBox', isActive, udElement, innerGroup); 
