@@ -499,7 +499,17 @@ function getFrontsAndDrawers(mod, config) {
       }
 
       if (typeof calculateDrawerHoles === 'function') {
-        const drawerHoles = calculateDrawerHoles(sysName, front.y, simulatedSpace, board, front.frontIndex, isBottomInZone);
+        // NAPRAWA: korekta "dolnego frontu" w calculateDrawerHoles (core/drawerMath.js)
+        // zakłada, że front na dole stosu ZJEŻDŻA na wieniec dolny (styl nakładany) -
+        // dla frontu wpuszczanego front.y jest już liczone od wnętrza (bez zjazdu na
+        // wieniec, patrz core/layout.js), więc bez tego warunku otwory prowadnicy/frontu
+        // wychodziłyby o całą grubość płyty za wysoko dla wpuszczanego dolnego frontu.
+        // Sprawdzamy geometrię (baseZone.minY ~ th), nie tag "boundBottom" - starsze
+        // projekty (import AI w sidebar.js) budują baseZone bez tego taga wcale, więc
+        // poleganie tylko na nim wyłączyłoby korektę też dla zwykłych, nakładanych
+        // frontów w tych projektach.
+        const isBottomOuter = front.baseZone && parseFloat(front.baseZone.minY) <= board + 0.5;
+        const drawerHoles = calculateDrawerHoles(sysName, front.y, simulatedSpace, board, front.frontIndex, isBottomInZone && isBottomOuter && !isInset);
         if (drawerHoles) { 
           const adjustedHoles = JSON.parse(JSON.stringify(drawerHoles));
           

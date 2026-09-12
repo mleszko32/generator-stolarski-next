@@ -5,6 +5,7 @@ import {
   calculateProjectHardware,
 } from "./cabinet.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
+import { drawerSystems } from "../core/drawerSystems.js";
 
 const find = (parts, name) => parts.find((p) => p.name === name);
 
@@ -120,6 +121,37 @@ describe("integracja layout -> drawerMath -> lista formatek", () => {
     const tyl = parts.find((p) => p.name.startsWith("Tył W600"));
     expect(tyl.name).toBe("Tył W600 (E)"); // wariant wysoki
     expect(tyl).toMatchObject({ length: 513, width: 184 });
+  });
+});
+
+describe("front wpuszczany: pozycja otworów prowadnicy dolnej szuflady", () => {
+  // Front wpuszczany nie zjeżdża na wieniec dolny (patrz core/layout.js, gałąź
+  // isBottomOuter) - el.y jest już liczone od wnętrza. Bez poprawki w
+  // getFrontsAndDrawers/dY (render/viewer3d.js) prowadnica dolnej szuflady
+  // wychodziła o całą grubość płyty (18mm) za wysoko przy froncie wpuszczanym,
+  // mimo że wymiary formatek (cutlist) się nie zmieniały - stąd wizualnie
+  // "unosząca się" szuflada w 3D.
+  const zone = { minX: 18, maxX: 582, minY: 18, maxY: 702, offsetBottom: 0, offsetTop: 0 };
+  const railOffset = drawerSystems.merivobox.mounting.railOffset;
+  const board = 18;
+  const drawerFront = () => ({
+    id: "f0", typ: "front", subtype: "szuflada", frontIndex: 0, gap: 3, distribution: "1", baseZone: { ...zone },
+  });
+
+  it("front nakładany: prowadnica siedzi na el.y + grubość płyty (zjeżdża na wieniec)", () => {
+    const mod = baseModule({ elements: [drawerFront()] });
+    setProject(freshProject({ modules: [mod] }));
+    const { mountingData } = calculateParts();
+    const slideY = mountingData.find((m) => m.type === "drawer").slideSideHoles[0].y;
+    expect(slideY).toBeCloseTo(mod.elements[0].y + board + railOffset);
+  });
+
+  it("front wpuszczany: prowadnica siedzi wprost na el.y, BEZ dodatkowej grubości płyty", () => {
+    const mod = baseModule({ front: { type: "wpuszczane" }, elements: [drawerFront()] });
+    setProject(freshProject({ modules: [mod] }));
+    const { mountingData } = calculateParts();
+    const slideY = mountingData.find((m) => m.type === "drawer").slideSideHoles[0].y;
+    expect(slideY).toBeCloseTo(mod.elements[0].y + railOffset);
   });
 });
 

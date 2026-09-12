@@ -970,7 +970,14 @@ export function update3D() {
                               const variantData = (drawerSystems[sysName] || drawerSystems.merivobox).variants[el.forceVariant];
                               if (variantData) simulatedSpace = Math.min(variantData.height, availableSpace);
                           }
-                          const dHoles = calculateDrawerHoles(sysName, el.y, simulatedSpace, th, el.frontIndex, isBottomInZone);
+                          // NAPRAWA: jak przy dY niżej - korekta "dolnego frontu" w
+                          // calculateDrawerHoles ma sens tylko dla frontu nakładanego,
+                          // zjeżdżającego na wieniec dolny. Front wpuszczany ma już
+                          // poprawne el.y liczone od wnętrza (core/layout.js). Sprawdzamy
+                          // geometrię (baseZone.minY ~ th), nie tag "boundBottom" - starsze
+                          // projekty (import AI) budują baseZone bez tego taga wcale.
+                          const isBottomOuter = el.baseZone && parseFloat(el.baseZone.minY) <= th + 0.5;
+                          const dHoles = calculateDrawerHoles(sysName, el.y, simulatedSpace, th, el.frontIndex, isBottomInZone && isBottomOuter && !isInsetFront);
                           
                           const innerWidth = el.w; 
                           
@@ -1003,7 +1010,18 @@ export function update3D() {
                               // core/drawerSystems.js), skopiowana tu przez pomyłkę i bez związku
                               // z wysokością samej prowadnicy. Efekt: szuflada renderowała się
                               // zawyżona względem realnie dostępnego miejsca w korpusie.
-                              const dY = posY + el.y + (isBottomInZone ? th : 0);
+                              //
+                              // NAPRAWA 2: korekta "+th" ma sens TYLKO gdy front na dole stosu jest
+                              // nakładany na wieniec dolny (wtedy el.y sam w sobie jest zaniżone o
+                              // th-luz, bo front "zjeżdża" na wieniec — patrz core/layout.js, gałąź
+                              // isBottomOuter) — pudło szuflady i tak siedzi na wieńcu, niezależnie
+                              // od stylu frontu. Front wpuszczany NIE zjeżdża na wieniec (el.y jest
+                              // już poprawne, liczone od wnętrza), więc doliczanie tu drugi raz "th"
+                              // podnosiło samo pudło o całą grubość płyty ponad realną pozycję —
+                              // widoczne w 3D jako "unosząca się" szuflada przy zmianie frontu na
+                              // wpuszczany, mimo że wymiary formatek (cutlist) się nie zmieniały.
+                              // (isBottomOuter policzone wyżej, przy dHoles - ten sam front/wnęka)
+                              const dY = posY + el.y + (isBottomInZone && isBottomOuter && !isInsetFront ? th : 0);
 
                               const boxStartZ = zForFront - NL;
 
