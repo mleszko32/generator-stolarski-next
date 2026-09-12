@@ -430,13 +430,20 @@ function appendDrawerPicker(toolbar, mod, subtype, label) {
   lbl.innerText = label;
   Object.assign(lbl.style, { fontFamily: "sans-serif", fontSize: "11.5px", fontWeight: "bold", color: "#fff" });
 
+  // Zwykła liczba (np. "3") = tyle samo w sobie równych frontów - ale to to
+  // samo pole obsługuje też pełną składnię podziału z layoutu (core/layout.js:
+  // wartości <=10 to wagi "fr" - proporcjonalny podział reszty miejsca, >10 to
+  // sztywne mm), np. "1:1:141" = dwa równe fronty na dole + górny sztywno
+  // 141mm. To dokładnie ta sama notacja co dawniej w menu kontekstowym 3D
+  // (usuniętym w tej sesji) i w konfiguratorze Blum.
   const input = document.createElement("input");
-  input.type = "number";
-  input.min = "1";
+  input.type = "text";
   input.value = "1";
-  input.title = "Ile frontów (np. 3 szuflady jedna pod drugą)";
-  Object.assign(input.style, { width: "34px", padding: "5px 3px", border: "none", borderRadius: "4px", textAlign: "center", fontSize: "11px" });
+  input.title = "Podział, np. 3 (trzy równe) albo 1:1:141 (dwa równe + górny sztywno 141mm)";
+  input.placeholder = "np. 1:1:141";
+  Object.assign(input.style, { width: "64px", padding: "5px 3px", border: "none", borderRadius: "4px", textAlign: "center", fontSize: "11px" });
   input.addEventListener("click", (e) => e.stopPropagation());
+  input.addEventListener("keydown", (e) => e.stopPropagation());
 
   const go = document.createElement("button");
   go.type = "button";
@@ -444,8 +451,8 @@ function appendDrawerPicker(toolbar, mod, subtype, label) {
   Object.assign(go.style, { width: "22px", height: "22px", border: "none", borderRadius: "4px", background: "#0284c7", color: "#fff", fontWeight: "bold", cursor: "pointer" });
   go.addEventListener("click", (e) => {
     e.stopPropagation();
-    const count = Math.max(1, parseInt(input.value, 10) || 1);
-    assignFront(mod, selectedNode, subtype, { distribution: String(count) });
+    const distribution = input.value.trim() || "1";
+    assignFront(mod, selectedNode, subtype, { distribution });
     refreshAfterEdit();
   });
 
