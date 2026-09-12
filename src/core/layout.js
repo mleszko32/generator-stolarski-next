@@ -51,6 +51,55 @@ export function clampModuleToRoom(mod) {
   mod.position.z = Math.min(Math.max(parseFloat(mod.position.z) || 0, 0), maxZ);
 }
 
+// Projekty zapisane PRZED dodaniem realnego pokoju miały w danych martwe,
+// nigdy nierenderowane pole room = {width:3500, height:2600, depth:600} (patrz
+// komentarz przy DEFAULT_ROOM w state.js - to było jak korytarz, nie mieściłby
+// się w nim nawet jeden rząd szafek). ensureRoomDefaults() samo w sobie tego
+// nie łapie, bo to poprawne, parsowalne liczby - więc stare projekty po prostu
+// wczytywały się z tym samym za małym, fikcyjnym pokojem, a realna zabudowa
+// (dziś faktycznie renderowana w 4 ścianach) wystawała poza niego / "przebijała"
+// ściany już przy samym otwarciu projektu, bez żadnego przeciągania. Wołaj to
+// razem z ensureRoomDefaults() przy każdej podmianie state.project (main.js,
+// storage.js, history.js) - jednorazowo "podciąga" pokój pod istniejący układ.
+const LEGACY_DEAD_ROOM = { width: 3500, height: 2600, depth: 600 };
+const ROOM_FIT_MARGIN = 200; // mm zapasu wokół istniejącej zabudowy
+
+export function migrateLegacyRoom(project) {
+  const r = project.room;
+  if (!r) return;
+  const isLegacyPlaceholder =
+    parseFloat(r.width) === LEGACY_DEAD_ROOM.width &&
+    parseFloat(r.height) === LEGACY_DEAD_ROOM.height &&
+    parseFloat(r.depth) === LEGACY_DEAD_ROOM.depth;
+  if (!isLegacyPlaceholder) return;
+
+  const modules = project.modules || [];
+  if (modules.length === 0) {
+    project.room = { ...DEFAULT_ROOM };
+    return;
+  }
+
+  let maxX = 0, maxZ = 0, maxY = 0;
+  modules.forEach(mod => {
+    const { worldW, worldD } = getWorldFootprint(mod);
+    const x = parseFloat(mod.position.x) || 0;
+    const z = parseFloat(mod.position.z) || 0;
+    const y = parseFloat(mod.position.y) || 0;
+    const h = parseFloat(mod.dimensions.height) || 0;
+    const legH = (mod.legs && mod.legs.active) ? (parseFloat(mod.legs.height) || 100) : 0;
+    maxX = Math.max(maxX, x + worldW);
+    maxZ = Math.max(maxZ, z + worldD);
+    maxY = Math.max(maxY, y + legH + h);
+  });
+
+  const roundUp10 = (v) => Math.ceil(v / 10) * 10;
+  project.room = {
+    width: Math.max(DEFAULT_ROOM.width, roundUp10(maxX + ROOM_FIT_MARGIN)),
+    depth: Math.max(DEFAULT_ROOM.depth, roundUp10(maxZ + ROOM_FIT_MARGIN)),
+    height: Math.max(DEFAULT_ROOM.height, roundUp10(maxY + ROOM_FIT_MARGIN)),
+  };
+}
+
 // Rozwiązuje konfigurację dwóch górnych trawersów (przedni/tylny) z opcjonalnym
 // nadpisaniem aktywności/szerokości pojedynczego trawersu (patrz ui/properties.js,
 // zakładka Konstrukcja — "Trawersy: wysokości/aktywność ręczne") na wspólną

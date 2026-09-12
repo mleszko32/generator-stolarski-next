@@ -14,6 +14,7 @@
 // temu nie trzeba było ręcznie dotykać każdego z kilkudziesięciu miejsc,
 // które zmieniają state.
 import { state, ensureRoomDefaults } from "./state.js";
+import { migrateLegacyRoom } from "./layout.js";
 
 const MAX_HISTORY = 50;
 const DEBOUNCE_MS = 600;
@@ -77,6 +78,7 @@ function applySnapshot(json) {
   const data = JSON.parse(json);
   state.project = data.project;
   ensureRoomDefaults(state.project);
+  migrateLegacyRoom(state.project);
   state.activeModuleId = data.activeModuleId;
   // Jeśli aktywny moduł zniknął w tej migawce (np. cofnięcie dodania modułu,
   // gdy on sam był zaznaczony), wybierz sensowny fallback zamiast wskazywać w pustkę.

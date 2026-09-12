@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { recalculateLayout, recalculateAllLayouts, getTraverseConfig, getWorldFootprint, clampModuleToRoom } from "./layout.js";
+import { recalculateLayout, recalculateAllLayouts, getTraverseConfig, getWorldFootprint, clampModuleToRoom, migrateLegacyRoom } from "./layout.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
 
 // Pełny korpus 600 x 720, płyta 18 -> wnętrze baseZone 18..582 / 18..702.
@@ -169,5 +169,39 @@ describe("clampModuleToRoom", () => {
     const mod = baseModule({ position: { x: 5000, y: 0, z: 0 }, rotation: 90 });
     clampModuleToRoom(mod);
     expect(mod.position.x).toBe(3500 - 513); // worldW po obrocie = lokalna głębokość (513)
+  });
+});
+
+describe("migrateLegacyRoom", () => {
+  const LEGACY = { width: 3500, height: 2600, depth: 600 };
+
+  it("nie rusza pokoju, który nie jest martwym placeholderem sprzed funkcji (nawet jeśli szafki wystają)", () => {
+    const project = {
+      room: { width: 1000, height: 2600, depth: 1000 }, // celowo mały, ale to NIE sygnatura legacy
+      modules: [baseModule({ position: { x: 5000, y: 0, z: 0 } })],
+    };
+    migrateLegacyRoom(project);
+    expect(project.room).toEqual({ width: 1000, height: 2600, depth: 1000 });
+  });
+
+  it("bez modułów: zamienia martwy placeholder na nowy, realny DEFAULT_ROOM", () => {
+    const project = { room: { ...LEGACY }, modules: [] };
+    migrateLegacyRoom(project);
+    expect(project.room).toEqual({ width: 4000, height: 2600, depth: 3000 });
+  });
+
+  it("z modułami: dopasowuje pokój do istniejącego układu (z zapasem, zaokrąglone do 10mm)", () => {
+    const project = {
+      room: { ...LEGACY },
+      modules: [
+        baseModule({
+          position: { x: 4500, y: 0, z: 3200 },
+          dimensions: { width: 600, height: 2200, depth: 513 },
+          legs: { active: true, height: 100, plinth: true, plinthOffset: 40 },
+        }),
+      ],
+    };
+    migrateLegacyRoom(project);
+    expect(project.room).toEqual({ width: 5300, height: 2600, depth: 3920 });
   });
 });
