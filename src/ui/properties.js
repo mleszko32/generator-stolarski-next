@@ -165,9 +165,19 @@ export function initPropertiesPanel() {
 
       <h3 style="color: #2563eb;">Pozycja w przestrzeni (3D)</h3>
       <div class="property-group" style="background: #eff6ff; padding: 10px; border-radius: 4px; border: 1px dashed #93c5fd;">
-        <div style="margin-bottom: 8px;"><label style="font-size: 11px; color: #1e3a8a;">Odsunięcie od lewej (X) [mm]:</label><input type="number" id="input-pos-x" value="${activeModule.position.x}" style="border-color: #bfdbfe;" /></div>
+        <div style="margin-bottom: 8px;"><label style="font-size: 11px; color: #1e3a8a;">Odsunięcie od lewej ściany (X) [mm]:</label><input type="number" id="input-pos-x" value="${activeModule.position.x}" style="border-color: #bfdbfe;" /></div>
+        <div style="margin-bottom: 8px;"><label style="font-size: 11px; color: #1e3a8a;">Odsunięcie od tylnej ściany (Z) [mm]:</label><input type="number" id="input-pos-z" value="${activeModule.position.z || 0}" style="border-color: #bfdbfe;" /></div>
         <div><label style="font-size: 11px; color: #1e3a8a;">Wysokość od podłogi (Y) [mm]:</label><input type="number" id="input-pos-y" value="${activeModule.position.y}" style="border-color: #bfdbfe;" /></div>
       </div>
+
+      <h3 style="color: #2563eb;">Obrót (co 90°)</h3>
+      <div class="property-group" style="display: flex; flex-direction: row; gap: 4px;">
+        ${[0, 90, 180, 270].map(rot => {
+            const active = (activeModule.rotation || 0) === rot;
+            return `<button type="button" class="btn-rotate${active ? ' active' : ''}" data-rot="${rot}" style="flex: 1; padding: 8px 4px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; border: 1px solid ${active ? '#2563eb' : '#93c5fd'}; background: ${active ? '#2563eb' : '#eff6ff'}; color: ${active ? '#fff' : '#1e3a8a'};">${rot}°</button>`;
+        }).join('')}
+      </div>
+      <div style="font-size: 10px; color: #94a3b8; margin-top: 4px;">Skrót: klawisz R obraca aktywną szafkę o +90°.</div>
     `)}
 
     ${tabContent("front", `
@@ -388,7 +398,7 @@ function setupEventListeners() {
   });
 
   const numberInputs = [
-    'pos-x', 'pos-y', 'traverse-width', 'board-thick', 'width', 'height', 'depth',
+    'pos-x', 'pos-y', 'pos-z', 'traverse-width', 'board-thick', 'width', 'height', 'depth',
     'front-gap', 'front-left', 'front-right', 'front-top', 'front-bottom', 'back-offset', 'back-groove',
     'legs-height', 'plinth-offset', 'hinge-top', 'hinge-bottom', 'hinge-margin', 'hinge-count',
     'filler-left-w', 'filler-left-h', 'filler-left-d', 'filler-left-y',
@@ -639,6 +649,7 @@ function setupEventListeners() {
 
             if (id === 'pos-x') mod.position.x = val;
             if (id === 'pos-y') mod.position.y = val;
+            if (id === 'pos-z') mod.position.z = val;
             if (id === 'legs-height') {
               if (!mod.legs) mod.legs = { active: true, height: 100, plinth: true, plinthOffset: 40 };
               mod.legs.height = val;
@@ -717,5 +728,14 @@ function setupEventListeners() {
       // POPRAWKA: Po zakończeniu wpisywania, zaktualizuj pełen panel boczny
       el.addEventListener('change', () => { initPropertiesPanel(); });
     }
+  });
+
+  document.querySelectorAll('.btn-rotate').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const rot = parseInt(btn.dataset.rot, 10);
+      getSelectedMods().forEach(mod => { mod.rotation = rot; });
+      updateAll();
+      initPropertiesPanel();
+    });
   });
 }

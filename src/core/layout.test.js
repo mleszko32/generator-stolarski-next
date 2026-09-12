@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { recalculateLayout, recalculateAllLayouts, getTraverseConfig } from "./layout.js";
+import { recalculateLayout, recalculateAllLayouts, getTraverseConfig, getWorldFootprint } from "./layout.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
 
 // Pełny korpus 600 x 720, płyta 18 -> wnętrze baseZone 18..582 / 18..702.
@@ -114,5 +114,29 @@ describe("getTraverseConfig", () => {
   it("nie pozwala wyłączyć obu naraz (zabezpieczenie przed korpusem bez wieńca)", () => {
     const trav = getTraverseConfig({ traverseWidth: 100, traverses: { front: { active: false }, rear: { active: false } } });
     expect(trav.front.active || trav.rear.active).toBe(true);
+  });
+});
+
+describe("getWorldFootprint", () => {
+  const dims = { width: 600, height: 720, depth: 513 };
+
+  it("rotation 0: odcisk = surowe wymiary", () => {
+    expect(getWorldFootprint({ dimensions: dims, rotation: 0 })).toEqual({ worldW: 600, worldD: 513, rotation: 0 });
+  });
+
+  it("rotation 180: odcisk = surowe wymiary (obrót w płaszczyźnie, bez zamiany osi)", () => {
+    expect(getWorldFootprint({ dimensions: dims, rotation: 180 })).toEqual({ worldW: 600, worldD: 513, rotation: 180 });
+  });
+
+  it("rotation 90: szerokość i głębokość zamieniają się miejscami", () => {
+    expect(getWorldFootprint({ dimensions: dims, rotation: 90 })).toEqual({ worldW: 513, worldD: 600, rotation: 90 });
+  });
+
+  it("rotation 270: szerokość i głębokość zamieniają się miejscami", () => {
+    expect(getWorldFootprint({ dimensions: dims, rotation: 270 })).toEqual({ worldW: 513, worldD: 600, rotation: 270 });
+  });
+
+  it("brak pola rotation traktowany jak 0 (stare moduły sprzed tej funkcji)", () => {
+    expect(getWorldFootprint({ dimensions: dims })).toEqual({ worldW: 600, worldD: 513, rotation: 0 });
   });
 });

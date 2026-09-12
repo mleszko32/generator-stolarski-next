@@ -57,6 +57,35 @@ describe("calculateAllProjectParts — cały projekt", () => {
     expect(plinths).toHaveLength(1);
     expect(plinths[0]).toMatchObject({ length: 1200, qty: 1 });
   });
+
+  it("scala cokół dwóch szafek obróconych o 90° pod tą samą ścianą wzdłuż Z (nie X)", () => {
+    setProject(
+      freshProject({
+        modules: [
+          baseModule({ id: "m1", position: { x: 0, y: 0, z: 0 }, rotation: 90 }),
+          baseModule({ id: "m2", position: { x: 0, y: 0, z: 600 }, rotation: 90 }),
+        ],
+      })
+    );
+    const parts = calculateAllProjectParts();
+    const plinths = parts.filter((p) => p.name.startsWith("Cokół dolny"));
+    expect(plinths).toHaveLength(1);
+    expect(plinths[0]).toMatchObject({ length: 1200, qty: 1 });
+  });
+
+  it("NIE scala cokołów dwóch szafek o różnym rotation, nawet stykających się po X", () => {
+    setProject(
+      freshProject({
+        modules: [
+          baseModule({ id: "m1", position: { x: 0, y: 0, z: 0 }, rotation: 0 }),
+          baseModule({ id: "m2", position: { x: 600, y: 0, z: 0 }, rotation: 90 }),
+        ],
+      })
+    );
+    const parts = calculateAllProjectParts();
+    const plinths = parts.filter((p) => p.name.startsWith("Cokół dolny"));
+    expect(plinths).toHaveLength(2);
+  });
 });
 
 describe("integracja layout -> drawerMath -> lista formatek", () => {

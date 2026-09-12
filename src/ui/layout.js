@@ -7,6 +7,7 @@ export function initLayout() {
       <div class="nav-actions" style="display: flex; align-items: center; gap: 8px;">
           <button id="btn-undo" class="btn btn-neutral btn-sm" title="Cofnij (Ctrl+Z)">↩️ Cofnij</button>
           <button id="btn-redo" class="btn btn-neutral btn-sm" title="Wprzód (Ctrl+Y)">↪️ Wprzód</button>
+          <button id="btn-room-settings" class="btn btn-teal btn-sm" title="Wymiary pomieszczenia">🏠 Pomieszczenie</button>
           <div style="width: 1px; height: 22px; background: rgba(255,255,255,0.3); margin: 0 4px;"></div>
           <span id="autosave-status" style="color: #cbd5e1; font-size: 12px;"></span>
           <span id="auth-status" style="color: #e2e8f0; font-size: 13px;"></span>

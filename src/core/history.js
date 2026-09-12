@@ -13,7 +13,7 @@
 // mutacja w aplikacji woła po sobie (patrz CLAUDE.md: "Update flow"). Dzięki
 // temu nie trzeba było ręcznie dotykać każdego z kilkudziesięciu miejsc,
 // które zmieniają state.
-import { state } from "./state.js";
+import { state, ensureRoomDefaults } from "./state.js";
 
 const MAX_HISTORY = 50;
 const DEBOUNCE_MS = 600;
@@ -76,6 +76,7 @@ export function canRedo() {
 function applySnapshot(json) {
   const data = JSON.parse(json);
   state.project = data.project;
+  ensureRoomDefaults(state.project);
   state.activeModuleId = data.activeModuleId;
   // Jeśli aktywny moduł zniknął w tej migawce (np. cofnięcie dodania modułu,
   // gdy on sam był zaznaczony), wybierz sensowny fallback zamiast wskazywać w pustkę.

@@ -3,7 +3,7 @@ import { state } from "../core/state.js";
 import { calculateDrawerHoles, getDrawerComponents } from "../core/drawerMath.js";
 import { drawerSystems } from "../core/drawerSystems.js";
 import { calculateHinges } from "../core/hingeMath.js";
-import { recalculateAllLayouts, getTraverseConfig } from "../core/layout.js";
+import { recalculateAllLayouts, getTraverseConfig, getWorldFootprint } from "../core/layout.js";
 
 export function calculateParts() {
   // Fronty muszą mieć aktualne el.x/y/w/h zanim policzymy z nich formatki.
@@ -127,36 +127,62 @@ export function calculateAllProjectParts() {
   });
 
   const baseCabinets = config.modules.filter(m => m.legs && m.legs.active && m.legs.plinth);
-  baseCabinets.sort((a, b) => (parseFloat(a.position.x) || 0) - (parseFloat(b.position.x) || 0));
-  
-  let plinthRuns = [];
-  baseCabinets.forEach(mod => {
-      const x = parseFloat(mod.position.x) || 0;
-      const y = parseFloat(mod.position.y) || 0;
-      const z = parseFloat(mod.position.z) || 0;
-      const w = parseFloat(mod.dimensions.width);
-      const d = parseFloat(mod.dimensions.depth);
-      const h = parseFloat(mod.legs.height);
-      const offset = parseFloat(mod.legs.plinthOffset !== undefined ? mod.legs.plinthOffset : 40);
-      const frontZ = z + d; 
 
-      let joined = false;
-      if (plinthRuns.length > 0) {
-          let last = plinthRuns[plinthRuns.length - 1];
-          if (Math.abs((last.x + last.w) - x) <= 1 && last.y === y && last.h === h && last.offset === offset && last.frontZ === frontZ) {
-              last.w += w + (x - (last.x + last.w)); 
-              joined = true;
+  // Tylko szafki o TEJ SAMEJ orientacji (rotation) mogą fizycznie stać w jednym,
+  // ciągłym biegu cokołu - stoją wtedy pod tą samą ścianą. Dla rotation 0/180
+  // bieg biegnie wzdłuż X (jak dawniej), dla 90/270 - wzdłuż Z, bo obrót zamienia
+  // odcisk szerokość/głębokość (patrz getWorldFootprint w core/layout.js).
+  const byRotation = new Map();
+  baseCabinets.forEach(mod => {
+      const rot = ((parseFloat(mod.rotation) || 0) % 360 + 360) % 360;
+      if (!byRotation.has(rot)) byRotation.set(rot, []);
+      byRotation.get(rot).push(mod);
+  });
+
+  let plinthRuns = [];
+  byRotation.forEach((mods, rot) => {
+      const alongZ = rot === 90 || rot === 270;
+      mods.sort((a, b) => {
+          const av = alongZ ? (parseFloat(a.position.z) || 0) : (parseFloat(a.position.x) || 0);
+          const bv = alongZ ? (parseFloat(b.position.z) || 0) : (parseFloat(b.position.x) || 0);
+          return av - bv;
+      });
+
+      mods.forEach(mod => {
+          const x = parseFloat(mod.position.x) || 0;
+          const y = parseFloat(mod.position.y) || 0;
+          const z = parseFloat(mod.position.z) || 0;
+          const { worldW, worldD } = getWorldFootprint(mod);
+          const h = parseFloat(mod.legs.height);
+          const offset = parseFloat(mod.legs.plinthOffset !== undefined ? mod.legs.plinthOffset : 40);
+
+          // "along" = pozycja wzdłuż kierunku, w którym rośnie bieg; "runLen" = ile
+          // zajmuje w tym kierunku; "crossPos"/"frontCoord" muszą się zgadzać u
+          // sąsiada, żeby w ogóle mogły się połączyć w jeden ciągły odcinek.
+          const along = alongZ ? z : x;
+          const runLen = alongZ ? worldD : worldW;
+          const crossPos = alongZ ? x : z;
+          const frontCoord = alongZ ? (x + worldW) : (z + worldD);
+
+          let joined = false;
+          if (plinthRuns.length > 0) {
+              let last = plinthRuns[plinthRuns.length - 1];
+              if (last.rot === rot && Math.abs((last.along + last.runLen) - along) <= 1 &&
+                  last.crossPos === crossPos && last.h === h && last.offset === offset && last.frontCoord === frontCoord) {
+                  last.runLen += runLen + (along - (last.along + last.runLen));
+                  joined = true;
+              }
           }
-      }
-      if (!joined) {
-          plinthRuns.push({ x, y, z, w, d, h, offset, frontZ });
-      }
+          if (!joined) {
+              plinthRuns.push({ rot, along, runLen, crossPos, y, h, offset, frontCoord });
+          }
+      });
   });
 
   plinthRuns.forEach((run, index) => {
     allParts.push({
       name: `Cokół dolny (Odcinek ${index + 1})`,
-      length: parseFloat(run.w.toFixed(1)),
+      length: parseFloat(run.runLen.toFixed(1)),
       width: parseFloat(run.h.toFixed(1)),
       qty: 1,
       category: "Korpus",

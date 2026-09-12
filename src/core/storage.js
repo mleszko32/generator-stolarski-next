@@ -8,7 +8,7 @@ import {
   signOut,
   onAuthStateChanged,
 } from "firebase/auth";
-import { state } from "./state.js";
+import { state, ensureRoomDefaults } from "./state.js";
 import { resetHistory } from "./history.js";
 
 // Konfiguracja klienta Firebase jest z założenia publiczna (leci do przeglądarki)
@@ -237,6 +237,7 @@ export async function loadProjectFromCloud(projectId) {
     
     if (docSnap.exists()) {
       state.project = docSnap.data();
+      ensureRoomDefaults(state.project); // projekty zapisane przed dodaniem pomieszczeń mogą nie mieć tego pola
       state.activeModuleId = state.project.modules.length > 0 ? state.project.modules[0].id : null;
       state.loadedProjectId = projectId;
       markSaved();

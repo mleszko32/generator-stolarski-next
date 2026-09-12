@@ -3,13 +3,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { state, duplicateModule, deleteModule } from '../core/state.js';
+import { state, duplicateModule, deleteModule, DEFAULT_ROOM } from '../core/state.js';
 
 import { getDrawerComponents, calculateDrawerHoles } from '../core/drawerMath.js';
 import { drawerSystems, DRAWER_VARIANT_ORDER, DRAWER_VARIANT_LABELS } from '../core/drawerSystems.js';
 import { calculateHinges } from '../core/hingeMath.js';
 import { autoDistributeShelves } from '../core/shelfMath.js';
-import { recalculateLayout, getTraverseConfig } from '../core/layout.js';
+import { recalculateLayout, getTraverseConfig, getWorldFootprint } from '../core/layout.js';
 import { scheduleCheckpoint } from '../core/history.js';
 import { toggleInteriorEditor, renderInteriorEditorIfVisible } from '../ui/interiorEditor.js';
 
@@ -32,10 +32,129 @@ let wasSelectedOnDown = false;
 let scene, camera, renderer, controls;
 let container;
 let cabinetGroup;
+let roomGroup;
+const WALL_THICKNESS = 20;
+// Ściany bliżej kamery przygasają, żeby wnętrze prawdziwego (zamkniętego z 4 stron)
+// pokoju zawsze było widoczne z orbitującej kamery — patrz updateWallVisibility().
+let wallMeshes = []; // { mesh, normal: THREE.Vector3 } (normalna skierowana na zewnątrz ściany)
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let pointerDownPos = new THREE.Vector2();
+
+function getRoom() {
+  return state.project.room || DEFAULT_ROOM;
+}
+
+// Czyści i odbudowuje geometrię pokoju (podłoga + 4 ściany) na podstawie
+// state.project.room. Wołane raz przy starcie i za każdym razem, gdy użytkownik
+// zapisze nowe wymiary w ui/roomPanel.js (przez eksportowane niżej updateRoom()) —
+// ściany nie muszą się przebudowywać przy każdej drobnej edycji szafki, więc to
+// NIE jest wołane z update3D().
+function rebuildRoomGeometry() {
+  if (!roomGroup) return;
+  while (roomGroup.children.length > 0) {
+    const child = roomGroup.children[0];
+    roomGroup.remove(child);
+    child.geometry?.dispose();
+    child.material?.dispose();
+  }
+  wallMeshes = [];
+
+  const room = getRoom();
+  const W = parseFloat(room.width) || DEFAULT_ROOM.width;
+  const D = parseFloat(room.depth) || DEFAULT_ROOM.depth;
+  const H = parseFloat(room.height) || DEFAULT_ROOM.height;
+
+  const floorMargin = Math.max(W, D) * 0.4;
+  const floorGeo = new THREE.PlaneGeometry(W + floorMargin * 2, D + floorMargin * 2);
+  const floorMat = new THREE.ShadowMaterial({ opacity: 0.12 });
+  const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(W / 2, 0, D / 2);
+  floor.receiveShadow = true;
+  roomGroup.add(floor);
+
+  // 4 ściany prostokątnego pokoju, narożnik (0,0) = tylno-lewy — dokładnie tam, gdzie
+  // dotąd stały dwie sztywno zakodowane ściany, więc istniejące projekty (moduły przy
+  // x=0/z=0) nadal "stoją przy ścianie" bez żadnej migracji współrzędnych.
+  // Każda ściana ma WŁASNY, przezroczysty materiał (transparent:true) — pozwala to
+  // przygaszać niezależnie te bliżej kamery w updateWallVisibility(), żeby wnętrze
+  // zamkniętego z 4 stron pokoju było zawsze widoczne z orbitującej kamery.
+  const makeWallMat = () => new THREE.MeshStandardMaterial({
+    color: 0xf7f5f1, roughness: 0.95, metalness: 0, transparent: true, opacity: 1, side: THREE.DoubleSide,
+  });
+
+  const wallDefs = [
+    { geo: new THREE.BoxGeometry(W + WALL_THICKNESS, H, WALL_THICKNESS), pos: [W / 2, H / 2, -WALL_THICKNESS / 2], normal: new THREE.Vector3(0, 0, -1) }, // tylna, z=0
+    { geo: new THREE.BoxGeometry(W + WALL_THICKNESS, H, WALL_THICKNESS), pos: [W / 2, H / 2, D + WALL_THICKNESS / 2], normal: new THREE.Vector3(0, 0, 1) }, // przednia, z=D
+    { geo: new THREE.BoxGeometry(WALL_THICKNESS, H, D + WALL_THICKNESS), pos: [-WALL_THICKNESS / 2, H / 2, D / 2], normal: new THREE.Vector3(-1, 0, 0) }, // lewa, x=0
+    { geo: new THREE.BoxGeometry(WALL_THICKNESS, H, D + WALL_THICKNESS), pos: [W + WALL_THICKNESS / 2, H / 2, D / 2], normal: new THREE.Vector3(1, 0, 0) }, // prawa, x=W
+  ];
+
+  wallDefs.forEach(({ geo, pos, normal }) => {
+    const mesh = new THREE.Mesh(geo, makeWallMat());
+    mesh.position.set(pos[0], pos[1], pos[2]);
+    mesh.receiveShadow = true;
+    roomGroup.add(mesh);
+    wallMeshes.push({ mesh, normal });
+  });
+}
+
+const roomCenterScratch = new THREE.Vector3();
+const toCameraScratch = new THREE.Vector3();
+
+// Wołane co klatkę z animate(): przygasza ścianę, jeśli kamera patrzy na pokój
+// "zza" niej (jej normalna, skierowana na zewnątrz, wskazuje w stronę kamery) —
+// dzięki temu pełny, zamknięty z 4 stron pokój nigdy nie zasłania wnętrza,
+// niezależnie jak użytkownik obróci widok.
+function updateWallVisibility() {
+  if (!wallMeshes.length || !camera) return;
+  const room = getRoom();
+  roomCenterScratch.set(
+    (parseFloat(room.width) || DEFAULT_ROOM.width) / 2,
+    (parseFloat(room.height) || DEFAULT_ROOM.height) / 2,
+    (parseFloat(room.depth) || DEFAULT_ROOM.depth) / 2
+  );
+  toCameraScratch.subVectors(camera.position, roomCenterScratch).normalize();
+
+  wallMeshes.forEach(({ mesh, normal }) => {
+    const facingCamera = normal.dot(toCameraScratch) > 0;
+    const targetOpacity = facingCamera ? 0.05 : 0.97;
+    mesh.material.opacity += (targetOpacity - mesh.material.opacity) * 0.15;
+  });
+}
+
+// Ustawia cel orbitowania na środek pokoju i cofa kamerę na odległość dopasowaną
+// do jego przekątnej, zachowując obecny kierunek patrzenia — żeby zmiana wymiarów
+// pokoju (ui/roomPanel.js) nie "teleportowała" widoku w losowe miejsce.
+function reframeCameraToRoom() {
+  if (!camera || !controls) return;
+  const room = getRoom();
+  const W = parseFloat(room.width) || DEFAULT_ROOM.width;
+  const D = parseFloat(room.depth) || DEFAULT_ROOM.depth;
+  const H = parseFloat(room.height) || DEFAULT_ROOM.height;
+
+  const center = new THREE.Vector3(W / 2, H / 3, D / 2);
+  const dir = new THREE.Vector3().subVectors(camera.position, controls.target);
+  if (dir.lengthSq() < 1) dir.set(0.6, 0.4, 1); // pierwsze wywołanie: kamera i target się pokrywają
+  dir.normalize();
+
+  const diag = Math.sqrt(W * W + D * D);
+  const targetDist = Math.max(diag * 1.1, 1500);
+
+  controls.target.copy(center);
+  camera.position.copy(center).addScaledVector(dir, targetDist);
+  controls.update();
+}
+
+// Wołane po zapisaniu nowych wymiarów w ui/roomPanel.js — przebudowuje ściany/podłogę
+// i dopasowuje kamerę. Celowo NIE jest częścią update3D() (ten biegnie przy każdej
+// drobnej edycji szafki; ściany pokoju zmieniają się dużo rzadziej).
+export function updateRoom() {
+  rebuildRoomGeometry();
+  reframeCameraToRoom();
+}
 
 export function init3DViewer() {
   container = document.getElementById('viewer-3d-container') || document.getElementById('editor-3d-container') || document.querySelector('.viewer-3d');
@@ -45,7 +164,7 @@ export function init3DViewer() {
   scene.background = new THREE.Color(0xf1f5f9);
 
   camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 10, 100000);
-  camera.position.set(2500, 1500, 3500);
+  camera.position.set(2500, 1500, 3500); // nadpisane zaraz po utworzeniu controls przez reframeCameraToRoom()
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(window.devicePixelRatio);
@@ -65,7 +184,6 @@ export function init3DViewer() {
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
-  controls.target.set(500, 500, 0);
 
   // Miękkie oświetlenie otoczenia (IBL) z gotowej "pokojowej" sceny three.js —
   // bez tego płyty korpusu (MeshStandardMaterial) odbijają światło tylko z
@@ -98,33 +216,14 @@ export function init3DViewer() {
 
   scene.fog = new THREE.Fog(0xf1f5f9, 9000, 24000); // wtapia ściany/podłogę w tło zamiast twardej krawędzi
 
-  const roomGroup = new THREE.Group();
+  roomGroup = new THREE.Group();
   scene.add(roomGroup);
-
-  const floorGeo = new THREE.PlaneGeometry(25000, 25000);
-  const floorMat = new THREE.ShadowMaterial({ opacity: 0.12 });
-  const floor = new THREE.Mesh(floorGeo, floorMat);
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = 0;
-  floor.receiveShadow = true;
-  roomGroup.add(floor);
-
-  // MeshStandardMaterial zamiast Lambert — ściany też reagują na environment
-  // i tone mapping, więc nie odcinają się płaskim, zimnym bielem od mebli.
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0xf7f5f1, roughness: 0.95, metalness: 0 });
-
-  const backWall = new THREE.Mesh(new THREE.BoxGeometry(10000, 3500, 20), wallMat);
-  backWall.position.set(5000, 1750, -10);
-  backWall.receiveShadow = true;
-  roomGroup.add(backWall);
-
-  const leftWall = new THREE.Mesh(new THREE.BoxGeometry(20, 3500, 5000), wallMat);
-  leftWall.position.set(-10, 1750, 2500);
-  leftWall.receiveShadow = true;
-  roomGroup.add(leftWall);
+  rebuildRoomGeometry();
 
   cabinetGroup = new THREE.Group();
   scene.add(cabinetGroup);
+
+  reframeCameraToRoom();
 
   renderer.domElement.addEventListener('pointerdown', (e) => {
       pointerDownPos.set(e.clientX, e.clientY);
@@ -193,29 +292,36 @@ export function init3DViewer() {
       
       if (intersect) {
           let newGroupPos = intersect.add(dragOffset);
-          
-          const W = parseFloat(dragModule.dimensions.width) || 600;
+
           const H = parseFloat(dragModule.dimensions.height) || 720;
-          const D = parseFloat(dragModule.dimensions.depth) || 510;
+          // Odcisk na podłodze (worldW/worldD) - przy rotation 90/270 zamienia się
+          // szerokość z głębokością (patrz core/layout.js getWorldFootprint). To on,
+          // nie surowe dimensions.width/depth, decyduje gdzie leży róg (position.x/z)
+          // - modGroup w update3D() centruje się dokładnie tak samo.
+          const { worldW, worldD } = getWorldFootprint(dragModule);
           let baseOffsetY = (dragModule.legs && dragModule.legs.active) ? (parseFloat(dragModule.legs.height) || 100) : 0;
-          
+
           const dragLeftW = (dragModule.fillers && dragModule.fillers.left && dragModule.fillers.left.active) ? (parseFloat(dragModule.fillers.left.width) || 50) : 0;
           const dragRightW = (dragModule.fillers && dragModule.fillers.right && dragModule.fillers.right.active) ? (parseFloat(dragModule.fillers.right.width) || 50) : 0;
-          
-          let snapX = newGroupPos.x - W/2;
+
+          let snapX = newGroupPos.x - worldW/2;
           let snapY = newGroupPos.y - H/2 - baseOffsetY;
-          let snapZ = newGroupPos.z - D/2;
+          let snapZ = newGroupPos.z - worldD/2;
+
+          const room = getRoom();
 
           if (Math.abs(snapX - dragLeftW) < SNAP_DIST) snapX = dragLeftW;
           if (Math.abs(snapY) < SNAP_DIST) snapY = 0;
           if (Math.abs(snapZ) < SNAP_DIST) snapZ = 0;
+          // Przyciąganie do dalszych ścian pokoju (bliższe x=0/z=0 obsługują linie wyżej).
+          if (Math.abs((snapX + worldW) - room.width) < SNAP_DIST) snapX = room.width - worldW;
+          if (Math.abs((snapZ + worldD) - room.depth) < SNAP_DIST) snapZ = room.depth - worldD;
 
           state.project.modules.forEach(other => {
               if (state.selectedModules && state.selectedModules.has(other.id)) return;
 
-              const oW = parseFloat(other.dimensions.width);
               const oH = parseFloat(other.dimensions.height);
-              const oD = parseFloat(other.dimensions.depth);
+              const { worldW: oW, worldD: oD } = getWorldFootprint(other);
               const oX = parseFloat(other.position.x);
               const oY = parseFloat(other.position.y);
               const oZ = parseFloat(other.position.z);
@@ -225,12 +331,12 @@ export function init3DViewer() {
 
               const effOX = oX - otherLeftW;
               const effOW = oW + otherLeftW + otherRightW;
-              
+
               let dragStartX = snapX - dragLeftW;
-              let dragEndX = snapX + W + dragRightW;
+              let dragEndX = snapX + worldW + dragRightW;
 
               if (Math.abs(dragStartX - (effOX + effOW)) < SNAP_DIST) snapX = effOX + effOW + dragLeftW;
-              else if (Math.abs(dragEndX - effOX) < SNAP_DIST) snapX = effOX - W - dragRightW;
+              else if (Math.abs(dragEndX - effOX) < SNAP_DIST) snapX = effOX - worldW - dragRightW;
               else if (Math.abs(dragStartX - effOX) < SNAP_DIST) snapX = effOX + dragLeftW;
 
               if (Math.abs(snapY - (oY + oH)) < SNAP_DIST) snapY = oY + oH;
@@ -238,7 +344,7 @@ export function init3DViewer() {
               else if (Math.abs(snapY - oY) < SNAP_DIST) snapY = oY;
 
               if (Math.abs(snapZ - (oZ + oD)) < SNAP_DIST) snapZ = oZ + oD;
-              else if (Math.abs((snapZ + D) - oZ) < SNAP_DIST) snapZ = oZ - D;
+              else if (Math.abs((snapZ + worldD) - oZ) < SNAP_DIST) snapZ = oZ - worldD;
               else if (Math.abs(snapZ - oZ) < SNAP_DIST) snapZ = oZ;
           });
 
@@ -263,9 +369,8 @@ export function init3DViewer() {
 
                       const tTarget = cabinetGroup.children.find(g => g.userData.moduleId === id);
                       if (tTarget) {
-                          const tW = parseFloat(m.dimensions.width) || 600;
                           const tH = parseFloat(m.dimensions.height) || 720;
-                          const tD = parseFloat(m.dimensions.depth) || 510;
+                          const { worldW: tW, worldD: tD } = getWorldFootprint(m);
                           const tBaseY = (m.legs && m.legs.active) ? (parseFloat(m.legs.height) || 100) : 0;
                           tTarget.position.set(
                               m.position.x + tW/2,
@@ -279,8 +384,10 @@ export function init3DViewer() {
 
           const inpX = document.getElementById('input-pos-x');
           const inpY = document.getElementById('input-pos-y');
+          const inpZ = document.getElementById('input-pos-z');
           if (inpX) inpX.value = dragModule.position.x;
           if (inpY) inpY.value = dragModule.position.y;
+          if (inpZ) inpZ.value = dragModule.position.z;
       }
   });
 
@@ -391,6 +498,7 @@ export function init3DViewer() {
 function animate() {
   requestAnimationFrame(animate);
   controls.update();
+  updateWallVisibility();
   renderer.render(scene, camera);
 }
 
@@ -649,6 +757,30 @@ function show3DContextMenu(event, hit, data) {
       posWrap.appendChild(createPosControl('y', '↕️ Oś Y', mod.position.y));
       posWrap.appendChild(createPosControl('z', '↗️ Oś Z', mod.position.z || 0));
       menu.appendChild(posWrap);
+
+      menu.appendChild(createHeader('Obrót (co 90°)'));
+      const rotWrap = document.createElement('div');
+      Object.assign(rotWrap.style, { display: 'flex', gap: '4px', padding: '0 8px 8px 8px' });
+      [0, 90, 180, 270].forEach(rot => {
+          const active = (mod.rotation || 0) === rot;
+          const b = document.createElement('button');
+          b.innerText = `${rot}°`;
+          Object.assign(b.style, {
+              flex: '1', padding: '6px 2px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer',
+              borderRadius: '4px', border: `1px solid ${active ? '#2563eb' : '#cbd5e1'}`,
+              background: active ? '#2563eb' : '#fff', color: active ? '#fff' : '#334155'
+          });
+          b.onclick = (e) => {
+              e.stopPropagation();
+              mod.rotation = rot;
+              update3D();
+              updateSidebar();
+              initPropertiesPanel();
+              menu.remove();
+          };
+          rotWrap.appendChild(b);
+      });
+      menu.appendChild(rotWrap);
 
       menu.appendChild(createHeader('Akcje korpusu'));
       menu.appendChild(createOption('Klonuj szafkę obok', '📋', () => { duplicateModule(mod.id); }, '#059669'));
@@ -1342,14 +1474,22 @@ export function update3D() {
       let baseOffsetY = 0;
       if (mod.legs && mod.legs.active) baseOffsetY = parseFloat(mod.legs.height) || 100;
       
+      const { worldW, worldD } = getWorldFootprint(mod);
+
       const modGroup = new THREE.Group();
       modGroup.userData = { moduleId: mod.id };
-      
+
+      // position.x/z to zawsze róg FAKTYCZNEGO odcisku modułu w pokoju (worldW/worldD,
+      // nie surowe dimensions.width/depth) - dzięki temu przy rotation===0 zachowanie
+      // jest identyczne jak dawniej (worldW===W, worldD===D), a przy 90/270 środek
+      // bryły (wokół którego obraca się modGroup) wypada tam, gdzie faktycznie stoi
+      // odcisk szafki na podłodze, zgodnie z tym co liczy drag/snap (getWorldFootprint).
       modGroup.position.set(
-          (parseFloat(mod.position.x) || 0) + W/2,
+          (parseFloat(mod.position.x) || 0) + worldW/2,
           (parseFloat(mod.position.y) || 0) + baseOffsetY + H/2,
-          (parseFloat(mod.position.z) || 0) + D/2
+          (parseFloat(mod.position.z) || 0) + worldD/2
       );
+      modGroup.rotation.y = -((parseFloat(mod.rotation) || 0) * Math.PI / 180);
 
       const innerGroup = new THREE.Group();
       innerGroup.position.set(-W/2, -H/2 - baseOffsetY, -D/2);

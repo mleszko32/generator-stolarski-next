@@ -20,6 +20,21 @@ export function recalculateAllLayouts() {
   (state.project.modules || []).forEach(recalculateLayout);
 }
 
+// Odcisk modułu na podłodze pomieszczenia, z uwzględnieniem obrotu co 90°
+// (mod.rotation). Przy 90/270 stopni szerokość i głębokość zamieniają się
+// miejscami w przestrzeni pokoju — lokalna geometria szafki (rysowanie,
+// formatki) się nie zmienia, zmienia się tylko to, ile miejsca zajmuje ona
+// "z zewnątrz". Jedyne miejsce prawdy dla tej zamiany — używane przy
+// przeciąganiu/przyciąganiu w 3D (render/viewer3d.js) i przy łączeniu
+// cokołów sąsiednich szafek (engine/cabinet.js), żeby oba liczyły to samo.
+export function getWorldFootprint(mod) {
+  const W = parseFloat(mod.dimensions.width) || 600;
+  const D = parseFloat(mod.dimensions.depth) || 513;
+  const rot = ((parseFloat(mod.rotation) || 0) % 360 + 360) % 360;
+  const swapped = rot === 90 || rot === 270;
+  return { worldW: swapped ? D : W, worldD: swapped ? W : D, rotation: rot };
+}
+
 // Rozwiązuje konfigurację dwóch górnych trawersów (przedni/tylny) z opcjonalnym
 // nadpisaniem aktywności/szerokości pojedynczego trawersu (patrz ui/properties.js,
 // zakładka Konstrukcja — "Trawersy: wysokości/aktywność ręczne") na wspólną

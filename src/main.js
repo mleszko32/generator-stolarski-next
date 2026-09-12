@@ -3,8 +3,10 @@ import "./styles/global.css";
 import { initLayout } from "./ui/layout.js"; 
 import { initPropertiesPanel } from "./ui/properties.js";
 import { updateSidebar } from "./ui/sidebar.js";
-import { init3DViewer, update3D } from "./render/viewer3d.js"; 
+import { init3DViewer, update3D } from "./render/viewer3d.js";
 import { escapeHtml } from "./utils/dom.js";
+import { state, ensureRoomDefaults, getActiveModule } from "./core/state.js";
+import { openRoomSettingsModal } from "./ui/roomPanel.js";
 
 
 // ZMIANA: Importujemy funkcję do usuwania projektów oraz customowy dialog
@@ -14,6 +16,7 @@ import { undo, redo, onHistoryChange, resetHistory } from "./core/history.js";
 
 console.log("Generator Stolarski Next uruchomiony");
 
+ensureRoomDefaults(state.project);
 initLayout();
 initPropertiesPanel();
 updateSidebar();
@@ -62,6 +65,23 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+// Skrót R — obrót aktywnego modułu o 90° (to samo pole co przyciski w
+// ui/properties.js i w menu kontekstowym 3D, patrz render/viewer3d.js).
+window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement?.isContentEditable) return;
+  if (e.key.toLowerCase() !== 'r') return;
+
+  const mod = getActiveModule();
+  if (!mod) return;
+  e.preventDefault();
+  mod.rotation = ((mod.rotation || 0) + 90) % 360;
+  update3D();
+  updateSidebar();
+  initPropertiesPanel();
+});
+
 // --- AUTOZAPIS ---
 // Cichy zapis co 2 minuty, tylko dla zalogowanego właściciela i tylko gdy
 // jest już ustalona nazwa projektu (patrz saveProjectSilently w storage.js)
@@ -87,6 +107,10 @@ function stopAutosave() {
   if (autosaveStatusEl) autosaveStatusEl.innerText = '';
 }
 
+
+// --- POMIESZCZENIE ---
+const btnRoom = document.getElementById('btn-room-settings');
+if (btnRoom) btnRoom.addEventListener('click', () => openRoomSettingsModal());
 
 // --- OBSŁUGA PRZYCISKÓW CHMURY ---
 const btnSave = document.getElementById('btn-save-cloud');
