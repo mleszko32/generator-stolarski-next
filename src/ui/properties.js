@@ -4,6 +4,7 @@ import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
 import { calculateParts } from "../engine/cabinet.js";
 import { calculateHinges } from "../core/hingeMath.js";
+import { getTraverseConfig } from "../core/layout.js";
 import { escapeHtml } from "../utils/dom.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
@@ -33,6 +34,9 @@ let activeTab = "wymiary";
 // (calculateProjectHardware) — wszystkie trzy miejsca czytają
 // mod.legs.heightOverrides[i] pod tym samym indeksem.
 const LEG_LABELS = ["Tył lewa", "Tył prawa", "Przód lewa", "Przód prawa"];
+
+// side ("front"/"rear") <-> etykieta w UI, patrz też core/layout.js (getTraverseConfig).
+const TRAVERSE_LABELS = { front: "Przedni", rear: "Tylny" };
 
 export function initPropertiesPanel() {
   scheduleCheckpoint(); // patrz core/history.js — debounce'owany checkpoint historii cofnij/wprzód
@@ -167,6 +171,35 @@ export function initPropertiesPanel() {
       <div class="property-group"><label>Sposób łączenia:</label><select id="input-join-type"><option value="boki_przelotowe" ${cons.joinType === 'boki_przelotowe' ? 'selected' : ''}>Boki do ziemi (wieńce wpuszczane)</option><option value="wience_przelotowe" ${cons.joinType === 'wience_przelotowe' ? 'selected' : ''}>Wieńce pełne (boki wpuszczane)</option></select></div>
       <div class="property-group"><label>Zamknięcie góry:</label><select id="input-top-type"><option value="pelny" ${cons.topType === 'pelny' ? 'selected' : ''}>Pełny wieniec</option><option value="trawersy_poziom" ${cons.topType === 'trawersy_poziom' ? 'selected' : ''}>Trawersy poziome</option><option value="trawersy_pion" ${cons.topType === 'trawersy_pion' ? 'selected' : ''}>Trawersy pionowe</option></select></div>
       <div id="traverse-options" style="display: ${cons.topType !== 'pelny' ? 'block' : 'none'}; background: #f8fafc; padding: 10px; border: 1px dashed #cbd5e1; border-radius: 4px; margin-bottom: 15px;"><div class="property-group" style="margin-bottom: 0;"><label style="font-size: 11px;">Szerokość trawersu (mm):</label><input type="number" id="input-traverse-width" value="${cons.traverseWidth}" /></div></div>
+
+      ${cons.topType !== 'pelny' ? (() => {
+          const trav = getTraverseConfig(cons);
+          const travRaw = cons.traverses || {};
+          return `
+          <h3>Trawersy — ustawienia ręczne</h3>
+          <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; margin-bottom: 15px;">
+            ${['front', 'rear'].map(side => {
+                const raw = travRaw[side] || {};
+                const widthOverridden = raw.width !== undefined && raw.width !== null && raw.width !== '';
+                const active = trav[side].active;
+                const displayWidth = widthOverridden ? raw.width : trav[side].width;
+                return `
+                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+                  <input type="checkbox" class="input-traverse-active" data-side="${side}" ${active ? 'checked' : ''} title="Czy ten trawers ma w ogóle istnieć" style="width: 14px; height: 14px; cursor: pointer; flex-shrink: 0;" />
+                  <span style="width: 52px; flex-shrink: 0; font-size: 11px; font-weight: bold;">${TRAVERSE_LABELS[side]}:</span>
+                  <input type="number" class="input-traverse-width-override" data-side="${side}" value="${displayWidth}" step="1" ${active ? '' : 'disabled'} style="flex: 1; min-width: 0;${widthOverridden ? ' border-color:#3b82f6; background:#eff6ff;' : ''}" />
+                  <span style="font-size: 10px; color: #94a3b8; flex-shrink: 0;">mm</span>
+                  ${widthOverridden
+                      ? `<button type="button" class="btn-traverse-reset" data-side="${side}" title="Wróć do wspólnej szerokości" style="border: none; background: #eff6ff; color: #1d4ed8; border-radius: 4px; width: 24px; height: 24px; cursor: pointer; font-weight: bold; flex-shrink: 0;">↺</button>`
+                      : '<span style="width: 24px; flex-shrink: 0;"></span>'
+                  }
+                </div>
+              `;
+            }).join('')}
+            <div style="font-size: 10px; color: #94a3b8;">Odznaczenie obu naraz nie jest możliwe — korpus musi mieć choć jeden trawers.</div>
+          </div>
+        `;
+      })() : ''}
 
       <div class="property-group"><label>Plecy (Tylko dla szafki):</label><select id="input-back-type"><option value="nut" ${backP.type === 'nut' ? 'selected' : ''}>W nucie</option><option value="nakladane" ${backP.type === 'nakladane' ? 'selected' : ''}>Nakładane</option></select></div>
       <div id="nut-options" style="display: ${backP.type === 'nut' ? 'block' : 'none'}; background: #f8fafc; padding: 10px; border: 1px dashed #cbd5e1; border-radius: 4px; margin-bottom: 15px;">
@@ -381,7 +414,8 @@ function setupEventListeners() {
   const traverseOptions = document.getElementById('traverse-options');
   if (topTypeInput && traverseOptions) topTypeInput.addEventListener('change', (e) => {
       getSelectedMods().forEach(mod => { mod.construction = mod.construction || {}; mod.construction.topType = e.target.value; });
-      traverseOptions.style.display = e.target.value !== 'pelny' ? 'block' : 'none'; updateAll();
+      updateAll();
+      initPropertiesPanel(); // odsłania/chowa sekcję "Trawersy — ustawienia ręczne", nie tylko #traverse-options
   });
   const typeInput = document.getElementById('input-front-type');
   if (typeInput) typeInput.addEventListener('change', (e) => {
@@ -455,6 +489,50 @@ function setupEventListeners() {
       const idx = parseInt(btn.dataset.legIndex, 10);
       getSelectedMods().forEach(mod => {
         if (mod.legs && mod.legs.heightOverrides) delete mod.legs.heightOverrides[idx];
+      });
+      updateAll();
+      initPropertiesPanel();
+    });
+  });
+
+  const mergedConstruction = (mod) => ({ joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(state.project.construction || {}), ...(mod.construction || {}) });
+  document.querySelectorAll('.input-traverse-active').forEach(chk => {
+    chk.addEventListener('change', (e) => {
+      const side = chk.dataset.side;
+      const otherSide = side === 'front' ? 'rear' : 'front';
+      const wantActive = e.target.checked;
+      getSelectedMods().forEach(mod => {
+        mod.construction = mod.construction || {};
+        // Nie pozwól wyłączyć obu trawersów naraz — korpus zostałby otwarty od góry.
+        if (!wantActive && !getTraverseConfig(mergedConstruction(mod))[otherSide].active) return;
+        mod.construction.traverses = mod.construction.traverses || {};
+        mod.construction.traverses[side] = { ...(mod.construction.traverses[side] || {}), active: wantActive };
+      });
+      updateAll();
+      initPropertiesPanel();
+    });
+  });
+  document.querySelectorAll('.input-traverse-width-override').forEach(inp => {
+    inp.addEventListener('change', (e) => {
+      const side = inp.dataset.side;
+      const val = e.target.value === '' ? null : Number(e.target.value);
+      getSelectedMods().forEach(mod => {
+        mod.construction = mod.construction || {};
+        mod.construction.traverses = mod.construction.traverses || {};
+        const sideCfg = { ...(mod.construction.traverses[side] || {}) };
+        if (val === null || isNaN(val)) delete sideCfg.width;
+        else sideCfg.width = val;
+        mod.construction.traverses[side] = sideCfg;
+      });
+      updateAll();
+      initPropertiesPanel();
+    });
+  });
+  document.querySelectorAll('.btn-traverse-reset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const side = btn.dataset.side;
+      getSelectedMods().forEach(mod => {
+        if (mod.construction?.traverses?.[side]) delete mod.construction.traverses[side].width;
       });
       updateAll();
       initPropertiesPanel();

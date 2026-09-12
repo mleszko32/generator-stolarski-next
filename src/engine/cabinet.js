@@ -2,7 +2,7 @@
 import { state } from "../core/state.js";
 import { calculateDrawerHoles, getDrawerComponents } from "../core/drawerMath.js";
 import { calculateHinges } from "../core/hingeMath.js";
-import { recalculateAllLayouts } from "../core/layout.js";
+import { recalculateAllLayouts, getTraverseConfig } from "../core/layout.js";
 
 export function calculateParts() {
   // Fronty muszą mieć aktualne el.x/y/w/h zanim policzymy z nich formatki.
@@ -274,7 +274,8 @@ function getCorpusHoles(mod, config) {
   const { width, height, depth } = mod.dimensions;
   const th = config.materials.boardThickness || 18;
   const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(config.construction || {}), ...(mod.construction || {}) };
-  
+  const trav = getTraverseConfig(cons);
+
   const holes = [];
 
   const addJoint = (y, distFromFront, reverse = false) => {
@@ -294,27 +295,30 @@ function getCorpusHoles(mod, config) {
         addJoint(topY, 37);
         addJoint(topY, depth - 37, true);
      } else if (cons.topType === 'trawersy_poziom') {
-        addJoint(topY, 37); 
-        addJoint(topY, depth - 37, true);
+        if (trav.front.active) addJoint(topY, 37);
+        if (trav.rear.active) addJoint(topY, depth - 37, true);
      } else if (cons.topType === 'trawersy_pion') {
-        holes.push({ y: height - 37, xFromFront: th / 2, holeType: 'screw' });
-        holes.push({ y: height - 69, xFromFront: th / 2, holeType: 'dowel' });
-        
-        holes.push({ y: height - 37, xFromFront: depth - th / 2, holeType: 'screw' });
-        holes.push({ y: height - 69, xFromFront: depth - th / 2, holeType: 'dowel' });
+        if (trav.front.active) {
+          holes.push({ y: height - 37, xFromFront: th / 2, holeType: 'screw' });
+          holes.push({ y: height - 69, xFromFront: th / 2, holeType: 'dowel' });
+        }
+        if (trav.rear.active) {
+          holes.push({ y: height - 37, xFromFront: depth - th / 2, holeType: 'screw' });
+          holes.push({ y: height - 69, xFromFront: depth - th / 2, holeType: 'dowel' });
+        }
      }
   } else {
      const bottomY = 0;
      const topY = height;
-     addJoint(bottomY, 37); 
+     addJoint(bottomY, 37);
      addJoint(bottomY, depth - 37, true);
-     
+
      if (cons.topType === 'pelny') {
         addJoint(topY, 37);
         addJoint(topY, depth - 37, true);
      } else if (cons.topType === 'trawersy_poziom') {
-        addJoint(topY, 37);
-        addJoint(topY, depth - 37, true);
+        if (trav.front.active) addJoint(topY, 37);
+        if (trav.rear.active) addJoint(topY, depth - 37, true);
      }
   }
 
@@ -344,8 +348,13 @@ function getCorpusParts(mod, config) {
     parts.push({ name: `W${width}`, length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1, category: "Korpus" });
   } else if (construction.topType.includes('trawersy')) {
     const isVertical = construction.topType === 'trawersy_pion';
-    const trWidth = construction.traverseWidth || 100;
-    parts.push({ name: `Trawers górny (${isVertical ? 'pionowy' : 'poziomy'})`, length: parseFloat(tbWidth.toFixed(1)), width: trWidth, qty: 2, category: "Korpus" });
+    const trav = getTraverseConfig(construction);
+    const trName = `Trawers górny (${isVertical ? 'pionowy' : 'poziomy'})`;
+    // Osobne wpisy dla przedniego/tylnego (patrz ui/properties.js, zakładka Konstrukcja) —
+    // gdy oba aktywne i tej samej szerokości, agregacja w calculateParts() i tak scali je
+    // w jedną pozycję qty:2, tak jak dotychczas.
+    if (trav.front.active) parts.push({ name: trName, length: parseFloat(tbWidth.toFixed(1)), width: trav.front.width, qty: 1, category: "Korpus" });
+    if (trav.rear.active) parts.push({ name: trName, length: parseFloat(tbWidth.toFixed(1)), width: trav.rear.width, qty: 1, category: "Korpus" });
   }
 
   const structuralShelvesCount = mod.elements ? mod.elements.filter(el => el.typ === 'poziom' && el.isStructural).length : 0;

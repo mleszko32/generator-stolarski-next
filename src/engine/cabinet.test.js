@@ -94,6 +94,39 @@ describe("integracja layout -> drawerMath -> lista formatek", () => {
   });
 });
 
+describe("Trawersy górne (przedni/tylny)", () => {
+  it("dwa trawersy tej samej szerokości agregują się w jedną pozycję qty:2 (jak dotychczas)", () => {
+    const mod = baseModule({ construction: { topType: "trawersy_poziom", traverseWidth: 80 } });
+    setProject(freshProject({ modules: [mod] }));
+    const { parts } = calculateParts();
+    const trav = parts.filter((p) => p.name.startsWith("Trawers górny"));
+    expect(trav).toHaveLength(1);
+    expect(trav[0]).toMatchObject({ qty: 2, width: 80 });
+  });
+
+  it("różna szerokość przedniego i tylnego trawersu daje dwie osobne pozycje", () => {
+    const mod = baseModule({
+      construction: { topType: "trawersy_poziom", traverseWidth: 100, traverses: { front: { width: 60 } } },
+    });
+    setProject(freshProject({ modules: [mod] }));
+    const { parts } = calculateParts();
+    const trav = parts.filter((p) => p.name.startsWith("Trawers górny"));
+    expect(trav).toHaveLength(2);
+    expect(trav.map((p) => p.width).sort((a, b) => a - b)).toEqual([60, 100]);
+  });
+
+  it("wyłączenie tylnego trawersu zostawia tylko przedni (tylko-przedni / tylko-tylny)", () => {
+    const mod = baseModule({
+      construction: { topType: "trawersy_poziom", traverseWidth: 100, traverses: { rear: { active: false } } },
+    });
+    setProject(freshProject({ modules: [mod] }));
+    const { parts } = calculateParts();
+    const trav = parts.filter((p) => p.name.startsWith("Trawers górny"));
+    expect(trav).toHaveLength(1);
+    expect(trav[0].qty).toBe(1);
+  });
+});
+
 describe("calculateProjectHardware", () => {
   it("liczy nóżki (4/szafkę) i złącza korpusowe (8/szafkę)", () => {
     setProject(freshProject({ modules: [baseModule()] }));

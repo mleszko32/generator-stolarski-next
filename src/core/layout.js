@@ -20,6 +20,27 @@ export function recalculateAllLayouts() {
   (state.project.modules || []).forEach(recalculateLayout);
 }
 
+// Rozwiązuje konfigurację dwóch górnych trawersów (przedni/tylny) z opcjonalnym
+// nadpisaniem aktywności/szerokości pojedynczego trawersu (patrz ui/properties.js,
+// zakładka Konstrukcja — "Trawersy: wysokości/aktywność ręczne") na wspólną
+// szerokość cons.traverseWidth, gdy nadpisania nie ma. Współdzielone przez
+// render/viewer3d.js i engine/cabinet.js, żeby oba liczyły dokładnie to samo —
+// inaczej podgląd 3D i lista formatek/nawiertów mogłyby się rozjechać.
+export function getTraverseConfig(cons) {
+  const t = cons.traverses || {};
+  const sharedWidth = parseFloat(cons.traverseWidth) || 100;
+  const resolve = (side) => {
+    const active = side.active !== false;
+    const hasOverride = side.width !== undefined && side.width !== null && side.width !== "";
+    const width = hasOverride ? (parseFloat(side.width) || sharedWidth) : sharedWidth;
+    return { active, width };
+  };
+  const result = { front: resolve(t.front || {}), rear: resolve(t.rear || {}) };
+  // Zabezpieczenie: szafka nie może zostać bez żadnego trawersu (otwarty korpus od góry).
+  if (!result.front.active && !result.rear.active) result.front.active = true;
+  return result;
+}
+
 export function recalculateLayout(mod) {
   if (!mod || !mod.elements) return;
   const config = state.project;

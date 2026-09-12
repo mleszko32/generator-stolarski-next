@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { recalculateLayout, recalculateAllLayouts } from "./layout.js";
+import { recalculateLayout, recalculateAllLayouts, getTraverseConfig } from "./layout.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
 
 // Pełny korpus 600 x 720, płyta 18 -> wnętrze baseZone 18..582 / 18..702.
@@ -86,5 +86,33 @@ describe("recalculateLayout", () => {
     recalculateAllLayouts();
     expect(m1.elements.every((e) => typeof e.h === "number")).toBe(true);
     expect(m2.elements.every((e) => typeof e.h === "number")).toBe(true);
+  });
+});
+
+describe("getTraverseConfig", () => {
+  it("bez konfiguracji: oba trawersy aktywne, wspólna szerokość", () => {
+    const trav = getTraverseConfig({ traverseWidth: 100 });
+    expect(trav).toEqual({ front: { active: true, width: 100 }, rear: { active: true, width: 100 } });
+  });
+
+  it("nadpisanie szerokości jednego trawersu nie rusza drugiego", () => {
+    const trav = getTraverseConfig({ traverseWidth: 100, traverses: { front: { width: 60 } } });
+    expect(trav.front).toEqual({ active: true, width: 60 });
+    expect(trav.rear).toEqual({ active: true, width: 100 });
+  });
+
+  it("pozwala wyłączyć jeden trawers (tylko przedni albo tylko tylny)", () => {
+    const onlyFront = getTraverseConfig({ traverseWidth: 100, traverses: { rear: { active: false } } });
+    expect(onlyFront.front.active).toBe(true);
+    expect(onlyFront.rear.active).toBe(false);
+
+    const onlyRear = getTraverseConfig({ traverseWidth: 100, traverses: { front: { active: false } } });
+    expect(onlyRear.front.active).toBe(false);
+    expect(onlyRear.rear.active).toBe(true);
+  });
+
+  it("nie pozwala wyłączyć obu naraz (zabezpieczenie przed korpusem bez wieńca)", () => {
+    const trav = getTraverseConfig({ traverseWidth: 100, traverses: { front: { active: false }, rear: { active: false } } });
+    expect(trav.front.active || trav.rear.active).toBe(true);
   });
 });

@@ -8,7 +8,7 @@ import { state, duplicateModule, deleteModule } from '../core/state.js';
 import { getDrawerComponents, calculateDrawerHoles } from '../core/drawerMath.js';
 import { calculateHinges } from '../core/hingeMath.js';
 import { autoDistributeShelves } from '../core/shelfMath.js';
-import { recalculateLayout } from '../core/layout.js';
+import { recalculateLayout, getTraverseConfig } from '../core/layout.js';
 import { scheduleCheckpoint } from '../core/history.js';
 import { toggleInteriorEditor, renderInteriorEditorIfVisible } from '../ui/interiorEditor.js';
 
@@ -1357,6 +1357,7 @@ export function update3D() {
 
       const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(state.project.construction || {}), ...(mod.construction || {}) };
       const isTopBottomFull = cons.joinType === 'wience_przelotowe';
+      const trav = getTraverseConfig(cons);
 
       const udCorp = { moduleId: mod.id, type: 'corpus' };
       const udBack = { moduleId: mod.id, type: 'corpus', part: 'back' }; 
@@ -1389,15 +1390,13 @@ export function update3D() {
           addBox(W - 2*th, th, tbD, posX + th, posY, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
           
           if (cons.topType === 'pelny') {
-              addBox(W - 2*th, th, tbD, posX + th, posY + H - th, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
+              addBox(W - 2*th, th, tbD, posX + th, posY + H - th, tbStartZ, 'corpus', isActive, udCorp, innerGroup);
           } else if (cons.topType === 'trawersy_poziom') {
-              const trW = parseFloat(cons.traverseWidth) || 100;
-              addBox(W - 2*th, th, trW, posX + th, posY + H - th, posZ + D - trW, 'corpus', isActive, udCorp, innerGroup); 
-              addBox(W - 2*th, th, trW, posX + th, posY + H - th, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
+              if (trav.front.active) addBox(W - 2*th, th, trav.front.width, posX + th, posY + H - th, posZ + D - trav.front.width, 'corpus', isActive, udCorp, innerGroup);
+              if (trav.rear.active) addBox(W - 2*th, th, trav.rear.width, posX + th, posY + H - th, tbStartZ, 'corpus', isActive, udCorp, innerGroup);
           } else if (cons.topType === 'trawersy_pion') {
-              const trW = parseFloat(cons.traverseWidth) || 100;
-              addBox(W - 2*th, trW, th, posX + th, posY + H - trW, posZ + D - th, 'corpus', isActive, udCorp, innerGroup); 
-              addBox(W - 2*th, trW, th, posX + th, posY + H - trW, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
+              if (trav.front.active) addBox(W - 2*th, trav.front.width, th, posX + th, posY + H - trav.front.width, posZ + D - th, 'corpus', isActive, udCorp, innerGroup);
+              if (trav.rear.active) addBox(W - 2*th, trav.rear.width, th, posX + th, posY + H - trav.rear.width, tbStartZ, 'corpus', isActive, udCorp, innerGroup);
           }
       }
 
@@ -1416,19 +1415,21 @@ export function update3D() {
           addHardware('screw', jx, bottomY, rearZ, hwAxis, innerGroup);
           addHardware('dowel', jx, bottomY, rearDowelZ, hwAxis, innerGroup);
           
-          if (cons.topType === 'pelny' || cons.topType === 'trawersy_poziom') {
+          if (cons.topType === 'pelny') {
               const topY = posY + H - th/2;
               addHardware('screw', jx, topY, posZ + D - 37, hwAxis, innerGroup);
               addHardware('dowel', jx, topY, posZ + D - 69, hwAxis, innerGroup);
               addHardware('screw', jx, topY, rearZ, hwAxis, innerGroup);
               addHardware('dowel', jx, topY, rearDowelZ, hwAxis, innerGroup);
+          } else if (cons.topType === 'trawersy_poziom') {
+              const topY = posY + H - th/2;
+              if (trav.front.active) { addHardware('screw', jx, topY, posZ + D - 37, hwAxis, innerGroup); addHardware('dowel', jx, topY, posZ + D - 69, hwAxis, innerGroup); }
+              if (trav.rear.active) { addHardware('screw', jx, topY, rearZ, hwAxis, innerGroup); addHardware('dowel', jx, topY, rearDowelZ, hwAxis, innerGroup); }
           } else if (cons.topType === 'trawersy_pion') {
               const topY = posY + H - 37;
               const topDowelY = posY + H - 69;
-              addHardware('screw', jx, topY, posZ + D - th/2, 'x', innerGroup);
-              addHardware('dowel', jx, topDowelY, posZ + D - th/2, 'x', innerGroup);
-              addHardware('screw', jx, topY, tbStartZ + th/2, 'x', innerGroup);
-              addHardware('dowel', jx, topDowelY, tbStartZ + th/2, 'x', innerGroup);
+              if (trav.front.active) { addHardware('screw', jx, topY, posZ + D - th/2, 'x', innerGroup); addHardware('dowel', jx, topDowelY, posZ + D - th/2, 'x', innerGroup); }
+              if (trav.rear.active) { addHardware('screw', jx, topY, tbStartZ + th/2, 'x', innerGroup); addHardware('dowel', jx, topDowelY, tbStartZ + th/2, 'x', innerGroup); }
           }
       });
 
