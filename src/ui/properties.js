@@ -3,6 +3,7 @@ import { state, getActiveModule } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
 import { calculateParts } from "../engine/cabinet.js";
+import { calculateHinges } from "../core/hingeMath.js";
 import { escapeHtml } from "../utils/dom.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
@@ -66,6 +67,7 @@ export function initPropertiesPanel() {
   const fc = { ...(state.project.front?.clearance || {}), ...(activeModule.front?.clearance || {}) };
   const fh = { topOffset: 100, bottomOffset: 100, margin: 40, forceCount: 0, ...(state.project.front?.hinges || {}), ...(activeModule.front?.hinges || {}) };
   const fill = activeModule.fillers;
+  const th = parseFloat(state.project.materials.boardThickness) || 18;
 
   let actualBottomText = "";
   let actualTopText = "";
@@ -83,6 +85,22 @@ export function initPropertiesPanel() {
           }
       }
   } catch(e) {}
+
+  // Lista drzwi aktywnej szafki z policzonymi zawiasami — do ręcznej korekty pozycji
+  // każdego z osobna (patrz zakładka "Zawiasy"). Liczone PO calculateParts() wyżej,
+  // które już przeliczyło layout (el.x/y/w/h frontów) dla tego renderu. hingeOverrides
+  // żyje na elemencie frontu, więc działa wszędzie tam, gdzie ten sam front jest
+  // odczytywany (3D, lista nawiertów, okucia) — nie tylko tutaj.
+  const doorHingeGroups = (activeModule.elements || [])
+      .filter(el => el.typ === 'front' && el.subtype && el.subtype.includes('drzwi'))
+      .map(front => {
+          const obstacles = (activeModule.elements || []).filter(el => el.typ === 'poziom' || el.subtype === 'szuflada-wewnetrzna');
+          const side = front.subtype === 'drzwi-lp' ? (front.id.includes('-L-') ? 'left' : 'right') : (front.openingSide || 'left');
+          const hinges = calculateHinges(front, th, obstacles, side);
+          const label = front.subtype === 'drzwi-lp' ? `Drzwi ${side === 'left' ? 'Lewe' : 'Prawe'}` : 'Drzwi';
+          return { front, side, label, hinges };
+      })
+      .sort((a, b) => (parseFloat(a.front.y) || 0) - (parseFloat(b.front.y) || 0));
 
   if (!TABS.some(t => t.id === activeTab)) activeTab = "wymiary";
 
@@ -218,6 +236,32 @@ export function initPropertiesPanel() {
         <div class="property-group"><label style="font-size: 11px;">Bezpieczny margines od półki (mm):</label><input type="number" id="input-hinge-margin" value="${fh.margin}" step="1" /></div>
         <div class="property-group" style="margin-top: 8px; margin-bottom: 0;"><label style="font-size: 11px; font-weight: bold; color: #065f46;">Wymuś ilość zawiasów (0 = Auto):</label><input type="number" id="input-hinge-count" value="${fh.forceCount || 0}" step="1" style="border-color: #34d399; background-color: #d1fae5;" /></div>
       </div>
+
+      <h3 style="color: #7c3aed;">Zawiasy — pozycje ręczne</h3>
+      ${doorHingeGroups.length === 0 ? `
+        <div style="font-size: 11px; color: #94a3b8;">Ta szafka nie ma jeszcze żadnych drzwi.</div>
+      ` : doorHingeGroups.map(group => `
+        <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 6px; padding: 10px; margin-bottom: 10px;">
+          <div style="font-weight: bold; font-size: 12px; color: #6d28d9; margin-bottom: 8px;">
+            🚪 ${escapeHtml(group.label)}
+            <span style="font-weight: normal; color: #94a3b8;">(wys. ${Math.round(group.front.h)}mm, start ${Math.round(group.front.y)}mm od dołu szafki)</span>
+          </div>
+          ${group.hinges.map((h, i) => {
+              const overridden = group.front.hingeOverrides && group.front.hingeOverrides[i] !== undefined && group.front.hingeOverrides[i] !== null;
+              return `
+              <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 6px;">
+                <span style="width: 52px; flex-shrink: 0; font-size: 11px; color: #6d28d9; font-weight: bold;">Zawias ${i + 1}:</span>
+                <input type="number" class="input-hinge-override" data-front-id="${group.front.id}" data-hinge-index="${i}" value="${h.y}" step="1" style="flex: 1; min-width: 0;${overridden ? ' border-color:#a855f7; background:#f3e8ff;' : ''}" />
+                <span style="font-size: 10px; color: #94a3b8; flex-shrink: 0;">mm</span>
+                ${overridden
+                    ? `<button type="button" class="btn-hinge-reset" data-front-id="${group.front.id}" data-hinge-index="${i}" title="Wróć do automatycznej pozycji" style="border: none; background: #ede9fe; color: #6d28d9; border-radius: 4px; width: 24px; height: 24px; cursor: pointer; font-weight: bold; flex-shrink: 0;">↺</button>`
+                    : (h.isAdjusted ? `<span title="Automatycznie odsunięty, żeby ominąć półkę/przeszkodę" style="flex-shrink: 0;">⚠️</span>` : '<span style="width: 24px; flex-shrink: 0;"></span>')
+                }
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `).join('')}
     `)}
   `;
 
@@ -329,6 +373,37 @@ function setupEventListeners() {
   }
   const nutBuildInput = document.getElementById('input-nut-build');
   if (nutBuildInput) nutBuildInput.addEventListener('change', (e) => { getSelectedMods().forEach(mod => { mod.backPanel.nutBuild = e.target.value; }); updateAll(); });
+
+  const findFront = (frontId) => {
+    const mod = getActiveModule();
+    return mod?.elements?.find(el => el.id === frontId);
+  };
+  document.querySelectorAll('.input-hinge-override').forEach(inp => {
+    inp.addEventListener('change', (e) => {
+      const front = findFront(inp.dataset.frontId);
+      const idx = parseInt(inp.dataset.hingeIndex, 10);
+      if (front) {
+        const val = e.target.value === '' ? null : Number(e.target.value);
+        if (val === null || isNaN(val)) {
+          if (front.hingeOverrides) delete front.hingeOverrides[idx];
+        } else {
+          if (!front.hingeOverrides) front.hingeOverrides = {};
+          front.hingeOverrides[idx] = val;
+        }
+      }
+      updateAll();
+      initPropertiesPanel();
+    });
+  });
+  document.querySelectorAll('.btn-hinge-reset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const front = findFront(btn.dataset.frontId);
+      const idx = parseInt(btn.dataset.hingeIndex, 10);
+      if (front && front.hingeOverrides) delete front.hingeOverrides[idx];
+      updateAll();
+      initPropertiesPanel();
+    });
+  });
 
   numberInputs.forEach(id => {
     const el = document.getElementById(`input-${id}`);

@@ -26,6 +26,22 @@ describe("calculateHinges", () => {
     expect(calculateHinges(door({ h: 700, forceHingeCount: 4 }), 18, [], "left")).toHaveLength(4);
   });
 
+  it("hingeOverrides na froncie nadpisuje pozycję konkretnego zawiasu, pomijając unikanie kolizji", () => {
+    const obstacles = [{ typ: "poziom", y: 600, h: 18 }];
+    const hinges = calculateHinges(
+      door({ h: 700, y: 0, hingeOverrides: { 1: 605 } }),
+      18,
+      obstacles,
+      "left"
+    );
+
+    expect(hinges[0].y).toBe(100); // zawias 0: bez zmian, liczony automatycznie
+    expect(hinges[0].isManual).toBeFalsy();
+    expect(hinges[1].y).toBe(605); // zawias 1: ręcznie ustawiony, mimo kolizji z półką
+    expect(hinges[1].isManual).toBe(true);
+    expect(hinges[1].isAdjusted).toBe(false);
+  });
+
   it("odsuwa zawias od kolidującej półki i oznacza go jako skorygowany", () => {
     const obstacles = [{ typ: "poziom", y: 600, h: 18 }];
     const hinges = calculateHinges(door({ h: 700, y: 0 }), 18, obstacles, "left");

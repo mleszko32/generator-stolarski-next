@@ -47,10 +47,28 @@ export function calculateHinges(front, boardThick, obstacles, side) {
     }
   }
 
-  const hinges = cupRelPositions.map(relY => {
-    let currentRelY = relY;          
-    let absY = y + currentRelY;      
-    
+  const hinges = cupRelPositions.map((relY, i) => {
+    // Ręczna korekta konkretnego zawiasu (patrz ui/properties.js, zakładka "Zawiasy" —
+    // lista numerowanych zawiasów z edytowalną pozycją Y). Wartość to bezwzględne Y w
+    // przestrzeni modułu, tak samo jak to, co jest już pokazywane w "Nawierty" (sidebar.js).
+    // Ręcznie ustawiony zawias pomija dobór automatyczny i unikanie kolizji — użytkownik
+    // bierze na siebie odpowiedzialność za pozycję.
+    const manualY = front.hingeOverrides ? front.hingeOverrides[i] : undefined;
+    if (manualY !== undefined && manualY !== null && manualY !== '') {
+      const manualAbsY = Number(manualY);
+      return {
+        y: Math.round(manualAbsY),
+        relY: Math.round(manualAbsY - y),
+        side: side,
+        cupXOffset: 22.5,
+        isAdjusted: false,
+        isManual: true,
+      };
+    }
+
+    let currentRelY = relY;
+    let absY = y + currentRelY;
+
     let collision = true;
     let attempt = 0;
     let shift = 0;
