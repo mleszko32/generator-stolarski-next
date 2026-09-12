@@ -665,6 +665,9 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
 
              svg += `<circle cx="${holeX_Left}" cy="${holeSvgY}" r="2.5" fill="#dc2626" />`;
              svg += `<circle cx="${holeX_Right}" cy="${holeSvgY}" r="2.5" fill="#dc2626" />`;
+
+             const tspanHtml = getDimText(hole.y, front.h, '#dc2626');
+             svg += `<text x="${holeX_Left - 8}" y="${holeSvgY + 4}" text-anchor="end" font-family="sans-serif">${tspanHtml}</text>`;
           });
         }
         svg += `</g>`;
