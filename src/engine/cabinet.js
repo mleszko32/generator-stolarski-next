@@ -27,7 +27,8 @@ export function calculateParts() {
   rawParts.push(...frontsAndDrawers.parts);
   
   mountingData.push(...frontsAndDrawers.mountingData);
-  mountingData.push(...getCorpusHoles(mod, config)); 
+  mountingData.push(...getCorpusHoles(mod, config));
+  mountingData.push(...getPionMountHoles(mod, config));
   mountingData.push(...getGlobalHingesForModule(mod, config));
 
   const aggregated = {};
@@ -350,6 +351,77 @@ function getCorpusHoles(mod, config) {
   }
 
   return holes.length > 0 ? [{ type: 'corpus', holes: holes }] : [];
+}
+
+// Nawierty kołek+wkręt mocujące przegrodę pionową (isStructural, patrz
+// core/zoneTree.js: toggleStructural) do wieńca albo półki NAD i POD nią -
+// jeden wpis mountingData PER PANEL (wieniec dolny/górny albo konkretna
+// półka), żeby render/viewer2d.js mógł narysować osobny rzut z góry tej
+// płyty z zaznaczonymi nawiertami (analogicznie do getCorpusHoles wyżej,
+// tylko że tam otwory są na BOKU, tu na WIEŃCU/PÓŁCE - stąd inna płaszczyzna:
+// X wzdłuż szerokości korpusu, Z wzdłuż głębokości).
+function getPionMountHoles(mod, config) {
+  const { width, height, depth } = mod.dimensions;
+  const th = config.materials.boardThickness || 18;
+  const backThick = config.materials.backThickness || 3;
+  const backP = mod.backPanel || { type: 'nakladane', offset: 16 };
+  const topBottomDepth = backP.type === 'nut' ? depth - backP.offset - backThick : depth - backThick;
+
+  const piony = (mod.elements || []).filter(el => el.typ === 'pion' && el.isStructural);
+  if (piony.length === 0) return [];
+
+  const poziomy = (mod.elements || []).filter(el => el.typ === 'poziom');
+  const EPS = 2;
+
+  // Ta sama formuła co core/zoneTree.js: getCabinetInnerRect (topY światła
+  // korpusu) - zduplikowana tu specjalnie, żeby nie wiązać silnika formatek
+  // z modułem edytora wnętrza (zoneTree.js) tylko dla jednej stałej.
+  const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(config.construction || {}), ...(mod.construction || {}) };
+  const hasTraverses = cons.topType.includes('trawersy');
+  const isVerticalTraverse = cons.topType === 'trawersy_pion';
+  const topInnerY = hasTraverses && isVerticalTraverse ? height - (parseFloat(cons.traverseWidth) || 100) : height - th;
+
+  const cons2 = { joinType: 'boki_przelotowe', ...(config.construction || {}), ...(mod.construction || {}) };
+  const wieniecWidth = cons2.joinType === 'wience_przelotowe' ? width : width - th * 2;
+  // Wieniec pełen (wience_przelotowe) zaczyna się od X=0 korpusu, wieniec
+  // "wpuszczony" między boki - dopiero od X=th - potrzebne, żeby przeliczyć
+  // bezwzględny X pionu (mod.elements, 0 = lewy bok) na X WZGLĘDEM lewej
+  // krawędzi TEGO KONKRETNEGO panelu (tak, jak go narysujemy w viewer2d.js).
+  const wieniecOffsetX = cons2.joinType === 'wience_przelotowe' ? 0 : th;
+
+  const byPanel = {};
+  const addHoles = (panelKey, panelLabel, panelWidth, panelOffsetX, pionCenterX) => {
+    if (!byPanel[panelKey]) byPanel[panelKey] = { type: 'wieniec-mount', panelKey, panelLabel, panelWidth, panelDepth: topBottomDepth, holes: [] };
+    const frontZ = topBottomDepth - 37;
+    const rearZ = 37;
+    const x = pionCenterX - panelOffsetX;
+    byPanel[panelKey].holes.push(
+      { x, zFromFront: frontZ, holeType: 'screw' },
+      { x, zFromFront: frontZ - 32, holeType: 'dowel' },
+      { x, zFromFront: rearZ, holeType: 'screw' },
+      { x, zFromFront: rearZ + 32, holeType: 'dowel' }
+    );
+  };
+
+  piony.forEach(p => {
+    const centerX = p.x + p.w / 2;
+
+    if (Math.abs(p.y - th) < EPS) {
+      addHoles('wieniec-dolny', 'Wieniec dolny', wieniecWidth, wieniecOffsetX, centerX);
+    } else {
+      const below = poziomy.find(s => Math.abs((s.y + s.h) - p.y) < EPS);
+      if (below) addHoles(`polka-${below.id}-gora`, 'Półka (spód przegrody)', below.w, below.x, centerX);
+    }
+
+    if (Math.abs((p.y + p.h) - topInnerY) < EPS) {
+      addHoles('wieniec-gorny', 'Wieniec górny', wieniecWidth, wieniecOffsetX, centerX);
+    } else {
+      const above = poziomy.find(s => Math.abs(s.y - (p.y + p.h)) < EPS);
+      if (above) addHoles(`polka-${above.id}-dol`, 'Półka (wierzch przegrody)', above.w, above.x, centerX);
+    }
+  });
+
+  return Object.values(byPanel);
 }
 
 function getCorpusParts(mod, config) {

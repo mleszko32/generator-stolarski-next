@@ -262,3 +262,36 @@ describe("calculateProjectHardware", () => {
     expect(hw.some((h) => h.name.startsWith("Komplet szuflady (MERIVOBOX"))).toBe(true);
   });
 });
+
+describe("nawierty kołek+wkręt przegrody pionowej (isStructural) w wieńcach", () => {
+  it("przegroda na kołek+wkręt, rozpięta na całą wysokość, generuje nawierty w wieńcu dolnym i górnym", () => {
+    const mod = baseModule({
+      elements: [
+        { id: "p0", typ: "pion", x: 291, y: 18, w: 18, h: 684, isStructural: true },
+      ],
+    });
+    setProject(freshProject({ modules: [mod] }));
+
+    const { mountingData } = calculateParts();
+    const mounts = mountingData.filter((m) => m.type === "wieniec-mount");
+    expect(mounts.map((m) => m.panelKey).sort()).toEqual(["wieniec-dolny", "wieniec-gorny"]);
+
+    const bottom = mounts.find((m) => m.panelKey === "wieniec-dolny");
+    // środek przegrody (x=291, w=18) -> 300, wieniec "wpuszczony" między boki
+    // (domyślny joinType) zaczyna się od X=th(18), więc względem NIEGO to 282.
+    expect(bottom.holes[0].x).toBeCloseTo(282);
+    expect(bottom.holes).toHaveLength(4); // 2x (screw+dowel) - przód i tył
+  });
+
+  it("nie generuje nawiertów, gdy przegroda nie jest oznaczona jako isStructural", () => {
+    const mod = baseModule({
+      elements: [
+        { id: "p0", typ: "pion", x: 291, y: 18, w: 18, h: 684, isStructural: false },
+      ],
+    });
+    setProject(freshProject({ modules: [mod] }));
+
+    const { mountingData } = calculateParts();
+    expect(mountingData.some((m) => m.type === "wieniec-mount")).toBe(false);
+  });
+});

@@ -677,12 +677,17 @@ function selectNode(node, anchorEl, stage, px, mode) {
     }, true);
   } else if (mode === "divider") {
     const isPoziom = selectedNode.axis === "h";
+    const isStruct = !!selectedNode.divider.isStructural;
+    addBtn(
+      isPoziom
+        ? (isStruct ? "🔩 Zmień na ruchomą" : "🔩 Zmień na konstrukcyjną")
+        : (isStruct ? "🔩 Usuń mocowanie (kołek+wkręt)" : "🔩 Zamontuj na kołek+wkręt"),
+      isPoziom
+        ? "Konstrukcyjna = na stałe wkręcona, ruchoma = na podpórkach"
+        : "Kołek + wkręt mocuje przegrodę na stałe do wieńca/półki nad i pod nią (dodaje nawierty w rysunku technicznym)",
+      () => { toggleStructural(selectedNode); refreshAfterEdit(); }
+    );
     if (isPoziom) {
-      addBtn(
-        selectedNode.divider.isStructural ? "🔩 Zmień na ruchomą" : "🔩 Zmień na konstrukcyjną",
-        "Konstrukcyjna = na stałe wkręcona, ruchoma = na podpórkach",
-        () => { toggleStructural(selectedNode); refreshAfterEdit(); }
-      );
       addBtn("🧲 Wyrównaj do innej szafki", "Przełącza na widok 3D i pozwala kliknąć wieniec/półkę innej szafki, do której wyrównać tę półkę", () => {
         const divider = selectedNode.divider;
         closeToolbar();

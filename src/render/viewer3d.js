@@ -931,6 +931,35 @@ export function update3D() {
               } 
               else if (el.typ === 'pion') {
                   addBox(el.w, el.h, shelfDepth, posX + el.x, posY + el.y, innerZ, 'shelf', isActive, udElement, innerGroup);
+
+                  // Mocowanie na kołek+wkręt (patrz core/zoneTree.js: toggleStructural) -
+                  // analogicznie do konstrukcyjnej półki (wyżej, oś X przez bok), tylko
+                  // obrócone o 90°: wkręt/kołek idzie PIONOWO (oś 'y') przez wieniec/półkę
+                  // nad i pod przegrodą, w jej własną krawędź (el.y i el.y+el.h - to, co
+                  // faktycznie tam jest, korpus albo sąsiednia półka, wynika już z tego,
+                  // że pion zawsze w pełni rozpina swoją wnękę, patrz core/zoneTree.js).
+                  if (isXrayMode && el.isStructural) {
+                      const frontHoleZ = (posZ + D - 2) - 37;
+                      const rearHoleZ = innerZ + 37;
+                      const holeZs = [frontHoleZ, rearHoleZ];
+
+                      const bottomHoleY = posY + el.y - th/2;
+                      const topHoleY = posY + el.y + el.h + th/2;
+                      const holeX = posX + el.x + el.w / 2;
+
+                      holeZs.forEach(hz => {
+                          const dowelZ = hz === frontHoleZ ? hz - 32 : hz + 32;
+                          addHole(1.5, th, holeX, bottomHoleY, hz, 'y', innerGroup);
+                          addHole(1.5, th, holeX, topHoleY, hz, 'y', innerGroup);
+                          addHardware('screw', holeX, bottomHoleY, hz, 'y', innerGroup);
+                          addHardware('screw', holeX, topHoleY, hz, 'y', innerGroup);
+
+                          addHole(4.0, th, holeX, bottomHoleY, dowelZ, 'y', innerGroup);
+                          addHole(4.0, th, holeX, topHoleY, dowelZ, 'y', innerGroup);
+                          addHardware('dowel', holeX, bottomHoleY, dowelZ, 'y', innerGroup);
+                          addHardware('dowel', holeX, topHoleY, dowelZ, 'y', innerGroup);
+                      });
+                  }
               }
               else if (el.typ === 'front') {
                   const isInternal = el.subtype === 'szuflada-wewnetrzna';

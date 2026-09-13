@@ -287,8 +287,13 @@ export function removeSplit(mod, node) {
   rescaleSubtree(survivor, axisKey, oldMin, oldMax, mergedMin, mergedMax);
 }
 
+// Działa na obu osiach: dla poziomu (półka) przełącza "konstrukcyjna" (na
+// stałe wkręcona w boki, kołek+wkręt) / "ruchoma" (na podpórkach); dla pionu
+// (przegroda) przełącza mocowanie na kołek+wkręt do wieńca/półki nad i pod
+// nią (patrz render/viewer3d.js - nawierty tylko gdy isStructural) / brak
+// mocowania (przegroda tylko wstawiona, bez wiercenia).
 export function toggleStructural(node) {
-  if (node.type === "split" && node.axis === "h") {
+  if (node.type === "split") {
     node.divider.isStructural = !node.divider.isStructural;
   }
 }

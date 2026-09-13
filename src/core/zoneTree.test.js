@@ -360,13 +360,24 @@ describe("przegroda pionowa MIĘDZY dwiema półkami", () => {
 });
 
 describe("toggleStructural", () => {
-  it("przełącza isStructural tylko na dzielniku poziomym (półce)", () => {
+  it("przełącza isStructural na dzielniku poziomym (półce)", () => {
     const mod = setup();
     const root = buildZoneTree(mod);
     splitZoneHorizontal(mod, root);
     const tree = buildZoneTree(mod);
 
     expect(tree.divider.isStructural).toBe(false);
+    toggleStructural(tree);
+    expect(tree.divider.isStructural).toBe(true);
+  });
+
+  it("przełącza isStructural też na dzielniku pionowym (przegrodzie) - montaż na kołek+wkręt", () => {
+    const mod = setup();
+    const root = buildZoneTree(mod);
+    splitZoneVertical(mod, root);
+    const tree = buildZoneTree(mod);
+
+    expect(tree.divider.isStructural).toBeFalsy();
     toggleStructural(tree);
     expect(tree.divider.isStructural).toBe(true);
   });

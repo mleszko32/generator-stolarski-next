@@ -14,6 +14,14 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   const isTopBottomFullWidth = cons.joinType === 'wience_przelotowe';
   const sideH = isTopBottomFullWidth ? height - (th * 2) : height;
 
+  // Nawierty kołek+wkręt przegród pionowych (core/engine/cabinet.js:
+  // getPionMountHoles) w wieńcu dolnym/górnym albo w konkretnej półce -
+  // słownik po panelKey, żeby dało się szybko sprawdzić "czy TEN wieniec/
+  // półka ma nawierty" przy rysowaniu mapy korpusu i dorysować jej osobny,
+  // klikalny rzut z góry (analogicznie do detail-left/right dla boków).
+  const pionMountByKey = {};
+  mountingData.filter(d => d.type === 'wieniec-mount').forEach(m => { pionMountByKey[m.panelKey] = m; });
+
   const activeModAbsX = parseFloat(mod.position.x) || 0;
   const activeModLegH = (mod.legs && mod.legs.active) ? (parseFloat(mod.legs.height) || 0) : 0;
   const activeModAbsY = (parseFloat(mod.position.y) || 0) + activeModLegH;
@@ -87,8 +95,12 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   const frontX = panelsRightEdge + 350; 
   const innerFrontX = frontX + cabWidth + 350; 
 
-  const marginY = 180; 
-  const svgWidth = innerFrontX + cabWidth + 400; 
+  const marginY = 180;
+  // Miejsce na rzuty z góry wieńców/półek z nawiertami przegrody pionowej
+  // (patrz sekcja "wieniecPanels" niżej) - inaczej te panele, doklejane ZA
+  // svgWidth, wypadałyby poza viewBox tego SVG.
+  const pionMountExtraWidth = Object.values(pionMountByKey).reduce((sum, p) => sum + p.panelWidth + 350, 0);
+  const svgWidth = innerFrontX + cabWidth + 400 + pionMountExtraWidth;
   
   const vBoxY = svgTopY - marginY;
   const vBoxH = totalSvgHeight + (marginY * 2);
@@ -192,23 +204,35 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
       svg += `<text x="${gX + smW/2}" y="${gY + smH/2}" font-size="20" fill="#475569" text-anchor="middle" font-weight="bold">${escapeHtml(sm.name)}</text></g>`;
   });
   
-  const bgFill = "#f1f5f9"; 
+  const bgFill = "#f1f5f9";
+
+  // Rysuje płytę wieńca/półki - jeśli ma nawierty od przegrody pionowej
+  // (pionMountByKey, patrz engine/cabinet.js: getPionMountHoles), robi ją
+  // klikalną i otwierającą osobny rzut z góry tej płyty z zaznaczonymi
+  // nawiertami (detail-<detailId>, patrz sekcja niżej) - dokładnie tak samo
+  // jak dziś działa klik w bok (detail-left/right).
+  const panelRect = (x, y, w, h, mountKey, detailId, fillWhenPlain) => {
+    const mount = pionMountByKey[mountKey];
+    if (!mount) return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fillWhenPlain}" stroke="#475569" stroke-width="1.5" />`;
+    return `<rect id="map-${detailId}" x="${x}" y="${y}" width="${w}" height="${h}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('${detailId}')" />`;
+  };
+
   if (isTopBottomFullWidth) {
-    svg += `<rect x="${cabX}" y="0" width="${cabWidth}" height="${th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`; 
-    svg += `<rect x="${cabX}" y="${sideH - th}" width="${cabWidth}" height="${th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`; 
-    svg += `<rect id="map-detail-left" x="${cabX}" y="${th}" width="${th}" height="${sideH - 2*th}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-left')" />`; 
-    svg += `<rect id="map-detail-right" x="${cabX + cabWidth - th}" y="${th}" width="${th}" height="${sideH - 2*th}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-right')" />`; 
+    svg += panelRect(cabX, 0, cabWidth, th, 'wieniec-gorny', 'detail-wieniec-gorny', '#ffffff');
+    svg += panelRect(cabX, sideH - th, cabWidth, th, 'wieniec-dolny', 'detail-wieniec-dolny', '#ffffff');
+    svg += `<rect id="map-detail-left" x="${cabX}" y="${th}" width="${th}" height="${sideH - 2*th}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-left')" />`;
+    svg += `<rect id="map-detail-right" x="${cabX + cabWidth - th}" y="${th}" width="${th}" height="${sideH - 2*th}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-right')" />`;
   } else {
     svg += `<rect id="map-detail-left" x="${cabX}" y="0" width="${th}" height="${sideH}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-left')" />`;
     svg += `<rect id="map-detail-right" x="${cabX + cabWidth - th}" y="0" width="${th}" height="${sideH}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-right')" />`;
-    svg += `<rect x="${cabX + th}" y="${sideH - th}" width="${cabWidth - th*2}" height="${th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
-    
+    svg += panelRect(cabX + th, sideH - th, cabWidth - th*2, th, 'wieniec-dolny', 'detail-wieniec-dolny', '#ffffff');
+
     if (cons.topType === 'pelny' || cons.topType === 'trawersy_poziom') {
       // Patrząc od przodu (widok szerokość x wysokość), trawersy poziome
       // (przedni + tylny) różnią się od pełnego wieńca tylko głębokością,
       // która nie jest widoczna z tego kąta - dlatego rysujemy identycznie
       // jak pełny wieniec (analogicznie do "duchów" sąsiednich modułów, patrz wyżej).
-      svg += `<rect x="${cabX + th}" y="0" width="${cabWidth - th*2}" height="${th}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+      svg += panelRect(cabX + th, 0, cabWidth - th*2, th, 'wieniec-gorny', 'detail-wieniec-gorny', '#ffffff');
     } else if (cons.topType === 'trawersy_pion') {
       svg += `<rect x="${cabX + th}" y="0" width="${th}" height="${cons.traverseWidth}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
       svg += `<rect x="${cabX + cabWidth - th * 2}" y="0" width="${th}" height="${cons.traverseWidth}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
@@ -220,14 +244,19 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
       if (el.typ === 'front') return;
       const elSvgX = cabX + el.x;
       let drawY = isTopBottomFullWidth ? el.y - th : el.y;
-      const elSvgY = sideH - drawY - el.h; 
-      
+      const elSvgY = sideH - drawY - el.h;
+
       if (el.typ === 'pion') {
           let pIndex = partitions.findIndex(p => p.id === el.id);
           svg += `<rect id="map-detail-part-${pIndex}" x="${elSvgX}" y="${elSvgY}" width="${el.w}" height="${el.h}" fill="${bgFill}" stroke="#475569" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-part-${pIndex}')" />`;
       } else {
-          let fillColor = (el.typ === 'poziom' && el.isStructural) ? '#a7f3d0' : '#cbd5e1'; 
-          svg += `<rect x="${elSvgX}" y="${elSvgY}" width="${el.w}" height="${el.h}" fill="${fillColor}" stroke="#475569" stroke-width="1.5" />`;
+          let fillColor = (el.typ === 'poziom' && el.isStructural) ? '#a7f3d0' : '#cbd5e1';
+          const polkaMountKey = pionMountByKey[`polka-${el.id}-gora`] ? `polka-${el.id}-gora` : (pionMountByKey[`polka-${el.id}-dol`] ? `polka-${el.id}-dol` : null);
+          if (polkaMountKey) {
+            svg += panelRect(elSvgX, elSvgY, el.w, el.h, polkaMountKey, `detail-${polkaMountKey}`, fillColor);
+          } else {
+            svg += `<rect x="${elSvgX}" y="${elSvgY}" width="${el.w}" height="${el.h}" fill="${fillColor}" stroke="#475569" stroke-width="1.5" />`;
+          }
       }
     });
   }
@@ -693,6 +722,47 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
     });
   }
   svg += `</g>`;
+
+  // Rzuty z góry wieńca/półki z nawiertami kołek+wkręt od przegrody pionowej
+  // (isStructural, patrz core/zoneTree.js: toggleStructural) - jeden osobny,
+  // klikalny widok PER PANEL (engine/cabinet.js: getPionMountHoles), otwierany
+  // z mapy korpusu wyżej (panelRect). Kolor/rozmiar otworów - taki sam jak
+  // istniejące nawierty kołek+wkręt półki konstrukcyjnej w bok (patrz
+  // drawShelfHoles wyżej), bo to dokładnie to samo połączenie.
+  const wieniecPanels = mountingData.filter(d => d.type === 'wieniec-mount');
+  let wieniecX = innerFrontX + cabWidth + 400;
+  wieniecPanels.forEach(panel => {
+    const w = panel.panelWidth;
+    const d = panel.panelDepth;
+    const detailId = `detail-${panel.panelKey}`;
+    const color = '#9333ea';
+
+    svg += `<g id="${detailId}" class="detail-view" style="display:none;">`;
+    svg += `<text x="${wieniecX + w/2}" y="${svgTopY - 25}" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">${escapeHtml(panel.panelLabel.toUpperCase())} (WIDOK Z GÓRY)</text>`;
+    svg += `<rect x="${wieniecX}" y="0" width="${w}" height="${d}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+    svg += `<text x="${wieniecX + w/2}" y="-10" font-size="11" fill="#94a3b8" font-weight="bold" text-anchor="middle" letter-spacing="1">PRZÓD</text>`;
+    svg += `<text x="${wieniecX + w/2}" y="${d + 20}" font-size="11" fill="#94a3b8" font-weight="bold" text-anchor="middle" letter-spacing="1">TYŁ</text>`;
+
+    const xPositions = new Set();
+    panel.holes.forEach(h => {
+      const r = h.holeType === 'dowel' ? 4.0 : 1.5;
+      svg += `<circle cx="${wieniecX + h.x}" cy="${h.zFromFront}" r="${r}" fill="${color}" />`;
+      if (h.holeType === 'screw') xPositions.add(Math.round(h.x));
+    });
+
+    // Wymiar X (od lewej krawędzi płyty do środka przegrody) - Z (odległość
+    // od przodu) widać wprost z rysunku w skali, tak jak przy innych widokach.
+    Array.from(xPositions).sort((a, b) => a - b).forEach(x => {
+      const lineX = wieniecX + x;
+      svg += `<line x1="${lineX}" y1="${d}" x2="${lineX}" y2="${d + 32}" stroke="${color}" stroke-width="0.75" stroke-dasharray="2,2" />`;
+      svg += `<line x1="${wieniecX}" y1="${d + 32}" x2="${lineX}" y2="${d + 32}" stroke="${color}" stroke-width="0.5" />`;
+      svg += `<circle cx="${wieniecX}" cy="${d + 32}" r="2" fill="${color}" />`;
+      svg += `<text x="${lineX + 4}" y="${d + 46}" font-size="10" fill="${color}" font-weight="bold">${Math.round(x)} mm od lewej</text>`;
+    });
+
+    svg += `</g>`;
+    wieniecX += w + 350;
+  });
 
   svg += `</g></svg>`;
   return svg;
