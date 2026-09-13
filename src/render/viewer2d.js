@@ -258,73 +258,122 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   }
 
   // ==== WYMIAROWANIE PRZESTRZENI KORPUSU (widok KORPUS) ====
-  // Wyłącznie wymiary WEWNĄTRZ zarysu AKTYWNEGO MODUŁU, NIEZALEŻNIE dla
-  // każdej kolumny wyznaczonej przez przegrody pionowe (piony) — bez piony to
-  // jedna kolumna na całą szerokość. Świadomie ani poza szafką (żadnego
-  // gabarytu zewnętrznego), ani w sąsiednich modułach "duchach" ze stosu
-  // (inna baza Y, czasem spora przerwa — scalanie dawało bezsensowne osie i
-  // przypadkowe "prześwity" w dziurze między modułami), ani mieszając ze sobą
-  // półki z różnych kolumn (dawało wymiary nieodpowiadające żadnej realnej
-  // przestrzeni, bo środkowy łańcuch nie trafiał w żadną z nich).
-  // Każda kolumna dostaje WŁASNY, niezależny łańcuch: pionowe światła między
-  // jej wieńcami/półkami + etykiety osi, oraz jej własne poziome światło
-  // (szerokość) w największym z jej własnych prześwitów.
+  // Wyłącznie wymiary WEWNĄTRZ zarysu AKTYWNEGO MODUŁU. Odtwarzamy tu TO SAMO
+  // drzewo BSP co core/zoneTree.js (przegroda pionowa liczy się jako podział
+  // TYLKO jeśli w pełni rozpina wysokość swojej wnęki - identyczny warunek
+  // jak tam), żeby kolumny nie "przeciekały" na wysokości, na których dana
+  // przegroda w ogóle nie istnieje (np. przegroda tylko w dolnej wnęce pod
+  // półką nie może dzielić też górnej wnęki nad tą półką na dwie kolumny -
+  // to był zgłoszony bug: "przestrzeń nie ma przegrody a wymiaruje się jakby
+  // była").
   {
-    const columns = [];
-    {
-      let cur = th;
-      partitions.forEach(p => {
-        columns.push({ left: cur, right: p.x });
-        cur = p.x + p.w;
-      });
-      columns.push({ left: cur, right: cabWidth - th });
+    function partitionMM(rect) {
+      const pionCandidates = partitions.filter(p =>
+        p.x > rect.minX + 2 && p.x + p.w < rect.maxX - 2 &&
+        p.y <= rect.minY + 2 && p.y + p.h >= rect.maxY - 2
+      ).sort((a, b) => a.x - b.x);
+      if (pionCandidates.length) {
+        const p = pionCandidates[0];
+        return {
+          axis: 'v', divider: p, rect,
+          a: partitionMM({ ...rect, maxX: p.x }),
+          b: partitionMM({ ...rect, minX: p.x + p.w }),
+        };
+      }
+      const poziomCandidates = (mod.elements || []).filter(el =>
+        el.typ === 'poziom' &&
+        el.y > rect.minY + 2 && el.y + el.h < rect.maxY - 2 &&
+        el.x <= rect.minX + 2 && el.x + el.w >= rect.maxX - 2
+      ).sort((a, b) => a.y - b.y);
+      if (poziomCandidates.length) {
+        const p = poziomCandidates[0];
+        return {
+          axis: 'h', divider: p, rect,
+          a: partitionMM({ ...rect, maxY: p.y }),
+          b: partitionMM({ ...rect, minY: p.y + p.h }),
+        };
+      }
+      return { axis: null, rect };
     }
 
     svg += `<defs><marker id="korpus-dim-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155" /></marker></defs>`;
     svg += `<g class="layer-dim-outline">`;
 
-    columns.forEach(col => {
-      const colWidthMM = col.right - col.left;
+    // Podział pionowy zawęża kolumnę (x) i rekurencyjnie oddaje obie strony
+    // do renderColumnChain - każda dostaje WŁASNY, niezależny łańcuch. Podział
+    // poziomy NIE zawęża x, więc kolejne piętra "h" zbieramy w JEDEN łańcuch
+    // (renderColumnChain -> descend), chyba że jedna ze stron sama okaże się
+    // podziałem pionowym - wtedy ta strona jest "nieprzezroczysta": ma swój
+    // WŁASNY, węższy łańcuch (osobne wywołanie renderRegion), a bieżący,
+    // szerszy łańcuch NIE rysuje przez nią światła (bo to już nie jedna,
+    // realna przestrzeń, tylko dwie węższe kolumny obok siebie).
+    function renderRegion(node) {
+      if (node.axis === 'v') {
+        renderRegion(node.a);
+        renderRegion(node.b);
+        return;
+      }
+      renderColumnChain(node);
+    }
+
+    function renderColumnChain(node) {
+      const { minX, maxX, minY, maxY } = node.rect;
+      const colWidthMM = maxX - minX;
       if (colWidthMM < 8) return;
-      const colDimX = cabX + (col.left + col.right) / 2;
+      const colDimX = cabX + (minX + maxX) / 2;
       const isNarrow = colWidthMM < 260;
 
-      // Dzielniki TYLKO tej kolumny: wieńce (pełna wys. modułu) + półki, których
-      // zasięg X faktycznie nachodzi na tę kolumnę (>5mm), żeby nie pożyczać
-      // dzielników z sąsiedniej przestrzeni po drugiej stronie przegrody.
+      const isBottomWieniec = Math.abs(minY - th) < 2;
+      const isTopWieniec = Math.abs(maxY - (sideH - th)) < 2;
+      // mmY = wysokość ŚRODKA płyty/dzielnika od podłogi (nie jej krawędzi) -
+      // rect.minY/maxY to WEWNĘTRZNE krawędzie (światło), więc płyta leżąca
+      // pod/nad tą krawędzią ma środek o th/2 dalej.
       const dividers = [
-        { axis: th / 2, half: th / 2, kind: 'wieniec' },
-        { axis: sideH - th / 2, half: th / 2, kind: 'wieniec' },
+        { mmY: minY - th / 2, half: th / 2, kind: isBottomWieniec ? 'wieniec' : 'poziom', openBelow: false, openAbove: true },
+        { mmY: maxY + th / 2, half: th / 2, kind: isTopWieniec ? 'wieniec' : 'poziom', openBelow: true, openAbove: false },
       ];
-      (mod.elements || []).filter(el =>
-        el.typ === 'poziom' && Number.isFinite(el.y) &&
-        Math.min(el.x + el.w, col.right) - Math.max(el.x, col.left) > 5
-      ).forEach(el => {
-        const drawY = isTopBottomFullWidth ? el.y - th : el.y;
-        const elSvgY = sideH - drawY - el.h;
-        dividers.push({ axis: elSvgY + el.h / 2, half: el.h / 2, kind: 'poziom' });
-      });
-      dividers.sort((a, b) => a.axis - b.axis);
 
-      // Etykiety osi + strzałkowe segmenty prześwitów — odsunięcie odnośnika
-      // skalowane do szerokości KOLUMNY, żeby nie wchodzić na sąsiednią przestrzeń.
+      // Zbiera wewnętrzne dzielniki poziome TEGO łańcucha, rekurencyjnie
+      // schodząc przez kolejne "h", ale zatrzymując się (i oddając dalej do
+      // renderRegion) na każdej stronie, która okaże się podziałem "v".
+      function descend(n) {
+        if (!n || n.axis !== 'h') return;
+        const aOpaque = n.a.axis === 'v';
+        if (aOpaque) renderRegion(n.a); else descend(n.a);
+        const bOpaque = n.b.axis === 'v';
+        dividers.push({
+          mmY: n.divider.y + n.divider.h / 2, half: n.divider.h / 2, kind: 'poziom',
+          openBelow: !aOpaque, openAbove: !bOpaque,
+        });
+        if (bOpaque) renderRegion(n.b); else descend(n.b);
+      }
+      descend(node);
+      // Malejąco po mmY = rosnąco po współrzędnej SVG (góra rysunku -> dół),
+      // tak samo jak poprzednio sortowano bezpośrednio po współrzędnej SVG.
+      dividers.sort((a, b) => b.mmY - a.mmY);
+
       const leaderLen = isNarrow ? Math.min(30, colWidthMM * 0.28) : Math.min(78, colWidthMM * 0.42);
       const leaderStartX = colDimX - leaderLen;
       const axisFontSize = isNarrow ? 8 : 10;
-      let bestGapTop = th, bestGapBot = sideH - th, bestGap = -1;
+      let bestGapTop = 0, bestGapBot = 0, bestGap = -1;
 
       dividers.forEach((d, i) => {
-        const axisY = d.axis;
-        const mmFromBase = formatVal(sideH - axisY);
+        const axisY = sideH - d.mmY;
         const isW = d.kind === 'wieniec';
-        const axisLabel = isNarrow ? `${mmFromBase}` : `${isW ? 'Oś wieńca' : 'Oś'}: ${mmFromBase}`;
+        const label = formatVal(d.mmY);
+        const axisLabel = isNarrow ? `${label}` : `${isW ? 'Oś wieńca' : 'Oś'}: ${label}`;
         svg += `<line x1="${leaderStartX}" y1="${axisY}" x2="${colDimX - 3}" y2="${axisY}" stroke="#94a3b8" stroke-width="0.6" stroke-dasharray="3,2" />`;
         svg += `<text x="${leaderStartX - 4}" y="${axisY + 3}" font-size="${axisFontSize}" fill="#1e3a8a" text-anchor="end" font-family="sans-serif" font-weight="${isW ? 'bold' : 'normal'}">${axisLabel}</text>`;
 
         if (i < dividers.length - 1) {
           const next = dividers[i + 1];
+          // d jest FIZYCZNIE WYŻEJ (większe mmY) niż next - światło między
+          // nimi jest realne tylko, gdy d ma otwartą stronę OD SPODU i next
+          // ma otwartą stronę OD GÓRY (żadne z nich nie jest "zaślepione"
+          // przez zagnieżdżony podział pionowy, patrz descend() wyżej).
+          if (!(d.openBelow && next.openAbove)) return;
           const yTop = axisY + d.half;
-          const yBot = next.axis - next.half;
+          const yBot = (sideH - next.mmY) - next.half;
           const gap = yBot - yTop;
           if (gap < 8) return;
           const midY = (yTop + yBot) / 2;
@@ -335,19 +384,23 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
         }
       });
 
-      // Poziome światło (wewnętrzna szerokość) TEJ kolumny — w jej własnym
-      // największym prześwicie, żeby nie wylądować na półce. Celowo NIE na
-      // środku tego prześwitu (tam pionowy łańcuch już rysuje swój box z
-      // wartością prześwitu — nałożyłyby się dokładnie na siebie), tylko
-      // przesunięte w górną część prześwitu.
+      // Poziome światło (wewnętrzna szerokość) TEJ kolumny - tylko jeśli ma
+      // choć jeden realny (nie "zaślepiony" przez zagnieżdżony podział "v")
+      // prześwit do pokazania; w jej własnym największym takim prześwicie,
+      // żeby nie wylądować na półce. Celowo NIE na środku tego prześwitu (tam
+      // pionowy łańcuch już rysuje swój box z wartością prześwitu -
+      // nałożyłyby się dokładnie na siebie), tylko przesunięte w górną część.
+      if (bestGap < 0) return;
       const gapSize = Math.max(bestGapBot - bestGapTop, 1);
       const widthDimY = bestGapTop + Math.max(4, Math.min(gapSize * 0.3, gapSize - 16));
-      const xL = cabX + col.left, xR = cabX + col.right;
+      const xL = cabX + minX, xR = cabX + maxX;
       const w = formatVal(colWidthMM);
       svg += `<line x1="${xL}" y1="${widthDimY}" x2="${xR}" y2="${widthDimY}" stroke="#334155" stroke-width="1" marker-start="url(#korpus-dim-arrow)" marker-end="url(#korpus-dim-arrow)" />`;
       svg += `<rect x="${colDimX - 24}" y="${widthDimY - 8}" width="48" height="15" fill="#f8fafc" stroke="#cbd5e1" stroke-width="0.5" />`;
       svg += `<text x="${colDimX}" y="${widthDimY + 4}" font-size="11" font-weight="bold" fill="#0f766e" text-anchor="middle" font-family="sans-serif">${w}</text>`;
-    });
+    }
+
+    renderRegion(partitionMM({ minX: th, maxX: cabWidth - th, minY: th, maxY: sideH - th }));
 
     svg += `</g>`;
   }
@@ -735,17 +788,24 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
     const d = panel.panelDepth;
     const detailId = `detail-${panel.panelKey}`;
     const color = '#9333ea';
+    // Dolna krawędź płyty wyrównana do sideH - dokładnie tam, gdzie domyślny
+    // viewBox (wyliczony z boków/frontów, patrz vBoxY/vBoxH wyżej) jest
+    // wycentrowany - inaczej ten widok, rysowany w lokalnym układzie 0..d
+    // niepowiązanym z wysokością szafki, wypadał poza domyślnie widocznym
+    // oknem i po kliknięciu "nic się nie działo" (trzeba było ręcznie
+    // odnaleźć go, przeciągając daleko w górę).
+    const topY = sideH - d;
 
     svg += `<g id="${detailId}" class="detail-view" style="display:none;">`;
     svg += `<text x="${wieniecX + w/2}" y="${svgTopY - 25}" font-size="16" fill="#1e3a8a" font-weight="bold" text-anchor="middle">${escapeHtml(panel.panelLabel.toUpperCase())} (WIDOK Z GÓRY)</text>`;
-    svg += `<rect x="${wieniecX}" y="0" width="${w}" height="${d}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
-    svg += `<text x="${wieniecX + w/2}" y="-10" font-size="11" fill="#94a3b8" font-weight="bold" text-anchor="middle" letter-spacing="1">PRZÓD</text>`;
-    svg += `<text x="${wieniecX + w/2}" y="${d + 20}" font-size="11" fill="#94a3b8" font-weight="bold" text-anchor="middle" letter-spacing="1">TYŁ</text>`;
+    svg += `<rect x="${wieniecX}" y="${topY}" width="${w}" height="${d}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+    svg += `<text x="${wieniecX + w/2}" y="${topY - 10}" font-size="11" fill="#94a3b8" font-weight="bold" text-anchor="middle" letter-spacing="1">PRZÓD</text>`;
+    svg += `<text x="${wieniecX + w/2}" y="${topY + d + 20}" font-size="11" fill="#94a3b8" font-weight="bold" text-anchor="middle" letter-spacing="1">TYŁ</text>`;
 
     const xPositions = new Set();
     panel.holes.forEach(h => {
       const r = h.holeType === 'dowel' ? 4.0 : 1.5;
-      svg += `<circle cx="${wieniecX + h.x}" cy="${h.zFromFront}" r="${r}" fill="${color}" />`;
+      svg += `<circle cx="${wieniecX + h.x}" cy="${topY + h.zFromFront}" r="${r}" fill="${color}" />`;
       if (h.holeType === 'screw') xPositions.add(Math.round(h.x));
     });
 
@@ -753,10 +813,10 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
     // od przodu) widać wprost z rysunku w skali, tak jak przy innych widokach.
     Array.from(xPositions).sort((a, b) => a - b).forEach(x => {
       const lineX = wieniecX + x;
-      svg += `<line x1="${lineX}" y1="${d}" x2="${lineX}" y2="${d + 32}" stroke="${color}" stroke-width="0.75" stroke-dasharray="2,2" />`;
-      svg += `<line x1="${wieniecX}" y1="${d + 32}" x2="${lineX}" y2="${d + 32}" stroke="${color}" stroke-width="0.5" />`;
-      svg += `<circle cx="${wieniecX}" cy="${d + 32}" r="2" fill="${color}" />`;
-      svg += `<text x="${lineX + 4}" y="${d + 46}" font-size="10" fill="${color}" font-weight="bold">${Math.round(x)} mm od lewej</text>`;
+      svg += `<line x1="${lineX}" y1="${topY + d}" x2="${lineX}" y2="${topY + d + 32}" stroke="${color}" stroke-width="0.75" stroke-dasharray="2,2" />`;
+      svg += `<line x1="${wieniecX}" y1="${topY + d + 32}" x2="${lineX}" y2="${topY + d + 32}" stroke="${color}" stroke-width="0.5" />`;
+      svg += `<circle cx="${wieniecX}" cy="${topY + d + 32}" r="2" fill="${color}" />`;
+      svg += `<text x="${lineX + 4}" y="${topY + d + 46}" font-size="10" fill="${color}" font-weight="bold">${Math.round(x)} mm od lewej</text>`;
     });
 
     svg += `</g>`;
