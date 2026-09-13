@@ -13,6 +13,13 @@
 // h:currentH). Dzięki temu rekonstrukcja drzewa przez szukanie dzielnika w
 // pełni rozpinającego bieżący prostokąt jest deterministyczna i działa na
 // każdych danych wygenerowanych tym generatorem.
+//
+// FRONT NA WĘŹLE 'split': front (baseZone) może pasować do prostokąta węzła
+// 'split', nie tylko 'leaf' - dzięki temu jeden front (np. drzwi) może wizualnie
+// obejmować CAŁĄ wnękę, mimo że w środku są już realne, zagnieżdżone półki/
+// przegrody (każda z nich to osobny węzeł 'split' w tym samym poddrzewie).
+// Dodanie takiej półki NIE usuwa frontu - baseZone frontu się nie zmienia,
+// więc nadal pasuje do rect węzła 'split', który go teraz reprezentuje.
 import { state } from "./state.js";
 import { autoDistributeShelves } from "./shelfMath.js";
 
@@ -57,46 +64,13 @@ function frontsMatchingZone(mod, rect) {
   );
 }
 
-// Półki "wolne" (isDivider: false, patrz partition() niżej) nie dzielą drzewa,
-// więc dowolna ich liczba może leżeć wewnątrz jednej wnęki - obojętnie, czy ma
-// ona już przypisany front, czy nie. Zwracamy je posortowane od dołu do góry,
-// żeby dało się je narysować/policzyć w stałej kolejności.
-function shelvesMatchingZone(mod, rect) {
-  return (mod.elements || [])
-    .filter(
-      (el) =>
-        el.typ === "poziom" &&
-        el.isDivider === false &&
-        el.y > rect.minY - EPS &&
-        el.y + el.h < rect.maxY + EPS &&
-        Math.abs(el.x - rect.minX) < EPS &&
-        Math.abs(el.x + el.w - rect.maxX) < EPS
-    )
-    .sort((a, b) => a.y - b.y);
-}
-
-// Przegrody pionowe, które NIE rozpinają się na pełną wysokość wnęki (patrz
-// splitZoneVertical z podanym `band`) z definicji nie przechodzą filtra
-// pionCandidates w partition() niżej (wymaga on pełnego rozpięcia y), więc
-// nigdy nie staną się węzłem 'split' - podobnie jak wolne półki, trzeba je
-// osobno dowiązać do liścia, żeby dało się je narysować i nimi zarządzać.
-function verticalsMatchingZone(mod, rect) {
-  return (mod.elements || [])
-    .filter(
-      (el) =>
-        el.typ === "pion" &&
-        el.x > rect.minX - EPS &&
-        el.x + el.w < rect.maxX + EPS &&
-        el.y > rect.minY - EPS &&
-        el.y + el.h < rect.maxY + EPS
-    )
-    .sort((a, b) => a.x - b.x);
-}
-
 // Buduje drzewo BSP wnętrza aktywnego modułu.
-// Węzeł 'split': { type:'split', axis:'v'|'h', divider: <element poziom/pion>, rect, a, b }
+// Węzeł 'split': { type:'split', axis:'v'|'h', divider: <element poziom/pion>, rect, a, b, fronts, bound*Id }
 //   'v' = podział przegrodą pionową (a = lewa kolumna, b = prawa)
 //   'h' = podział półką poziomą (a = dół, b = góra)
+//   fronts: front(y), których baseZone pasuje do CAŁEGO rect tego węzła (patrz
+//     komentarz na górze pliku - pozwala jednemu frontowi obejmować całe
+//     poddrzewo z zagnieżdżonymi półkami/przegrodami).
 // Węzeł 'leaf': { type:'leaf', rect, fronts: [...], boundLeftId, boundRightId, boundBottomId, boundTopId }
 export function buildZoneTree(mod) {
   const piony = (mod.elements || []).filter((el) => el.typ === "pion");
@@ -104,6 +78,8 @@ export function buildZoneTree(mod) {
   const root = getCabinetInnerRect(mod);
 
   function partition(rect, boundLeftId, boundRightId, boundBottomId, boundTopId) {
+    const fronts = frontsMatchingZone(mod, rect);
+
     const pionCandidates = piony
       .filter(
         (p) =>
@@ -118,18 +94,12 @@ export function buildZoneTree(mod) {
       const pion = pionCandidates[0];
       const a = partition({ ...rect, maxX: pion.x }, boundLeftId, pion.id, boundBottomId, boundTopId);
       const b = partition({ ...rect, minX: pion.x + pion.w }, pion.id, boundRightId, boundBottomId, boundTopId);
-      return { type: "split", axis: "v", divider: pion, rect, a, b };
+      return { type: "split", axis: "v", divider: pion, rect, a, b, fronts, boundLeftId, boundRightId, boundBottomId, boundTopId };
     }
 
     const poziomCandidates = poziomy
       .filter(
         (p) =>
-          // isDivider: false = "wolna" półka (patrz appendAutoShelvesPicker w
-          // ui/interiorEditor.js) - fizycznie leży w wnęce, ale NIE dzieli jej
-          // na dwie niezależne, osobno obsadzalne frontem strefy. Bez tego
-          // wyjątku każda dodana półka rozcinałaby drzewo, przez co nie dało
-          // się mieć jednego frontu na całą wysokość ORAZ półek za nim.
-          p.isDivider !== false &&
           p.y > rect.minY + EPS &&
           p.y + p.h < rect.maxY - EPS &&
           p.x <= rect.minX + EPS &&
@@ -141,20 +111,10 @@ export function buildZoneTree(mod) {
       const poziom = poziomCandidates[0];
       const a = partition({ ...rect, maxY: poziom.y }, boundLeftId, boundRightId, boundBottomId, poziom.id);
       const b = partition({ ...rect, minY: poziom.y + poziom.h }, boundLeftId, boundRightId, poziom.id, boundTopId);
-      return { type: "split", axis: "h", divider: poziom, rect, a, b };
+      return { type: "split", axis: "h", divider: poziom, rect, a, b, fronts, boundLeftId, boundRightId, boundBottomId, boundTopId };
     }
 
-    return {
-      type: "leaf",
-      rect,
-      boundLeftId,
-      boundRightId,
-      boundBottomId,
-      boundTopId,
-      fronts: frontsMatchingZone(mod, rect),
-      shelves: shelvesMatchingZone(mod, rect),
-      verticals: verticalsMatchingZone(mod, rect),
-    };
+    return { type: "leaf", rect, boundLeftId, boundRightId, boundBottomId, boundTopId, fronts };
   }
 
   return partition(root, "cab-left", "cab-right", "cab-bottom", "cab-top");
@@ -164,21 +124,40 @@ function randomSuffix() {
   return Math.random().toString(36).slice(2, 6);
 }
 
-function clearLeafFronts(mod, node) {
-  if (node.type !== "leaf" || node.fronts.length === 0) return;
-  const ids = new Set(node.fronts.map((f) => f.id));
+// Usuwa fronty przypisane BEZPOŚREDNIO do tego węzła (dowolnego typu - patrz
+// komentarz na górze pliku o frontach na węzłach 'split'). Nie rusza frontów
+// ani dzielników zagnieżdżonych głębiej w poddrzewie.
+// Usuwa fronty przypisane do TEGO węzła i - jeśli to 'split' - rekurencyjnie
+// wszystkie fronty zagnieżdżone głębiej w jego poddrzewie. Bez rekursji
+// przypisanie jednego frontu na CAŁOŚĆ (np. drzwi na cały korpus) zostawiałoby
+// "osierocone" fronty wcześniej przypisane do pojedynczych, węższych wnęk w
+// środku tego samego obszaru - w rezultacie dwa nachodzące na siebie fronty
+// naraz (widoczne np. w liście formatek jako dwa razy "Drzwi").
+function clearNodeFronts(mod, node) {
+  const ids = new Set();
+  collectFrontIds(node, ids);
+  if (ids.size === 0) return;
   mod.elements = mod.elements.filter((el) => !ids.has(el.id));
 }
 
-// Dzieli pustą wnękę (leaf) na dwie, wstawiając półkę na jej środku wysokości.
-// Jeśli wnęka była obsadzona frontem, front zostaje usunięty (dzielimy tylko
-// przestrzeń — front trzeba przypisać na nowo do jednej z powstałych wnęk).
+function collectFrontIds(node, into) {
+  node.fronts.forEach((f) => into.add(f.id));
+  if (node.type === "split") {
+    collectFrontIds(node.a, into);
+    collectFrontIds(node.b, into);
+  }
+}
+
+// Dzieli wnękę (leaf) na dwie, wstawiając półkę na jej środku wysokości.
+// Front przypisany do tej wnęki (jeśli był) NIE jest usuwany - jego baseZone
+// się nie zmienia, więc po podziale nadal pasuje do rect nowego węzła 'split'
+// obejmującego obie powstałe pod-wnęki (patrz partition() wyżej), czyli
+// wizualnie nadal obejmuje całość, a nowa półka jest już za nim.
 export function splitZoneHorizontal(mod, node) {
   if (node.type !== "leaf") return null;
   const th = getBoardThickness();
   const { minX, maxX, minY, maxY } = node.rect;
   const midY = (minY + maxY) / 2;
-  clearLeafFronts(mod, node);
   const shelf = {
     id: "poziom-" + Date.now() + "-" + randomSuffix(),
     typ: "poziom",
@@ -187,51 +166,17 @@ export function splitZoneHorizontal(mod, node) {
     w: maxX - minX,
     h: th,
     isStructural: false,
-    isDivider: true, // dzieli wnękę na dwie niezależne, osobno obsadzalne strefy
   };
   mod.elements.push(shelf);
   return shelf;
 }
 
 // Jak wyżej, ale przegrodą pionową na środku szerokości.
-//
-// `band` (opcjonalny { minY, maxY }) ogranicza przegrodę do konkretnego
-// fragmentu wysokości wnęki (np. tylko do prześwitu MIĘDZY dwiema wolnymi
-// półkami, patrz ui/interiorEditor.js: computeClickBand) - bez tego przegroda
-// zawsze rozpinała się na całą wysokość wnęki, nawet gdy użytkownik kliknął
-// wyraźnie w wąski prześwit między półkami. Gdy band nie jest podany (albo
-// w wnęce nie ma żadnych wolnych półek), zachowanie jest identyczne jak
-// dawniej - pełna wysokość wnęki i (patrz partition() w tym pliku) prawdziwy
-// podział drzewa/frontu.
-export function splitZoneVertical(mod, node, band = null) {
+export function splitZoneVertical(mod, node) {
   if (node.type !== "leaf") return null;
   const th = getBoardThickness();
-  const { minX, maxX } = node.rect;
-  const minY = band ? band.minY : node.rect.minY;
-  const maxY = band ? band.maxY : node.rect.maxY;
+  const { minX, maxX, minY, maxY } = node.rect;
   const midX = (minX + maxX) / 2;
-  if (!band) clearLeafFronts(mod, node);
-
-  // Wolne półki (isDivider: false) fizycznie rozpinają się na całą szerokość
-  // wnęki - przegroda TYLKO wtedy je przecina, gdy jej zakres Y faktycznie
-  // nachodzi na daną półkę (przy przegrodzie ograniczonej do prześwitu MIĘDZY
-  // półkami żadna z nich nie jest w ogóle dotknięta). Przeciętą półkę trzeba
-  // rozciąć na dwa niezależne odcinki (po jednym w każdej z powstałych
-  // kolumn) - inaczej żaden z nich nie pasowałby już do węższej wnęki po
-  // żadnej ze stron (patrz shelvesMatchingZone - wymaga dopasowania do PEŁNEJ
-  // szerokości) i po prostu "znikałby" z edytora.
-  const affected = node.shelves.filter((s) => s.y < maxY - EPS && s.y + s.h > minY + EPS);
-  if (affected.length > 0) {
-    const ids = new Set(affected.map((s) => s.id));
-    mod.elements = mod.elements.filter((el) => !ids.has(el.id));
-    affected.forEach((shelf) => {
-      mod.elements.push(
-        { ...shelf, id: shelf.id + "-L", x: minX, w: midX - th / 2 - minX },
-        { ...shelf, id: shelf.id + "-R", x: midX + th / 2, w: maxX - (midX + th / 2) }
-      );
-    });
-  }
-
   const divider = {
     id: "pion-" + Date.now() + "-" + randomSuffix(),
     typ: "pion",
@@ -244,26 +189,102 @@ export function splitZoneVertical(mod, node, band = null) {
   return divider;
 }
 
+// Rozmieszcza N półek równomiernie w danej wnęce (odstępy liczone przez
+// core/shelfMath.js) - front przypisany do tej wnęki (jeśli był) przetrwa,
+// z tych samych powodów co przy splitZoneHorizontal.
+export function addEvenShelves(mod, node, count) {
+  if (node.type !== "leaf" || count < 1) return [];
+  const th = getBoardThickness();
+  const { minX, maxX, minY, maxY } = node.rect;
+  const offsets = autoDistributeShelves(maxY - minY, th, count);
+  const ts = Date.now();
+  const shelves = offsets.map((o, idx) => ({
+    id: "poziom-auto-" + ts + "-" + idx + "-" + randomSuffix(),
+    typ: "poziom",
+    x: minX,
+    y: minY + o.y,
+    w: maxX - minX,
+    h: th,
+    isStructural: false,
+  }));
+  shelves.forEach((s) => mod.elements.push(s));
+  return shelves;
+}
+
+// Zbiera id wszystkich elementów (fronty, dzielnik, zagnieżdżone dalej fronty
+// i dzielniki) należących do CAŁEGO poddrzewa danego węzła - używane tylko w
+// removeSplit() niżej, w tym jednym przypadku, gdy obie strony usuwanego
+// podziału mają WŁASNE, dalsze podziały (patrz komentarz tam) i nie da się
+// ich bezkolizyjnie scalić.
 function collectSubtreeElementIds(node, into) {
-  if (node.type === "leaf") {
-    node.fronts.forEach((f) => into.add(f.id));
-    node.shelves.forEach((s) => into.add(s.id));
-    node.verticals.forEach((v) => into.add(v.id));
-  } else {
+  node.fronts.forEach((f) => into.add(f.id));
+  if (node.type === "split") {
     into.add(node.divider.id);
     collectSubtreeElementIds(node.a, into);
     collectSubtreeElementIds(node.b, into);
   }
 }
 
-// Usuwa podział (dzielnik + wszystko, co powstało w obu powstałych z niego
-// wnękach — fronty i zagnieżdżone dalsze podziały) i scala z powrotem w
-// jedną pustą wnękę.
+// Usuwa TYLKO ten jeden dzielnik, scalając node.a i node.b z powrotem w jedną
+// wnękę. Trzy przypadki:
+// 1) Żadna ze stron nie ma własnego, dalszego podziału - po prostu usuwamy
+//    dzielnik i fronty bezpośrednio na obu stronach (ich baseZone == znikająca
+//    wnęka, inaczej zostałyby osierocone - niewidoczne w edytorze, ale nadal
+//    wliczane do listy formatek).
+// 2) TYLKO JEDNA strona ma dalszy podział - to nadal prawdziwe, osobne
+//    elementy poziom/pion, więc zostają; ale skoro wcześniej rozpinały tylko
+//    węższą wnękę tej jednej strony, trzeba je "rozciągnąć" (rescaleSubtree)
+//    na cały scalony obszar - inaczej przestałyby w pełni rozpinać swoją
+//    wnękę (patrz "KLUCZOWE ZAŁOŻENIE" na górze pliku) i same zostałyby
+//    osierocone przy najbliższym buildZoneTree(). Fronty w tej zachowanej
+//    gałęzi, których baseZone.bound* wskazywało na WŁAŚNIE usuwany dzielnik
+//    (core/layout.js liczy z tego realną geometrię, nie tylko zoneTree.js),
+//    trzeba przepiąć na to, co ograniczało cały ten węzeł od tej samej strony
+//    PRZED podziałem.
+// 3) OBIE strony mają własne, dalsze podziały - dwie niezależne struktury
+//    rządzące tym samym, teraz wspólnym obszarem, nie da się ich bezkolizyjnie
+//    scalić w jedno proste drzewo - usuwamy całą zawartość obu stron (jak
+//    poprzednio).
+// Front przypisany do SAMEGO usuwanego węzła `node` (obejmujący już całe to
+// poddrzewo, patrz komentarz na górze pliku) zawsze zostaje nietknięty - jego
+// baseZone i tak pasuje do scalonej wnęki.
 export function removeSplit(mod, node) {
   if (node.type !== "split") return;
-  const toRemove = new Set();
-  collectSubtreeElementIds(node, toRemove);
+  const isH = node.axis === "h";
+  const dividerId = node.divider.id;
+  const aHasSplit = node.a.type === "split";
+  const bHasSplit = node.b.type === "split";
+  const toRemove = new Set([dividerId]);
+
+  if (aHasSplit && bHasSplit) {
+    collectSubtreeElementIds(node.a, toRemove);
+    collectSubtreeElementIds(node.b, toRemove);
+  } else {
+    node.a.fronts.forEach((f) => toRemove.add(f.id));
+    node.b.fronts.forEach((f) => toRemove.add(f.id));
+  }
   mod.elements = mod.elements.filter((el) => !toRemove.has(el.id));
+
+  if (aHasSplit === bHasSplit) return; // przypadek 1 albo 3 - nic więcej do zrobienia
+
+  mod.elements.forEach((el) => {
+    if (el.typ !== "front" || !el.baseZone) return;
+    if (isH) {
+      if (el.baseZone.boundBottom === dividerId) el.baseZone.boundBottom = node.boundBottomId;
+      if (el.baseZone.boundTop === dividerId) el.baseZone.boundTop = node.boundTopId;
+    } else {
+      if (el.baseZone.boundLeft === dividerId) el.baseZone.boundLeft = node.boundLeftId;
+      if (el.baseZone.boundRight === dividerId) el.baseZone.boundRight = node.boundRightId;
+    }
+  });
+
+  const axisKey = isH ? "y" : "x";
+  const mergedMin = isH ? node.rect.minY : node.rect.minX;
+  const mergedMax = isH ? node.rect.maxY : node.rect.maxX;
+  const survivor = aHasSplit ? node.a : node.b;
+  const oldMin = isH ? survivor.rect.minY : survivor.rect.minX;
+  const oldMax = isH ? survivor.rect.maxY : survivor.rect.maxX;
+  rescaleSubtree(survivor, axisKey, oldMin, oldMax, mergedMin, mergedMax);
 }
 
 export function toggleStructural(node) {
@@ -272,11 +293,13 @@ export function toggleStructural(node) {
   }
 }
 
-// Obsadza pustą wnękę frontem. subtype: 'drzwi' | 'drzwi-lp' | 'szuflada' | 'szuflada-wewnetrzna'.
+// Obsadza wnękę frontem - node może być 'leaf' ALBO 'split' (patrz komentarz
+// na górze pliku: front na węźle 'split' obejmuje wizualnie całe poddrzewo,
+// z zagnieżdżonymi półkami/przegrodami w środku). subtype: 'drzwi' |
+// 'drzwi-lp' | 'szuflada' | 'szuflada-wewnetrzna'.
 // opts: { gap, openingSide, distribution, offsetBottom, offsetTop }
 export function assignFront(mod, node, subtype, opts = {}) {
-  if (node.type !== "leaf") return;
-  clearLeafFronts(mod, node);
+  clearNodeFronts(mod, node);
 
   const { minX, maxX, minY, maxY } = node.rect;
   const baseZone = {
@@ -336,65 +359,64 @@ export function assignFront(mod, node, subtype, opts = {}) {
   }
 }
 
-// Rozmieszcza N "wolnych" półek (isDivider: false) równomiernie w danej
-// wnęce - w odróżnieniu od splitZoneHorizontal, DZIAŁA także na wnęce już
-// obsadzonej frontem (nie usuwa go) i nie dzieli drzewa (patrz partition()
-// wyżej), więc front nadal obejmuje całą wnękę, a te półki są za nim.
-export function addEvenShelves(mod, node, count) {
-  if (node.type !== "leaf" || count < 1) return [];
-  const th = getBoardThickness();
-  const { minX, maxX, minY, maxY } = node.rect;
-  const offsets = autoDistributeShelves(maxY - minY, th, count);
-  const ts = Date.now();
-  const shelves = offsets.map((o, idx) => ({
-    id: "poziom-shelf-" + ts + "-" + idx + "-" + randomSuffix(),
-    typ: "poziom",
-    x: minX,
-    y: minY + o.y,
-    w: maxX - minX,
-    h: th,
-    isStructural: false,
-    isDivider: false,
-  }));
-  shelves.forEach((s) => mod.elements.push(s));
-  return shelves;
-}
-
-// Usuwa wszystkie "wolne" półki danej wnęki (patrz addEvenShelves) - nie rusza
-// frontu ani dzielników.
-export function removeShelves(mod, node) {
-  if (node.type !== "leaf" || node.shelves.length === 0) return;
-  const ids = new Set(node.shelves.map((s) => s.id));
-  mod.elements = mod.elements.filter((el) => !ids.has(el.id));
-}
-
 // Przeskalowuje WSZYSTKIE poziomy/piony zagnieżdżone w poddrzewie tak, by ich
-// x/y/w/h nadal proporcjonalnie wypełniały nowy zakres [newMin, newMax] w
-// miejsce starego [oldMin, oldMax]. Fronty (baseZone) same się przeliczą
-// przy najbliższym recalculateLayout() dzięki bound-referencjom (boundLeft/
-// Right/Top/Bottom) — nie trzeba ich tu ręcznie ruszać.
+// x/y/w/h nadal wypełniały nowy zakres [newMin, newMax] w miejsce starego
+// [oldMin, oldMax]. Fronty (baseZone) same się przeliczą przy najbliższym
+// recalculateLayout() dzięki bound-referencjom (boundLeft/Right/Top/Bottom)
+// — nie trzeba ich tu ręcznie ruszać.
+//
+// ZABLOKOWANY WYMIAR (divider.lockA / divider.lockB, patrz ui/interiorEditor.js
+// - kłódka przy edytowalnym wymiarze wnęki): domyślnie (bez blokady) dzielnik
+// przesuwa się PROPORCJONALNIE (`remap`) - obie strony rosną/kurczą się razem.
+// Gdy jedna strona jest zablokowana, ta strona ma zachować DOKŁADNIE ten sam
+// rozmiar co przed przeskalowaniem, a cała zmiana zakresu idzie na drugą
+// (odblokowaną) stronę. Dlatego w głąb NIE przekazujemy już ślepo tego samego
+// globalnego zakresu do obu dzieci (jak w czysto proporcjonalnym przypadku,
+// gdzie to i tak wychodzi na to samo) - liczymy WŁASNY, faktyczny stary/nowy
+// zakres każdej strony z osobna, bo przy blokadzie te zakresy przestają być
+// jedną wspólną transformacją afiniczną.
 function rescaleSubtree(node, axis, oldMin, oldMax, newMin, newMax) {
   const oldSpan = oldMax - oldMin;
   if (oldSpan <= 0 || node.type !== "split") return;
   const scale = (newMax - newMin) / oldSpan;
   const remap = (v) => newMin + (v - oldMin) * scale;
 
-  if (axis === "x" && node.axis === "v") {
-    node.divider.x = remap(node.divider.x);
-  } else if (axis === "y" && node.axis === "h") {
-    node.divider.y = remap(node.divider.y);
-  } else if (axis === "x" && node.axis === "h") {
-    // dzielnik poziomy (półka) wewnątrz kolumny, której szerokość się zmieniła
-    node.divider.x = remap(node.divider.x);
-    node.divider.w = node.divider.w * scale;
-  } else if (axis === "y" && node.axis === "v") {
-    // przegroda pionowa wewnątrz rzędu, którego wysokość się zmieniła
-    node.divider.y = remap(node.divider.y);
-    node.divider.h = node.divider.h * scale;
+  const isPrimary = (axis === "x" && node.axis === "v") || (axis === "y" && node.axis === "h");
+
+  if (!isPrimary) {
+    // Dzielnik PROSTOPADŁY do przeskalowywanej osi - jego pozycja na tej osi
+    // się nie zmienia (to nie jego oś podziału), zmienia się tylko jego
+    // rozciągnięcie, żeby nadal w pełni rozpinał nową szerokość/wysokość.
+    if (axis === "x" && node.axis === "h") {
+      node.divider.x = remap(node.divider.x);
+      node.divider.w = node.divider.w * scale;
+    } else if (axis === "y" && node.axis === "v") {
+      node.divider.y = remap(node.divider.y);
+      node.divider.h = node.divider.h * scale;
+    }
+    rescaleSubtree(node.a, axis, oldMin, oldMax, newMin, newMax);
+    rescaleSubtree(node.b, axis, oldMin, oldMax, newMin, newMax);
+    return;
   }
 
-  rescaleSubtree(node.a, axis, oldMin, oldMax, newMin, newMax);
-  rescaleSubtree(node.b, axis, oldMin, oldMax, newMin, newMax);
+  const th = node.axis === "h" ? node.divider.h : node.divider.w;
+  const oldPos = node.axis === "h" ? node.divider.y : node.divider.x;
+  const oldSizeA = oldPos - oldMin;
+  const oldSizeB = oldMax - (oldPos + th);
+
+  let newPos;
+  if (node.divider.lockA) {
+    newPos = newMin + oldSizeA; // strona 'a' zachowuje dokładny rozmiar
+  } else if (node.divider.lockB) {
+    newPos = newMax - th - oldSizeB; // strona 'b' zachowuje dokładny rozmiar
+  } else {
+    newPos = remap(oldPos);
+  }
+
+  if (node.axis === "h") node.divider.y = newPos; else node.divider.x = newPos;
+
+  rescaleSubtree(node.a, axis, oldMin, oldPos, newMin, newPos);
+  rescaleSubtree(node.b, axis, oldPos + th, oldMax, newPos + th, newMax);
 }
 
 const MIN_GAP = 30; // najmniejszy dopuszczalny prześwit po obu stronach przesuwanego dzielnika (mm)

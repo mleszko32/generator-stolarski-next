@@ -18,9 +18,8 @@ import {
   assignFront,
   moveSplit,
   addEvenShelves,
-  removeShelves,
 } from "../core/zoneTree.js";
-import { update3D, enterAlignMode } from "../render/viewer3d.js";
+import { update3D, enterAlignMode, areFrontsVisible } from "../render/viewer3d.js";
 import { updateSidebar } from "./sidebar.js";
 import { initPropertiesPanel } from "./properties.js";
 
@@ -38,8 +37,7 @@ const FRONT_COLORS = {
 };
 
 let selectedNode = null; // węzeł drzewa aktualnie pod pływającym paskiem
-let toolbarMode = null; // null | 'zone' | 'front-picker' | 'divider'
-let selectedBand = null; // { minY, maxY } - fragment wysokości klikniętej wnęki (patrz computeClickBand)
+let toolbarMode = null; // null | 'empty' | 'occupied' | 'divider'
 
 function getContainer() {
   return document.getElementById("editor-interior-container");
@@ -134,48 +132,206 @@ export function renderInteriorEditor() {
   });
 }
 
-function renderNode(node, stage, px) {
+// Rysuje węzeł drzewa. Front (jeśli jest) może być przypisany do węzła
+// 'split', nie tylko 'leaf' (patrz core/zoneTree.js) - dlatego overlay frontu
+// i rekurencja w głąb (dzielniki/wnęki zagnieżdżone ZA tym frontem) są od
+// siebie niezależne: front rysuje się jako tło całego node.rect, a wszystko
+// zagnieżdżone rysuje się NA WIERZCHU (później w DOM = wyżej wizualnie),
+// więc dalej można kliknąć i edytować to, co jest za frontem.
+// `parentH`/`parentV` = najbliższy węzeł 'split' (odpowiednio osi 'h'/'v'),
+// którego dzielnik rządzi wysokością/szerokością aktualnie renderowanego
+// węzła - przekazywane w dół rekurencji, PODMIENIANE tylko gdy mijamy split
+// tej samej osi (split przeciwnej osi nie zmienia np. zakresu Y, więc
+// "kto rządzi wysokością" zostaje ten sam, sprzed tego splitu). Używane przez
+// appendDimTag(), żeby wiedzieć, który dzielnik przesunąć przy edycji wymiaru.
+function renderNode(node, stage, px, insideFront = false, parentH = null, parentV = null) {
+  const hasFront = node.fronts.length > 0;
+  // "Ukryj fronty zewn." (render/viewer3d.js) ukrywa fronty tu tak samo jak
+  // w podglądzie 3D - front nadal istnieje (klik dalej otwiera "occupied"),
+  // ale rysuje się przezroczyście, żeby dało się zobaczyć, co jest za nim.
+  const frontsHidden = hasFront && !areFrontsVisible();
+  if (hasFront) {
+    renderFrontOverlay(node, stage, px, parentH, parentV, frontsHidden);
+  }
   if (node.type === "leaf") {
-    renderLeaf(node, stage, px);
+    if (!hasFront) renderLeaf(node, stage, px, insideFront, parentH, parentV);
     return;
   }
-  renderNode(node.a, stage, px);
-  renderNode(node.b, stage, px);
+  const nextParentH = node.axis === "h" ? node : parentH;
+  const nextParentV = node.axis === "v" ? node : parentV;
+  const nestedInsideFront = insideFront || (hasFront && !frontsHidden);
+  renderNode(node.a, stage, px, nestedInsideFront, nextParentH, nextParentV);
+  renderNode(node.b, stage, px, nestedInsideFront, nextParentH, nextParentV);
   renderDividerHandle(node, stage, px);
 }
 
-// Zwraca fragment wysokości wnęki { minY, maxY } ograniczony przez najbliższe
-// wolne półki wokół miejsca kliknięcia (albo całą wnękę, gdy nie ma żadnych
-// półek) - patrz core/zoneTree.js: splitZoneVertical(mod, node, band). Bez
-// tego "Podziel pionowo" zawsze rozpinało przegrodę na całą wysokość wnęki,
-// nawet gdy użytkownik wyraźnie kliknął w wąski prześwit między półkami.
-function computeClickBand(node, el, e) {
-  const { minY, maxY } = node.rect;
-  if (node.shelves.length === 0) return { minY, maxY };
-
-  const domRect = el.getBoundingClientRect();
-  const frac = (e.clientY - domRect.top) / domRect.height;
-  const clickY = maxY - frac * (maxY - minY); // oś Y odwrócona względem ekranu
-
-  let cursor = minY;
-  for (const s of node.shelves) { // posortowane rosnąco po y (patrz shelvesMatchingZone)
-    if (clickY < s.y) return { minY: cursor, maxY: s.y };
-    cursor = s.y + s.h;
-  }
-  return { minY: cursor, maxY };
+// Czy `node` leży po stronie 'a' (dół/lewo) czy 'b' (góra/prawo) dzielnika
+// węzła `parentSplit` - działa niezależnie od głębokości zagnieżdżenia, bo
+// split PROSTOPADŁEJ osi nie zmienia zakresu tej osi (patrz core/zoneTree.js).
+function dividerSide(node, parentSplit, isH) {
+  if (!parentSplit) return null;
+  return isH
+    ? Math.abs(node.rect.maxY - parentSplit.divider.y) < 3 ? "a" : "b"
+    : Math.abs(node.rect.maxX - parentSplit.divider.x) < 3 ? "a" : "b";
 }
 
-function renderLeaf(node, stage, px) {
+// Rysuje wymiary wnęki jak na rysunku technicznym: linia ze strzałkami na
+// obu końcach (szerokość - wzdłuż dołu, wysokość - wzdłuż prawej krawędzi),
+// przerwana "okienkiem" z liczbą (edytowalną, patrz appendDimNumber) i kłódką
+// blokującą ją przed automatycznym dociąganiem, gdy gdzie indziej w drzewie
+// coś innego się zmieni (core/zoneTree.js: divider.lockA/B). Wymiar bez
+// dzielnika, który by nim rządził (np. cała, niepodzielona jeszcze wnęka),
+// rysuje się tą samą linią ze strzałkami, ale liczba zostaje statyczna
+// (nie ma czego przesuwać).
+function appendDimTag(parentEl, node, parentH, parentV) {
+  appendDimLine(parentEl, true, node, parentV, dividerSide(node, parentV, false));
+  appendDimLine(parentEl, false, node, parentH, dividerSide(node, parentH, true));
+}
+
+const DIM_MARGIN = 7; // px od krawędzi wnęki, żeby strzałki nie nachodziły na jej ramkę
+
+function appendDimLine(parentEl, isH, node, parentSplit, side) {
+  const valueMm = isH ? node.rect.maxX - node.rect.minX : node.rect.maxY - node.rect.minY;
+  const locked = !!parentSplit && (side === "a" ? !!parentSplit.divider.lockA : !!parentSplit.divider.lockB);
+  const color = !parentSplit ? "#94a3b8" : locked ? "#b45309" : "#0284c7";
+
+  const line = document.createElement("div");
+  Object.assign(line.style, { position: "absolute", pointerEvents: "none" });
+  if (isH) {
+    Object.assign(line.style, { left: DIM_MARGIN + "px", right: DIM_MARGIN + "px", bottom: "4px", height: "1px", background: color });
+  } else {
+    Object.assign(line.style, { top: DIM_MARGIN + "px", bottom: DIM_MARGIN + "px", right: "4px", width: "1px", background: color });
+  }
+
+  const arrow = (atStart) => {
+    const a = document.createElement("div");
+    Object.assign(a.style, { position: "absolute", width: "0", height: "0" });
+    if (isH) {
+      a.style.top = "-3px";
+      Object.assign(a.style, { borderTop: "3px solid transparent", borderBottom: "3px solid transparent" });
+      if (atStart) { a.style.left = "0"; a.style.borderRight = `5px solid ${color}`; }
+      else { a.style.right = "0"; a.style.borderLeft = `5px solid ${color}`; }
+    } else {
+      a.style.left = "-3px";
+      Object.assign(a.style, { borderLeft: "3px solid transparent", borderRight: "3px solid transparent" });
+      if (atStart) { a.style.top = "0"; a.style.borderBottom = `5px solid ${color}`; }
+      else { a.style.bottom = "0"; a.style.borderTop = `5px solid ${color}`; }
+    }
+    return a;
+  };
+  line.appendChild(arrow(true));
+  line.appendChild(arrow(false));
+  parentEl.appendChild(line);
+
+  // "Okienko" - przerywa linię tam, gdzie siedzi liczba, dokładnie jak na
+  // rysunku technicznym. Osobny element (nie dziecko `line`, które ma
+  // pointer-events:none), wyśrodkowany na linii przez transform.
+  const windowEl = document.createElement("div");
+  Object.assign(windowEl.style, {
+    position: "absolute",
+    background: "rgba(255,255,255,0.95)",
+    border: `1px solid ${color}`,
+    borderRadius: "3px",
+    padding: "0 3px",
+    fontSize: "9px",
+    fontFamily: "sans-serif",
+    lineHeight: "13px",
+    display: "flex",
+    alignItems: "center",
+    gap: "1px",
+    whiteSpace: "nowrap",
+  });
+  if (isH) {
+    Object.assign(windowEl.style, { left: "50%", bottom: "4px", transform: "translate(-50%, 50%)" });
+  } else {
+    Object.assign(windowEl.style, { top: "50%", right: "4px", transform: "translate(50%, -50%)" });
+  }
+  windowEl.addEventListener("click", (e) => e.stopPropagation());
+  parentEl.appendChild(windowEl);
+
+  appendDimNumber(windowEl, valueMm, parentSplit, side, (mm) => {
+    const mod = getActiveModule();
+    if (isH) {
+      const newX = side === "a" ? node.rect.minX + mm : node.rect.maxX - mm - parentSplit.divider.w;
+      moveSplit(mod, parentSplit, newX);
+    } else {
+      const newY = side === "a" ? node.rect.minY + mm : node.rect.maxY - mm - parentSplit.divider.h;
+      moveSplit(mod, parentSplit, newY);
+    }
+    refreshAfterEdit();
+  });
+}
+
+function appendDimNumber(container, valueMm, parentSplit, side, onCommit) {
+  const rounded = Math.round(valueMm);
+  if (!parentSplit) {
+    const span = document.createElement("span");
+    span.innerText = rounded;
+    container.appendChild(span);
+    return;
+  }
+
+  const locked = side === "a" ? !!parentSplit.divider.lockA : !!parentSplit.divider.lockB;
+
+  const numSpan = document.createElement("span");
+  numSpan.innerText = rounded;
+  numSpan.title = "Kliknij, żeby wpisać dokładny wymiar";
+  Object.assign(numSpan.style, {
+    cursor: "pointer",
+    borderBottom: "1px dotted #0284c7",
+    color: locked ? "#b45309" : "#0284c7",
+    fontWeight: locked ? "bold" : "normal",
+  });
+  numSpan.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const input = document.createElement("input");
+    input.type = "number";
+    input.value = rounded;
+    Object.assign(input.style, { width: "36px", fontSize: "9px", padding: "0 2px", verticalAlign: "middle" });
+    input.addEventListener("click", (ev) => ev.stopPropagation());
+    input.addEventListener("keydown", (ev) => {
+      ev.stopPropagation();
+      if (ev.key === "Enter") input.blur();
+      if (ev.key === "Escape") { input.value = rounded; input.blur(); }
+    });
+    input.addEventListener("blur", () => {
+      const mm = parseFloat(input.value);
+      if (Number.isFinite(mm) && mm > 0 && Math.round(mm) !== rounded) onCommit(mm);
+      else if (input.parentNode) input.parentNode.replaceChild(numSpan, input);
+    });
+    container.replaceChild(input, numSpan);
+    input.focus();
+    input.select();
+  });
+
+  const lockBtn = document.createElement("span");
+  lockBtn.innerText = locked ? "🔒" : "🔓";
+  lockBtn.title = locked
+    ? "Odblokuj ten wymiar (znów będzie się dostosowywał automatycznie)"
+    : "Zablokuj ten wymiar (nie zmieni się, gdy dostosowują się inne wnęki)";
+  Object.assign(lockBtn.style, { cursor: "pointer", fontSize: "8px" });
+  lockBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (side === "a") parentSplit.divider.lockA = !locked; else parentSplit.divider.lockB = !locked;
+    refreshAfterEdit();
+  });
+
+  container.appendChild(numSpan);
+  container.appendChild(lockBtn);
+}
+
+// `insideFront` = ta pusta wnęka leży wewnątrz regionu, który ma już
+// przypisany front na wyższym poziomie drzewa (patrz renderNode) - front
+// rysuje się jako tło pod spodem, więc tu NIE możemy dać nieprzezroczystego
+// wypełnienia, bo zasłoniłoby front (i jego etykietę/wymiar) całkowicie.
+// Zamiast tego tylko przerywana ramka, żeby dało się kliknąć i dodać kolejny
+// podział, a front dalej było widać "przez" tę wnękę.
+function renderLeaf(node, stage, px, insideFront = false, parentH = null, parentV = null) {
   const { minX, maxX, minY, maxY } = node.rect;
   const el = document.createElement("div");
-  const isOccupied = node.fronts.length > 0;
-  const isMultiFront = node.fronts.length > 1;
-  const colors = isOccupied ? FRONT_COLORS[node.fronts[0].subtype] || { fill: "#f1f5f9", border: "#94a3b8" } : null;
+  const idleBg = insideFront ? "transparent" : "#f8fafc";
+  const hoverBg = insideFront ? "rgba(224,242,254,0.55)" : "#e0f2fe";
 
-  // Przy kilku frontach w jednej wnęce (np. 3 szuflady jedna nad drugą) sam
-  // prostokąt wnęki zostaje tylko celem kliknięcia (cała grupa to jeden front
-  // w sensie "Usuń front"/kierunek otwierania) - realny podział rysują
-  // osobne, nieklikalne boksy niżej, każdy na własnej pozycji z layoutu.
   Object.assign(el.style, {
     position: "absolute",
     left: px.toPxX(minX) + "px",
@@ -183,34 +339,120 @@ function renderLeaf(node, stage, px) {
     width: px.toPxLen(maxX - minX) + "px",
     height: px.toPxLen(maxY - minY) + "px",
     boxSizing: "border-box",
-    border: isOccupied ? (isMultiFront ? `1px dashed ${colors.border}` : `1.5px solid ${colors.border}`) : "1px dashed #cbd5e1",
-    background: isOccupied ? (isMultiFront ? "transparent" : colors.fill) : "#f8fafc",
+    border: insideFront ? "1px dashed rgba(100,116,139,0.6)" : "1px dashed #cbd5e1",
+    background: idleBg,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     cursor: "pointer",
     fontSize: "11px",
-    color: isOccupied ? colors.border : "#94a3b8",
+    color: insideFront ? "#475569" : "#94a3b8",
     transition: "background .12s",
   });
   el.dataset.leaf = "1";
+  el.innerText = "+ pusta wnęka";
 
-  if (isOccupied && !isMultiFront) {
-    el.innerText = FRONT_LABELS[node.fronts[0].subtype] || node.fronts[0].subtype;
-  } else if (!isOccupied) {
-    el.innerText = "+ pusta wnęka";
-  }
-
-  el.addEventListener("mouseenter", () => { if (!isOccupied) el.style.background = "#e0f2fe"; });
-  el.addEventListener("mouseleave", () => { if (!isOccupied) el.style.background = "#f8fafc"; });
+  el.addEventListener("mouseenter", () => { el.style.background = hoverBg; });
+  el.addEventListener("mouseleave", () => { el.style.background = idleBg; });
   el.addEventListener("click", (e) => {
     e.stopPropagation();
-    selectNode(node, el, stage, px, isOccupied ? "occupied" : "empty", computeClickBand(node, el, e));
+    selectNode(node, el, stage, px, "empty");
   });
 
   stage.appendChild(el);
+  appendDimTag(el, node, parentH, parentV);
+}
 
-  if (isMultiFront) {
+// Rysuje front (jeden albo kilka, np. 3 szuflady jedna nad drugą) rozpięty na
+// CAŁYM node.rect - node może być 'leaf' ALBO 'split' (patrz komentarz przy
+// renderNode). Przy kilku frontach w tej samej wnęce sam prostokąt node.rect
+// zostaje tylko celem kliknięcia (cała grupa to jeden front w sensie "Usuń
+// front"/kierunek otwierania) - realny podział rysują osobne, nieklikalne
+// boksy niżej, każdy na własnej pozycji z layoutu.
+// `hidden` = przycisk "Ukryj fronty zewn." (render/viewer3d.js) jest aktywny -
+// front nadal ISTNIEJE i klik na niego dalej otwiera "occupied" (żeby dało
+// się go np. usunąć czy zmienić), ale rysuje się przezroczyście, żeby dało
+// się zobaczyć, co jest realnie za nim (dokładnie to samo, co ten przycisk
+// robi już w podglądzie 3D).
+function renderFrontOverlay(node, stage, px, parentH = null, parentV = null, hidden = false) {
+  const { minX, maxX, minY, maxY } = node.rect;
+  const isMultiFront = node.fronts.length > 1;
+  // Węzeł 'split' ma zagnieżdżoną, klikalną zawartość (dzielniki, puste
+  // pod-wnęki) rysowaną NA WIERZCHU tego overlayu (patrz renderNode) - duża
+  // wyśrodkowana etykieta kolidowałaby wtedy wizualnie z ich własnymi "+
+  // pusta wnęka", więc dla takich węzłów etykieta frontu idzie do rogu.
+  const hasNestedContent = node.type === "split";
+  const colors = FRONT_COLORS[node.fronts[0].subtype] || { fill: "#f1f5f9", border: "#94a3b8" };
+  const badgeStyle = hidden || hasNestedContent;
+
+  const el = document.createElement("div");
+  Object.assign(el.style, {
+    position: "absolute",
+    left: px.toPxX(minX) + "px",
+    top: px.toPxY(maxY) + "px",
+    width: px.toPxLen(maxX - minX) + "px",
+    height: px.toPxLen(maxY - minY) + "px",
+    boxSizing: "border-box",
+    border: hidden ? "1px dashed rgba(100,116,139,0.6)" : isMultiFront ? `1px dashed ${colors.border}` : `1.5px solid ${colors.border}`,
+    background: hidden ? "transparent" : isMultiFront ? "transparent" : colors.fill,
+    display: isMultiFront || badgeStyle ? "block" : "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    fontSize: "11px",
+    color: colors.border,
+  });
+  el.dataset.leaf = "1";
+
+  if (!isMultiFront) {
+    const labelText = (FRONT_LABELS[node.fronts[0].subtype] || node.fronts[0].subtype) + (hidden ? " (ukryty)" : "");
+    if (badgeStyle) {
+      const badge = document.createElement("div");
+      badge.innerText = labelText;
+      Object.assign(badge.style, {
+        position: "absolute",
+        left: "4px",
+        top: "2px",
+        fontSize: "10px",
+        fontWeight: "bold",
+        color: colors.border,
+        background: "rgba(255,255,255,0.85)",
+        padding: "0 4px",
+        borderRadius: "3px",
+        pointerEvents: "none",
+      });
+      el.appendChild(badge);
+    } else {
+      el.innerText = labelText;
+    }
+  } else if (hidden) {
+    const label = FRONT_LABELS[node.fronts[0].subtype] || node.fronts[0].subtype;
+    const badge = document.createElement("div");
+    badge.innerText = `${label} ×${node.fronts.length} (ukryte)`;
+    Object.assign(badge.style, {
+      position: "absolute",
+      left: "4px",
+      top: "2px",
+      fontSize: "10px",
+      fontWeight: "bold",
+      color: colors.border,
+      background: "rgba(255,255,255,0.85)",
+      padding: "0 4px",
+      borderRadius: "3px",
+      pointerEvents: "none",
+    });
+    el.appendChild(badge);
+  }
+
+  el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    selectNode(node, el, stage, px, "occupied");
+  });
+
+  stage.appendChild(el);
+  appendDimTag(el, node, parentH, parentV);
+
+  if (isMultiFront && !hidden) {
     node.fronts.forEach((front) => {
       const fx = parseFloat(front.x);
       const fy = parseFloat(front.y);
@@ -241,57 +483,6 @@ function renderLeaf(node, stage, px) {
       stage.appendChild(box);
     });
   }
-
-  // Wolne półki (isDivider: false, patrz core/zoneTree.js) - rysowane zawsze
-  // NA WIERZCHU wnęki (nawet obsadzonej frontem), bo w przeciwieństwie do
-  // dzielników nie tworzą osobnych węzłów drzewa do narysowania rekurencją.
-  node.shelves.forEach((shelf) => {
-    const line = document.createElement("div");
-    Object.assign(line.style, {
-      position: "absolute",
-      left: px.toPxX(shelf.x) + "px",
-      top: px.toPxY(shelf.y + shelf.h) + "px",
-      width: px.toPxLen(shelf.w) + "px",
-      height: Math.max(px.toPxLen(shelf.h), 3) + "px",
-      background: shelf.isStructural ? "#a7f3d0" : "#e2e8f0",
-      border: "1px solid #64748b",
-      boxSizing: "border-box",
-      cursor: "pointer",
-      zIndex: "1",
-    });
-    line.title = shelf.isStructural ? "Półka konstrukcyjna" : "Półka ruchoma";
-    line.addEventListener("click", (e) => {
-      e.stopPropagation();
-      selectNode({ type: "shelf", shelf }, line, stage, px, "shelf");
-    });
-    stage.appendChild(line);
-  });
-
-  // Przegrody pionowe ograniczone do fragmentu wysokości wnęki (patrz
-  // core/zoneTree.js: splitZoneVertical z podanym `band`) - z tego samego
-  // powodu co wolne półki, nie tworzą węzła drzewa, więc trzeba je narysować
-  // tutaj osobno.
-  node.verticals.forEach((v) => {
-    const bar = document.createElement("div");
-    Object.assign(bar.style, {
-      position: "absolute",
-      left: px.toPxX(v.x) + "px",
-      top: px.toPxY(v.y + v.h) + "px",
-      width: Math.max(px.toPxLen(v.w), 3) + "px",
-      height: px.toPxLen(v.h) + "px",
-      background: "#e2e8f0",
-      border: "1px solid #64748b",
-      boxSizing: "border-box",
-      cursor: "pointer",
-      zIndex: "1",
-    });
-    bar.title = "Przegroda pionowa";
-    bar.addEventListener("click", (e) => {
-      e.stopPropagation();
-      selectNode({ type: "vertical", vertical: v }, bar, stage, px, "vertical");
-    });
-    stage.appendChild(bar);
-  });
 }
 
 function renderDividerHandle(node, stage, px) {
@@ -374,14 +565,12 @@ function closeToolbar() {
   if (existing) existing.remove();
   selectedNode = null;
   toolbarMode = null;
-  selectedBand = null;
 }
 
-function selectNode(node, anchorEl, stage, px, mode, band = null) {
+function selectNode(node, anchorEl, stage, px, mode) {
   closeToolbar();
   selectedNode = node;
   toolbarMode = mode;
-  selectedBand = band;
 
   const toolbar = document.createElement("div");
   toolbar.id = "interior-toolbar";
@@ -434,16 +623,10 @@ function selectNode(node, anchorEl, stage, px, mode, band = null) {
       splitZoneHorizontal(mod, selectedNode);
       refreshAfterEdit();
     });
-    addBtn(
-      "⬌ Podziel pionowo",
-      selectedBand && (selectedBand.minY > selectedNode.rect.minY + 1 || selectedBand.maxY < selectedNode.rect.maxY - 1)
-        ? "Dodaj przegrodę tylko w obrębie klikniętego prześwitu (między półkami)"
-        : "Dodaj przegrodę na środku szerokości, na całą wysokość wnęki",
-      () => {
-        splitZoneVertical(mod, selectedNode, selectedBand);
-        refreshAfterEdit();
-      }
-    );
+    addBtn("⬌ Podziel pionowo", "Dodaj przegrodę na środku szerokości", () => {
+      splitZoneVertical(mod, selectedNode);
+      refreshAfterEdit();
+    });
     addBtn("▭ Drzwi", "Zabuduj wnękę pojedynczymi drzwiami", () => {
       assignFront(mod, selectedNode, "drzwi");
       refreshAfterEdit();
@@ -455,12 +638,6 @@ function selectNode(node, anchorEl, stage, px, mode, band = null) {
     appendDrawerPicker(toolbar, mod, "szuflada", "📦 Szuflady zewn.");
     appendDrawerPicker(toolbar, mod, "szuflada-wewnetrzna", "📥 Szuflady wewn.");
     appendAutoShelvesPicker(toolbar, mod, selectedNode);
-    if (selectedNode.shelves.length > 0) {
-      addBtn(`🗑️ Usuń półki (${selectedNode.shelves.length})`, "Usuwa wszystkie wolne półki tej wnęki", () => {
-        removeShelves(mod, selectedNode);
-        refreshAfterEdit();
-      }, true);
-    }
   } else if (mode === "occupied") {
     const subtype = selectedNode.fronts[0]?.subtype;
     const label = FRONT_LABELS[subtype] || subtype;
@@ -476,15 +653,21 @@ function selectNode(node, anchorEl, stage, px, mode, band = null) {
         refreshAfterEdit();
       });
     }
-    // Wolne półki (patrz core/zoneTree.js: addEvenShelves) NIE dzielą wnęki,
-    // więc w odróżnieniu od "Podziel poziomo" można je dodać także tutaj,
-    // za już przypisanym frontem, bez jego usuwania.
-    appendAutoShelvesPicker(toolbar, mod, selectedNode);
-    if (selectedNode.shelves.length > 0) {
-      addBtn(`🗑️ Usuń półki (${selectedNode.shelves.length})`, "Usuwa wszystkie wolne półki tej wnęki", () => {
-        removeShelves(mod, selectedNode);
+    // Podziel/półki równo można dodać TYLKO wtedy, gdy ta wnęka jeszcze nie ma
+    // żadnego wewnętrznego podziału (node.type === 'leaf') - front przetrwa
+    // (patrz core/zoneTree.js). Jeśli podział już istnieje, kolejny dodaje się
+    // klikając bezpośrednio w konkretną, pustą pod-wnękę (widoczną "przez"
+        // ten front, bo rysuje się na wierzchu - patrz renderNode).
+    if (selectedNode.type === "leaf") {
+      addBtn("⬍ Podziel poziomo", "Dodaj półkę za frontem (front zostaje)", () => {
+        splitZoneHorizontal(mod, selectedNode);
         refreshAfterEdit();
-      }, true);
+      });
+      addBtn("⬌ Podziel pionowo", "Dodaj przegrodę za frontem (front zostaje)", () => {
+        splitZoneVertical(mod, selectedNode);
+        refreshAfterEdit();
+      });
+      appendAutoShelvesPicker(toolbar, mod, selectedNode);
     }
     addBtn("🗑️ Usuń front", "Usuwa front, wnęka zostaje pusta", () => {
       // usunięcie frontu = przypisanie "pustego" -> wystarczy usunąć elementy z fronts
@@ -507,25 +690,8 @@ function selectNode(node, anchorEl, stage, px, mode, band = null) {
         enterAlignMode(mod, divider);
       });
     }
-    addBtn("🗑️ Usuń podział", "Usuwa dzielnik i wszystko, co jest w obu powstałych z niego wnękach", () => {
+    addBtn("🗑️ Usuń podział", "Usuwa dzielnik i wszystko, co jest w obu powstałych z niego wnękach (front na całości, jeśli był, zostaje)", () => {
       removeSplit(mod, selectedNode);
-      refreshAfterEdit();
-    }, true);
-  } else if (mode === "shelf") {
-    const shelf = selectedNode.shelf;
-    addBtn(
-      shelf.isStructural ? "🔩 Zmień na ruchomą" : "🔩 Zmień na konstrukcyjną",
-      "Konstrukcyjna = na stałe wkręcona, ruchoma = na podpórkach",
-      () => { shelf.isStructural = !shelf.isStructural; refreshAfterEdit(); }
-    );
-    addBtn("🗑️ Usuń tę półkę", "Usuwa tę wolną półkę", () => {
-      mod.elements = mod.elements.filter((el) => el.id !== shelf.id);
-      refreshAfterEdit();
-    }, true);
-  } else if (mode === "vertical") {
-    const vertical = selectedNode.vertical;
-    addBtn("🗑️ Usuń tę przegrodę", "Usuwa tę przegrodę pionową", () => {
-      mod.elements = mod.elements.filter((el) => el.id !== vertical.id);
       refreshAfterEdit();
     }, true);
   }
@@ -577,7 +743,7 @@ function appendDrawerPicker(toolbar, mod, subtype, label) {
   toolbar.appendChild(wrap);
 }
 
-// Rozmieszcza N wolnych półek równomiernie w wnęce (pustej albo już obsadzonej
+// Rozmieszcza N półek równomiernie w wnęce (pustej albo już obsadzonej
 // frontem - patrz core/zoneTree.js: addEvenShelves) - odstępy liczone przez
 // core/shelfMath.js.
 function appendAutoShelvesPicker(toolbar, mod, node) {

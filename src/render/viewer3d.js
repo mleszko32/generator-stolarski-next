@@ -17,8 +17,15 @@ import { updateSidebar } from '../ui/sidebar.js';
 import { initPropertiesPanel } from '../ui/properties.js';
 
 let alignMode = { active: false, sourceMod: null, sourceEl: null, banner: null };
-let isXrayMode = true; 
-let isFrontsVisible = true; 
+let isXrayMode = true;
+let isFrontsVisible = true;
+
+// Odczyt stanu przycisku "Ukryj/Pokaż fronty zewn." dla ui/interiorEditor.js -
+// ten sam przełącznik ma teraz ukrywać fronty także we Wnętrzu 2D, nie tylko
+// w podglądzie 3D (patrz toggleFrontsBtn.onclick niżej).
+export function areFrontsVisible() {
+  return isFrontsVisible;
+}
 
 let isDragging = false;
 let dragTarget = null;
@@ -461,6 +468,7 @@ export function init3DViewer() {
       toggleFrontsBtn.innerText = isFrontsVisible ? '🚪 Ukryj fronty zewn.' : '🚪 Pokaż fronty zewn.';
       toggleFrontsBtn.style.background = isFrontsVisible ? '#8b5cf6' : '#64748b';
       update3D();
+      renderInteriorEditorIfVisible();
   };
 
   const toggleInteriorBtn = document.createElement('button');

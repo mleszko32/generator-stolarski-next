@@ -9,7 +9,6 @@ import {
   assignFront,
   moveSplit,
   addEvenShelves,
-  removeShelves,
 } from "./zoneTree.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
 import { recalculateLayout } from "./layout.js";
@@ -70,7 +69,7 @@ describe("splitZoneHorizontal / splitZoneVertical", () => {
     expect(tree.b.rect.minX).toBeCloseTo(309);
   });
 
-  it("dzielenie obsadzonej frontem wnęki usuwa front", () => {
+  it("dzielenie obsadzonej frontem wnęki NIE usuwa frontu - obejmuje teraz cały węzeł 'split'", () => {
     const mod = setup();
     let root = buildZoneTree(mod);
     assignFront(mod, root, "drzwi");
@@ -80,6 +79,9 @@ describe("splitZoneHorizontal / splitZoneVertical", () => {
     splitZoneHorizontal(mod, root);
     const tree = buildZoneTree(mod);
     expect(tree.type).toBe("split");
+    // front przetrwał i "przeniósł się" na węzeł 'split' obejmujący całość -
+    // baseZone się nie zmienił, nadal pasuje do tego samego rect.
+    expect(tree.fronts).toHaveLength(1);
     expect(tree.a.fronts).toHaveLength(0);
     expect(tree.b.fronts).toHaveLength(0);
   });
@@ -129,6 +131,42 @@ describe("assignFront", () => {
     const tree = buildZoneTree(mod);
     expect(tree.fronts).toHaveLength(2);
     expect(tree.fronts.every((f) => f.subtype === "szuflada")).toBe(true);
+  });
+
+  it("można obsadzić frontem węzeł 'split' (front obejmuje całe poddrzewo z półkami w środku)", () => {
+    const mod = setup();
+    const root = buildZoneTree(mod);
+    splitZoneHorizontal(mod, root); // jedna półka - wnęka to teraz węzeł 'split'
+
+    const tree = buildZoneTree(mod);
+    expect(tree.type).toBe("split");
+    assignFront(mod, tree, "drzwi");
+
+    const after = buildZoneTree(mod);
+    expect(after.type).toBe("split"); // półka nadal tam jest
+    expect(after.fronts).toHaveLength(1);
+    expect(after.fronts[0].baseZone).toMatchObject(INNER); // front na CAŁĄ wnękę, nie tylko połowę
+  });
+
+  it("obsadzenie ANCESTORA frontem usuwa fronty wcześniej przypisane głębiej w jego poddrzewie (bez duplikatów)", () => {
+    const mod = setup();
+    const root = buildZoneTree(mod);
+    addEvenShelves(mod, root, 3); // trzy półki - kilka zagnieżdżonych węzłów 'split'
+
+    let tree = buildZoneTree(mod);
+    // obsadź jedną z węższych, zagnieżdżonych wnęk frontem
+    assignFront(mod, tree.b.a, "szuflada", { distribution: "1" });
+    tree = buildZoneTree(mod);
+    expect(tree.b.a.fronts).toHaveLength(1);
+
+    // teraz obsadź frontem CAŁY korpus (najwyższy węzeł) - poprzedni,
+    // zagnieżdżony front nie powinien przetrwać jako "duch" pod spodem
+    assignFront(mod, tree, "drzwi");
+
+    const after = buildZoneTree(mod);
+    expect(after.fronts).toHaveLength(1);
+    expect(after.fronts[0].subtype).toBe("drzwi");
+    expect(mod.elements.filter((el) => el.typ === "front")).toHaveLength(1);
   });
 });
 
@@ -186,7 +224,7 @@ describe("integracja z recalculateLayout (core/layout.js)", () => {
 });
 
 describe("removeSplit", () => {
-  it("usuwa dzielnik i całą zagnieżdżoną zawartość, scalając z powrotem w jedną wnękę", () => {
+  it("usuwa dzielnik i fronty BEZPOŚREDNIO na jego dwóch stronach, scalając je z powrotem w jedną wnękę", () => {
     const mod = setup();
     let root = buildZoneTree(mod);
     splitZoneHorizontal(mod, root);
@@ -202,26 +240,74 @@ describe("removeSplit", () => {
     expect(tree).toMatchObject({ type: "leaf", rect: INNER, fronts: [] });
     expect(mod.elements).toHaveLength(0);
   });
+
+  it("usuwa TYLKO ten jeden podział - głębiej zagnieżdżony podział (i jego fronty) po drugiej stronie przetrwa scalenie", () => {
+    const mod = setup();
+    let root = buildZoneTree(mod);
+    splitZoneHorizontal(mod, root); // dół (a) / góra (b)
+    root = buildZoneTree(mod);
+    assignFront(mod, root.a, "drzwi"); // front bezpośrednio na dolnej wnęce - ma zniknąć
+
+    splitZoneVertical(mod, root.b); // góra podzielona dalej na dwie kolumny
+    root = buildZoneTree(mod);
+    assignFront(mod, root.b.a, "szuflada", { distribution: "1" });
+    assignFront(mod, root.b.b, "drzwi", { openingSide: "right" });
+    root = buildZoneTree(mod);
+    const nestedDividerId = root.b.divider.id;
+
+    removeSplit(mod, root); // usuń TYLKO dolny/górny podział (root), nie ten w środku
+
+    // W prawdziwym flow (ui/interiorEditor.js: refreshAfterEdit) update3D()
+    // wywołuje recalculateLayout() dla każdego modułu PRZED przebudową drzewa
+    // - to ono odświeża literalne baseZone.min/max frontów na podstawie
+    // bound-referencji (core/layout.js), które removeSplit właśnie przepięło.
+    recalculateLayout(mod);
+
+    const tree = buildZoneTree(mod);
+    // scaliło się w JEDNĄ wnękę na starym miejscu root.a (front tam usunięty)...
+    expect(tree.type).toBe("split"); // ...ale zagnieżdżony podział (dawne root.b) przetrwał
+    expect(tree.axis).toBe("v");
+    expect(tree.divider.id).toBe(nestedDividerId);
+    expect(tree.rect).toEqual(INNER); // scalona wnęka rozpina się na CAŁY korpus
+    expect(tree.a.fronts).toHaveLength(1);
+    expect(tree.a.fronts[0].subtype).toBe("szuflada");
+    expect(tree.b.fronts).toHaveLength(1);
+    expect(tree.b.fronts[0].subtype).toBe("drzwi");
+  });
+
+  it("zachowuje front przypisany do SAMEGO usuwanego węzła 'split' (front na całość, bez półki w środku)", () => {
+    const mod = setup();
+    let root = buildZoneTree(mod);
+    assignFront(mod, root, "drzwi"); // front na całą (jeszcze niepodzieloną) wnękę
+    root = buildZoneTree(mod);
+    splitZoneHorizontal(mod, root); // dodaj półkę - front "przenosi się" na węzeł split
+    root = buildZoneTree(mod);
+    expect(root.type).toBe("split");
+    expect(root.fronts).toHaveLength(1);
+
+    removeSplit(mod, root); // usuń tylko półkę, front ma zostać
+
+    const tree = buildZoneTree(mod);
+    expect(tree).toMatchObject({ type: "leaf", rect: INNER });
+    expect(tree.fronts).toHaveLength(1);
+  });
 });
 
 describe("addEvenShelves", () => {
-  it("dodaje wolne półki do PUSTEJ wnęki bez dzielenia drzewa (nie blokuje późniejszego frontu na całość)", () => {
+  it("dzieli wnękę na N+1 niezależnych wnęk (prawdziwe zagnieżdżone podziały)", () => {
     const mod = setup();
     const root = buildZoneTree(mod);
     addEvenShelves(mod, root, 2);
 
     const tree = buildZoneTree(mod);
-    expect(tree.type).toBe("leaf"); // wolne półki NIE tworzą węzłów 'split'
-    expect(tree.shelves).toHaveLength(2);
-
-    // front na całą wnękę nadal możliwy mimo obecnych półek
-    assignFront(mod, tree, "drzwi");
-    const after = buildZoneTree(mod);
-    expect(after.fronts).toHaveLength(1);
-    expect(after.shelves).toHaveLength(2);
+    expect(tree.type).toBe("split");
+    expect(tree.axis).toBe("h");
+    expect(tree.b.type).toBe("split"); // druga półka zagnieżdżona w górnej części
+    expect(tree.b.axis).toBe("h");
+    expect(tree.b.b.type).toBe("leaf"); // trzy wnęki finalnie: a, b.a, b.b
   });
 
-  it("dodaje wolne półki do wnęki JUŻ obsadzonej frontem, nie usuwając go", () => {
+  it("front przypisany PRZED dodaniem półek przetrwa - obejmuje całe poddrzewo", () => {
     const mod = setup();
     let root = buildZoneTree(mod);
     assignFront(mod, root, "drzwi");
@@ -230,85 +316,46 @@ describe("addEvenShelves", () => {
     addEvenShelves(mod, root, 3);
 
     const tree = buildZoneTree(mod);
-    expect(tree.fronts).toHaveLength(1); // front przetrwał
-    expect(tree.shelves).toHaveLength(3);
+    expect(tree.fronts).toHaveLength(1); // front przetrwał na węźle obejmującym całość
+    expect(tree.fronts[0].baseZone).toMatchObject(INNER);
+  });
+
+  it("po dodaniu półek każda z powstałych wnęk jest osobno obsadzalna frontem", () => {
+    const mod = setup();
+    const root = buildZoneTree(mod);
+    addEvenShelves(mod, root, 1); // jedna półka -> dwie niezależne wnęki (a, b)
+
+    let tree = buildZoneTree(mod);
+    assignFront(mod, tree.a, "szuflada", { distribution: "1" });
+    tree = buildZoneTree(mod);
+    assignFront(mod, tree.b, "drzwi");
+
+    const after = buildZoneTree(mod);
+    expect(after.a.fronts).toHaveLength(1);
+    expect(after.a.fronts[0].subtype).toBe("szuflada");
+    expect(after.b.fronts).toHaveLength(1);
+    expect(after.b.fronts[0].subtype).toBe("drzwi");
   });
 });
 
-describe("splitZoneVertical z wolnymi półkami w tle", () => {
-  it("nie gubi wolnych półek przy dodaniu przegrody pionowej - rozcina je na dwie kolumny", () => {
+describe("przegroda pionowa MIĘDZY dwiema półkami", () => {
+  it("kliknięcie w konkretną (środkową) wnękę powstałą z dwóch półek naturalnie ogranicza przegrodę do niej", () => {
     const mod = setup();
     const root = buildZoneTree(mod);
-    addEvenShelves(mod, root, 2); // dwie wolne półki na całą szerokość wnęki
+    addEvenShelves(mod, root, 2); // dwie półki -> trzy wnęki: dół, środek, góra
 
-    const leaf = buildZoneTree(mod);
-    splitZoneVertical(mod, leaf);
+    let tree = buildZoneTree(mod);
+    const middleLeaf = tree.b.a; // środkowa wnęka (patrz addEvenShelves test wyżej: b.a, b.b)
+    expect(middleLeaf.type).toBe("leaf");
+    splitZoneVertical(mod, middleLeaf);
 
-    const tree = buildZoneTree(mod);
-    expect(tree.type).toBe("split");
-    expect(tree.axis).toBe("v");
-    // każda z 2 półek rozcięta na kolumnę lewą i prawą -> po 2 w każdej wnęce
-    expect(tree.a.shelves).toHaveLength(2);
-    expect(tree.b.shelves).toHaveLength(2);
-    // rozcięte kawałki mieszczą się dokładnie w swojej (węższej) kolumnie
-    tree.a.shelves.forEach((s) => {
-      expect(s.x).toBeCloseTo(tree.a.rect.minX);
-      expect(s.x + s.w).toBeCloseTo(tree.a.rect.maxX);
-    });
-    tree.b.shelves.forEach((s) => {
-      expect(s.x).toBeCloseTo(tree.b.rect.minX);
-      expect(s.x + s.w).toBeCloseTo(tree.b.rect.maxX);
-    });
-  });
-});
-
-describe("splitZoneVertical z ograniczonym `band`", () => {
-  it("ogranicza przegrodę do prześwitu MIĘDZY półkami, nie ruszając samych półek", () => {
-    const mod = setup();
-    const root = buildZoneTree(mod);
-    const [shelfA, shelfB] = addEvenShelves(mod, root, 2); // dwie wolne półki, shelfA niżej niż shelfB
-
-    let leaf = buildZoneTree(mod);
-    const gapBetween = { minY: shelfA.y + shelfA.h, maxY: shelfB.y };
-    splitZoneVertical(mod, leaf, gapBetween);
-
-    const tree = buildZoneTree(mod);
-    // przegroda NIE dzieli drzewa (nie rozpina się na pełną wysokość wnęki)
-    expect(tree.type).toBe("leaf");
-    // obie półki przetrwały nietknięte (żadna nie została rozcięta)
-    expect(tree.shelves).toHaveLength(2);
-    expect(tree.shelves.map((s) => s.id).sort()).toEqual([shelfA.id, shelfB.id].sort());
-    // przegroda widoczna jako "wolna" (ograniczona wysokościowo), nie jako dzielnik
-    expect(tree.verticals).toHaveLength(1);
-    expect(tree.verticals[0].y).toBeCloseTo(gapBetween.minY);
-    expect(tree.verticals[0].y + tree.verticals[0].h).toBeCloseTo(gapBetween.maxY);
-  });
-
-  it("bez podanego `band` (albo bez żadnych półek) działa jak dawniej - pełna wysokość i prawdziwy podział drzewa", () => {
-    const mod = setup();
-    const root = buildZoneTree(mod);
-    splitZoneVertical(mod, root);
-
-    const tree = buildZoneTree(mod);
-    expect(tree.type).toBe("split");
-    expect(tree.axis).toBe("v");
-  });
-});
-
-describe("removeShelves", () => {
-  it("usuwa wolne półki wnęki, zostawiając front nietknięty", () => {
-    const mod = setup();
-    let root = buildZoneTree(mod);
-    assignFront(mod, root, "drzwi");
-    root = buildZoneTree(mod);
-    addEvenShelves(mod, root, 2);
-    root = buildZoneTree(mod);
-
-    removeShelves(mod, root);
-
-    const tree = buildZoneTree(mod);
-    expect(tree.shelves).toHaveLength(0);
-    expect(tree.fronts).toHaveLength(1);
+    tree = buildZoneTree(mod);
+    // przegroda podzieliła TYLKO środkową wnękę - dolna i górna zostały nietknięte (dalej 'leaf')
+    expect(tree.a.type).toBe("leaf");
+    expect(tree.b.a.type).toBe("split");
+    expect(tree.b.a.axis).toBe("v");
+    expect(tree.b.a.rect).toEqual(middleLeaf.rect); // przegroda nie wyszła poza granice tej wnęki
+    expect(tree.b.b.type).toBe("leaf");
   });
 });
 
@@ -353,6 +400,32 @@ describe("moveSplit", () => {
     expect(tree.b.rect).toEqual({ minX: 18, maxX: 582, minY: 418, maxY: 702 });
   });
 
+  it("przesunięcie przegrody pionowej PRZESKALOWUJE zagnieżdżone półki po obu stronach (nie gubi ich)", () => {
+    const mod = setup();
+    let root = buildZoneTree(mod);
+    addEvenShelves(mod, root, 2); // dwie półki, wnęka staje się węzłem 'split' (axis h)
+    root = buildZoneTree(mod);
+
+    // dodaj przegrodę pionową w środkowej wnęce (między półkami)
+    const middleLeaf = root.b.a;
+    splitZoneVertical(mod, middleLeaf);
+
+    root = buildZoneTree(mod);
+    const vSplit = root.b.a; // węzeł 'split' (axis v) w środkowej wnęce
+    expect(vSplit.type).toBe("split");
+    expect(vSplit.axis).toBe("v");
+
+    moveSplit(mod, vSplit, vSplit.rect.minX + 100); // przesuń przegrodę w prawo
+
+    const tree = buildZoneTree(mod);
+    const movedV = tree.b.a;
+    expect(movedV.type).toBe("split");
+    expect(movedV.divider.x).toBeCloseTo(vSplit.rect.minX + 100);
+    // obie kolumny nadal istnieją i razem wypełniają dokładnie starą szerokość wnęki
+    expect(movedV.a.rect.minX).toBeCloseTo(vSplit.rect.minX);
+    expect(movedV.b.rect.maxX).toBeCloseTo(vSplit.rect.maxX);
+  });
+
   it("nie pozwala docisnąć dzielnika bliżej niż MIN_GAP do krawędzi wnęki", () => {
     const mod = setup();
     const root = buildZoneTree(mod);
@@ -362,5 +435,57 @@ describe("moveSplit", () => {
     moveSplit(mod, tree, 5); // dużo poniżej dolnej krawędzi (18) + MIN_GAP
     const after = buildZoneTree(mod);
     expect(after.divider.y).toBeCloseTo(48); // rect.minY(18) + MIN_GAP(30)
+  });
+
+  describe("zablokowany wymiar (divider.lockA / lockB)", () => {
+    it("przesunięcie dzielnika WYŻEJ w drzewie respektuje lockA nested dzielnika po drodze - cała zmiana idzie na drugą stronę", () => {
+      const mod = setup();
+      let root = buildZoneTree(mod);
+      addEvenShelves(mod, root, 2); // trzy wnęki: dół (a), środek (b.a), góra (b.b)
+      root = buildZoneTree(mod);
+
+      const middleHeight = root.b.a.rect.maxY - root.b.a.rect.minY;
+      root.b.divider.lockA = true; // zablokuj wysokość ŚRODKOWEJ wnęki (strona 'a' węzła root.b)
+
+      // przesuń NAJNIŻSZY dzielnik (root) - to przeskalowuje CAŁY węzeł root.b
+      // (a więc i zagnieżdżony root.b.divider) przez rescaleSubtree
+      moveSplit(mod, root, root.divider.y - 80);
+
+      const tree = buildZoneTree(mod);
+      const newMiddleHeight = tree.b.a.rect.maxY - tree.b.a.rect.minY;
+      expect(newMiddleHeight).toBeCloseTo(middleHeight);
+    });
+
+    it("przesunięcie dzielnika WYŻEJ w drzewie też respektuje lockB nested dzielnika po drodze", () => {
+      const mod = setup();
+      let root = buildZoneTree(mod);
+      addEvenShelves(mod, root, 2); // dół (a), środek (b.a), góra (b.b)
+      root = buildZoneTree(mod);
+
+      const topHeight = root.b.b.rect.maxY - root.b.b.rect.minY;
+      root.b.divider.lockB = true; // zablokuj wysokość GÓRNEJ wnęki (strona 'b' węzła root.b)
+
+      // przesuń NAJNIŻSZY dzielnik (root) - to przeskalowuje CAŁY węzeł root.b
+      // (a więc i zagnieżdżony root.b.divider) przez rescaleSubtree
+      moveSplit(mod, root, root.divider.y + 100);
+
+      const tree = buildZoneTree(mod);
+      const newTopHeight = tree.b.b.rect.maxY - tree.b.b.rect.minY;
+      expect(newTopHeight).toBeCloseTo(topHeight);
+    });
+
+    it("bez blokady zachowanie jest jak dawniej - proporcjonalne", () => {
+      const mod = setup();
+      let root = buildZoneTree(mod);
+      addEvenShelves(mod, root, 2);
+      root = buildZoneTree(mod);
+
+      const middleHeight = root.b.a.rect.maxY - root.b.a.rect.minY;
+      moveSplit(mod, root.b, root.b.divider.y + 80);
+
+      const tree = buildZoneTree(mod);
+      const newMiddleHeight = tree.b.a.rect.maxY - tree.b.a.rect.minY;
+      expect(newMiddleHeight).not.toBeCloseTo(middleHeight, 0);
+    });
   });
 });
