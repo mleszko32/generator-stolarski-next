@@ -371,15 +371,15 @@ describe("toggleStructural", () => {
     expect(tree.divider.isStructural).toBe(true);
   });
 
-  it("przełącza isStructural też na dzielniku pionowym (przegrodzie) - montaż na kołek+wkręt", () => {
+  it("przegroda pionowa ma domyślnie mocowanie na kołek+wkręt, toggleStructural je zdejmuje", () => {
     const mod = setup();
     const root = buildZoneTree(mod);
     splitZoneVertical(mod, root);
     const tree = buildZoneTree(mod);
 
-    expect(tree.divider.isStructural).toBeFalsy();
-    toggleStructural(tree);
     expect(tree.divider.isStructural).toBe(true);
+    toggleStructural(tree);
+    expect(tree.divider.isStructural).toBe(false);
   });
 });
 

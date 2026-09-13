@@ -171,7 +171,11 @@ export function splitZoneHorizontal(mod, node) {
   return shelf;
 }
 
-// Jak wyżej, ale przegrodą pionową na środku szerokości.
+// Jak wyżej, ale przegrodą pionową na środku szerokości. W przeciwieństwie do
+// półki (poziom) przegroda nie ma sensownego odpowiednika "na podpórkach" -
+// domyślnie od razu isStructural: true, więc od razu dostaje mocowanie na
+// kołek+wkręt do wieńca/półki nad i pod nią (patrz toggleStructural niżej i
+// nawierty w rysunku technicznym, engine/cabinet.js: getPionMountHoles).
 export function splitZoneVertical(mod, node) {
   if (node.type !== "leaf") return null;
   const th = getBoardThickness();
@@ -184,6 +188,7 @@ export function splitZoneVertical(mod, node) {
     y: minY,
     w: th,
     h: maxY - minY,
+    isStructural: true,
   };
   mod.elements.push(divider);
   return divider;
