@@ -235,6 +235,33 @@ describe("addEvenShelves", () => {
   });
 });
 
+describe("splitZoneVertical z wolnymi półkami w tle", () => {
+  it("nie gubi wolnych półek przy dodaniu przegrody pionowej - rozcina je na dwie kolumny", () => {
+    const mod = setup();
+    const root = buildZoneTree(mod);
+    addEvenShelves(mod, root, 2); // dwie wolne półki na całą szerokość wnęki
+
+    const leaf = buildZoneTree(mod);
+    splitZoneVertical(mod, leaf);
+
+    const tree = buildZoneTree(mod);
+    expect(tree.type).toBe("split");
+    expect(tree.axis).toBe("v");
+    // każda z 2 półek rozcięta na kolumnę lewą i prawą -> po 2 w każdej wnęce
+    expect(tree.a.shelves).toHaveLength(2);
+    expect(tree.b.shelves).toHaveLength(2);
+    // rozcięte kawałki mieszczą się dokładnie w swojej (węższej) kolumnie
+    tree.a.shelves.forEach((s) => {
+      expect(s.x).toBeCloseTo(tree.a.rect.minX);
+      expect(s.x + s.w).toBeCloseTo(tree.a.rect.maxX);
+    });
+    tree.b.shelves.forEach((s) => {
+      expect(s.x).toBeCloseTo(tree.b.rect.minX);
+      expect(s.x + s.w).toBeCloseTo(tree.b.rect.maxX);
+    });
+  });
+});
+
 describe("removeShelves", () => {
   it("usuwa wolne półki wnęki, zostawiając front nietknięty", () => {
     const mod = setup();

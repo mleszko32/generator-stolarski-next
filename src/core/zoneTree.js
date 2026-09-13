@@ -181,6 +181,25 @@ export function splitZoneVertical(mod, node) {
   const { minX, maxX, minY, maxY } = node.rect;
   const midX = (minX + maxX) / 2;
   clearLeafFronts(mod, node);
+
+  // Wolne półki (isDivider: false) w tej wnęce fizycznie rozpinają się na całą
+  // jej szerokość - nowa przegroda pionowa je przecina, więc trzeba je
+  // rozciąć na dwa niezależne odcinki (po jednym w każdej z powstałych
+  // kolumn). Bez tego żaden z nich nie pasowałby już do węższej wnęki po
+  // żadnej ze stron (patrz shelvesMatchingZone - wymaga dopasowania do PEŁNEJ
+  // szerokości), więc półki po prostu "znikałyby" z edytora, mimo że nadal
+  // wisiałyby (na starą, pełną szerokość) w danych.
+  if (node.shelves.length > 0) {
+    const oldIds = new Set(node.shelves.map((s) => s.id));
+    mod.elements = mod.elements.filter((el) => !oldIds.has(el.id));
+    node.shelves.forEach((shelf) => {
+      mod.elements.push(
+        { ...shelf, id: shelf.id + "-L", x: minX, w: midX - th / 2 - minX },
+        { ...shelf, id: shelf.id + "-R", x: midX + th / 2, w: maxX - (midX + th / 2) }
+      );
+    });
+  }
+
   const divider = {
     id: "pion-" + Date.now() + "-" + randomSuffix(),
     typ: "pion",
@@ -196,6 +215,7 @@ export function splitZoneVertical(mod, node) {
 function collectSubtreeElementIds(node, into) {
   if (node.type === "leaf") {
     node.fronts.forEach((f) => into.add(f.id));
+    node.shelves.forEach((s) => into.add(s.id));
   } else {
     into.add(node.divider.id);
     collectSubtreeElementIds(node.a, into);
