@@ -96,11 +96,7 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   const innerFrontX = frontX + cabWidth + 350; 
 
   const marginY = 180;
-  // Miejsce na rzuty z góry wieńców/półek z nawiertami przegrody pionowej
-  // (patrz sekcja "wieniecPanels" niżej) - inaczej te panele, doklejane ZA
-  // svgWidth, wypadałyby poza viewBox tego SVG.
-  const pionMountExtraWidth = Object.values(pionMountByKey).reduce((sum, p) => sum + p.panelWidth + 350, 0);
-  const svgWidth = innerFrontX + cabWidth + 400 + pionMountExtraWidth;
+  const svgWidth = innerFrontX + cabWidth + 400;
   
   const vBoxY = svgTopY - marginY;
   const vBoxH = totalSvgHeight + (marginY * 2);
@@ -728,9 +724,12 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   // klikalny widok PER PANEL (engine/cabinet.js: getPionMountHoles), otwierany
   // z mapy korpusu wyżej (panelRect). Kolor/rozmiar otworów - taki sam jak
   // istniejące nawierty kołek+wkręt półki konstrukcyjnej w bok (patrz
-  // drawShelfHoles wyżej), bo to dokładnie to samo połączenie.
+  // drawShelfHoles wyżej), bo to dokładnie to samo połączenie. Rysowane w tym
+  // samym miejscu co boki/przegrody (detailStartX) - tylko jeden widok jest
+  // naraz widoczny (showDetail), więc nie potrzeba dla nich osobnej kolumny
+  // z boku rysunku.
   const wieniecPanels = mountingData.filter(d => d.type === 'wieniec-mount');
-  let wieniecX = innerFrontX + cabWidth + 400;
+  const wieniecX = detailStartX;
   wieniecPanels.forEach(panel => {
     const w = panel.panelWidth;
     const d = panel.panelDepth;
@@ -761,7 +760,6 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
     });
 
     svg += `</g>`;
-    wieniecX += w + 350;
   });
 
   svg += `</g></svg>`;
