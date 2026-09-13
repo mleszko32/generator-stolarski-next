@@ -576,7 +576,10 @@ function selectNode(node, anchorEl, stage, px, mode) {
   toolbar.id = "interior-toolbar";
   Object.assign(toolbar.style, {
     position: "absolute",
-    zIndex: "10",
+    // Wyżej niż uiOverlay (Przezroczysty/Ukryj fronty/Podgląd 3D, patrz
+    // render/viewer3d.js - z-index: 100) - inaczej na wąskim ekranie te
+    // przyciski, nachodzące na górę toolbara, zasłaniały go całkowicie.
+    zIndex: "200",
     background: "#1e293b",
     borderRadius: "8px",
     padding: "6px",
