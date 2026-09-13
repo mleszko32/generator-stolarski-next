@@ -39,6 +39,7 @@ const FRONT_COLORS = {
 
 let selectedNode = null; // węzeł drzewa aktualnie pod pływającym paskiem
 let toolbarMode = null; // null | 'zone' | 'front-picker' | 'divider'
+let selectedBand = null; // { minY, maxY } - fragment wysokości klikniętej wnęki (patrz computeClickBand)
 
 function getContainer() {
   return document.getElementById("editor-interior-container");
@@ -143,6 +144,27 @@ function renderNode(node, stage, px) {
   renderDividerHandle(node, stage, px);
 }
 
+// Zwraca fragment wysokości wnęki { minY, maxY } ograniczony przez najbliższe
+// wolne półki wokół miejsca kliknięcia (albo całą wnękę, gdy nie ma żadnych
+// półek) - patrz core/zoneTree.js: splitZoneVertical(mod, node, band). Bez
+// tego "Podziel pionowo" zawsze rozpinało przegrodę na całą wysokość wnęki,
+// nawet gdy użytkownik wyraźnie kliknął w wąski prześwit między półkami.
+function computeClickBand(node, el, e) {
+  const { minY, maxY } = node.rect;
+  if (node.shelves.length === 0) return { minY, maxY };
+
+  const domRect = el.getBoundingClientRect();
+  const frac = (e.clientY - domRect.top) / domRect.height;
+  const clickY = maxY - frac * (maxY - minY); // oś Y odwrócona względem ekranu
+
+  let cursor = minY;
+  for (const s of node.shelves) { // posortowane rosnąco po y (patrz shelvesMatchingZone)
+    if (clickY < s.y) return { minY: cursor, maxY: s.y };
+    cursor = s.y + s.h;
+  }
+  return { minY: cursor, maxY };
+}
+
 function renderLeaf(node, stage, px) {
   const { minX, maxX, minY, maxY } = node.rect;
   const el = document.createElement("div");
@@ -183,7 +205,7 @@ function renderLeaf(node, stage, px) {
   el.addEventListener("mouseleave", () => { if (!isOccupied) el.style.background = "#f8fafc"; });
   el.addEventListener("click", (e) => {
     e.stopPropagation();
-    selectNode(node, el, stage, px, isOccupied ? "occupied" : "empty");
+    selectNode(node, el, stage, px, isOccupied ? "occupied" : "empty", computeClickBand(node, el, e));
   });
 
   stage.appendChild(el);
@@ -243,6 +265,32 @@ function renderLeaf(node, stage, px) {
       selectNode({ type: "shelf", shelf }, line, stage, px, "shelf");
     });
     stage.appendChild(line);
+  });
+
+  // Przegrody pionowe ograniczone do fragmentu wysokości wnęki (patrz
+  // core/zoneTree.js: splitZoneVertical z podanym `band`) - z tego samego
+  // powodu co wolne półki, nie tworzą węzła drzewa, więc trzeba je narysować
+  // tutaj osobno.
+  node.verticals.forEach((v) => {
+    const bar = document.createElement("div");
+    Object.assign(bar.style, {
+      position: "absolute",
+      left: px.toPxX(v.x) + "px",
+      top: px.toPxY(v.y + v.h) + "px",
+      width: Math.max(px.toPxLen(v.w), 3) + "px",
+      height: px.toPxLen(v.h) + "px",
+      background: "#e2e8f0",
+      border: "1px solid #64748b",
+      boxSizing: "border-box",
+      cursor: "pointer",
+      zIndex: "1",
+    });
+    bar.title = "Przegroda pionowa";
+    bar.addEventListener("click", (e) => {
+      e.stopPropagation();
+      selectNode({ type: "vertical", vertical: v }, bar, stage, px, "vertical");
+    });
+    stage.appendChild(bar);
   });
 }
 
@@ -326,12 +374,14 @@ function closeToolbar() {
   if (existing) existing.remove();
   selectedNode = null;
   toolbarMode = null;
+  selectedBand = null;
 }
 
-function selectNode(node, anchorEl, stage, px, mode) {
+function selectNode(node, anchorEl, stage, px, mode, band = null) {
   closeToolbar();
   selectedNode = node;
   toolbarMode = mode;
+  selectedBand = band;
 
   const toolbar = document.createElement("div");
   toolbar.id = "interior-toolbar";
@@ -384,10 +434,16 @@ function selectNode(node, anchorEl, stage, px, mode) {
       splitZoneHorizontal(mod, selectedNode);
       refreshAfterEdit();
     });
-    addBtn("⬌ Podziel pionowo", "Dodaj przegrodę na środku szerokości", () => {
-      splitZoneVertical(mod, selectedNode);
-      refreshAfterEdit();
-    });
+    addBtn(
+      "⬌ Podziel pionowo",
+      selectedBand && (selectedBand.minY > selectedNode.rect.minY + 1 || selectedBand.maxY < selectedNode.rect.maxY - 1)
+        ? "Dodaj przegrodę tylko w obrębie klikniętego prześwitu (między półkami)"
+        : "Dodaj przegrodę na środku szerokości, na całą wysokość wnęki",
+      () => {
+        splitZoneVertical(mod, selectedNode, selectedBand);
+        refreshAfterEdit();
+      }
+    );
     addBtn("▭ Drzwi", "Zabuduj wnękę pojedynczymi drzwiami", () => {
       assignFront(mod, selectedNode, "drzwi");
       refreshAfterEdit();
@@ -464,6 +520,12 @@ function selectNode(node, anchorEl, stage, px, mode) {
     );
     addBtn("🗑️ Usuń tę półkę", "Usuwa tę wolną półkę", () => {
       mod.elements = mod.elements.filter((el) => el.id !== shelf.id);
+      refreshAfterEdit();
+    }, true);
+  } else if (mode === "vertical") {
+    const vertical = selectedNode.vertical;
+    addBtn("🗑️ Usuń tę przegrodę", "Usuwa tę przegrodę pionową", () => {
+      mod.elements = mod.elements.filter((el) => el.id !== vertical.id);
       refreshAfterEdit();
     }, true);
   }

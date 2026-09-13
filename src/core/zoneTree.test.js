@@ -262,6 +262,39 @@ describe("splitZoneVertical z wolnymi półkami w tle", () => {
   });
 });
 
+describe("splitZoneVertical z ograniczonym `band`", () => {
+  it("ogranicza przegrodę do prześwitu MIĘDZY półkami, nie ruszając samych półek", () => {
+    const mod = setup();
+    const root = buildZoneTree(mod);
+    const [shelfA, shelfB] = addEvenShelves(mod, root, 2); // dwie wolne półki, shelfA niżej niż shelfB
+
+    let leaf = buildZoneTree(mod);
+    const gapBetween = { minY: shelfA.y + shelfA.h, maxY: shelfB.y };
+    splitZoneVertical(mod, leaf, gapBetween);
+
+    const tree = buildZoneTree(mod);
+    // przegroda NIE dzieli drzewa (nie rozpina się na pełną wysokość wnęki)
+    expect(tree.type).toBe("leaf");
+    // obie półki przetrwały nietknięte (żadna nie została rozcięta)
+    expect(tree.shelves).toHaveLength(2);
+    expect(tree.shelves.map((s) => s.id).sort()).toEqual([shelfA.id, shelfB.id].sort());
+    // przegroda widoczna jako "wolna" (ograniczona wysokościowo), nie jako dzielnik
+    expect(tree.verticals).toHaveLength(1);
+    expect(tree.verticals[0].y).toBeCloseTo(gapBetween.minY);
+    expect(tree.verticals[0].y + tree.verticals[0].h).toBeCloseTo(gapBetween.maxY);
+  });
+
+  it("bez podanego `band` (albo bez żadnych półek) działa jak dawniej - pełna wysokość i prawdziwy podział drzewa", () => {
+    const mod = setup();
+    const root = buildZoneTree(mod);
+    splitZoneVertical(mod, root);
+
+    const tree = buildZoneTree(mod);
+    expect(tree.type).toBe("split");
+    expect(tree.axis).toBe("v");
+  });
+});
+
 describe("removeShelves", () => {
   it("usuwa wolne półki wnęki, zostawiając front nietknięty", () => {
     const mod = setup();

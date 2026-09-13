@@ -75,6 +75,24 @@ function shelvesMatchingZone(mod, rect) {
     .sort((a, b) => a.y - b.y);
 }
 
+// Przegrody pionowe, które NIE rozpinają się na pełną wysokość wnęki (patrz
+// splitZoneVertical z podanym `band`) z definicji nie przechodzą filtra
+// pionCandidates w partition() niżej (wymaga on pełnego rozpięcia y), więc
+// nigdy nie staną się węzłem 'split' - podobnie jak wolne półki, trzeba je
+// osobno dowiązać do liścia, żeby dało się je narysować i nimi zarządzać.
+function verticalsMatchingZone(mod, rect) {
+  return (mod.elements || [])
+    .filter(
+      (el) =>
+        el.typ === "pion" &&
+        el.x > rect.minX - EPS &&
+        el.x + el.w < rect.maxX + EPS &&
+        el.y > rect.minY - EPS &&
+        el.y + el.h < rect.maxY + EPS
+    )
+    .sort((a, b) => a.x - b.x);
+}
+
 // Buduje drzewo BSP wnętrza aktywnego modułu.
 // Węzeł 'split': { type:'split', axis:'v'|'h', divider: <element poziom/pion>, rect, a, b }
 //   'v' = podział przegrodą pionową (a = lewa kolumna, b = prawa)
@@ -135,6 +153,7 @@ export function buildZoneTree(mod) {
       boundTopId,
       fronts: frontsMatchingZone(mod, rect),
       shelves: shelvesMatchingZone(mod, rect),
+      verticals: verticalsMatchingZone(mod, rect),
     };
   }
 
@@ -175,24 +194,37 @@ export function splitZoneHorizontal(mod, node) {
 }
 
 // Jak wyżej, ale przegrodą pionową na środku szerokości.
-export function splitZoneVertical(mod, node) {
+//
+// `band` (opcjonalny { minY, maxY }) ogranicza przegrodę do konkretnego
+// fragmentu wysokości wnęki (np. tylko do prześwitu MIĘDZY dwiema wolnymi
+// półkami, patrz ui/interiorEditor.js: computeClickBand) - bez tego przegroda
+// zawsze rozpinała się na całą wysokość wnęki, nawet gdy użytkownik kliknął
+// wyraźnie w wąski prześwit między półkami. Gdy band nie jest podany (albo
+// w wnęce nie ma żadnych wolnych półek), zachowanie jest identyczne jak
+// dawniej - pełna wysokość wnęki i (patrz partition() w tym pliku) prawdziwy
+// podział drzewa/frontu.
+export function splitZoneVertical(mod, node, band = null) {
   if (node.type !== "leaf") return null;
   const th = getBoardThickness();
-  const { minX, maxX, minY, maxY } = node.rect;
+  const { minX, maxX } = node.rect;
+  const minY = band ? band.minY : node.rect.minY;
+  const maxY = band ? band.maxY : node.rect.maxY;
   const midX = (minX + maxX) / 2;
-  clearLeafFronts(mod, node);
+  if (!band) clearLeafFronts(mod, node);
 
-  // Wolne półki (isDivider: false) w tej wnęce fizycznie rozpinają się na całą
-  // jej szerokość - nowa przegroda pionowa je przecina, więc trzeba je
+  // Wolne półki (isDivider: false) fizycznie rozpinają się na całą szerokość
+  // wnęki - przegroda TYLKO wtedy je przecina, gdy jej zakres Y faktycznie
+  // nachodzi na daną półkę (przy przegrodzie ograniczonej do prześwitu MIĘDZY
+  // półkami żadna z nich nie jest w ogóle dotknięta). Przeciętą półkę trzeba
   // rozciąć na dwa niezależne odcinki (po jednym w każdej z powstałych
-  // kolumn). Bez tego żaden z nich nie pasowałby już do węższej wnęki po
+  // kolumn) - inaczej żaden z nich nie pasowałby już do węższej wnęki po
   // żadnej ze stron (patrz shelvesMatchingZone - wymaga dopasowania do PEŁNEJ
-  // szerokości), więc półki po prostu "znikałyby" z edytora, mimo że nadal
-  // wisiałyby (na starą, pełną szerokość) w danych.
-  if (node.shelves.length > 0) {
-    const oldIds = new Set(node.shelves.map((s) => s.id));
-    mod.elements = mod.elements.filter((el) => !oldIds.has(el.id));
-    node.shelves.forEach((shelf) => {
+  // szerokości) i po prostu "znikałby" z edytora.
+  const affected = node.shelves.filter((s) => s.y < maxY - EPS && s.y + s.h > minY + EPS);
+  if (affected.length > 0) {
+    const ids = new Set(affected.map((s) => s.id));
+    mod.elements = mod.elements.filter((el) => !ids.has(el.id));
+    affected.forEach((shelf) => {
       mod.elements.push(
         { ...shelf, id: shelf.id + "-L", x: minX, w: midX - th / 2 - minX },
         { ...shelf, id: shelf.id + "-R", x: midX + th / 2, w: maxX - (midX + th / 2) }
@@ -216,6 +248,7 @@ function collectSubtreeElementIds(node, into) {
   if (node.type === "leaf") {
     node.fronts.forEach((f) => into.add(f.id));
     node.shelves.forEach((s) => into.add(s.id));
+    node.verticals.forEach((v) => into.add(v.id));
   } else {
     into.add(node.divider.id);
     collectSubtreeElementIds(node.a, into);
