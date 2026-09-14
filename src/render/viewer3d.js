@@ -32,9 +32,12 @@ let dragTarget = null;
 let dragModule = null;
 const dragOffset = new THREE.Vector3();
 const dragPlane = new THREE.Plane();
-const SNAP_DIST = 40; 
+const SNAP_DIST = 40;
 let dragSelectionOrigins = new Map();
 let wasSelectedOnDown = false;
+// Przeciąganie z wciśniętym Alt = tylko w pionie (Y), reszta myszką = tylko
+// po podłodze (X/Z) - patrz komentarz przy ustawianiu dragPlane niżej.
+let verticalDrag = false;
 
 let scene, camera, renderer, controls;
 let container;
@@ -334,9 +337,34 @@ export function init3DViewer() {
               dragTarget = group;
               dragModule = state.project.modules.find(m => m.id === group.userData.moduleId);
               
-              controls.enabled = false; 
-              
-              const normal = camera.getWorldDirection(new THREE.Vector3()).negate();
+              controls.enabled = false;
+
+              // Płaszczyzna przeciągania musi być POZIOMA (normalna = pion Y),
+              // nie skierowana na kamerę - inaczej przy pochylonej (orbitującej)
+              // kamerze przesunięcie myszką "w bok" na ekranie mapowało się na
+              // ruch po płaszczyźnie ekranu w 3D, czyli w rzeczywistości po
+              // przekątnej (z domieszką Y/Z), więc szafka "uciekała" w górę albo
+              // w głąb zamiast jechać wzdłuż podłogi - zgłoszony bug. Płaszczyzna
+              // pozioma sprawia, że mysz zawsze rusza modułem wyłącznie po X/Z
+              // (po podłodze), niezależnie od kąta kamery.
+              //
+              // Trzymając Alt: odwrotnie - płaszczyzna PIONOWA (billboard,
+              // zawiera oś Y, zwrócona w stronę rzutu kamery na podłogę), więc
+              // mysz rusza modułem wyłącznie w GÓRĘ/DÓŁ (Y), z zablokowanym X/Z -
+              // bez tego, po wprowadzeniu wyłącznie poziomego przeciągania,
+              // nie dało się już wcale podnieść/opuścić modułu myszką
+              // (zgłoszony bug), tylko przez wpisanie liczby w polu bocznym.
+              verticalDrag = e.altKey;
+              let normal;
+              if (verticalDrag) {
+                  const camDir = camera.getWorldDirection(new THREE.Vector3());
+                  camDir.y = 0;
+                  if (camDir.lengthSq() < 1e-6) camDir.set(0, 0, 1);
+                  camDir.normalize();
+                  normal = camDir;
+              } else {
+                  normal = new THREE.Vector3(0, 1, 0);
+              }
               dragPlane.setFromNormalAndCoplanarPoint(normal, intersects[0].point);
               dragOffset.copy(dragTarget.position).sub(intersects[0].point);
               
@@ -394,21 +422,30 @@ export function init3DViewer() {
           const dragLeftW = (dragModule.fillers && dragModule.fillers.left && dragModule.fillers.left.active) ? (parseFloat(dragModule.fillers.left.width) || 50) : 0;
           const dragRightW = (dragModule.fillers && dragModule.fillers.right && dragModule.fillers.right.active) ? (parseFloat(dragModule.fillers.right.width) || 50) : 0;
 
-          let snapX = newGroupPos.x - worldW/2;
+          const orig = dragSelectionOrigins.get(dragModule.id);
+
+          // Tryb pionowy (Alt): X/Z zostają PRZYPIĘTE do pozycji sprzed
+          // przeciągania - liczy się tylko intersect.y z pionowej płaszczyzny
+          // (patrz pointerdown wyżej). Bez tego nawet drobny poziomy ruch myszką
+          // w trakcie podnoszenia/opuszczania modułu przesuwałby go też w bok.
+          let snapX = (verticalDrag && orig) ? orig.x : newGroupPos.x - worldW/2;
           let snapY = newGroupPos.y - H/2 - baseOffsetY;
-          let snapZ = newGroupPos.z - worldD/2;
+          let snapZ = (verticalDrag && orig) ? orig.z : newGroupPos.z - worldD/2;
 
           const room = getRoom();
 
-          if (Math.abs(snapX - dragLeftW) < SNAP_DIST) snapX = dragLeftW;
           if (Math.abs(snapY) < SNAP_DIST) snapY = 0;
-          if (Math.abs(snapZ) < SNAP_DIST) snapZ = 0;
-          // Przyciąganie do dalszych ścian pokoju (bliższe x=0/z=0 obsługują linie wyżej).
-          // Uwzględnia blendę prawą (dragRightW) tak samo jak lewa ściana wyżej
-          // uwzględnia dragLeftW - inaczej blenda prawa przy dosunięciu do
-          // ściany przenikała przez nią (zgłoszony bug).
-          if (Math.abs((snapX + worldW + dragRightW) - room.width) < SNAP_DIST) snapX = room.width - worldW - dragRightW;
-          if (Math.abs((snapZ + worldD) - room.depth) < SNAP_DIST) snapZ = room.depth - worldD;
+
+          if (!verticalDrag) {
+              if (Math.abs(snapX - dragLeftW) < SNAP_DIST) snapX = dragLeftW;
+              if (Math.abs(snapZ) < SNAP_DIST) snapZ = 0;
+              // Przyciąganie do dalszych ścian pokoju (bliższe x=0/z=0 obsługują linie wyżej).
+              // Uwzględnia blendę prawą (dragRightW) tak samo jak lewa ściana wyżej
+              // uwzględnia dragLeftW - inaczej blenda prawa przy dosunięciu do
+              // ściany przenikała przez nią (zgłoszony bug).
+              if (Math.abs((snapX + worldW + dragRightW) - room.width) < SNAP_DIST) snapX = room.width - worldW - dragRightW;
+              if (Math.abs((snapZ + worldD) - room.depth) < SNAP_DIST) snapZ = room.depth - worldD;
+          }
 
           state.project.modules.forEach(other => {
               if (state.selectedModules && state.selectedModules.has(other.id)) return;
@@ -419,34 +456,37 @@ export function init3DViewer() {
               const oY = parseFloat(other.position.y);
               const oZ = parseFloat(other.position.z);
 
-              const otherLeftW = (other.fillers && other.fillers.left && other.fillers.left.active) ? (parseFloat(other.fillers.left.width) || 50) : 0;
-              const otherRightW = (other.fillers && other.fillers.right && other.fillers.right.active) ? (parseFloat(other.fillers.right.width) || 50) : 0;
+              if (!verticalDrag) {
+                  const otherLeftW = (other.fillers && other.fillers.left && other.fillers.left.active) ? (parseFloat(other.fillers.left.width) || 50) : 0;
+                  const otherRightW = (other.fillers && other.fillers.right && other.fillers.right.active) ? (parseFloat(other.fillers.right.width) || 50) : 0;
 
-              const effOX = oX - otherLeftW;
-              const effOW = oW + otherLeftW + otherRightW;
+                  const effOX = oX - otherLeftW;
+                  const effOW = oW + otherLeftW + otherRightW;
 
-              let dragStartX = snapX - dragLeftW;
-              let dragEndX = snapX + worldW + dragRightW;
+                  let dragStartX = snapX - dragLeftW;
+                  let dragEndX = snapX + worldW + dragRightW;
 
-              if (Math.abs(dragStartX - (effOX + effOW)) < SNAP_DIST) snapX = effOX + effOW + dragLeftW;
-              else if (Math.abs(dragEndX - effOX) < SNAP_DIST) snapX = effOX - worldW - dragRightW;
-              else if (Math.abs(dragStartX - effOX) < SNAP_DIST) snapX = effOX + dragLeftW;
+                  if (Math.abs(dragStartX - (effOX + effOW)) < SNAP_DIST) snapX = effOX + effOW + dragLeftW;
+                  else if (Math.abs(dragEndX - effOX) < SNAP_DIST) snapX = effOX - worldW - dragRightW;
+                  else if (Math.abs(dragStartX - effOX) < SNAP_DIST) snapX = effOX + dragLeftW;
+
+                  if (Math.abs(snapZ - (oZ + oD)) < SNAP_DIST) snapZ = oZ + oD;
+                  else if (Math.abs((snapZ + worldD) - oZ) < SNAP_DIST) snapZ = oZ - worldD;
+                  else if (Math.abs(snapZ - oZ) < SNAP_DIST) snapZ = oZ;
+              }
 
               if (Math.abs(snapY - (oY + oH)) < SNAP_DIST) snapY = oY + oH;
               else if (Math.abs((snapY + H) - oY) < SNAP_DIST) snapY = oY - H;
               else if (Math.abs(snapY - oY) < SNAP_DIST) snapY = oY;
-
-              if (Math.abs(snapZ - (oZ + oD)) < SNAP_DIST) snapZ = oZ + oD;
-              else if (Math.abs((snapZ + worldD) - oZ) < SNAP_DIST) snapZ = oZ - worldD;
-              else if (Math.abs(snapZ - oZ) < SNAP_DIST) snapZ = oZ;
           });
 
-          snapX = Math.max(dragLeftW, snapX);
-          snapX = Math.min(room.width - worldW - dragRightW, snapX);
+          if (!verticalDrag) {
+              snapX = Math.max(dragLeftW, snapX);
+              snapX = Math.min(room.width - worldW - dragRightW, snapX);
+              snapZ = Math.max(0, snapZ);
+          }
           snapY = Math.max(0, snapY);
-          snapZ = Math.max(0, snapZ);
 
-          const orig = dragSelectionOrigins.get(dragModule.id);
           if (orig) {
               let deltaX = snapX - orig.x;
               const deltaY = snapY - orig.y;
