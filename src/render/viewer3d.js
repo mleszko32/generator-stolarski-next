@@ -79,6 +79,16 @@ function getModuleBox(mod) {
 // przeciągany moduł. Efekt łańcuchowy: odsunięty moduł sam trafia z powrotem
 // do kolejki i jest sprawdzany przeciw reszcie, więc pchnięcie propaguje się
 // dalej, tak jak przy zmianie wymiaru.
+//
+// WAŻNE: minimum translation vector liczymy PO WSZYSTKICH TRZECH osiach
+// (X/Y/Z), nie tylko X/Z. Budowanie szafy z dwóch modułów jeden NA DRUGIM
+// (np. dolny + górny, ten sam odcisk X/Z) też przechodzi przez chwilową
+// kolizję w trakcie przeciągania - ale tam naturalnym rozwiązaniem jest
+// dosunięcie w pionie (Y), o które i tak dba już magnetyczne przyciąganie
+// do sąsiada wyżej (snapY). Jeśli to właśnie oś Y ma najmniejsze nałożenie,
+// NIE pchamy w bok (zgłoszony bug: odsuwało dolny moduł zamiast pozwolić
+// się zestawić w pionie) - zostawiamy przeciąganemu modułowi dokończenie
+// dosunięcia w Y.
 function pushOverlappingModules(draggedIds) {
   const EPS = 0.5;
   const queue = Array.from(draggedIds);
@@ -97,6 +107,7 @@ function pushOverlappingModules(draggedIds) {
       const overlapY = Math.min(boxM.y1, boxO.y1) - Math.max(boxM.y0, boxO.y0);
       const overlapZ = Math.min(boxM.z1, boxO.z1) - Math.max(boxM.z0, boxO.z0);
       if (overlapX <= EPS || overlapY <= EPS || overlapZ <= EPS) return;
+      if (overlapY <= overlapX && overlapY <= overlapZ) return; // stawianie w pionie - zostaw snapY
 
       if (overlapX <= overlapZ) {
         const dir = (boxO.x0 + boxO.x1) >= (boxM.x0 + boxM.x1) ? 1 : -1;
