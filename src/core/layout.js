@@ -45,9 +45,16 @@ export function getWorldFootprint(mod) {
 export function clampModuleToRoom(mod) {
   const room = state.project.room || DEFAULT_ROOM;
   const { worldW, worldD } = getWorldFootprint(mod);
-  const maxX = Math.max(0, room.width - worldW);
+  // Blendy L-kształtne (mod.fillers.left/right, patrz render/viewer3d.js)
+  // dostawiają się PO BOKACH modułu, poszerzając jego realny odcisk w
+  // pokoju - bez tego przy szafce dosuniętej do ściany sama blenda
+  // przenikała przez tę ścianę (zgłoszony bug), mimo że sam korpus mieścił
+  // się w środku.
+  const leftW = (mod.fillers && mod.fillers.left && mod.fillers.left.active) ? (parseFloat(mod.fillers.left.width) || 50) : 0;
+  const rightW = (mod.fillers && mod.fillers.right && mod.fillers.right.active) ? (parseFloat(mod.fillers.right.width) || 50) : 0;
+  const maxX = Math.max(leftW, room.width - worldW - rightW);
   const maxZ = Math.max(0, room.depth - worldD);
-  mod.position.x = Math.min(Math.max(parseFloat(mod.position.x) || 0, 0), maxX);
+  mod.position.x = Math.min(Math.max(parseFloat(mod.position.x) || 0, leftW), maxX);
   mod.position.z = Math.min(Math.max(parseFloat(mod.position.z) || 0, 0), maxZ);
 }
 

@@ -321,7 +321,10 @@ export function init3DViewer() {
           if (Math.abs(snapY) < SNAP_DIST) snapY = 0;
           if (Math.abs(snapZ) < SNAP_DIST) snapZ = 0;
           // Przyciąganie do dalszych ścian pokoju (bliższe x=0/z=0 obsługują linie wyżej).
-          if (Math.abs((snapX + worldW) - room.width) < SNAP_DIST) snapX = room.width - worldW;
+          // Uwzględnia blendę prawą (dragRightW) tak samo jak lewa ściana wyżej
+          // uwzględnia dragLeftW - inaczej blenda prawa przy dosunięciu do
+          // ściany przenikała przez nią (zgłoszony bug).
+          if (Math.abs((snapX + worldW + dragRightW) - room.width) < SNAP_DIST) snapX = room.width - worldW - dragRightW;
           if (Math.abs((snapZ + worldD) - room.depth) < SNAP_DIST) snapZ = room.depth - worldD;
 
           state.project.modules.forEach(other => {
@@ -356,6 +359,7 @@ export function init3DViewer() {
           });
 
           snapX = Math.max(dragLeftW, snapX);
+          snapX = Math.min(room.width - worldW - dragRightW, snapX);
           snapY = Math.max(0, snapY);
           snapZ = Math.max(0, snapZ);
 
@@ -376,9 +380,16 @@ export function init3DViewer() {
                   const mOrig = dragSelectionOrigins.get(id);
                   if (!m || !mOrig) return;
                   const { worldW: mW, worldD: mD } = getWorldFootprint(m);
-                  const maxDeltaX = Math.max(0, room.width - mW) - mOrig.x;
+                  // Każdy człon grupy ma WŁASNE blendy - rezerwujemy dla nich
+                  // miejsce tak samo jak dla dragModule wyżej, inaczej blenda
+                  // innego niż przeciągany modułu członka grupy mogła przeniknąć
+                  // przez ścianę, mimo że sam moduł się w niej mieścił.
+                  const mLeftW = (m.fillers && m.fillers.left && m.fillers.left.active) ? (parseFloat(m.fillers.left.width) || 50) : 0;
+                  const mRightW = (m.fillers && m.fillers.right && m.fillers.right.active) ? (parseFloat(m.fillers.right.width) || 50) : 0;
+                  const minDeltaX = mLeftW - mOrig.x;
+                  const maxDeltaX = Math.max(0, room.width - mW - mRightW) - mOrig.x;
                   const maxDeltaZ = Math.max(0, room.depth - mD) - mOrig.z;
-                  deltaX = Math.min(Math.max(deltaX, -mOrig.x), maxDeltaX);
+                  deltaX = Math.min(Math.max(deltaX, minDeltaX), maxDeltaX);
                   deltaZ = Math.min(Math.max(deltaZ, -mOrig.z), maxDeltaZ);
               });
 

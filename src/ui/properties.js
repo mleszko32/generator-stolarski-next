@@ -509,9 +509,14 @@ function setupEventListeners() {
                       } else {
                           mod.position.x = Math.max(0, (parseFloat(mod.position.x) || 0) - fillerW);
                       }
-                      const inpX = document.getElementById('input-pos-x');
-                      if (inpX) inpX.value = mod.position.x;
                   }
+                  // Zabezpieczenie dla PRAWEJ blendy (i domknięcie lewej) -
+                  // clampModuleToRoom teraz sam wie o aktywnych blendach
+                  // (patrz core/layout.js) - bez tego blenda dostawiona do
+                  // szafki dosuniętej do ściany przenikała przez nią.
+                  clampModuleToRoom(mod);
+                  const inpX = document.getElementById('input-pos-x');
+                  if (inpX) inpX.value = mod.position.x;
               });
               opts.style.display = e.target.checked ? 'block' : 'none';
               updateAll();
@@ -918,7 +923,7 @@ function setupEventListeners() {
       el.addEventListener('change', () => {
         // Ręczne wpisanie pozycji/wymiaru mogło wystawić szafkę poza pokój - dopiero
         // po skończeniu wpisywania (nie na każdy znak), żeby nie "walczyć" z użytkownikiem.
-        if (['pos-x', 'pos-z', 'width', 'depth'].includes(id)) {
+        if (['pos-x', 'pos-z', 'width', 'depth', 'filler-left-w', 'filler-right-w'].includes(id)) {
           getSelectedMods().forEach(mod => clampModuleToRoom(mod));
         }
         initPropertiesPanel();

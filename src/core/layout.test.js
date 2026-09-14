@@ -170,6 +170,33 @@ describe("clampModuleToRoom", () => {
     clampModuleToRoom(mod);
     expect(mod.position.x).toBe(3500 - 513); // worldW po obrocie = lokalna głębokość (513)
   });
+
+  it("rezerwuje miejsce na blendę prawą, żeby nie przenikała przez daleką ścianę", () => {
+    const mod = baseModule({
+      position: { x: 5000, y: 0, z: 0 },
+      fillers: { right: { active: true, width: 50 } },
+    });
+    clampModuleToRoom(mod);
+    expect(mod.position.x).toBe(3500 - 600 - 50); // room.width - worldW - blenda prawa
+  });
+
+  it("rezerwuje miejsce na blendę lewą, żeby nie przenikała przez bliską ścianę", () => {
+    const mod = baseModule({
+      position: { x: -200, y: 0, z: 0 },
+      fillers: { left: { active: true, width: 50 } },
+    });
+    clampModuleToRoom(mod);
+    expect(mod.position.x).toBe(50); // nie 0 - blenda lewa potrzebuje własnych 50mm
+  });
+
+  it("nieaktywna blenda nie ogranicza pozycji", () => {
+    const mod = baseModule({
+      position: { x: 5000, y: 0, z: 0 },
+      fillers: { right: { active: false, width: 50 } },
+    });
+    clampModuleToRoom(mod);
+    expect(mod.position.x).toBe(3500 - 600);
+  });
 });
 
 describe("migrateLegacyRoom", () => {
