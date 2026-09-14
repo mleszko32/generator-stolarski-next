@@ -23,14 +23,35 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   mountingData.filter(d => d.type === 'wieniec-mount').forEach(m => { pionMountByKey[m.panelKey] = m; });
 
   const activeModAbsX = parseFloat(mod.position.x) || 0;
+  const activeModAbsZ = parseFloat(mod.position.z) || 0;
+  const cabDepth = parseFloat(mod.dimensions?.depth) || 513;
   const activeModLegH = (mod.legs && mod.legs.active) ? (parseFloat(mod.legs.height) || 0) : 0;
   const activeModAbsY = (parseFloat(mod.position.y) || 0) + activeModLegH;
 
+  // "Duchy" (stackModules) mają pokazywać moduły faktycznie stojące w TYM SAMYM
+  // pionowym ciągu co aktywny (np. szafka dolna + wisząca nad nią) - to
+  // wymaga pokrywania się ZARÓWNO w X, JAK I W Z. Sam warunek X (bez Z) łapał
+  // też zupełnie inne, niepowiązane zestawy meblowe stojące gdzie indziej w
+  // pokoju (np. na przeciwległej ścianie, obrócone o 180°), które przypadkiem
+  // mają nachodzący zakres X - dawało to fantomowe "duchy" i błędnie dorzucone
+  // fronty w rysunku technicznym (zgłoszony bug dla zgrupowanych modułów).
+  //
+  // Dodatkowo: moduł ze wspólnym groupId (patrz ui/properties.js: "Połącz
+  // zaznaczone w grupę") liczy się jako duch ZAWSZE, niezależnie od X/Z -
+  // grupa może obejmować też sąsiadów OBOK (nie tylko nad/pod), np. szafa
+  // złożona z 4 modułów (2x wąska+szeroka, piętro dolne+górne) - użytkownik
+  // sam zdecydował, że to jedna całość, więc cały rysunek techniczny powinien
+  // pokazywać ją w komplecie, z zaznaczonymi półkami/przegrodami każdego
+  // członka, nawet gdy klika akurat tylko jeden z nich.
   const stackModules = state.project.modules.filter(m => {
+      if (mod.groupId && m.groupId === mod.groupId) return true;
       const mX = parseFloat(m.position.x) || 0;
       const mW = parseFloat(m.dimensions.width) || 600;
-      const overlap = Math.max(0, Math.min(mX + mW, activeModAbsX + cabWidth) - Math.max(mX, activeModAbsX));
-      return overlap > 10;
+      const mZ = parseFloat(m.position.z) || 0;
+      const mD = parseFloat(m.dimensions.depth) || 513;
+      const overlapX = Math.max(0, Math.min(mX + mW, activeModAbsX + cabWidth) - Math.max(mX, activeModAbsX));
+      const overlapZ = Math.max(0, Math.min(mZ + mD, activeModAbsZ + cabDepth) - Math.max(mZ, activeModAbsZ));
+      return overlapX > 10 && overlapZ > 10;
   });
   
   const getDy = (m) => {
@@ -79,7 +100,21 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   });
 
   const cabX = 80;
-  const detailStartX = cabX + cabWidth + 500; 
+
+  // Duchy zgrupowanych modułów (stackModules) mogą sięgać dalej w prawo niż
+  // sama szerokość aktywnego modułu (np. szeroki moduł obok wąskiego aktywnego)
+  // - kolumna z formatkami/nawiertami (detail-left/right/part-N) musi zaczynać
+  // się ZA całą narysowaną grupą, inaczej formatka z nawiertami nachodziła na
+  // schemat korpusu grupy zamiast stać obok niego.
+  let groupRightExtent = cabWidth;
+  stackModules.forEach(sm => {
+      if (sm.id === mod.id) return;
+      const smW = parseFloat(sm.dimensions.width) || 600;
+      const relX = (parseFloat(sm.position.x) || 0) - activeModAbsX;
+      groupRightExtent = Math.max(groupRightExtent, relX + smW);
+  });
+
+  const detailStartX = cabX + groupRightExtent + 500;
 
   panels.forEach(p => {
       if (p.id.endsWith('-R')) p.svgX = detailStartX + depth + 350;
@@ -675,11 +710,12 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   const allOuterFronts = [];
   stackModules.forEach(sm => {
       const smDy = getDy(sm);
+      const smRelX = (parseFloat(sm.position.x) || 0) - activeModAbsX;
       const smCons = { joinType: 'boki_przelotowe', topType: 'pelny', ...config.construction, ...(sm.construction || {}) };
       const smIsTBF = smCons.joinType === 'wience_przelotowe';
       if (sm.elements) {
           sm.elements.filter(el => el.typ === 'front' && el.subtype !== 'szuflada-wewnetrzna').forEach(f => {
-              allOuterFronts.push({ ...f, dy: smDy, sourceModId: sm.id, sourceModName: sm.name, isTBF: smIsTBF });
+              allOuterFronts.push({ ...f, dy: smDy, relX: smRelX, sourceModId: sm.id, sourceModName: sm.name, isTBF: smIsTBF });
           });
       }
   });
@@ -695,7 +731,7 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
       let strokeDash = isForeign ? 'stroke-dasharray="4,4"' : '';
       
       const fWidth = front.w || cabWidth;
-      const fSvgX = frontX + (front.x || 0);
+      const fSvgX = frontX + front.relX + (front.x || 0);
 
       svg += `<rect x="${fSvgX}" y="${elSvgY}" width="${fWidth}" height="${front.h}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5" ${strokeDash} />`;
 

@@ -614,7 +614,40 @@ export function updateSidebar() {
           let drawDepth = sidePanel ? sidePanel.width : (parseFloat(activeMod.dimensions.depth) || 510);
 
           const svgContent = generateSidePanelSVG(drawHeight, drawDepth, mountingData || []);
-          
+
+          // Szafa złożona z kilku zgrupowanych modułów (patrz ui/properties.js:
+          // "Połącz zaznaczone w grupę") - widok KORPUS już pokazuje całą grupę
+          // naraz (viewer2d.js: stackModules), ale klikalny do nawiertów jest
+          // tylko AKTYWNY moduł. Guziki niżej pozwalają przełączyć, który to
+          // jest, BEZ zamykania okna wydruku - klikając wywołują z powrotem
+          // funkcję w oknie aplikacji (window.opener, ta sama origin co blob:),
+          // która realnie przełącza state.activeModuleId (dokładnie tak samo,
+          // jakby użytkownik kliknął ten moduł na liście po lewej w aplikacji)
+          // i oddaje świeży SVG dla nowego aktywnego modułu.
+          const groupId = activeMod.groupId;
+          const groupModules = groupId
+              ? state.project.modules.filter(m => m.groupId === groupId)
+              : [];
+          window.__printSelectModule = (moduleId) => {
+              state.activeModuleId = moduleId;
+              update3D();
+              updateSidebar();
+              initPropertiesPanel();
+              const m = state.project.modules.find(mm => mm.id === moduleId);
+              if (!m) return null;
+              const { parts: mParts, mountingData: mMountingData } = calculateParts();
+              const mSidePanel = mParts.find(p => p.name.toLowerCase().includes('bok'));
+              const mDrawHeight = mSidePanel ? mSidePanel.length : (parseFloat(m.dimensions.height) || 720);
+              const mDrawDepth = mSidePanel ? mSidePanel.width : (parseFloat(m.dimensions.depth) || 510);
+              return generateSidePanelSVG(mDrawHeight, mDrawDepth, mMountingData || []);
+          };
+
+          const tabsHtml = groupModules.length > 1 ? `
+                <div class="module-tabs">
+                    ${groupModules.map(m => `<button class="module-tab${m.id === activeMod.id ? ' active' : ''}" data-module-id="${m.id}" onclick="switchModule('${m.id}', this)">${escapeHtml(m.name)}</button>`).join('')}
+                </div>
+          ` : '';
+
           const htmlContent = `
             <!DOCTYPE html>
             <html lang="pl">
@@ -622,39 +655,47 @@ export function updateSidebar() {
                 <meta charset="UTF-8">
                 <title>Wydruk na produkcję (Interaktywny)</title>
                 <style>
-                    body { margin: 0; padding: 0; background-color: #f1f5f9; display: flex; flex-direction: column; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; } 
-                    .header { background-color: #ffffff; padding: 16px 24px; border-bottom: 1px solid #cbd5e1; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); z-index: 10; display: flex; justify-content: space-between; align-items: center; } 
-                    .header-text h1 { margin: 0 0 6px 0; font-size: 20px; color: #0f172a; } 
-                    .header-text p { margin: 0; font-size: 13px; color: #64748b; } 
+                    body { margin: 0; padding: 0; background-color: #f1f5f9; display: flex; flex-direction: column; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+                    .header { background-color: #ffffff; padding: 16px 24px; border-bottom: 1px solid #cbd5e1; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); z-index: 10; display: flex; flex-direction: column; gap: 10px; }
+                    .header-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+                    .header-text h1 { margin: 0 0 6px 0; font-size: 20px; color: #0f172a; }
+                    .header-text p { margin: 0; font-size: 13px; color: #64748b; }
                     .controls { display: flex; flex-wrap: wrap; gap: 12px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; font-weight: bold; color: #334155; align-items: center;}
                     .controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
                     .controls input { cursor: pointer; width: 16px; height: 16px; }
-                    .svg-container { flex-grow: 1; width: 100%; height: 100%; overflow: hidden; background-color: #f8fafc; cursor: grab; } 
+                    .svg-container { flex-grow: 1; width: 100%; height: 100%; overflow: hidden; background-color: #f8fafc; cursor: grab; }
                     .svg-container:active { cursor: grabbing; }
                     .btn-front { padding: 6px 12px; background: #fff; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: bold; color: #1e3a8a; cursor: pointer; transition: background 0.2s;}
                     .btn-front:hover { background: #e0f2fe; border-color: #3b82f6;}
-                    @media print { 
-                        body { height: auto; overflow: visible; display: block; background: white; } 
-                        .header { display: none; } 
-                        .svg-container { display: block; overflow: visible; background: white; } 
+                    .module-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+                    .module-tab { padding: 6px 14px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 999px; font-weight: bold; color: #334155; cursor: pointer; font-size: 12px; transition: all 0.15s; }
+                    .module-tab:hover { background: #e0f2fe; border-color: #3b82f6; }
+                    .module-tab.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+                    @media print {
+                        body { height: auto; overflow: visible; display: block; background: white; }
+                        .header { display: none; }
+                        .svg-container { display: block; overflow: visible; background: white; }
                     }
                 </style>
             </head>
             <body>
                 <div class="header">
-                    <div class="header-text">
-                        <h1>Interaktywny Rysunek Techniczny</h1>
-                        <p><b>Kliknij element na korpusie</b> by zobaczyć jego nawierty. Przeciągaj LKM (przesunięcie) | Kółko myszy (Zoom).</p>
+                    <div class="header-top">
+                        <div class="header-text">
+                            <h1>Interaktywny Rysunek Techniczny</h1>
+                            <p><b>Kliknij element na korpusie</b> by zobaczyć jego nawierty. Przeciągaj LKM (przesunięcie) | Kółko myszy (Zoom).</p>
+                        </div>
+                        <div class="controls">
+                            <label style="color:#9333ea;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-corpus', this)"> Wieńce/Stałe</label>
+                            <label style="color:#ea580c;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-shelf', this)"> Podpórki</label>
+                            <label style="color:#16a34a;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-hinge', this)"> Zawiasy</label>
+                            <label style="color:#0284c7;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-drawer', this)"> Szuflady</label>
+                            <div style="width: 2px; height: 20px; background: #cbd5e1; margin: 0 5px;"></div>
+                            <button class="btn-front" onclick="toggleFront('detail-front', this)">🚪 Fronty Zewn.</button>
+                            <button class="btn-front" onclick="toggleFront('detail-front-inner', this)">📥 Fronty Wewn.</button>
+                        </div>
                     </div>
-                    <div class="controls">
-                        <label style="color:#9333ea;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-corpus', this)"> Wieńce/Stałe</label>
-                        <label style="color:#ea580c;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-shelf', this)"> Podpórki</label>
-                        <label style="color:#16a34a;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-hinge', this)"> Zawiasy</label>
-                        <label style="color:#0284c7;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-drawer', this)"> Szuflady</label>
-                        <div style="width: 2px; height: 20px; background: #cbd5e1; margin: 0 5px;"></div>
-                        <button class="btn-front" onclick="toggleFront('detail-front', this)">🚪 Fronty Zewn.</button>
-                        <button class="btn-front" onclick="toggleFront('detail-front-inner', this)">📥 Fronty Wewn.</button>
-                    </div>
+                    ${tabsHtml}
                 </div>
                 <div class="svg-container" id="svg-viewport">
                     ${svgContent}
@@ -664,7 +705,7 @@ export function updateSidebar() {
                         const elements = document.querySelectorAll('.' + layerName);
                         elements.forEach(el => { el.style.display = checkbox.checked ? '' : 'none'; });
                     }
-                    
+
                     function toggleFront(id, btn) {
                         const el = document.getElementById(id);
                         if (el) {
@@ -696,30 +737,51 @@ export function updateSidebar() {
                             if (mapRect) mapRect.classList.add('active-part');
                         }
                     }
-                    
-                    window.onload = () => { showDetail('detail-left'); };
 
-                    const svg = document.getElementById('side-panel-svg');
-                    let isPanning = false; let startPoint = { x: 0, y: 0 }; let startViewBox = { x: 0, y: 0 };
+                    function bindSvgPanZoom() {
+                        const svg = document.getElementById('side-panel-svg');
+                        if (!svg) return;
+                        let isPanning = false; let startPoint = { x: 0, y: 0 }; let startViewBox = { x: 0, y: 0 };
+                        svg.addEventListener('mousedown', (e) => {
+                            isPanning = true; startPoint = { x: e.clientX, y: e.clientY };
+                            startViewBox = { x: svg.viewBox.baseVal.x, y: svg.viewBox.baseVal.y }; svg.style.cursor = 'grabbing';
+                        });
+                        window.addEventListener('mousemove', (e) => {
+                            if (!isPanning) return; const CTM = svg.getScreenCTM();
+                            const dx = (e.clientX - startPoint.x) / CTM.a; const dy = (e.clientY - startPoint.y) / CTM.d;
+                            svg.viewBox.baseVal.x = startViewBox.x - dx; svg.viewBox.baseVal.y = startViewBox.y - dy;
+                        });
+                        window.addEventListener('mouseup', () => { isPanning = false; svg.style.cursor = 'grab'; });
+                        window.addEventListener('mouseleave', () => { isPanning = false; svg.style.cursor = 'grab'; });
+                        svg.addEventListener('wheel', (e) => {
+                            e.preventDefault(); const zoom = e.deltaY > 0 ? 1.1 : 0.9; const pt = svg.createSVGPoint();
+                            pt.x = e.clientX; pt.y = e.clientY; const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+                            svg.viewBox.baseVal.x = svgP.x - (svgP.x - svg.viewBox.baseVal.x) * zoom;
+                            svg.viewBox.baseVal.y = svgP.y - (svgP.y - svg.viewBox.baseVal.y) * zoom;
+                            svg.viewBox.baseVal.width *= zoom; svg.viewBox.baseVal.height *= zoom;
+                        }, { passive: false });
+                    }
+
+                    // Przełącza, KTÓRY moduł grupy jest aktywny - woła z powrotem funkcję
+                    // w oknie aplikacji (window.opener.__printSelectModule, patrz
+                    // ui/sidebar.js), która realnie zmienia state.activeModuleId (jakby
+                    // kliknięto ten moduł na liście po lewej w aplikacji) i oddaje świeży
+                    // SVG - dzięki temu nie trzeba zamykać okna wydruku, żeby zobaczyć
+                    // nawierty innego modułu z tej samej grupy.
+                    function switchModule(moduleId, btn) {
+                        if (!window.opener || window.opener.closed || !window.opener.__printSelectModule) return;
+                        const svg = window.opener.__printSelectModule(moduleId);
+                        if (!svg) return;
+                        document.getElementById('svg-viewport').innerHTML = svg;
+                        bindSvgPanZoom();
+                        showDetail('detail-left');
+                        document.querySelectorAll('.module-tab').forEach(t => {
+                            t.classList.toggle('active', t === btn);
+                        });
+                    }
+
                     document.body.style.userSelect = 'none';
-                    svg.addEventListener('mousedown', (e) => {
-                        isPanning = true; startPoint = { x: e.clientX, y: e.clientY };
-                        startViewBox = { x: svg.viewBox.baseVal.x, y: svg.viewBox.baseVal.y }; svg.style.cursor = 'grabbing';
-                    });
-                    window.addEventListener('mousemove', (e) => {
-                        if (!isPanning) return; const CTM = svg.getScreenCTM();
-                        const dx = (e.clientX - startPoint.x) / CTM.a; const dy = (e.clientY - startPoint.y) / CTM.d;
-                        svg.viewBox.baseVal.x = startViewBox.x - dx; svg.viewBox.baseVal.y = startViewBox.y - dy;
-                    });
-                    window.addEventListener('mouseup', () => { isPanning = false; svg.style.cursor = 'grab'; });
-                    window.addEventListener('mouseleave', () => { isPanning = false; svg.style.cursor = 'grab'; });
-                    svg.addEventListener('wheel', (e) => {
-                        e.preventDefault(); const zoom = e.deltaY > 0 ? 1.1 : 0.9; const pt = svg.createSVGPoint();
-                        pt.x = e.clientX; pt.y = e.clientY; const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
-                        svg.viewBox.baseVal.x = svgP.x - (svgP.x - svg.viewBox.baseVal.x) * zoom;
-                        svg.viewBox.baseVal.y = svgP.y - (svgP.y - svg.viewBox.baseVal.y) * zoom;
-                        svg.viewBox.baseVal.width *= zoom; svg.viewBox.baseVal.height *= zoom;
-                    }, { passive: false });
+                    window.onload = () => { showDetail('detail-left'); bindSvgPanZoom(); };
                 </script>
             </body>
             </html>`;
