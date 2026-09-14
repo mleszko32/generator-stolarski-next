@@ -47,6 +47,8 @@ export function calculateParts() {
 function getGlobalHingesForModule(targetMod, config) {
   const mountingData = [];
   const targetAbsX = parseFloat(targetMod.position.x) || 0;
+  const targetAbsZ = parseFloat(targetMod.position.z) || 0;
+  const targetD = parseFloat(targetMod.dimensions.depth) || 513;
   const targetLegH = (targetMod.legs && targetMod.legs.active) ? (parseFloat(targetMod.legs.height) || 0) : 0;
   const targetAbsY = (parseFloat(targetMod.position.y) || 0) + targetLegH;
   const targetH = parseFloat(targetMod.dimensions.height);
@@ -55,24 +57,34 @@ function getGlobalHingesForModule(targetMod, config) {
 
   config.modules.forEach(sourceMod => {
       const sourceAbsX = parseFloat(sourceMod.position.x) || 0;
+      const sourceAbsZ = parseFloat(sourceMod.position.z) || 0;
+      const sourceD = parseFloat(sourceMod.dimensions.depth) || 513;
       const sourceLegH = (sourceMod.legs && sourceMod.legs.active) ? (parseFloat(sourceMod.legs.height) || 0) : 0;
       const sourceAbsY = (parseFloat(sourceMod.position.y) || 0) + sourceLegH;
       const sourceW = parseFloat(sourceMod.dimensions.width) || 600;
 
       const overlapX = Math.max(0, Math.min(targetAbsX + targetW, sourceAbsX + sourceW) - Math.max(targetAbsX, sourceAbsX));
+      // Samo nachodzenie w X nie wystarcza - dwie szafki stojące przy różnych
+      // ścianach (różne Z) mogą przypadkiem mieć nakładający się zakres X, co
+      // dawało fantomowe "globalne" zawiasy (dublujące się nawierty prawie w tym
+      // samym miejscu na boku) dla drzwi z zupełnie innej, niepowiązanej szafki
+      // (zgłoszony bug). Drzwi "spinające" dwie szafki muszą stać w tym samym
+      // miejscu pokoju, więc wymagamy nachodzenia też w Z.
+      const overlapZ = Math.max(0, Math.min(targetAbsZ + targetD, sourceAbsZ + sourceD) - Math.max(targetAbsZ, sourceAbsZ));
 
-      if (overlapX > 10) { 
+      if (overlapX > 10 && overlapZ > 10) {
           if (sourceMod.elements) {
               const fronts = sourceMod.elements.filter(el => el.typ === 'front' && el.subtype.includes('drzwi'));
               fronts.forEach(front => {
-                  
+
                   let obstacles = [];
                   config.modules.forEach(otherMod => {
                       const otherAbsX = parseFloat(otherMod.position.x) || 0;
+                      const otherAbsZ = parseFloat(otherMod.position.z) || 0;
                       const otherLegH = (otherMod.legs && otherMod.legs.active) ? (parseFloat(otherMod.legs.height) || 0) : 0;
                       const otherAbsY = (parseFloat(otherMod.position.y) || 0) + otherLegH;
-                      
-                      if (Math.abs(sourceAbsX - otherAbsX) < 10) {
+
+                      if (Math.abs(sourceAbsX - otherAbsX) < 10 && Math.abs(sourceAbsZ - otherAbsZ) < 10) {
                           const dy = otherAbsY - sourceAbsY;
                           if (otherMod.elements) {
                               otherMod.elements.forEach(el => {

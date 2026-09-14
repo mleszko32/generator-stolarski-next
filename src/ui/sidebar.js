@@ -252,7 +252,7 @@ export function updateSidebar() {
   scheduleCheckpoint(); // patrz core/history.js — debounce'owany checkpoint historii cofnij/wprzód
   renderInteriorEditorIfVisible(); // patrz ui/interiorEditor.js
   const leftSidebar = document.querySelector(".sidebar-left");
-  const { parts, mountingData } = calculateParts(); 
+  const { parts, mountingData } = calculateParts();
   const activeMod = getActiveModule();
   const projectHardware = calculateProjectHardware();
   
