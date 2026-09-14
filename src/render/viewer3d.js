@@ -53,6 +53,77 @@ function getRoom() {
   return state.project.room || DEFAULT_ROOM;
 }
 
+// Prostokątny odcisk modułu w przestrzeni pokoju (X/Y/Z), z uwzględnieniem
+// obrotu (getWorldFootprint) i wysokości nóżek - używane tylko do wykrywania
+// kolizji przy przeciąganiu (pushOverlappingModules niżej).
+function getModuleBox(mod) {
+  const { worldW, worldD } = getWorldFootprint(mod);
+  const H = parseFloat(mod.dimensions.height) || 720;
+  const baseY = (mod.legs && mod.legs.active) ? (parseFloat(mod.legs.height) || 100) : 0;
+  const x0 = parseFloat(mod.position.x) || 0;
+  const y0 = (parseFloat(mod.position.y) || 0) + baseY;
+  const z0 = parseFloat(mod.position.z) || 0;
+  return { x0, x1: x0 + worldW, y0, y1: y0 + H, z0, z1: z0 + worldD };
+}
+
+// Dotąd przeciąganie tylko PRZYCIĄGAŁO (magnetycznie) do krawędzi sąsiadów,
+// ale nic nie stało na przeszkodzie, żeby wjechać w sąsiedni moduł na wylot -
+// zmiana szerokości/wysokości modułu (patrz ui/properties.js) już dawno
+// odsuwa dalsze moduły w łańcuchu, przeciąganie robiło to tylko dla ściany,
+// nie dla innych szafek (zgłoszony bug). Woła się co klatkę przeciągania
+// (pointermove niżej) dla aktualnie przesuwanego zaznaczenia (draggedIds) -
+// każdy napotkany, kolidujący moduł jest odsuwany o dokładnie tyle, ile
+// trzeba, żeby znów stykał się krawędzią, wzdłuż osi (X albo Z) z MNIEJSZYM
+// nakładaniem ("minimum translation vector" przy rozwiązywaniu kolizji AABB)
+// - dzięki temu odsunięcie idzie w stronę, z której faktycznie nadjechał
+// przeciągany moduł. Efekt łańcuchowy: odsunięty moduł sam trafia z powrotem
+// do kolejki i jest sprawdzany przeciw reszcie, więc pchnięcie propaguje się
+// dalej, tak jak przy zmianie wymiaru.
+function pushOverlappingModules(draggedIds) {
+  const EPS = 0.5;
+  const queue = Array.from(draggedIds);
+  let guard = 0;
+  while (queue.length && guard < 100) {
+    guard++;
+    const id = queue.shift();
+    const m = state.project.modules.find(mm => mm.id === id);
+    if (!m) continue;
+    const boxM = getModuleBox(m);
+
+    state.project.modules.forEach(other => {
+      if (other.id === id || draggedIds.has(other.id)) return;
+      const boxO = getModuleBox(other);
+      const overlapX = Math.min(boxM.x1, boxO.x1) - Math.max(boxM.x0, boxO.x0);
+      const overlapY = Math.min(boxM.y1, boxO.y1) - Math.max(boxM.y0, boxO.y0);
+      const overlapZ = Math.min(boxM.z1, boxO.z1) - Math.max(boxM.z0, boxO.z0);
+      if (overlapX <= EPS || overlapY <= EPS || overlapZ <= EPS) return;
+
+      if (overlapX <= overlapZ) {
+        const dir = (boxO.x0 + boxO.x1) >= (boxM.x0 + boxM.x1) ? 1 : -1;
+        other.position.x = (parseFloat(other.position.x) || 0) + dir * overlapX;
+      } else {
+        const dir = (boxO.z0 + boxO.z1) >= (boxM.z0 + boxM.z1) ? 1 : -1;
+        other.position.z = (parseFloat(other.position.z) || 0) + dir * overlapZ;
+      }
+      clampModuleToRoom(other);
+
+      const tOther = cabinetGroup && cabinetGroup.children.find(g => g.userData.moduleId === other.id);
+      if (tOther) {
+          const { worldW: oW, worldD: oD } = getWorldFootprint(other);
+          const oH = parseFloat(other.dimensions.height) || 720;
+          const oBaseY = (other.legs && other.legs.active) ? (parseFloat(other.legs.height) || 100) : 0;
+          tOther.position.set(
+              (parseFloat(other.position.x) || 0) + oW/2,
+              (parseFloat(other.position.y) || 0) + oBaseY + oH/2,
+              (parseFloat(other.position.z) || 0) + oD/2
+          );
+      }
+
+      queue.push(other.id);
+    });
+  }
+}
+
 // Czyści i odbudowuje geometrię pokoju (podłoga + 4 ściany) na podstawie
 // state.project.room. Wołane raz przy starcie i za każdym razem, gdy użytkownik
 // zapisze nowe wymiary w ui/roomPanel.js (przez eksportowane niżej updateRoom()) —
@@ -415,6 +486,10 @@ export function init3DViewer() {
                       }
                   }
               });
+
+              // Odsuń każdy inny moduł, w który właśnie wjechaliśmy - patrz
+              // pushOverlappingModules() wyżej.
+              pushOverlappingModules(state.selectedModules);
           }
 
           const inpX = document.getElementById('input-pos-x');
