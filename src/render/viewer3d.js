@@ -429,9 +429,20 @@ export function init3DViewer() {
   window.addEventListener('pointerup', (e) => {
       if (isDragging) {
           isDragging = false;
+          // Ostateczne, świadome obrotu zabezpieczenie (patrz clampModuleToRoom w
+          // core/layout.js) - snapowanie/twardy limit w pointermove wyżej zna
+          // blendy tylko dla rotation===0, więc dla obróconego modułu mógł
+          // wypuścić blendę poza pokój w trakcie przeciągania.
+          if (state.selectedModules) {
+              state.selectedModules.forEach(id => {
+                  const m = state.project.modules.find(mod => mod.id === id);
+                  if (m) clampModuleToRoom(m);
+              });
+              update3D();
+          }
           dragTarget = null;
           dragModule = null;
-          controls.enabled = true; 
+          controls.enabled = true;
           updateSidebar();
           initPropertiesPanel();
       }

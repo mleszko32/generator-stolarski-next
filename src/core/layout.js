@@ -50,12 +50,37 @@ export function clampModuleToRoom(mod) {
   // pokoju - bez tego przy szafce dosuniętej do ściany sama blenda
   // przenikała przez tę ścianę (zgłoszony bug), mimo że sam korpus mieścił
   // się w środku.
+  //
+  // Kierunek "lewa/prawa" jest zdefiniowany w LOKALNYM układzie modułu, a
+  // obrót co 90° (modGroup.rotation.y w render/viewer3d.js) obraca ten
+  // lokalny układ względem pokoju - "lewa" blenda nie zawsze poszerza odcisk
+  // w stronę -X świata. Zweryfikowane wprost z transformacji modGroup
+  // (innerGroup.position = -W/2,.., -D/2, potem obrót o mod.rotation):
+  //   rotation   0°: lewa -> -X (bliższa ściana X=0),   prawa -> +X (daleka)
+  //   rotation 180°: lewa -> +X (daleka),                prawa -> -X (bliższa)
+  //   rotation  90°: lewa -> -Z (bliższa ściana Z=0),   prawa -> +Z (daleka)
+  //   rotation 270°: lewa -> +Z (daleka),                prawa -> -Z (bliższa)
+  // Bez tego (poprzednia wersja zakładała zawsze "lewa = -X, prawa = +X",
+  // czyli tylko przypadek rotation=0) blenda modułu obróconego o 180°/90°/270°
+  // nadal przenikała przez ścianę, mimo że ta funkcja "wiedziała" już
+  // ogólnie o blendach - zgłoszony bug w konkretnym zapisanym projekcie.
   const leftW = (mod.fillers && mod.fillers.left && mod.fillers.left.active) ? (parseFloat(mod.fillers.left.width) || 50) : 0;
   const rightW = (mod.fillers && mod.fillers.right && mod.fillers.right.active) ? (parseFloat(mod.fillers.right.width) || 50) : 0;
-  const maxX = Math.max(leftW, room.width - worldW - rightW);
-  const maxZ = Math.max(0, room.depth - worldD);
-  mod.position.x = Math.min(Math.max(parseFloat(mod.position.x) || 0, leftW), maxX);
-  mod.position.z = Math.min(Math.max(parseFloat(mod.position.z) || 0, 0), maxZ);
+  const rot = ((parseFloat(mod.rotation) || 0) % 360 + 360) % 360;
+  const nearIsLeft = rot === 0 || rot === 90;
+  const nearW = nearIsLeft ? leftW : rightW;
+  const farW = nearIsLeft ? rightW : leftW;
+  const onXAxis = rot === 0 || rot === 180;
+
+  const nearFillerX = onXAxis ? nearW : 0;
+  const farFillerX = onXAxis ? farW : 0;
+  const nearFillerZ = onXAxis ? 0 : nearW;
+  const farFillerZ = onXAxis ? 0 : farW;
+
+  const maxX = Math.max(nearFillerX, room.width - worldW - farFillerX);
+  const maxZ = Math.max(nearFillerZ, room.depth - worldD - farFillerZ);
+  mod.position.x = Math.min(Math.max(parseFloat(mod.position.x) || 0, nearFillerX), maxX);
+  mod.position.z = Math.min(Math.max(parseFloat(mod.position.z) || 0, nearFillerZ), maxZ);
 }
 
 // Projekty zapisane PRZED dodaniem realnego pokoju miały w danych martwe,

@@ -9,7 +9,7 @@ import {
   onAuthStateChanged,
 } from "firebase/auth";
 import { state, ensureRoomDefaults } from "./state.js";
-import { migrateLegacyRoom } from "./layout.js";
+import { migrateLegacyRoom, clampModuleToRoom } from "./layout.js";
 import { resetHistory } from "./history.js";
 
 // Konfiguracja klienta Firebase jest z założenia publiczna (leci do przeglądarki)
@@ -240,6 +240,12 @@ export async function loadProjectFromCloud(projectId) {
       state.project = docSnap.data();
       ensureRoomDefaults(state.project); // projekty zapisane przed dodaniem pomieszczeń mogą nie mieć tego pola
       migrateLegacyRoom(state.project); // ...a te sprzed realnego renderowania pokoju mogą mieć martwy, za mały placeholder
+      // Projekty zapisane przed poprawką clampModuleToRoom (blendy L-kształtne)
+      // mogły zapisać pozycję z blendą przenikającą przez ścianę - ten stan
+      // wczytywał się bez żadnej walidacji, a re-clamp uruchamiał się dopiero
+      // przy KOLEJNEJ interaktywnej zmianie (drag/obrót/pole liczbowe), więc
+      // sama szafka po prostu wisiała tak przy każdym otwarciu projektu.
+      (state.project.modules || []).forEach(clampModuleToRoom);
       state.activeModuleId = state.project.modules.length > 0 ? state.project.modules[0].id : null;
       state.loadedProjectId = projectId;
       markSaved();

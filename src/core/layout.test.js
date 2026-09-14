@@ -197,6 +197,51 @@ describe("clampModuleToRoom", () => {
     clampModuleToRoom(mod);
     expect(mod.position.x).toBe(3500 - 600);
   });
+
+  // Obrót co 90° obraca lokalny układ modułu (lewa/prawa) względem pokoju -
+  // patrz komentarz w clampModuleToRoom. Bez tego blenda modułu obróconego
+  // przenikała przez ścianę, mimo że sama funkcja "znała" już blendy
+  // (zgłoszony bug na konkretnym zapisanym projekcie).
+  it("obrót 180° zamienia strony - blenda prawa zagraża BLISKIEJ ścianie X", () => {
+    const mod = baseModule({
+      position: { x: -200, y: 0, z: 0 },
+      rotation: 180,
+      fillers: { right: { active: true, width: 50 } },
+    });
+    clampModuleToRoom(mod);
+    expect(mod.position.x).toBe(50);
+  });
+
+  it("obrót 180° - blenda lewa zagraża DALEKIEJ ścianie X", () => {
+    const mod = baseModule({
+      position: { x: 5000, y: 0, z: 0 },
+      rotation: 180,
+      fillers: { left: { active: true, width: 50 } },
+    });
+    clampModuleToRoom(mod);
+    expect(mod.position.x).toBe(3500 - 600 - 50);
+  });
+
+  it("obrót 90° - blendy L/R działają na osi Z (bliska/daleka), nie na X", () => {
+    const mod = baseModule({
+      position: { x: 5000, y: 0, z: -200 },
+      rotation: 90,
+      fillers: { left: { active: true, width: 50 } },
+    });
+    clampModuleToRoom(mod);
+    expect(mod.position.x).toBe(3500 - 513); // X liczone bez blend, jak zwykły odcisk
+    expect(mod.position.z).toBe(50); // blenda lewa zagraża bliskiej ścianie Z
+  });
+
+  it("obrót 270° - blenda prawa zagraża bliskiej ścianie Z, lewa dalekiej", () => {
+    const mod = baseModule({
+      position: { x: 0, y: 0, z: -200 },
+      rotation: 270,
+      fillers: { right: { active: true, width: 50 } },
+    });
+    clampModuleToRoom(mod);
+    expect(mod.position.z).toBe(50);
+  });
 });
 
 describe("migrateLegacyRoom", () => {
