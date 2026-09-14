@@ -83,6 +83,53 @@ export function clampModuleToRoom(mod) {
   mod.position.z = Math.min(Math.max(parseFloat(mod.position.z) || 0, nearFillerZ), maxZ);
 }
 
+// Prostokątny odcisk modułu w przestrzeni pokoju (X/Y/Z), z uwzględnieniem
+// obrotu (getWorldFootprint) i wysokości nóżek. Używane przez
+// restModuleOnNeighbors() niżej oraz przez pushOverlappingModules()
+// w render/viewer3d.js (ta sama definicja - stąd eksport, żeby nie liczyć
+// tego samego dwa razy w dwóch miejscach).
+export function getModuleBox(mod) {
+  const { worldW, worldD } = getWorldFootprint(mod);
+  const H = parseFloat(mod.dimensions.height) || 720;
+  const baseY = (mod.legs && mod.legs.active) ? (parseFloat(mod.legs.height) || 100) : 0;
+  const x0 = parseFloat(mod.position.x) || 0;
+  const y0 = (parseFloat(mod.position.y) || 0) + baseY;
+  const z0 = parseFloat(mod.position.z) || 0;
+  return { x0, x1: x0 + worldW, y0, y1: y0 + H, z0, z1: z0 + worldD };
+}
+
+// Stawianie szafy z dwóch modułów jeden NA DRUGIM (np. dolny + górny, ten
+// sam odcisk X/Z) - ustawienie wysokości (position.y) ręcznie w polu "Wysokość
+// od podłogi" (ui/properties.js) samo w sobie nie sprawdzało kolizji z niczym,
+// więc niedokładna wartość (np. o kilka mm za mało) zostawiała moduł
+// "zatopiony" w tym pod/nad nim spodem - zgłoszony bug ("wnika w głąb").
+// Dosuwa PRZESUNIĘTY właśnie moduł (mod) do oparcia się dokładnie o sąsiada,
+// z którym akurat nachodzi w pionie, zamiast ruszać sąsiada - w przeciwieństwie
+// do kolizji bok-w-bok (pushOverlappingModules w render/viewer3d.js), gdzie to
+// sąsiad jest odsuwany, bo tu nie ma odpowiednika "łańcucha" - dwa moduły w tym
+// samym miejscu w planie mogą się stykać tylko piętrowo. Działa tylko gdy X I Z
+// faktycznie się nakładają (inaczej to zwykłe sąsiedztwo w rzędzie, nie
+// piętrowanie) ORAZ nakładanie w Y jest MNIEJSZE niż w X/Z (ten sam warunek
+// "minimum translation vector" co przy przeciąganiu w 3D).
+export function restModuleOnNeighbors(mod) {
+  const EPS = 0.5;
+  const boxM = getModuleBox(mod);
+  (state.project.modules || []).forEach((other) => {
+    if (other.id === mod.id) return;
+    const boxO = getModuleBox(other);
+    const overlapX = Math.min(boxM.x1, boxO.x1) - Math.max(boxM.x0, boxO.x0);
+    const overlapY = Math.min(boxM.y1, boxO.y1) - Math.max(boxM.y0, boxO.y0);
+    const overlapZ = Math.min(boxM.z1, boxO.z1) - Math.max(boxM.z0, boxO.z0);
+    if (overlapX <= EPS || overlapY <= EPS || overlapZ <= EPS) return;
+    if (!(overlapY <= overlapX && overlapY <= overlapZ)) return;
+
+    const dir = boxM.y0 + boxM.y1 >= boxO.y0 + boxO.y1 ? 1 : -1;
+    mod.position.y = Math.round((parseFloat(mod.position.y) || 0) + dir * overlapY);
+    boxM.y0 += dir * overlapY;
+    boxM.y1 += dir * overlapY;
+  });
+}
+
 // Projekty zapisane PRZED dodaniem realnego pokoju miały w danych martwe,
 // nigdy nierenderowane pole room = {width:3500, height:2600, depth:600} (patrz
 // komentarz przy DEFAULT_ROOM w state.js - to było jak korytarz, nie mieściłby

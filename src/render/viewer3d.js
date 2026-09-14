@@ -8,7 +8,7 @@ import { state, DEFAULT_ROOM } from '../core/state.js';
 import { getDrawerComponents, calculateDrawerHoles } from '../core/drawerMath.js';
 import { drawerSystems } from '../core/drawerSystems.js';
 import { calculateHinges } from '../core/hingeMath.js';
-import { recalculateLayout, getTraverseConfig, getWorldFootprint, clampModuleToRoom } from '../core/layout.js';
+import { recalculateLayout, getTraverseConfig, getWorldFootprint, clampModuleToRoom, getModuleBox } from '../core/layout.js';
 import { buildZoneTree, moveSplit } from '../core/zoneTree.js';
 import { scheduleCheckpoint } from '../core/history.js';
 import { toggleInteriorEditor, renderInteriorEditorIfVisible } from '../ui/interiorEditor.js';
@@ -53,17 +53,21 @@ function getRoom() {
   return state.project.room || DEFAULT_ROOM;
 }
 
-// Prostokątny odcisk modułu w przestrzeni pokoju (X/Y/Z), z uwzględnieniem
-// obrotu (getWorldFootprint) i wysokości nóżek - używane tylko do wykrywania
-// kolizji przy przeciąganiu (pushOverlappingModules niżej).
-function getModuleBox(mod) {
+// Odświeża transform bryły modułu w scenie na podstawie aktualnego
+// mod.position/rotation - używane po ręcznej korekcie pozycji poza normalnym
+// update3D() (pushOverlappingModules niżej), żeby widok od razu nadążał za
+// zmianą, klatka po klatce przeciągania.
+function syncModuleMesh(mod) {
+  const target = cabinetGroup && cabinetGroup.children.find(g => g.userData.moduleId === mod.id);
+  if (!target) return;
   const { worldW, worldD } = getWorldFootprint(mod);
   const H = parseFloat(mod.dimensions.height) || 720;
   const baseY = (mod.legs && mod.legs.active) ? (parseFloat(mod.legs.height) || 100) : 0;
-  const x0 = parseFloat(mod.position.x) || 0;
-  const y0 = (parseFloat(mod.position.y) || 0) + baseY;
-  const z0 = parseFloat(mod.position.z) || 0;
-  return { x0, x1: x0 + worldW, y0, y1: y0 + H, z0, z1: z0 + worldD };
+  target.position.set(
+      (parseFloat(mod.position.x) || 0) + worldW/2,
+      (parseFloat(mod.position.y) || 0) + baseY + H/2,
+      (parseFloat(mod.position.z) || 0) + worldD/2
+  );
 }
 
 // Dotąd przeciąganie tylko PRZYCIĄGAŁO (magnetycznie) do krawędzi sąsiadów,
@@ -84,11 +88,12 @@ function getModuleBox(mod) {
 // (X/Y/Z), nie tylko X/Z. Budowanie szafy z dwóch modułów jeden NA DRUGIM
 // (np. dolny + górny, ten sam odcisk X/Z) też przechodzi przez chwilową
 // kolizję w trakcie przeciągania - ale tam naturalnym rozwiązaniem jest
-// dosunięcie w pionie (Y), o które i tak dba już magnetyczne przyciąganie
-// do sąsiada wyżej (snapY). Jeśli to właśnie oś Y ma najmniejsze nałożenie,
-// NIE pchamy w bok (zgłoszony bug: odsuwało dolny moduł zamiast pozwolić
-// się zestawić w pionie) - zostawiamy przeciąganemu modułowi dokończenie
-// dosunięcia w Y.
+// dosunięcie w pionie (Y), NIE odepchnięcie stacjonarnego modułu w bok
+// (zgłoszony bug: odsuwało dolny moduł). Gdy to oś Y ma najmniejsze
+// nałożenie, dosuwamy więc PRZECIĄGANY moduł (m), a nie stacjonarny (other) -
+// dokładnie to samo robi core/layout.js:restModuleOnNeighbors() dla pozycji
+// Y wpisanej ręcznie w polu w panelu bocznym (ui/properties.js), więc oba
+// wejścia (drag i pole liczbowe) dają ten sam, spójny wynik.
 function pushOverlappingModules(draggedIds) {
   const EPS = 0.5;
   const queue = Array.from(draggedIds);
@@ -107,7 +112,15 @@ function pushOverlappingModules(draggedIds) {
       const overlapY = Math.min(boxM.y1, boxO.y1) - Math.max(boxM.y0, boxO.y0);
       const overlapZ = Math.min(boxM.z1, boxO.z1) - Math.max(boxM.z0, boxO.z0);
       if (overlapX <= EPS || overlapY <= EPS || overlapZ <= EPS) return;
-      if (overlapY <= overlapX && overlapY <= overlapZ) return; // stawianie w pionie - zostaw snapY
+
+      if (overlapY <= overlapX && overlapY <= overlapZ) {
+        const dir = (boxM.y0 + boxM.y1) >= (boxO.y0 + boxO.y1) ? 1 : -1;
+        m.position.y = Math.round((parseFloat(m.position.y) || 0) + dir * overlapY);
+        boxM.y0 += dir * overlapY;
+        boxM.y1 += dir * overlapY;
+        syncModuleMesh(m);
+        return;
+      }
 
       if (overlapX <= overlapZ) {
         const dir = (boxO.x0 + boxO.x1) >= (boxM.x0 + boxM.x1) ? 1 : -1;
@@ -117,19 +130,7 @@ function pushOverlappingModules(draggedIds) {
         other.position.z = (parseFloat(other.position.z) || 0) + dir * overlapZ;
       }
       clampModuleToRoom(other);
-
-      const tOther = cabinetGroup && cabinetGroup.children.find(g => g.userData.moduleId === other.id);
-      if (tOther) {
-          const { worldW: oW, worldD: oD } = getWorldFootprint(other);
-          const oH = parseFloat(other.dimensions.height) || 720;
-          const oBaseY = (other.legs && other.legs.active) ? (parseFloat(other.legs.height) || 100) : 0;
-          tOther.position.set(
-              (parseFloat(other.position.x) || 0) + oW/2,
-              (parseFloat(other.position.y) || 0) + oBaseY + oH/2,
-              (parseFloat(other.position.z) || 0) + oD/2
-          );
-      }
-
+      syncModuleMesh(other);
       queue.push(other.id);
     });
   }

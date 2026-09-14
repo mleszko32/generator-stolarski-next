@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { recalculateLayout, recalculateAllLayouts, getTraverseConfig, getWorldFootprint, clampModuleToRoom, migrateLegacyRoom } from "./layout.js";
+import { recalculateLayout, recalculateAllLayouts, getTraverseConfig, getWorldFootprint, clampModuleToRoom, migrateLegacyRoom, restModuleOnNeighbors } from "./layout.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
 
 // Pełny korpus 600 x 720, płyta 18 -> wnętrze baseZone 18..582 / 18..702.
@@ -241,6 +241,45 @@ describe("clampModuleToRoom", () => {
     });
     clampModuleToRoom(mod);
     expect(mod.position.z).toBe(50);
+  });
+});
+
+describe("restModuleOnNeighbors", () => {
+  beforeEach(() => setProject(freshProject({ room: { width: 3500, height: 2600, depth: 3000 } })));
+
+  it("dosuwa moduł stawiany NA drugim (ten sam ślad X/Z), zamiast zostawić go zatopionym", () => {
+    const bottom = baseModule({ id: "bottom", position: { x: 0, y: 0, z: 0 } }); // 600x720x513
+    const top = baseModule({ id: "top", position: { x: 0, y: 700, z: 0 } }); // wpisano "700" zamiast 720 - 20mm zatopione
+    setProject(freshProject({ room: { width: 3500, height: 2600, depth: 3000 }, modules: [bottom, top] }));
+    restModuleOnNeighbors(top);
+    expect(top.position.y).toBe(720);
+  });
+
+  it("dosuwa moduł stawiany POD drugim analogicznie w dół", () => {
+    const top = baseModule({ id: "top", position: { x: 0, y: 720, z: 0 } });
+    const bottom = baseModule({ id: "bottom", position: { x: 0, y: 20, z: 0 } }); // powinno być y=0
+    setProject(freshProject({ room: { width: 3500, height: 2600, depth: 3000 }, modules: [top, bottom] }));
+    restModuleOnNeighbors(bottom);
+    expect(bottom.position.y).toBe(0);
+  });
+
+  it("nie rusza modułu, gdy sąsiad jest obok (w rzędzie), nie pod/nad nim", () => {
+    const a = baseModule({ id: "a", position: { x: 0, y: 0, z: 0 } });
+    const b = baseModule({ id: "b", position: { x: 600, y: 0, z: 0 } }); // stykają się krawędzią w X, ten sam Y
+    setProject(freshProject({ room: { width: 3500, height: 2600, depth: 3000 }, modules: [a, b] }));
+    restModuleOnNeighbors(b);
+    expect(b.position.x).toBe(600);
+    expect(b.position.y).toBe(0);
+  });
+
+  it("nie rusza modułu bez rzeczywistego nakładania (osobno stojące szafki)", () => {
+    const a = baseModule({ id: "a", position: { x: 0, y: 0, z: 0 } });
+    const b = baseModule({ id: "b", position: { x: 2000, y: 0, z: 2000 } });
+    setProject(freshProject({ room: { width: 3500, height: 2600, depth: 3000 }, modules: [a, b] }));
+    restModuleOnNeighbors(b);
+    expect(b.position.x).toBe(2000);
+    expect(b.position.y).toBe(0);
+    expect(b.position.z).toBe(2000);
   });
 });
 

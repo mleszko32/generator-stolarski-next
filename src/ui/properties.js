@@ -4,7 +4,7 @@ import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
 import { calculateParts } from "../engine/cabinet.js";
 import { calculateHinges } from "../core/hingeMath.js";
-import { getTraverseConfig, clampModuleToRoom } from "../core/layout.js";
+import { getTraverseConfig, clampModuleToRoom, restModuleOnNeighbors } from "../core/layout.js";
 import { drawerSystems, DRAWER_VARIANT_ORDER, DRAWER_VARIANT_LABELS } from "../core/drawerSystems.js";
 import { getDrawerVariant } from "../core/drawerMath.js";
 import { escapeHtml } from "../utils/dom.js";
@@ -925,6 +925,14 @@ function setupEventListeners() {
         // po skończeniu wpisywania (nie na każdy znak), żeby nie "walczyć" z użytkownikiem.
         if (['pos-x', 'pos-z', 'width', 'depth', 'filler-left-w', 'filler-right-w'].includes(id)) {
           getSelectedMods().forEach(mod => clampModuleToRoom(mod));
+        }
+        // Budowanie szafy z dwóch modułów jeden na drugim - wpisanie wysokości
+        // "na oko" (np. o kilka mm za mało) zostawiało moduł zatopiony w
+        // sąsiadującym, z którym akurat nachodzi w pionie (patrz
+        // core/layout.js: restModuleOnNeighbors - to ta sama poprawka, co przy
+        // przeciąganiu w 3D, tylko dla wpisania wartości ręcznie w to pole).
+        if (id === 'pos-y') {
+          getSelectedMods().forEach(mod => restModuleOnNeighbors(mod));
         }
         initPropertiesPanel();
       });
