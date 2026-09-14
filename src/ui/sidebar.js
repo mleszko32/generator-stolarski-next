@@ -285,15 +285,21 @@ export function updateSidebar() {
     `;
 
     state.project.modules.forEach(m => {
-      const isActive = (state.selectedModules && state.selectedModules.has(m.id)) || m.id === state.activeModuleId;
-      const bg = isActive ? '#3b82f6' : '#f8fafc';
+      // Kliknięcie zgrupowanej szafki zaznacza CAŁĄ grupę (selectedModules),
+      // ale tylko JEDNA z nich jest "aktywna" (activeModuleId) - to ona ma
+      // otwarty panel właściwości/rysunek techniczny. Bez rozróżnienia obie
+      // były podświetlone identycznie na niebiesko, więc nie dało się
+      // rozpoznać, który moduł grupy jest faktycznie edytowany (zgłoszony bug).
+      const isActive = m.id === state.activeModuleId;
+      const isSelected = state.selectedModules && state.selectedModules.has(m.id);
+      const bg = isActive ? '#3b82f6' : (isSelected ? '#dbeafe' : '#f8fafc');
       const color = isActive ? '#ffffff' : '#1e293b';
-      const border = isActive ? '#2563eb' : '#cbd5e1';
-      
+      const border = isActive ? '#2563eb' : (isSelected ? '#93c5fd' : '#cbd5e1');
+
       let icon = '🗄️';
       if (m.type === 'upper_cabinet') icon = '☁️';
       if (m.type === 'tall_cabinet') icon = '🚪';
-      
+
       const groupIcon = m.groupId ? `<span title="Zgrupowana z innymi szafkami" style="color: ${isActive ? '#bae6fd' : '#ef4444'}; font-size:12px; margin-left:6px;">🔗</span>` : '';
 
       html += `
