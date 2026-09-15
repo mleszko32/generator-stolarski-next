@@ -103,6 +103,7 @@ body {
   --color-neutral: #64748b;
   --color-purple: #7c3aed;
   --color-teal: #0f766e;
+  --color-gold: #b45309;
   --radius: 6px;
   --shadow-btn: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
@@ -138,6 +139,7 @@ body {
 .btn-neutral { background: var(--color-neutral); }
 .btn-purple  { background: var(--color-purple); }
 .btn-teal    { background: var(--color-teal); }
+.btn-gold    { background: linear-gradient(135deg, #f59e0b, var(--color-gold)); }
 
 .btn-outline {
   background: #fff;

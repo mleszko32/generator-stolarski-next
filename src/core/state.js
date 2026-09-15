@@ -22,6 +22,27 @@ export function ensureRoomDefaults(project) {
   return project.room;
 }
 
+// Ceny materiałów/okuć (kosztorys) - jak room, to dane PROJEKTU (zapisywane/
+// wczytywane razem z nim w Firestore), więc stare projekty sprzed dodania tej
+// funkcji nie mają tego pola wcale. Wołaj po każdej podmianie state.project
+// (main.js, history.js, storage.js), analogicznie do ensureRoomDefaults.
+// `hardware` to słownik nazwa-okucia -> cena, bo lista okuć jest dynamiczna
+// (np. "Nóżka regulowana H-100" zależy od wysokości nóżek w projekcie) -
+// nie da się z góry przewidzieć stałego zestawu pozycji.
+export function ensurePricingDefaults(project) {
+  if (!project.pricing || typeof project.pricing !== 'object') {
+    project.pricing = { boardPricePerM2: 0, hdfPricePerM2: 0, marginPercent: 0, hardware: {} };
+  } else {
+    project.pricing.boardPricePerM2 = parseFloat(project.pricing.boardPricePerM2) || 0;
+    project.pricing.hdfPricePerM2 = parseFloat(project.pricing.hdfPricePerM2) || 0;
+    project.pricing.marginPercent = parseFloat(project.pricing.marginPercent) || 0;
+    if (!project.pricing.hardware || typeof project.pricing.hardware !== 'object') {
+      project.pricing.hardware = {};
+    }
+  }
+  return project.pricing;
+}
+
 export const state = {
   activeModuleId: null, 
   loadedProjectId: null, 
@@ -31,7 +52,8 @@ export const state = {
     construction: { joinType: "boki_przelotowe", topType: "pelny", traverseWidth: 100 },
     front: { active: true, distribution: "1:1:1", drawerSystem: "merivobox", gap: 3, clearance: { sides: 1.5, top: 5, bottom: 0 } },
     room: { ...DEFAULT_ROOM },
-    modules: [] 
+    pricing: { boardPricePerM2: 0, hdfPricePerM2: 0, marginPercent: 0, hardware: {} },
+    modules: []
   }
 };
 

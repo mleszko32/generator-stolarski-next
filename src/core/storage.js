@@ -8,7 +8,7 @@ import {
   signOut,
   onAuthStateChanged,
 } from "firebase/auth";
-import { state, ensureRoomDefaults } from "./state.js";
+import { state, ensureRoomDefaults, ensurePricingDefaults } from "./state.js";
 import { migrateLegacyRoom, clampModuleToRoom } from "./layout.js";
 import { resetHistory } from "./history.js";
 
@@ -239,6 +239,7 @@ export async function loadProjectFromCloud(projectId) {
     if (docSnap.exists()) {
       state.project = docSnap.data();
       ensureRoomDefaults(state.project); // projekty zapisane przed dodaniem pomieszczeń mogą nie mieć tego pola
+      ensurePricingDefaults(state.project); // ...ani projekty sprzed dodania kosztorysu
       migrateLegacyRoom(state.project); // ...a te sprzed realnego renderowania pokoju mogą mieć martwy, za mały placeholder
       // Projekty zapisane przed poprawką clampModuleToRoom (blendy L-kształtne)
       // mogły zapisać pozycję z blendą przenikającą przez ścianę - ten stan

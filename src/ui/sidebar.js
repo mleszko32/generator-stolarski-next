@@ -1,4 +1,4 @@
-import { calculateParts, calculateAllProjectParts, calculateProjectHardware } from "../engine/cabinet.js";
+import { calculateParts, calculateAllProjectParts, calculateProjectHardware, calculateProjectCost } from "../engine/cabinet.js";
 import { generateSidePanelSVG } from "../render/viewer2d.js"; 
 import { state, getActiveModule, addModule, deleteModule, duplicateModule } from "../core/state.js";
 import { update3D } from "../render/viewer3d.js";
@@ -248,6 +248,167 @@ function openCsvEditorModal(partsList) {
     });
 }
 
+function formatPLN(n) {
+    return (Number(n) || 0).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' zł';
+}
+
+// Szacunkowy kosztorys materiałowy - ceny płyty/HDF/okuć edytowalne na żywo,
+// zapisywane bezpośrednio w state.project.pricing (patrz core/state.js:
+// ensurePricingDefaults), więc lecą do chmury razem z resztą projektu przy
+// zwykłym "Zapisz projekt" - nie ma tu osobnego przycisku zapisu. Lista
+// okuć jest dynamiczna (patrz engine/cabinet.js: calculateProjectHardware),
+// więc ceny okuć trzymane są w słowniku nazwa->cena, uzupełnianym o nowe
+// pozycje w miarę jak pojawiają się w projekcie.
+function openKosztorysModal() {
+    const pricing = state.project.pricing;
+
+    const overlay = document.createElement('div');
+    Object.assign(overlay.style, {
+        position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
+        backgroundColor: 'rgba(15, 23, 42, 0.8)', zIndex: '10000', display: 'flex',
+        alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '40px 16px'
+    });
+
+    const modal = document.createElement('div');
+    Object.assign(modal.style, {
+        backgroundColor: '#fff', width: '100%', maxWidth: '640px', borderRadius: '8px',
+        boxShadow: '0 10px 25px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden'
+    });
+
+    modal.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; padding:20px 22px 16px 22px; border-bottom:1px solid #e2e8f0;">
+            <div>
+                <h2 style="margin:0 0 2px 0; font-size:18px; color:#1e293b;">💰 Kosztorys projektu</h2>
+                <p style="margin:0; color:#64748b; font-size:12.5px;">${escapeHtml(state.project.name)} · ceny edytowalne, liczone na żywo</p>
+            </div>
+            <button id="kosztorys-close" style="border:none; background:#f8fafc; color:#64748b; width:28px; height:28px; border-radius:6px; font-size:14px; cursor:pointer; flex-shrink:0;">✕</button>
+        </div>
+        <div style="padding:18px 22px; display:flex; flex-direction:column; gap:20px; max-height:60vh; overflow-y:auto;">
+
+            <section>
+                <h3 style="margin:0 0 8px 0; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#64748b;">Płyty</h3>
+                <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
+                    <thead><tr>
+                        <th style="text-align:left; font-size:10.5px; color:#64748b; font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid #cbd5e1;">Materiał</th>
+                        <th style="text-align:right; font-size:10.5px; color:#64748b; font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid #cbd5e1;">Powierzchnia</th>
+                        <th style="text-align:right; font-size:10.5px; color:#64748b; font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid #cbd5e1;">Cena / m²</th>
+                        <th style="text-align:right; font-size:10.5px; color:#64748b; font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid #cbd5e1;">Koszt</th>
+                    </tr></thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding:8px 8px 8px 0; border-bottom:1px solid #f1f5f9;">Płyta ${escapeHtml(String(state.project.materials?.boardThickness || 18))}&nbsp;mm</td>
+                            <td style="padding:8px 8px 8px 0; border-bottom:1px solid #f1f5f9; text-align:right;" id="kosztorys-board-area">—</td>
+                            <td style="padding:8px 8px 8px 0; border-bottom:1px solid #f1f5f9; text-align:right;"><input type="number" id="kosztorys-board-price" value="${pricing.boardPricePerM2}" step="1" min="0" style="width:70px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px; font-size:12.5px;">&nbsp;zł</td>
+                            <td style="padding:8px 8px 8px 0; border-bottom:1px solid #f1f5f9; text-align:right; font-weight:600;" id="kosztorys-board-cost">—</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:8px 8px 8px 0;">HDF ${escapeHtml(String(state.project.materials?.backThickness || 3))}&nbsp;mm (plecy)</td>
+                            <td style="padding:8px 8px 8px 0; text-align:right;" id="kosztorys-hdf-area">—</td>
+                            <td style="padding:8px 8px 8px 0; text-align:right;"><input type="number" id="kosztorys-hdf-price" value="${pricing.hdfPricePerM2}" step="1" min="0" style="width:70px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px; font-size:12.5px;">&nbsp;zł</td>
+                            <td style="padding:8px 8px 8px 0; text-align:right; font-weight:600;" id="kosztorys-hdf-cost">—</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <section>
+                <h3 style="margin:0 0 8px 0; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#64748b;">Okucia</h3>
+                <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
+                    <thead><tr>
+                        <th style="text-align:left; font-size:10.5px; color:#64748b; font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid #cbd5e1;">Pozycja</th>
+                        <th style="text-align:right; font-size:10.5px; color:#64748b; font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid #cbd5e1;">Ilość</th>
+                        <th style="text-align:right; font-size:10.5px; color:#64748b; font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid #cbd5e1;">Cena jedn.</th>
+                        <th style="text-align:right; font-size:10.5px; color:#64748b; font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid #cbd5e1;">Koszt</th>
+                    </tr></thead>
+                    <tbody id="kosztorys-hardware-tbody"></tbody>
+                </table>
+            </section>
+
+            <div style="display:flex; align-items:center; justify-content:space-between; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:10px 14px;">
+                <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:#92400e;">
+                    Marża / narzut na robociznę
+                    <input type="number" id="kosztorys-margin" value="${pricing.marginPercent}" step="1" min="0" style="width:56px; text-align:right; border:1px solid #fcd34d; border-radius:5px; padding:4px 6px; font-size:12.5px; color:#92400e; font-weight:700;">%
+                </label>
+                <span style="font-size:11px; color:#92400e; opacity:.8;">liczona od sumy materiału + okuć</span>
+            </div>
+
+        </div>
+        <div style="border-top:1px solid #e2e8f0; padding:16px 22px 20px 22px; display:flex; flex-direction:column; gap:6px; background:#f8fafc;">
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Płyty</span><span id="kosztorys-foot-plyty" style="color:#1e293b;">—</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Okucia</span><span id="kosztorys-foot-okucia" style="color:#1e293b;">—</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Marża (<span id="kosztorys-foot-marginpct">0</span>%)</span><span id="kosztorys-foot-margin" style="color:#1e293b;">—</span></div>
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:6px; padding-top:10px; border-top:1px dashed #cbd5e1;">
+                <span style="font-weight:700; font-size:13px;">Razem szacunkowo</span>
+                <span id="kosztorys-foot-total" style="font-weight:800; font-size:22px; color:#059669;">—</span>
+            </div>
+            <p style="font-size:10.5px; color:#64748b; margin:8px 0 0 0;">Ceny zapisują się razem z projektem (przycisk "Zapisz projekt"). Ilości pobrane z listy formatek i listy okuć.</p>
+        </div>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    const hardwareTbody = modal.querySelector('#kosztorys-hardware-tbody');
+
+    function recalc() {
+        pricing.boardPricePerM2 = parseFloat(modal.querySelector('#kosztorys-board-price').value) || 0;
+        pricing.hdfPricePerM2 = parseFloat(modal.querySelector('#kosztorys-hdf-price').value) || 0;
+        pricing.marginPercent = parseFloat(modal.querySelector('#kosztorys-margin').value) || 0;
+
+        modal.querySelectorAll('.kosztorys-hw-price').forEach(input => {
+            const name = input.getAttribute('data-name');
+            pricing.hardware[name] = parseFloat(input.value) || 0;
+        });
+
+        const cost = calculateProjectCost();
+
+        modal.querySelector('#kosztorys-board-area').textContent = cost.board.areaM2.toFixed(2) + ' m²';
+        modal.querySelector('#kosztorys-hdf-area').textContent = cost.hdf.areaM2.toFixed(2) + ' m²';
+        modal.querySelector('#kosztorys-board-cost').textContent = formatPLN(cost.board.cost);
+        modal.querySelector('#kosztorys-hdf-cost').textContent = formatPLN(cost.hdf.cost);
+
+        modal.querySelectorAll('.kosztorys-hw-cost').forEach(cell => {
+            const name = cell.getAttribute('data-name');
+            const line = cost.hardware.find(h => h.name === name);
+            cell.textContent = line ? formatPLN(line.cost) : formatPLN(0);
+        });
+
+        modal.querySelector('#kosztorys-foot-plyty').textContent = formatPLN(cost.materialsSubtotal);
+        modal.querySelector('#kosztorys-foot-okucia').textContent = formatPLN(cost.hardwareSubtotal);
+        modal.querySelector('#kosztorys-foot-margin').textContent = formatPLN(cost.marginAmount);
+        modal.querySelector('#kosztorys-foot-marginpct').textContent = cost.marginPercent;
+        modal.querySelector('#kosztorys-foot-total').textContent = formatPLN(cost.total);
+    }
+
+    function renderHardwareRows() {
+        const cost = calculateProjectCost();
+        if (cost.hardware.length === 0) {
+            hardwareTbody.innerHTML = `<tr><td colspan="4" style="padding:12px 0; text-align:center; color:#94a3b8;">Brak okuć w projekcie</td></tr>`;
+            return;
+        }
+        hardwareTbody.innerHTML = cost.hardware.map(hw => `
+            <tr>
+                <td style="padding:8px 8px 8px 0; border-bottom:1px solid #f1f5f9;">${escapeHtml(hw.name)}</td>
+                <td style="padding:8px 8px 8px 0; border-bottom:1px solid #f1f5f9; text-align:right; white-space:nowrap;">${hw.qty} ${escapeHtml(hw.unit)}</td>
+                <td style="padding:8px 8px 8px 0; border-bottom:1px solid #f1f5f9; text-align:right;"><input type="number" class="kosztorys-hw-price" data-name="${escapeHtml(hw.name)}" value="${hw.price}" step="0.1" min="0" style="width:64px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px; font-size:12.5px;">&nbsp;zł</td>
+                <td class="kosztorys-hw-cost" data-name="${escapeHtml(hw.name)}" style="padding:8px 8px 8px 0; border-bottom:1px solid #f1f5f9; text-align:right; font-weight:600;">${formatPLN(hw.cost)}</td>
+            </tr>
+        `).join('');
+        hardwareTbody.querySelectorAll('.kosztorys-hw-price').forEach(input => {
+            input.addEventListener('input', recalc);
+        });
+    }
+
+    renderHardwareRows();
+    recalc();
+
+    modal.querySelector('#kosztorys-board-price').addEventListener('input', recalc);
+    modal.querySelector('#kosztorys-hdf-price').addEventListener('input', recalc);
+    modal.querySelector('#kosztorys-margin').addEventListener('input', recalc);
+    modal.querySelector('#kosztorys-close').addEventListener('click', () => document.body.removeChild(overlay));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) document.body.removeChild(overlay); });
+}
+
 export function updateSidebar() {
   scheduleCheckpoint(); // patrz core/history.js — debounce'owany checkpoint historii cofnij/wprzód
   renderInteriorEditorIfVisible(); // patrz ui/interiorEditor.js
@@ -337,6 +498,9 @@ export function updateSidebar() {
         </button>
         <button id="btn-export-hardware" class="btn btn-warning btn-block btn-sm">
           🛒 Wydrukuj / PDF (Lista Zakupów)
+        </button>
+        <button id="btn-kosztorys" class="btn btn-gold btn-block btn-sm">
+          💰 Kosztorys Projektu
         </button>
       </div>
     `;
@@ -899,6 +1063,13 @@ export function updateSidebar() {
       
       const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
       window.open(URL.createObjectURL(blob), '_blank');
+    });
+  }
+
+  const kosztorysBtn = document.getElementById('btn-kosztorys');
+  if (kosztorysBtn) {
+    kosztorysBtn.addEventListener('click', () => {
+      openKosztorysModal();
     });
   }
 }

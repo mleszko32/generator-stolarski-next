@@ -5,7 +5,7 @@ import { initPropertiesPanel } from "./ui/properties.js";
 import { updateSidebar } from "./ui/sidebar.js";
 import { init3DViewer, update3D } from "./render/viewer3d.js";
 import { escapeHtml } from "./utils/dom.js";
-import { state, ensureRoomDefaults, getActiveModule } from "./core/state.js";
+import { state, ensureRoomDefaults, ensurePricingDefaults, getActiveModule } from "./core/state.js";
 import { openRoomSettingsModal } from "./ui/roomPanel.js";
 import { clampModuleToRoom, migrateLegacyRoom } from "./core/layout.js";
 
@@ -18,6 +18,7 @@ import { undo, redo, onHistoryChange, resetHistory } from "./core/history.js";
 console.log("Generator Stolarski Next uruchomiony");
 
 ensureRoomDefaults(state.project);
+ensurePricingDefaults(state.project);
 migrateLegacyRoom(state.project);
 initLayout();
 initPropertiesPanel();
