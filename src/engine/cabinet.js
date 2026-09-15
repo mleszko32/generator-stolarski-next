@@ -518,7 +518,14 @@ function getInteriorParts(mod, config) {
     if (el.typ === 'pion') {
       parts.push({ name: `Przegroda pionowa`, length: parseFloat((el.h || 0).toFixed(1)), width: innerPartDepth, qty: 1, category: "Korpus" });
     } else if (el.typ === 'poziom' && !el.isStructural) {
-      parts.push({ name: `P${width}`, length: parseFloat((el.w || 0).toFixed(1)), width: innerPartDepth - 5, qty: 1, category: "Korpus" });
+      // NAPRAWA: sama nazwa "P<szerokość_modułu>" myliła, gdy przegroda pionowa
+      // dzieli moduł na wnęki węższe niż cały korpus - półka miała np. 458mm,
+      // a nazwa sugerowała pełne 960mm (zgłoszony bug). Realna długość (el.w)
+      // i tak trafiała poprawnie do kolumny "Wymiar", więc dopisujemy ją też
+      // w nazwie w nawiasie - zawsze, niezależnie czy półka jest na całą
+      // szerokość czy nie, żeby format był przewidywalny na liście formatek.
+      const realW = Math.round(el.w || 0);
+      parts.push({ name: `P${width} (${realW})`, length: parseFloat((el.w || 0).toFixed(1)), width: innerPartDepth - 5, qty: 1, category: "Korpus" });
     }
   });
 
