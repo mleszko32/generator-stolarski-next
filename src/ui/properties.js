@@ -8,6 +8,7 @@ import { getTraverseConfig, clampModuleToRoom, restModuleOnNeighbors, getCornerF
 import { drawerSystems, DRAWER_VARIANT_ORDER, DRAWER_VARIANT_LABELS } from "../core/drawerSystems.js";
 import { getDrawerVariant } from "../core/drawerMath.js";
 import { escapeHtml } from "../utils/dom.js";
+import { evalDimensionExpr } from "../utils/math.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
 
@@ -136,10 +137,10 @@ function renderCornerModuleProperties(rightSidebar, mod) {
     </div>
 
     <h3>Wymiary</h3>
-    <div class="property-group"><label>Ramię A (mm):</label><input type="number" id="input-corner-legA" value="${mod.dimensions.width}" /></div>
-    <div class="property-group"><label>Ramię B (mm):</label><input type="number" id="input-corner-legB" value="${mod.dimensions.legB}" /></div>
-    <div class="property-group"><label>Głębokość ramion (mm):</label><input type="number" id="input-corner-depth" value="${mod.dimensions.depth}" /></div>
-    <div class="property-group"><label>Wysokość korpusu (mm):</label><input type="number" id="input-corner-height" value="${mod.dimensions.height}" /></div>
+    <div class="property-group"><label>Ramię A (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-legA" value="${mod.dimensions.width}" /></div>
+    <div class="property-group"><label>Ramię B (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-legB" value="${mod.dimensions.legB}" /></div>
+    <div class="property-group"><label>Głębokość ramion (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-depth" value="${mod.dimensions.depth}" /></div>
+    <div class="property-group"><label>Wysokość korpusu (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-height" value="${mod.dimensions.height}" /></div>
 
     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
 
@@ -169,7 +170,18 @@ function renderCornerModuleProperties(rightSidebar, mod) {
   };
   const bindDim = (id, apply) => {
       const el = document.getElementById(id);
-      if (el) el.addEventListener('input', e => { apply(parseFloat(e.target.value) || 0); getCornerFrontZones(mod); update3D(); updateSidebar(); });
+      // Pole tekstowe (nie number) - pozwala wpisać działanie, np. "400+18"
+      // (patrz utils/math.js: evalDimensionExpr). Podczas pisania wyrażenie
+      // bywa chwilowo niepoprawne (np. samo "400+") - wtedy NIE aktualizujemy
+      // wymiaru, żeby nie nadpisać go zerem w połowie wpisywania.
+      if (el) el.addEventListener('input', e => {
+          const val = evalDimensionExpr(e.target.value);
+          if (val === null || Number.isNaN(val)) return;
+          apply(val);
+          getCornerFrontZones(mod);
+          update3D();
+          updateSidebar();
+      });
   };
   const bindPos = (id, apply) => {
       const el = document.getElementById(id);
@@ -347,9 +359,9 @@ export function initPropertiesPanel() {
 
     ${tabContent("wymiary", `
       <h3>Wymiary Modułu</h3>
-      <div class="property-group"><label>Szerokość (mm):</label><input type="number" id="input-width" value="${activeModule.dimensions.width}" /></div>
-      <div class="property-group"><label>Wysokość korpusu (mm):</label><input type="number" id="input-height" value="${activeModule.dimensions.height}" /></div>
-      <div class="property-group"><label>Głębokość (mm):</label><input type="number" id="input-depth" value="${activeModule.dimensions.depth}" /></div>
+      <div class="property-group"><label>Szerokość (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-width" value="${activeModule.dimensions.width}" /></div>
+      <div class="property-group"><label>Wysokość korpusu (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-height" value="${activeModule.dimensions.height}" /></div>
+      <div class="property-group"><label>Głębokość (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-depth" value="${activeModule.dimensions.depth}" /></div>
 
       <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
 
@@ -988,7 +1000,16 @@ function setupEventListeners() {
     const el = document.getElementById(`input-${id}`);
     if(el) {
       el.addEventListener('input', (e) => {
-        const val = e.target.value === '' ? null : Number(e.target.value);
+        // width/height/depth to pola tekstowe (nie number) - pozwalają wpisać
+        // działanie, np. "400+18" (patrz utils/math.js: evalDimensionExpr).
+        // Reszta (pozycje, luzy, marginesy...) zostaje przy zwykłym Number(),
+        // to wciąż są input[type=number].
+        const isExprField = id === 'width' || id === 'height' || id === 'depth';
+        const val = isExprField ? evalDimensionExpr(e.target.value) : (e.target.value === '' ? null : Number(e.target.value));
+        // Wyrażenie bywa chwilowo niepoprawne w trakcie pisania (np. samo
+        // "400+") - wtedy nie aktualizujemy wymiaru, żeby nie nadpisać go
+        // zerem/NaN w połowie wpisywania.
+        if (isExprField && Number.isNaN(val)) return;
         getSelectedMods().forEach(mod => {
 
             if (id === 'filler-left-w') mod.fillers.left.width = val;
