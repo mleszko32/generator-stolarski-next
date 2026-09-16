@@ -145,6 +145,61 @@ export function addModule(type = "base_cabinet") {
   return newModule;
 }
 
+// Szafka narożna (kąt prosty, BEZ ścięcia narożnika - zgłoszona korekta:
+// pierwsza wersja miała ścięty, skośny front, użytkownik chce ostry kąt
+// 90° jak w typowym "narożniku ślepym" z dwoma zwykłymi, prostymi
+// frontami, po jednym na ramię). PIERWSZY nieprostokątny moduł w aplikacji
+// - bryła to dwa ramiona (legA=dimensions.width, legB) spotykające się pod
+// kątem prostym (patrz render/viewer3d.js: renderCornerCabinet, engine/
+// cabinet.js: getCornerCorpusParts). Oba fronty są tworzone od razu tutaj
+// - w przeciwieństwie do zwykłego modułu użytkownik NIE dokłada ich
+// ręcznie przez generyczny mechanizm stref, bo geometria narożnika jest
+// z góry ustalona. `cornerArm` mówi renderowi, na którym ramieniu (i którą
+// ścianą lokalną) dany front leży. baseZone to tylko placeholder - core/
+// layout.js: getCornerFrontZones() przelicza je zaraz po dodaniu (wołane
+// przez wywołującego, patrz ui/sidebar.js) i przy każdej zmianie wymiarów
+// w panelu (ui/properties.js).
+export function addCornerModule() {
+  const newId = 'mod-' + Date.now();
+  const legA = 860, legB = 860, depth = 540, height = 720;
+
+  let nextX = 0;
+  if (state.project.modules.length > 0) {
+    nextX = Math.max(...state.project.modules.map(m => (parseFloat(m.position.x) || 0) + (parseFloat(m.dimensions.width) || 0)));
+  }
+
+  const emptyZone = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+
+  const newModule = {
+    id: newId,
+    name: 'Szafka narożna ' + (state.project.modules.length + 1),
+    type: 'corner_cabinet',
+    dimensions: { width: legA, legB: legB, depth: depth, height: height },
+    position: { x: nextX, y: 0, z: 0 },
+    rotation: 0,
+    backPanel: { type: "nakladane", offset: 20, grooveDepth: 7, nutBuild: "all", clearance: 2 },
+    legs: { active: true, height: 100, plinth: true, plinthOffset: 40 },
+    front: { hinges: { topOffset: 100, bottomOffset: 100, margin: 40 } },
+    elements: [
+      {
+        id: 'front-' + Date.now() + '-a',
+        typ: 'front', subtype: 'drzwi', cornerArm: 'A', openingSide: 'left',
+        baseZone: { ...emptyZone }
+      },
+      {
+        id: 'front-' + Date.now() + '-b',
+        typ: 'front', subtype: 'drzwi', cornerArm: 'B', openingSide: 'right',
+        baseZone: { ...emptyZone }
+      }
+    ]
+  };
+
+  state.project.modules.push(newModule);
+  state.activeModuleId = newId;
+
+  return newModule;
+}
+
 export function getActiveSidePanel() {
   return state.project.sidePanels.find(p => p.id === state.activeSidePanelId) || null;
 }

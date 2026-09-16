@@ -965,7 +965,7 @@ const mats = {
 };
 const holeMat = new THREE.MeshBasicMaterial({ color: 0xdc2626 }); 
 
-function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, parentGroup) {
+function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, parentGroup, rotationY = 0) {
   const geo = new THREE.BoxGeometry(w, h, d);
   let matObj = isXrayMode ? mats.xray : mats.solid;
   let mat = matObj.corpus;
@@ -973,11 +973,16 @@ function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, parentG
   if (type === 'shelf') mat = matObj.shelf;
   if (type === 'drawerBox') mat = matObj.drawerBox;
   if (type === 'hdf') mat = matObj.hdf;
-  if (type === 'plinth') mat = matObj.plinth; 
+  if (type === 'plinth') mat = matObj.plinth;
 
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(x + w/2, y + h/2, z + d/2);
-  
+  // Front skośny narożnika (render/viewer3d.js: renderCornerCabinet) to
+  // jedyny element, który nie leży płasko na ścianie modułu - obracamy go
+  // wokół WŁASNEGO środka (już ustawionego wyżej), reszta wywołań nie
+  // podaje rotationY (domyślnie 0) i zachowuje się identycznie jak dotąd.
+  if (rotationY) mesh.rotation.y = rotationY;
+
   if (userData) mesh.userData = userData;
   mesh.castShadow = !isXrayMode; mesh.receiveShadow = !isXrayMode;
 
@@ -1025,6 +1030,153 @@ function addHardware(type, x, y, z, axis, parentGroup) {
   parentGroup.add(mesh);
 }
 
+// Panel wieńca narożnika (obrys L ze ściętym rogiem) - jedyna geometria w
+// całej aplikacji, która nie jest zwykłym prostopadłościanem (patrz
+// render/viewer3d.js: renderCornerCabinet). `shape` to THREE.Shape w
+// płaszczyźnie XY (x=lokalny X modułu, y=lokalny Z modułu) - obracamy
+// wytłoczoną geometrię o -90° wokół X, żeby leżała płasko (grubość w Y),
+// zamiast stać pionowo jak domyślna ekstruzja.
+function addCornerPanel(shape, thickness, y, isActiveModule, userData, parentGroup) {
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
+  geo.rotateX(-Math.PI / 2);
+
+  const matObj = isXrayMode ? mats.xray : mats.solid;
+  const mesh = new THREE.Mesh(geo, matObj.corpus);
+  mesh.position.set(0, y, 0);
+  if (userData) mesh.userData = userData;
+  mesh.castShadow = !isXrayMode; mesh.receiveShadow = !isXrayMode;
+
+  const edges = new THREE.EdgesGeometry(geo);
+  let edgeColor = isXrayMode ? 0x64748b : 0x334155;
+  if (isActiveModule) edgeColor = 0x2563eb;
+  const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: edgeColor, linewidth: isActiveModule ? 2 : 1 }));
+  if (userData) line.userData = userData;
+  mesh.add(line);
+  parentGroup.add(mesh);
+}
+
+// Szafka narożna, kąt prosty (mod.type === 'corner_cabinet', patrz core/
+// state.js: addCornerModule) - PIERWSZY nieprostokątny moduł w aplikacji.
+// Zgłoszona korekta: pierwsza wersja miała ścięty, skośny narożnik/front -
+// docelowo ma to być ostry kąt 90° (typowy "narożnik ślepy") z dwoma
+// zwykłymi, prostymi frontami, po jednym na ramię, bez żadnego skosu.
+// Lokalny układ (przed position/rotation, jak w generycznej ścieżce
+// modułu wyżej): origin w wewnętrznym rogu (styk dwóch ścian), +X wzdłuż
+// ramienia A (dimensions.width=legA), +Z wzdłuż ramienia B
+// (dimensions.legB). Oba fronty (mod.elements, rozróżnione przez
+// front.cornerArm) przechodzą przez ZWYKŁY recalculateLayout/
+// calculateHinges bez żadnych zmian (patrz core/layout.js:
+// getCornerFrontZones) - są fizycznie płaskimi prostokątami, tylko inaczej
+// tu pozycjonowanymi niż w prostokątnym module.
+function renderCornerCabinet(mod, isActive, th) {
+  const legA = parseFloat(mod.dimensions.width) || 860;
+  const legB = parseFloat(mod.dimensions.legB) || 860;
+  const depth = parseFloat(mod.dimensions.depth) || 540;
+  const H = parseFloat(mod.dimensions.height) || 720;
+
+  let baseOffsetY = 0;
+  if (mod.legs && mod.legs.active) baseOffsetY = parseFloat(mod.legs.height) || 100;
+
+  const { worldW, worldD } = getWorldFootprint(mod);
+
+  const modGroup = new THREE.Group();
+  modGroup.userData = { moduleId: mod.id };
+  modGroup.position.set(
+      (parseFloat(mod.position.x) || 0) + worldW / 2,
+      (parseFloat(mod.position.y) || 0) + baseOffsetY + H / 2,
+      (parseFloat(mod.position.z) || 0) + worldD / 2
+  );
+  modGroup.rotation.y = -((parseFloat(mod.rotation) || 0) * Math.PI / 180);
+
+  const innerGroup = new THREE.Group();
+  innerGroup.position.set(-legA / 2, -H / 2 - baseOffsetY, -legB / 2);
+  modGroup.add(innerGroup);
+
+  const posY = baseOffsetY;
+  const udCorp = { moduleId: mod.id, type: 'corpus' };
+  const udBack = { moduleId: mod.id, type: 'corpus', part: 'back' };
+
+  // --- Boki (2, na zewnętrznym końcu każdego ramienia) ---
+  // Skrócone od tyłu o backThick (jak w zwykłym module przy plecach
+  // "nakładane" - core/layout.js/viewer3d.js: sideD = D - backThick) - inaczej
+  // płyta plecy siedziałaby WEWNĄTRZ pełnego zasięgu boków (wyglądałoby jak
+  // wpuszczane), a nie jako osobna płyta przykładana na zamkniętą od tyłu
+  // krawędź boków.
+  const backThick = 3;
+  addBox(th, H, depth - backThick, legA - th, posY, backThick, 'corpus', isActive, udCorp, innerGroup);
+  addBox(depth - backThick, H, th, backThick, posY, legB - th, 'corpus', isActive, udCorp, innerGroup);
+
+  // --- Wieniec dolny/górny: obrys L, ostry kąt 90° (bez ścięcia) ---
+  // THREE.Shape rysuje w płaszczyźnie XY, a addCornerPanel obraca wytłoczoną
+  // geometrię o -90° wokół X, żeby leżała płasko - ten obrót mapuje lokalny
+  // Y kształtu na ŚWIATOWE -Z, więc podajemy tu od razu -Z (drugi argument
+  // lineTo), żeby po obrocie wylądować na +Z, zgodnie z resztą lokalnego
+  // układu (boki/plecy liczone są dla Z rosnącego w stronę pokoju).
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0);
+  shape.lineTo(legA, 0);
+  shape.lineTo(legA, -depth);
+  shape.lineTo(depth, -depth);
+  shape.lineTo(depth, -legB);
+  shape.lineTo(0, -legB);
+  shape.closePath();
+  addCornerPanel(shape, th, posY, isActive, udCorp, innerGroup);
+  addCornerPanel(shape, th, posY + H - th, isActive, udCorp, innerGroup);
+
+  // --- Listwa narożna pionowa (w tylnym, wewnętrznym rogu) ---
+  // Zgłoszona korekta: dwie płyty plecy (HDF) osobno nie mają się do czego
+  // przykleić w rogu, gdzie się stykają - płaska listwa 18(gr.)×100(szer.),
+  // na pełną wysokość, przykręcona płasko do ściany ramienia A (Z=0), do
+  // której mocują się obie płyty plecy.
+  const battenW = 100;
+  addBox(battenW, H, th, 0, posY, 0, 'corpus', isActive, udCorp, innerGroup);
+
+  // --- Plecy (2, cienkie płyty HDF "nakładane" - przykręcone płasko na
+  // skróconą od tyłu krawędź boków, patrz boki wyżej) ---
+  addBox(legA - th - battenW, H, backThick, battenW, posY, 0, 'hdf', isActive, udBack, innerGroup);
+  addBox(backThick, H, legB - th - th, 0, posY, th, 'hdf', isActive, udBack, innerGroup);
+
+  // --- Fronty: zwykłe, płaskie drzwi, po jednym na ramię ---
+  (mod.elements || []).forEach(front => {
+      if (front.typ !== 'front') return;
+      const fw = parseFloat(front.w) || 0;
+      const fh = parseFloat(front.h) || 0;
+      const fx = parseFloat(front.x) || 0;
+      const fy = parseFloat(front.y) || 0;
+      const udFront = { moduleId: mod.id, type: 'front', frontId: front.id };
+
+      if (front.cornerArm === 'A') {
+          // Ramię A biegnie wzdłuż +X, front na jego czole (Z=depth):
+          // lokalny front.x (0..widthA) mapuje się na X = depth + front.x.
+          addBox(fw, fh, th, depth + fx, posY + fy, depth, 'front', isActive, udFront, innerGroup);
+      } else {
+          // Ramię B biegnie wzdłuż +Z, front na jego czole (X=depth):
+          // lokalny front.x (0..widthB) mapuje się na Z = depth + front.x.
+          addBox(th, fh, fw, depth, posY + fy, depth + fx, 'front', isActive, udFront, innerGroup);
+      }
+  });
+
+  // --- Nóżki (5 - jedna wspólna w tylnym rogu + po dwie na końcach każdego
+  // ramienia) ---
+  // Obrys L ma 5 wypukłych (nie wklęsłych) narożników podłogi - dokładnie
+  // tyle, ile nóżek widać na zdjęciu referencyjnym (core/state.js:
+  // addCornerModule). Wklęsły róg przy froncie (X=depth,Z=depth) nóżki nie
+  // dostaje - nie ma tam żadnego materiału korpusu nad podłogą. Rozstaw 30×30,
+  // wcięcie 50mm od krawędzi - identycznie jak przy zwykłym module niżej.
+  if (mod.legs && mod.legs.active) {
+      const legH = parseFloat(mod.legs.height) || 100;
+      const rootY = 0.5;
+      const udLeg = { moduleId: mod.id, type: 'plinth' };
+      addBox(30, legH, 30, 50, rootY, 50, 'corpus', false, udLeg, innerGroup);
+      addBox(30, legH, 30, legA - 80, rootY, 50, 'corpus', false, udLeg, innerGroup);
+      addBox(30, legH, 30, legA - 80, rootY, depth - 80, 'corpus', false, udLeg, innerGroup);
+      addBox(30, legH, 30, 50, rootY, legB - 80, 'corpus', false, udLeg, innerGroup);
+      addBox(30, legH, 30, depth - 80, rootY, legB - 80, 'corpus', false, udLeg, innerGroup);
+  }
+
+  cabinetGroup.add(modGroup);
+}
+
 export function update3D() {
   scheduleCheckpoint(); // patrz core/history.js — debounce'owany checkpoint historii cofnij/wprzód
   renderInteriorEditorIfVisible(); // patrz ui/interiorEditor.js — odświeża się tylko, gdy jest widoczny
@@ -1038,6 +1190,16 @@ export function update3D() {
 
   state.project.modules.forEach(mod => {
       recalculateLayout(mod);
+
+      // Szafka narożna (mod.type === 'corner_cabinet', core/state.js:
+      // addCornerModule) ma zupełnie inną, nieprostokątną geometrię -
+      // osobna, w pełni odizolowana ścieżka renderowania (nie dotyka
+      // generycznego W/H/D/innerGroup poniżej, które zakłada jeden
+      // prostokątny korpus).
+      if (mod.type === 'corner_cabinet') {
+          renderCornerCabinet(mod, mod.id === state.activeModuleId, th);
+          return;
+      }
 
       const isActive = mod.id === state.activeModuleId;
       const W = parseFloat(mod.dimensions.width);

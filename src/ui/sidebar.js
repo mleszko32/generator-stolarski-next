@@ -1,10 +1,11 @@
 import { calculateParts, calculateAllProjectParts, calculateProjectHardware, calculateProjectCost } from "../engine/cabinet.js";
 import { generateSidePanelSVG } from "../render/viewer2d.js"; 
-import { state, getActiveModule, addModule, deleteModule, duplicateModule, addSidePanel, deleteSidePanel } from "../core/state.js";
+import { state, getActiveModule, addModule, deleteModule, duplicateModule, addSidePanel, deleteSidePanel, addCornerModule } from "../core/state.js";
 import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel } from "./properties.js";
 import { escapeHtml } from "../utils/dom.js";
 import { scheduleCheckpoint } from "../core/history.js";
+import { getCornerFrontZones } from "../core/layout.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
 
 function showLoading(msg) {
@@ -482,6 +483,7 @@ export function updateSidebar() {
       let icon = '🗄️';
       if (m.type === 'upper_cabinet') icon = '☁️';
       if (m.type === 'tall_cabinet') icon = '🚪';
+      if (m.type === 'corner_cabinet') icon = '📐';
 
       const groupIcon = m.groupId ? `<span title="Zgrupowana z innymi szafkami" style="color: ${isActive ? '#bae6fd' : '#ef4444'}; font-size:12px; margin-left:6px;">🔗</span>` : '';
 
@@ -505,6 +507,7 @@ export function updateSidebar() {
         <button id="btn-add-upper" class="btn btn-primary btn-sm" style="flex: 1;" title="Szafka wisząca">➕ Wisząca</button>
         <button id="btn-add-tall" class="btn btn-purple btn-sm" style="flex: 1;" title="Słupek">➕ Słupek</button>
       </div>
+      <button id="btn-add-corner" class="btn btn-neutral btn-block btn-sm" style="margin-top: 6px;" title="Szafka narożna z frontem łamanym (front prosty + skośny)">➕ Narożna</button>
       <button id="btn-add-side-panel" class="btn btn-teal btn-block btn-sm" style="margin-top: 6px;" title="Dekoracyjny panel niezależny od modułów, np. na cały słup szafek">➕ Bok dokładany</button>
     </div>
     <hr style="margin: 15px 0; border: 0; border-top: 1px dashed #cbd5e1;">
@@ -694,6 +697,17 @@ export function updateSidebar() {
     if (btn) btn.addEventListener('click', () => { addModule(type); initPropertiesPanel();  update3D(); updateSidebar(); });
   };
   setupAddBtn('btn-add-base', 'base_cabinet'); setupAddBtn('btn-add-upper', 'upper_cabinet'); setupAddBtn('btn-add-tall', 'tall_cabinet');
+
+  const btnAddCorner = document.getElementById('btn-add-corner');
+  if (btnAddCorner) {
+    btnAddCorner.addEventListener('click', () => {
+      const mod = addCornerModule();
+      getCornerFrontZones(mod); // liczy baseZone dwóch frontów z domyślnych wymiarów
+      initPropertiesPanel();
+      update3D();
+      updateSidebar();
+    });
+  }
 
   const btnAddSidePanel = document.getElementById('btn-add-side-panel');
   if (btnAddSidePanel) {

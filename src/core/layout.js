@@ -29,7 +29,14 @@ export function recalculateAllLayouts() {
 // cokołów sąsiednich szafek (engine/cabinet.js), żeby oba liczyły to samo.
 export function getWorldFootprint(mod) {
   const W = parseFloat(mod.dimensions.width) || 600;
-  const D = parseFloat(mod.dimensions.depth) || 513;
+  // Szafka narożna (mod.type === 'corner_cabinet') ma DWA ramiona - dla
+  // kolizji/przyciągania w v1 traktujemy ją jak prostokąt legA×legB
+  // (bounding box obu ramion), a nie legA×depth jak zwykły moduł, bo
+  // depth to głębokość KAŻDEGO ramienia, nie odcisk całej bryły na
+  // podłodze. Uproszczenie świadome - patrz core/state.js: addCornerModule.
+  const D = mod.type === 'corner_cabinet'
+      ? (parseFloat(mod.dimensions.legB) || W)
+      : (parseFloat(mod.dimensions.depth) || 513);
   const rot = ((parseFloat(mod.rotation) || 0) % 360 + 360) % 360;
   const swapped = rot === 90 || rot === 270;
   return { worldW: swapped ? D : W, worldD: swapped ? W : D, rotation: rot };
@@ -269,8 +276,15 @@ export function recalculateLayout(mod) {
               const isBoundBottomFront = el.baseZone.boundBottom && el.baseZone.boundBottom.startsWith('front');
               const isBoundTopFront = el.baseZone.boundTop && el.baseZone.boundTop.startsWith('front');
 
-              const isLeftOuter = minX <= th + 1;
-              const isRightOuter = maxX >= width - th - 1;
+              // Szafka narożna (core/state.js: addCornerModule) ma DWA
+              // niezależne ramiona zamiast jednego wspólnego dimensions.width,
+              // więc porównanie minX/maxX do współdzielonego `width` nie ma
+              // sensu dla jej frontów - baseZone.forceOuterLeft/Right pozwala
+              // wprost zadeklarować "ta krawędź to prawdziwa zewnętrzna
+              // krawędź korpusu" bez zgadywania z geometrii. Domyślnie (pole
+              // nieustawione) zachowanie jest identyczne jak dotąd.
+              const isLeftOuter = el.baseZone.forceOuterLeft !== undefined ? el.baseZone.forceOuterLeft : minX <= th + 1;
+              const isRightOuter = el.baseZone.forceOuterRight !== undefined ? el.baseZone.forceOuterRight : maxX >= width - th - 1;
               const isBottomOuter = minY <= th + 1;
               const isTopOuter = maxY >= (hasTraverses && isVerticalTraverse ? height - traverseWidth - 1 : height - th - 1);
 
@@ -341,4 +355,58 @@ export function recalculateLayout(mod) {
           if (el.forceOffsetY) el.y += el.forceOffsetY;
       }
   });
+}
+
+// Szafka narożna, kąt prosty bez ścięcia (mod.type === 'corner_cabinet',
+// core/state.js: addCornerModule) - liczy baseZone dwóch zwykłych,
+// prostych frontów (po jednym na ramię) z bieżących wymiarów modułu.
+// Wołaj raz przy tworzeniu modułu (ui/sidebar.js) i przy każdej zmianie
+// legA/legB/depth w panelu (ui/properties.js) - PRZED recalculateLayout
+// (mod), bo ten czyta już gotowe baseZone. Zapisuje wprost LICZBOWE
+// minX/maxX/minY/maxY (bez boundLeft/boundRight) i forceOuterLeft/
+// Right=true na obu frontach - stykają się ze sobą w ostrym, prostym
+// narożniku (nie sąsiadują wzdłuż wspólnej krawędzi jak fronty w module
+// prostokątnym), więc obie krawędzie każdego z nich traktujemy jak
+// zewnętrzne krawędzie korpusu (pełny luz cLeft/cRight).
+export function getCornerFrontZones(mod) {
+  const th = parseFloat(state.project.materials?.boardThickness) || 18;
+  const legA = parseFloat(mod.dimensions.width) || 860;
+  const legB = parseFloat(mod.dimensions.legB) || 860;
+  const depth = parseFloat(mod.dimensions.depth) || 540;
+  const height = parseFloat(mod.dimensions.height) || 720;
+
+  // Reszta danego ramienia poza strefą wspólnego narożnika (depth), pomniejszona
+  // dodatkowo o grubość frontu SĄSIEDNIEGO ramienia (cornerGap) - oba fronty mają
+  // swój płat grubości `th` sięgający dokładnie do linii `depth` w OSI DRUGIEGO
+  // ramienia (patrz render/viewer3d.js: renderCornerCabinet), więc bez tego
+  // odsunięcia ich bliższe naroża fizycznie by się przenikały w rogu (zgłoszone
+  // jako "fronty jakoś wystają"). minX/maxX są przesunięte o cornerGap, żeby
+  // dalsza (zewnętrzna, przy boku) krawędź frontu została DOKŁADNIE tam, gdzie
+  // była wcześniej - zmienia się tylko krawędź bliżej narożnika.
+  const cornerGap = th;
+  const widthA = Math.max(50, legA - depth - th - cornerGap);
+  const widthB = Math.max(50, legB - depth - th - cornerGap);
+
+  // Zgłoszona korekta "fronty wystają poza szafkę": recalculateLayout() dokłada
+  // na krawędzi forceOuterRight standardowy zakład "nakładane" (th - cRight,
+  // ok. 16.5mm) - dla zwykłego modułu to normalne (front nakłada się na bok od
+  // zewnątrz), ale przy szafce narożnej ten zakład wystawał POZA legA/legB, za
+  // zewnętrzne lico boku. Odejmujemy go tu z góry z maxX, żeby po dodaniu
+  // zakładu przez recalculateLayout front kończył się DOKŁADNIE na krawędzi
+  // bryły (legA/legB), a nie poza nią. Bliższa narożnika krawędź (cornerGap
+  // wyżej) ma zostać bez zmian.
+  const fc = { ...(state.project.front?.clearance || {}), ...(mod.front?.clearance || {}) };
+  const cRight = parseFloat(fc.right ?? fc.sides ?? 1.5) || 0;
+  const overlayReach = th - cRight;
+
+  const zoneFor = (w) => ({
+      minX: th + cornerGap, maxX: th + cornerGap + w - overlayReach, minY: th, maxY: height - th,
+      forceOuterLeft: true, forceOuterRight: true
+  });
+
+  const frontA = (mod.elements || []).find(el => el.typ === 'front' && el.cornerArm === 'A');
+  const frontB = (mod.elements || []).find(el => el.typ === 'front' && el.cornerArm === 'B');
+
+  if (frontA) frontA.baseZone = zoneFor(widthA);
+  if (frontB) frontB.baseZone = zoneFor(widthB);
 }

@@ -18,16 +18,27 @@ export function calculateParts() {
   let rawParts = [];
   let mountingData = [];
 
-  rawParts.push(...getCorpusParts(mod, config));
-  rawParts.push(...getBackPanelParts(mod, config));
+  // Szafka narożna (mod.type === 'corner_cabinet') ma dwa ramiona zamiast
+  // jednego prostokątnego korpusu - getCorpusParts/getBackPanelParts
+  // zakładają jeden wspólny width/depth i dałyby błędne formatki, więc ma
+  // własną, równoległą funkcję (patrz getCornerCorpusParts niżej).
+  // getCorpusHoles (nawierty łączeń kołek+wkręt) też zakłada jeden
+  // prostokątny korpus - dla narożnika pomijamy (brak jeszcze rysunku
+  // technicznego dla tego typu modułu, patrz plan boki dokładane/narożnik).
+  if (mod.type === 'corner_cabinet') {
+      rawParts.push(...getCornerCorpusParts(mod, config));
+  } else {
+      rawParts.push(...getCorpusParts(mod, config));
+      rawParts.push(...getBackPanelParts(mod, config));
+      mountingData.push(...getCorpusHoles(mod, config));
+  }
   rawParts.push(...getInteriorParts(mod, config));
-  rawParts.push(...getFillerParts(mod, config)); 
+  rawParts.push(...getFillerParts(mod, config));
 
   const frontsAndDrawers = getFrontsAndDrawers(mod, config);
   rawParts.push(...frontsAndDrawers.parts);
-  
+
   mountingData.push(...frontsAndDrawers.mountingData);
-  mountingData.push(...getCorpusHoles(mod, config));
   mountingData.push(...getPionMountHoles(mod, config));
   mountingData.push(...getGlobalHingesForModule(mod, config));
 
@@ -128,10 +139,14 @@ export function calculateAllProjectParts() {
 
   config.modules.forEach(mod => {
     const modParts = [];
-    modParts.push(...getCorpusParts(mod, config));
-    modParts.push(...getBackPanelParts(mod, config));
+    if (mod.type === 'corner_cabinet') {
+        modParts.push(...getCornerCorpusParts(mod, config));
+    } else {
+        modParts.push(...getCorpusParts(mod, config));
+        modParts.push(...getBackPanelParts(mod, config));
+    }
     modParts.push(...getInteriorParts(mod, config));
-    modParts.push(...getFillerParts(mod, config)); 
+    modParts.push(...getFillerParts(mod, config));
 
     const frontsAndDrawers = getFrontsAndDrawers(mod, config);
     modParts.push(...frontsAndDrawers.parts);
@@ -147,7 +162,13 @@ export function calculateAllProjectParts() {
     allParts.push(...getSidePanelParts(panel, config).map(p => ({ ...p, moduleName: panel.name || 'Bok dokładany' })));
   });
 
-  const baseCabinets = config.modules.filter(m => m.legs && m.legs.active && m.legs.plinth);
+  // Szafka narożna (mod.type === 'corner_cabinet') wyłączona z tego wspólnego
+  // biegu cokołu - jej odcisk to L (dwa ramiona), a ta logika liczy jeden
+  // prostokątny odcinek na bazie getWorldFootprint (bounding box legA×legB),
+  // co dałoby jedną fikcyjną, za długą listwę cokołu zamiast dwóch krótkich
+  // (po jednej na czoło każdego ramienia). Render 3D na razie też nie rysuje
+  // cokołu narożnika (patrz renderCornerCabinet) - tylko same nóżki.
+  const baseCabinets = config.modules.filter(m => m.legs && m.legs.active && m.legs.plinth && m.type !== 'corner_cabinet');
 
   // Tylko szafki o TEJ SAMEJ orientacji (rotation) mogą fizycznie stać w jednym,
   // ciągłym biegu cokołu - stoją wtedy pod tą samą ścianą. Dla rotation 0/180
@@ -257,7 +278,10 @@ export function calculateProjectHardware() {
       // Każda nóżka liczona osobno wg swojej (ew. nadpisanej) wysokości — patrz
       // ui/properties.js "Nóżki — wysokości ręczne" — żeby lista zakupów odzwierciedlała
       // realny komplet (np. 3x H-100 + 1x H-90), a nie zawsze 4x ten sam model.
-      for (let i = 0; i < 4; i++) {
+      // Szafka narożna ma 5 nóżek (kształt L ma 5 wypukłych rogów podłogi,
+      // patrz render/viewer3d.js: renderCornerCabinet) - bez nadpisań per-nóżka.
+      const legCount = mod.type === 'corner_cabinet' ? 5 : 4;
+      for (let i = 0; i < legCount; i++) {
         const ov = legOverrides[i];
         const h = (ov !== undefined && ov !== null && ov !== '') ? (parseFloat(ov) || legH) : legH;
         const legKey = `Nóżka regulowana H-${h}`;
@@ -565,6 +589,45 @@ function getBackPanelParts(mod, config) {
   }
 
   return [{ name: `Plecy ${height}x${width}`, length: parseFloat(hdfHeight.toFixed(1)), width: parseFloat(hdfWidth.toFixed(1)), qty: 1, category: "Plecy" }];
+}
+
+// Szafka narożna, kąt prosty (mod.type === 'corner_cabinet', core/
+// state.js: addCornerModule) - korpus i plecy dla modułu o dwóch
+// ramionach zamiast jednego prostokąta. Wieniec dolny/górny NIE liczy
+// prawdziwego obrysu L (z wycięciem w rogu) - wystarcza bounding box obu
+// ramion (legA×legB) jako rozmiar formatki do wycięcia (realny kawałek
+// montujemy z tego blanku, docinając naroże na miejscu).
+function getCornerCorpusParts(mod, config) {
+  const parts = [];
+  const legA = parseFloat(mod.dimensions.width) || 860;
+  const legB = parseFloat(mod.dimensions.legB) || 860;
+  const depth = parseFloat(mod.dimensions.depth) || 540;
+  const height = parseFloat(mod.dimensions.height) || 720;
+  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const backThick = parseFloat(config.materials?.backThickness) || 3;
+  const battenW = 100;
+
+  // Boki skrócone od tyłu o backThick - plecy "nakładane" (render/viewer3d.js:
+  // renderCornerCabinet), tak samo jak sideDepth = depth - backThick w
+  // getCorpusParts() dla zwykłego modułu.
+  parts.push({ name: "Bok narożny (Ramię A)", length: parseFloat(height.toFixed(1)), width: parseFloat((depth - backThick).toFixed(1)), qty: 1, category: "Korpus" });
+  parts.push({ name: "Bok narożny (Ramię B)", length: parseFloat(height.toFixed(1)), width: parseFloat((depth - backThick).toFixed(1)), qty: 1, category: "Korpus" });
+
+  const wieniecName = `Wieniec narożny ${Math.round(legA)}x${Math.round(legB)} (naroże do wycięcia - patrz rysunek 3D)`;
+  parts.push({ name: wieniecName, length: parseFloat(legA.toFixed(1)), width: parseFloat(legB.toFixed(1)), qty: 2, category: "Korpus" });
+
+  // Listwa narożna pionowa (render/viewer3d.js: renderCornerCabinet) - płaska
+  // listwa 18(gr.)x100(szer.) na pełną wysokość, do której mocują się obie
+  // płyty plecy.
+  parts.push({ name: "Listwa narożna pionowa", length: parseFloat(height.toFixed(1)), width: battenW, qty: 1, category: "Korpus" });
+
+  // Plecy "nakładane" - szerokość pomniejszona o bok (th) i listwę narożną
+  // (battenW dla ramienia A, th dla ramienia B), zgodnie z render/viewer3d.js:
+  // renderCornerCabinet (plecy sięgają od listwy do boku).
+  parts.push({ name: `Plecy narożne ${Math.round(height)}x${Math.round(legA)} (Ramię A)`, length: parseFloat((height - 4).toFixed(1)), width: parseFloat((legA - th - battenW - 4).toFixed(1)), qty: 1, category: "Plecy" });
+  parts.push({ name: `Plecy narożne ${Math.round(height)}x${Math.round(legB)} (Ramię B)`, length: parseFloat((height - 4).toFixed(1)), width: parseFloat((legB - 2 * th - 4).toFixed(1)), qty: 1, category: "Plecy" });
+
+  return parts;
 }
 
 function getInteriorParts(mod, config) {

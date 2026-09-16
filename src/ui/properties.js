@@ -1,10 +1,10 @@
 // src/ui/properties.js
-import { state, getActiveModule, deleteSidePanel } from "../core/state.js";
+import { state, getActiveModule, deleteSidePanel, deleteModule } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
 import { calculateParts } from "../engine/cabinet.js";
 import { calculateHinges } from "../core/hingeMath.js";
-import { getTraverseConfig, clampModuleToRoom, restModuleOnNeighbors } from "../core/layout.js";
+import { getTraverseConfig, clampModuleToRoom, restModuleOnNeighbors, getCornerFrontZones } from "../core/layout.js";
 import { drawerSystems, DRAWER_VARIANT_ORDER, DRAWER_VARIANT_LABELS } from "../core/drawerSystems.js";
 import { getDrawerVariant } from "../core/drawerMath.js";
 import { escapeHtml } from "../utils/dom.js";
@@ -120,6 +120,89 @@ function renderSidePanelProperties(rightSidebar, panel) {
   });
 }
 
+// Szafka narożna z frontem łamanym (mod.type === 'corner_cabinet', core/
+// state.js: addCornerModule) - PIERWSZY nieprostokątny moduł w aplikacji,
+// więc dostaje osobny, krótki formularz zamiast pełnych zakładek Wymiary/
+// Front/Szuflady/Konstrukcja/Zawiasy (te zakładają jeden prostokątny
+// korpus - nie mają tu zastosowania). Każda zmiana wymiaru przelicza
+// getCornerFrontZones (core/layout.js) PRZED update3D(), bo od tego
+// zależą baseZone obu ruchomych frontów.
+function renderCornerModuleProperties(rightSidebar, mod) {
+  rightSidebar.innerHTML = `
+    <h2>Parametry szafki narożnej</h2>
+    <div class="property-group" style="background: #f8fafc; padding: 10px; border-radius: 4px; border: 1px solid #cbd5e1; margin-bottom: 15px;">
+      <label style="font-weight: bold; color: #0f172a;">Nazwa szafki:</label>
+      <input type="text" id="input-corner-name" value="${escapeHtml(mod.name)}" style="font-weight: bold; color: #1e293b;" />
+    </div>
+
+    <h3>Wymiary</h3>
+    <div class="property-group"><label>Ramię A (mm):</label><input type="number" id="input-corner-legA" value="${mod.dimensions.width}" /></div>
+    <div class="property-group"><label>Ramię B (mm):</label><input type="number" id="input-corner-legB" value="${mod.dimensions.legB}" /></div>
+    <div class="property-group"><label>Głębokość ramion (mm):</label><input type="number" id="input-corner-depth" value="${mod.dimensions.depth}" /></div>
+    <div class="property-group"><label>Wysokość korpusu (mm):</label><input type="number" id="input-corner-height" value="${mod.dimensions.height}" /></div>
+
+    <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
+
+    <h3 style="color: #2563eb;">Pozycja w przestrzeni (3D)</h3>
+    <div class="property-group" style="background: #eff6ff; padding: 10px; border-radius: 4px; border: 1px dashed #93c5fd;">
+      <div style="margin-bottom: 8px;"><label style="font-size: 11px; color: #1e3a8a;">Odsunięcie od lewej ściany (X) [mm]:</label><input type="number" id="input-corner-pos-x" value="${mod.position.x}" style="border-color: #bfdbfe;" /></div>
+      <div style="margin-bottom: 8px;"><label style="font-size: 11px; color: #1e3a8a;">Odsunięcie od tylnej ściany (Z) [mm]:</label><input type="number" id="input-corner-pos-z" value="${mod.position.z || 0}" style="border-color: #bfdbfe;" /></div>
+      <div><label style="font-size: 11px; color: #1e3a8a;">Wysokość od podłogi (Y) [mm]:</label><input type="number" id="input-corner-pos-y" value="${mod.position.y}" style="border-color: #bfdbfe;" /></div>
+    </div>
+
+    <h3 style="color: #2563eb; margin-top: 15px;">Obrót (co 90°)</h3>
+    <div class="property-group" style="display: flex; flex-direction: row; gap: 4px;">
+      ${[0, 90, 180, 270].map(rot => {
+          const active = (mod.rotation || 0) === rot;
+          return `<button type="button" class="btn-corner-rotate${active ? ' active' : ''}" data-rot="${rot}" style="flex: 1; padding: 8px 4px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; border: 1px solid ${active ? '#2563eb' : '#93c5fd'}; background: ${active ? '#2563eb' : '#eff6ff'}; color: ${active ? '#fff' : '#1e3a8a'};">${rot}°</button>`;
+      }).join('')}
+    </div>
+    <div style="font-size: 10px; color: #94a3b8; margin-top: 4px;">Ramię A biegnie wzdłuż lokalnej osi X, ramię B wzdłuż lokalnej osi Z (przed obrotem).</div>
+
+    <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
+    <button type="button" id="btn-corner-delete" class="btn btn-danger btn-block btn-sm">🗑️ Usuń szafkę narożną</button>
+  `;
+
+  const bindText = (id, apply) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', e => { apply(e.target.value); update3D(); updateSidebar(); });
+  };
+  const bindDim = (id, apply) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', e => { apply(parseFloat(e.target.value) || 0); getCornerFrontZones(mod); update3D(); updateSidebar(); });
+  };
+  const bindPos = (id, apply) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', e => { apply(parseFloat(e.target.value) || 0); update3D(); updateSidebar(); });
+  };
+
+  bindText('input-corner-name', v => mod.name = v);
+  bindDim('input-corner-legA', v => mod.dimensions.width = v);
+  bindDim('input-corner-legB', v => mod.dimensions.legB = v);
+  bindDim('input-corner-depth', v => mod.dimensions.depth = v);
+  bindDim('input-corner-height', v => mod.dimensions.height = v);
+  bindPos('input-corner-pos-x', v => mod.position.x = v);
+  bindPos('input-corner-pos-z', v => mod.position.z = v);
+  bindPos('input-corner-pos-y', v => mod.position.y = v);
+
+  rightSidebar.querySelectorAll('.btn-corner-rotate').forEach(btn => {
+      btn.addEventListener('click', () => {
+          mod.rotation = parseInt(btn.getAttribute('data-rot'), 10);
+          update3D();
+          updateSidebar();
+          initPropertiesPanel();
+      });
+  });
+
+  const delBtn = document.getElementById('btn-corner-delete');
+  if (delBtn) delBtn.addEventListener('click', () => {
+      deleteModule(mod.id);
+      initPropertiesPanel();
+      update3D();
+      updateSidebar();
+  });
+}
+
 export function initPropertiesPanel() {
   scheduleCheckpoint(); // patrz core/history.js — debounce'owany checkpoint historii cofnij/wprzód
   renderInteriorEditorIfVisible();
@@ -140,6 +223,11 @@ export function initPropertiesPanel() {
         <h3 style="margin: 0; color: #64748b; text-transform: none; letter-spacing: normal; border-bottom: none; font-size: 15px;">Brak aktywnej szafki</h3>
       </div>
     `;
+    return;
+  }
+
+  if (activeModule.type === 'corner_cabinet') {
+    renderCornerModuleProperties(rightSidebar, activeModule);
     return;
   }
 
