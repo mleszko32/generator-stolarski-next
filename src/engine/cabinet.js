@@ -139,6 +139,14 @@ export function calculateAllProjectParts() {
     allParts.push(...modParts.map(p => ({ ...p, moduleName: mod.name })));
   });
 
+  // Boki dokładane (core/state.js: addSidePanel) NIE należą do żadnego
+  // modułu - mają obejmować kilka szafek naraz (np. cały słup dolna+górna),
+  // więc trafiają do wspólnej listy formatek projektu, ale nie do
+  // calculateParts() (lista formatek AKTYWNEGO modułu).
+  (config.sidePanels || []).forEach(panel => {
+    allParts.push(...getSidePanelParts(panel, config).map(p => ({ ...p, moduleName: panel.name || 'Bok dokładany' })));
+  });
+
   const baseCabinets = config.modules.filter(m => m.legs && m.legs.active && m.legs.plinth);
 
   // Tylko szafki o TEJ SAMEJ orientacji (rotation) mogą fizycznie stać w jednym,
@@ -758,6 +766,25 @@ function getFillerParts(mod, config) {
       parts.push({ name: `Blenda Górna (Czoło)`, length: w, width: h, qty: 1, category: "Front" });
       parts.push({ name: `Blenda Górna (Mocowanie wewn.)`, length: w, width: (parseFloat(mod.fillers.top.depth) || 80) - th, qty: 1, category: "Korpus" });
   }
-  
+
   return parts;
+}
+
+// Bok dokładany (core/state.js: addSidePanel) to samodzielny, płaski
+// obiekt projektu (nie właściwość jednego modułu jak blenda) - fizycznie
+// to tylko jedna płyta (front, dekor), więc jedna formatka: wysokość x
+// głębokość (grubość to grubość samej płyty, nie osobny wymiar cięcia).
+// Kategoria "Front", bo to zwykle ten sam, droższy dekor co fronty (lakier/
+// fornir/okleina) - w Kosztorysie (calculateProjectCost) liczy się razem
+// z frontami, dając realną sumę m² tego dekoru do wyceny.
+function getSidePanelParts(panel, config) {
+  const label = panel.decor ? `Bok dokładany (${panel.decor})` : 'Bok dokładany';
+  const name = panel.name ? `${label} — ${panel.name}` : label;
+  return [{
+    name,
+    length: parseFloat(panel.dimensions?.height) || 0,
+    width: parseFloat(panel.dimensions?.depth) || 0,
+    qty: 1,
+    category: "Front"
+  }];
 }

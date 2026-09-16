@@ -1,6 +1,6 @@
 import { calculateParts, calculateAllProjectParts, calculateProjectHardware, calculateProjectCost } from "../engine/cabinet.js";
 import { generateSidePanelSVG } from "../render/viewer2d.js"; 
-import { state, getActiveModule, addModule, deleteModule, duplicateModule } from "../core/state.js";
+import { state, getActiveModule, addModule, deleteModule, duplicateModule, addSidePanel, deleteSidePanel } from "../core/state.js";
 import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel } from "./properties.js";
 import { escapeHtml } from "../utils/dom.js";
@@ -486,7 +486,7 @@ export function updateSidebar() {
       const groupIcon = m.groupId ? `<span title="Zgrupowana z innymi szafkami" style="color: ${isActive ? '#bae6fd' : '#ef4444'}; font-size:12px; margin-left:6px;">🔗</span>` : '';
 
       html += `
-        <div class="module-item" data-id="${m.id}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; margin-bottom: 6px; background-color: ${bg}; color: ${color}; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; border: 1px solid ${border}; transition: all 0.2s;">
+        <div class="module-item" data-id="${m.id}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; margin-bottom: 6px; background-color: ${bg}; color: ${color}; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; border: 1px solid ${border}; transition: all 0.2s; user-select: none;">
           <div style="flex-grow: 1; pointer-events: none;">
             ${icon} ${escapeHtml(m.name)} ${groupIcon} <span style="font-weight: normal; font-size: 11px; opacity: 0.8; margin-left: 2px;">(${m.dimensions.width}x${m.dimensions.height})</span>
           </div>
@@ -505,9 +505,32 @@ export function updateSidebar() {
         <button id="btn-add-upper" class="btn btn-primary btn-sm" style="flex: 1;" title="Szafka wisząca">➕ Wisząca</button>
         <button id="btn-add-tall" class="btn btn-purple btn-sm" style="flex: 1;" title="Słupek">➕ Słupek</button>
       </div>
+      <button id="btn-add-side-panel" class="btn btn-teal btn-block btn-sm" style="margin-top: 6px;" title="Dekoracyjny panel niezależny od modułów, np. na cały słup szafek">➕ Bok dokładany</button>
     </div>
     <hr style="margin: 15px 0; border: 0; border-top: 1px dashed #cbd5e1;">
   `;
+
+  // Boki dokładane (core/state.js: addSidePanel) - samodzielne obiekty
+  // projektu (nie właściwość modułu jak blenda), więc osobna lista niezależna
+  // od "Lista Szafek" wyżej.
+  if (state.project.sidePanels.length > 0) {
+    html += `<details open style="margin-bottom: 15px;"><summary style="font-weight: bold; cursor: pointer; outline: none; color: #0f766e;">🧱 Boki dokładane</summary><div style="margin-top: 8px;">`;
+    state.project.sidePanels.forEach(p => {
+      const isActive = p.id === state.activeSidePanelId;
+      const bg = isActive ? '#0f766e' : '#f0fdfa';
+      const color = isActive ? '#ffffff' : '#134e4a';
+      const border = isActive ? '#0f766e' : '#99f6e4';
+      html += `
+        <div class="side-panel-item" data-id="${p.id}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; margin-bottom: 6px; background-color: ${bg}; color: ${color}; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; border: 1px solid ${border}; transition: all 0.2s; user-select: none;">
+          <div style="flex-grow: 1; pointer-events: none;">
+            🧱 ${escapeHtml(p.name || 'Bok dokładany')} <span style="font-weight: normal; font-size: 11px; opacity: 0.8; margin-left: 2px;">(${p.dimensions.height}×${p.dimensions.depth})</span>
+          </div>
+          <button class="btn-side-panel-del" data-id="${p.id}" title="Usuń bok dokładany" style="background: none; border: none; cursor: pointer; padding: 2px 4px; font-size: 14px; opacity: ${isActive ? 1 : 0.6}; transition: opacity 0.2s;">🗑️</button>
+        </div>
+      `;
+    });
+    html += `</div></details>`;
+  }
 
   if (state.project.modules.length > 0) {
     html += `
@@ -614,6 +637,7 @@ export function updateSidebar() {
   if (btnShowAll) {
     btnShowAll.addEventListener('click', () => {
       state.activeModuleId = null;
+      state.activeSidePanelId = null;
       if (state.selectedModules) state.selectedModules.clear();
       initPropertiesPanel(); update3D(); updateSidebar();
     });
@@ -657,10 +681,11 @@ export function updateSidebar() {
           state.selectedModules = new Set(idsToSelect);
           state.activeModuleId = id;
       }
-      
-      initPropertiesPanel();  
-      update3D(); 
-      updateSidebar();       
+      state.activeSidePanelId = null;
+
+      initPropertiesPanel();
+      update3D();
+      updateSidebar();
     });
   });
 
@@ -669,6 +694,33 @@ export function updateSidebar() {
     if (btn) btn.addEventListener('click', () => { addModule(type); initPropertiesPanel();  update3D(); updateSidebar(); });
   };
   setupAddBtn('btn-add-base', 'base_cabinet'); setupAddBtn('btn-add-upper', 'upper_cabinet'); setupAddBtn('btn-add-tall', 'tall_cabinet');
+
+  const btnAddSidePanel = document.getElementById('btn-add-side-panel');
+  if (btnAddSidePanel) {
+    btnAddSidePanel.addEventListener('click', () => { addSidePanel(); initPropertiesPanel(); update3D(); updateSidebar(); });
+  }
+
+  document.querySelectorAll('.side-panel-item').forEach(el => {
+    el.addEventListener('click', (e) => {
+      const id = e.currentTarget.getAttribute('data-id');
+      state.activeSidePanelId = id;
+      state.activeModuleId = null;
+      if (state.selectedModules) state.selectedModules.clear();
+      initPropertiesPanel();
+      update3D();
+      updateSidebar();
+    });
+  });
+
+  document.querySelectorAll('.btn-side-panel-del').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteSidePanel(e.currentTarget.getAttribute('data-id'));
+      initPropertiesPanel();
+      update3D();
+      updateSidebar();
+    });
+  });
 
   const btnAi = document.getElementById('btn-import-ai');
   const inputAi = document.getElementById('input-ai-image');

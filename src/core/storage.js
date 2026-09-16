@@ -8,7 +8,7 @@ import {
   signOut,
   onAuthStateChanged,
 } from "firebase/auth";
-import { state, ensureRoomDefaults, ensurePricingDefaults } from "./state.js";
+import { state, ensureRoomDefaults, ensurePricingDefaults, ensureSidePanelsDefaults } from "./state.js";
 import { migrateLegacyRoom, clampModuleToRoom } from "./layout.js";
 import { resetHistory } from "./history.js";
 
@@ -240,6 +240,7 @@ export async function loadProjectFromCloud(projectId) {
       state.project = docSnap.data();
       ensureRoomDefaults(state.project); // projekty zapisane przed dodaniem pomieszczeń mogą nie mieć tego pola
       ensurePricingDefaults(state.project); // ...ani projekty sprzed dodania kosztorysu
+      ensureSidePanelsDefaults(state.project); // ...ani projekty sprzed dodania boków dokładanych
       migrateLegacyRoom(state.project); // ...a te sprzed realnego renderowania pokoju mogą mieć martwy, za mały placeholder
       // Projekty zapisane przed poprawką clampModuleToRoom (blendy L-kształtne)
       // mogły zapisać pozycję z blendą przenikającą przez ścianę - ten stan
@@ -248,6 +249,7 @@ export async function loadProjectFromCloud(projectId) {
       // sama szafka po prostu wisiała tak przy każdym otwarciu projektu.
       (state.project.modules || []).forEach(clampModuleToRoom);
       state.activeModuleId = state.project.modules.length > 0 ? state.project.modules[0].id : null;
+      state.activeSidePanelId = null;
       state.loadedProjectId = projectId;
       markSaved();
       resetHistory(); // cofanie między dwoma różnymi wczytanymi projektami nie ma sensu

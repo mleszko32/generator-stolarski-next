@@ -62,9 +62,23 @@ export function ensurePricingDefaults(project) {
   return p;
 }
 
+// Boki dokładane (dekoracyjne panele boczne w dekorze frontów) - w
+// przeciwieństwie do blendy (mod.fillers), NIE należą do jednego modułu:
+// mają objąć np. cały słup dolna+górna szafka naraz, a domyślnie sięgają od
+// podłogi do sufitu niezależnie od wysokości modułów za nimi (zgłoszona
+// potrzeba). To pierwszy samodzielny obiekt projektu obok `modules` - stare
+// projekty sprzed tej funkcji nie mają wcale pola `sidePanels`.
+export function ensureSidePanelsDefaults(project) {
+  if (!Array.isArray(project.sidePanels)) {
+    project.sidePanels = [];
+  }
+  return project.sidePanels;
+}
+
 export const state = {
-  activeModuleId: null, 
-  loadedProjectId: null, 
+  activeModuleId: null,
+  activeSidePanelId: null,
+  loadedProjectId: null,
   project: {
     name: "Zabudowa Wielomodułowa",
     materials: { boardThickness: 18, backThickness: 3 },
@@ -72,7 +86,8 @@ export const state = {
     front: { active: true, distribution: "1:1:1", drawerSystem: "merivobox", gap: 3, clearance: { sides: 1.5, top: 5, bottom: 0 } },
     room: { ...DEFAULT_ROOM },
     pricing: { materials: { Korpus: 0, Front: 0, Szuflada: 0, Plecy: 0 }, marginPercent: 0, hardware: {} },
-    modules: []
+    modules: [],
+    sidePanels: []
   }
 };
 
@@ -128,6 +143,45 @@ export function addModule(type = "base_cabinet") {
   state.activeModuleId = newId; 
   
   return newModule;
+}
+
+export function getActiveSidePanel() {
+  return state.project.sidePanels.find(p => p.id === state.activeSidePanelId) || null;
+}
+
+export function addSidePanel() {
+  const newId = 'side-' + Date.now();
+  const room = state.project.room || DEFAULT_ROOM;
+
+  const newPanel = {
+    id: newId,
+    name: 'Bok dokładany ' + (state.project.sidePanels.length + 1),
+    decor: '', // wolna etykieta dekoru (np. "Front biały połysk") - trafia do nazwy formatki
+    position: { x: 0, y: 0, z: 0 },
+    rotation: 0,
+    // width = grubość płyty (jak th w bokach korpusu); height/depth jak w
+    // module - dzięki temu getWorldFootprint(panel) z core/layout.js działa
+    // bez zmian. Domyślnie podłoga->sufit, bo bok ma obejmować kilka modułów
+    // naraz, nie tylko jeden (zgłoszona potrzeba).
+    dimensions: {
+      width: parseFloat(state.project.materials?.boardThickness) || 18,
+      height: parseFloat(room.height) || DEFAULT_ROOM.height,
+      depth: 600
+    }
+  };
+
+  state.project.sidePanels.push(newPanel);
+  state.activeSidePanelId = newId;
+  state.activeModuleId = null;
+
+  return newPanel;
+}
+
+export function deleteSidePanel(panelId) {
+  state.project.sidePanels = state.project.sidePanels.filter(p => p.id !== panelId);
+  if (state.activeSidePanelId === panelId) {
+    state.activeSidePanelId = null;
+  }
 }
 
 export function deleteModule(moduleId) {

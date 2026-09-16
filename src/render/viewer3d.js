@@ -381,9 +381,10 @@ export function init3DViewer() {
                       state.selectedModules = new Set(idsToSelect);
                   }
                   state.activeModuleId = dragModule.id;
+                  state.activeSidePanelId = null;
                   updateSidebar();
                   initPropertiesPanel();
-                  update3D(); 
+                  update3D();
               }
 
               dragSelectionOrigins.clear();
@@ -738,7 +739,7 @@ function handle3DClick(event) {
 
   for (let i = 0; i < intersects.length; i++) {
       const obj = intersects[i].object;
-      if (obj.userData && obj.userData.moduleId) {
+      if (obj.userData && (obj.userData.moduleId || obj.userData.sidePanelId)) {
           validHit = intersects[i];
           data = obj.userData;
           break;
@@ -748,11 +749,25 @@ function handle3DClick(event) {
   if (!validHit) {
       if (!event.shiftKey) {
           state.activeModuleId = null;
+          state.activeSidePanelId = null;
           if (state.selectedModules) state.selectedModules.clear();
           updateSidebar();
           initPropertiesPanel();
           update3D();
       }
+      return;
+  }
+
+  // Bok dokładany (core/state.js: addSidePanel) - w v1 klik go tylko zaznacza
+  // (edycja pozycji/wymiarów wyłącznie liczbowo w panelu bocznym), bez trybu
+  // przeciągania czy menu kontekstowego, jak przy module.
+  if (data.sidePanelId && !data.moduleId) {
+      state.activeSidePanelId = data.sidePanelId;
+      state.activeModuleId = null;
+      if (state.selectedModules) state.selectedModules.clear();
+      updateSidebar();
+      initPropertiesPanel();
+      update3D();
       return;
   }
 
@@ -815,6 +830,7 @@ function handle3DClick(event) {
           } else if (state.selectedModules.size > idsToSelect.length) {
               state.selectedModules = new Set(idsToSelect);
               state.activeModuleId = data.moduleId;
+              state.activeSidePanelId = null;
               updateSidebar();
               initPropertiesPanel();
               update3D();
@@ -1374,4 +1390,32 @@ export function update3D() {
 
       cabinetGroup.add(modGroup);
   });
+
+  // Boki dokładane (core/state.js: addSidePanel) - samodzielne, płaskie
+  // obiekty projektu (NIE dzieci żadnego modGroup, jak blenda), bo mają
+  // obejmować kilka modułów naraz i sięgać niezależnie od podłogi do sufitu.
+  // Ta sama sztuczka co przy module: position.x/z to róg FAKTYCZNEGO odcisku
+  // po uwzględnieniu obrotu (getWorldFootprint działa na tym obiekcie bez
+  // zmian, bo ma ten sam kształt dimensions/rotation co moduł).
+  if (isFrontsVisible) {
+      (state.project.sidePanels || []).forEach(panel => {
+          const isActiveSide = panel.id === state.activeSidePanelId;
+          const { worldW, worldD } = getWorldFootprint(panel);
+          const x = parseFloat(panel.position?.x) || 0;
+          const y = parseFloat(panel.position?.y) || 0;
+          const z = parseFloat(panel.position?.z) || 0;
+          const H = parseFloat(panel.dimensions?.height) || 0;
+          const W = parseFloat(panel.dimensions?.width) || 18;
+          const D = parseFloat(panel.dimensions?.depth) || 600;
+
+          const panelGroup = new THREE.Group();
+          panelGroup.userData = { sidePanelId: panel.id };
+          panelGroup.position.set(x + worldW / 2, y + H / 2, z + worldD / 2);
+          panelGroup.rotation.y = -((parseFloat(panel.rotation) || 0) * Math.PI / 180);
+
+          addBox(W, H, D, -W / 2, -H / 2, -D / 2, 'front', isActiveSide, { sidePanelId: panel.id }, panelGroup);
+
+          cabinetGroup.add(panelGroup);
+      });
+  }
 }

@@ -13,7 +13,7 @@
 // mutacja w aplikacji woła po sobie (patrz CLAUDE.md: "Update flow"). Dzięki
 // temu nie trzeba było ręcznie dotykać każdego z kilkudziesięciu miejsc,
 // które zmieniają state.
-import { state, ensureRoomDefaults, ensurePricingDefaults } from "./state.js";
+import { state, ensureRoomDefaults, ensurePricingDefaults, ensureSidePanelsDefaults } from "./state.js";
 import { migrateLegacyRoom } from "./layout.js";
 
 const MAX_HISTORY = 50;
@@ -79,12 +79,19 @@ function applySnapshot(json) {
   state.project = data.project;
   ensureRoomDefaults(state.project);
   ensurePricingDefaults(state.project);
+  ensureSidePanelsDefaults(state.project);
   migrateLegacyRoom(state.project);
   state.activeModuleId = data.activeModuleId;
   // Jeśli aktywny moduł zniknął w tej migawce (np. cofnięcie dodania modułu,
   // gdy on sam był zaznaczony), wybierz sensowny fallback zamiast wskazywać w pustkę.
   if (state.activeModuleId && !state.project.modules.some(m => m.id === state.activeModuleId)) {
     state.activeModuleId = state.project.modules[0]?.id ?? null;
+  }
+  // activeSidePanelId nie jest częścią migawki (jak selectedModules - to
+  // ulotny wybór UI, nie stan projektu) - po cofnięciu/wprzód może więc
+  // wskazywać na bok, który już nie istnieje w tej wersji projektu.
+  if (state.activeSidePanelId && !state.project.sidePanels.some(p => p.id === state.activeSidePanelId)) {
+    state.activeSidePanelId = null;
   }
 }
 

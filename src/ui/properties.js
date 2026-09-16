@@ -1,5 +1,5 @@
 // src/ui/properties.js
-import { state, getActiveModule } from "../core/state.js";
+import { state, getActiveModule, deleteSidePanel } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
 import { calculateParts } from "../engine/cabinet.js";
@@ -41,10 +41,96 @@ const LEG_LABELS = ["Tył lewa", "Tył prawa", "Przód lewa", "Przód prawa"];
 // side ("front"/"rear") <-> etykieta w UI, patrz też core/layout.js (getTraverseConfig).
 const TRAVERSE_LABELS = { front: "Przedni", rear: "Tylny" };
 
+// Bok dokładany (core/state.js: addSidePanel) - samodzielny obiekt projektu,
+// nie właściwość modułu, więc dostaje osobny, krótki formularz zamiast
+// całego "Parametry szafki" (zakładki front/szuflady/konstrukcja/zawiasy nie
+// mają tu zastosowania - to tylko płaska, dekoracyjna płyta).
+function renderSidePanelProperties(rightSidebar, panel) {
+  rightSidebar.innerHTML = `
+    <h2>Parametry boku dokładanego</h2>
+    <div class="property-group" style="background: #f8fafc; padding: 10px; border-radius: 4px; border: 1px solid #cbd5e1; margin-bottom: 15px;">
+      <label style="font-weight: bold; color: #0f172a;">Nazwa:</label>
+      <input type="text" id="input-side-name" value="${escapeHtml(panel.name || '')}" style="font-weight: bold; color: #1e293b;" />
+    </div>
+    <div class="property-group">
+      <label>Dekor (opis do formatki):</label>
+      <input type="text" id="input-side-decor" value="${escapeHtml(panel.decor || '')}" placeholder="np. Front biały połysk" />
+    </div>
+
+    <h3>Wymiary</h3>
+    <div class="property-group"><label>Grubość płyty (mm):</label><input type="number" id="input-side-width" value="${panel.dimensions.width}" /></div>
+    <div class="property-group"><label>Wysokość (mm):</label><input type="number" id="input-side-height" value="${panel.dimensions.height}" /></div>
+    <div class="property-group"><label>Głębokość (mm):</label><input type="number" id="input-side-depth" value="${panel.dimensions.depth}" /></div>
+
+    <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
+
+    <h3 style="color: #2563eb;">Pozycja w przestrzeni (3D)</h3>
+    <div class="property-group" style="background: #eff6ff; padding: 10px; border-radius: 4px; border: 1px dashed #93c5fd;">
+      <div style="margin-bottom: 8px;"><label style="font-size: 11px; color: #1e3a8a;">Odsunięcie od lewej ściany (X) [mm]:</label><input type="number" id="input-side-pos-x" value="${panel.position.x}" style="border-color: #bfdbfe;" /></div>
+      <div style="margin-bottom: 8px;"><label style="font-size: 11px; color: #1e3a8a;">Odsunięcie od tylnej ściany (Z) [mm]:</label><input type="number" id="input-side-pos-z" value="${panel.position.z || 0}" style="border-color: #bfdbfe;" /></div>
+      <div><label style="font-size: 11px; color: #1e3a8a;">Wysokość startu od podłogi (Y) [mm]:</label><input type="number" id="input-side-pos-y" value="${panel.position.y || 0}" style="border-color: #bfdbfe;" /></div>
+    </div>
+    <div style="font-size: 10px; color: #94a3b8; margin-top: 4px;">Domyślnie Y=0 i wysokość = wysokość pomieszczenia, żeby bok sięgał od podłogi do sufitu niezależnie od modułów za nim.</div>
+
+    <h3 style="color: #2563eb; margin-top: 15px;">Obrót (co 90°)</h3>
+    <div class="property-group" style="display: flex; flex-direction: row; gap: 4px;">
+      ${[0, 90, 180, 270].map(rot => {
+          const active = (panel.rotation || 0) === rot;
+          return `<button type="button" class="btn-side-rotate${active ? ' active' : ''}" data-rot="${rot}" style="flex: 1; padding: 8px 4px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; border: 1px solid ${active ? '#2563eb' : '#93c5fd'}; background: ${active ? '#2563eb' : '#eff6ff'}; color: ${active ? '#fff' : '#1e3a8a'};">${rot}°</button>`;
+      }).join('')}
+    </div>
+
+    <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
+    <button type="button" id="btn-side-delete" class="btn btn-danger btn-block btn-sm">🗑️ Usuń bok dokładany</button>
+  `;
+
+  const bindText = (id, apply) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', (e) => { apply(e.target.value); update3D(); updateSidebar(); });
+  };
+  const bindNumber = (id, apply) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', (e) => { apply(parseFloat(e.target.value) || 0); update3D(); updateSidebar(); });
+  };
+
+  bindText('input-side-name', v => panel.name = v);
+  bindText('input-side-decor', v => panel.decor = v);
+  bindNumber('input-side-width', v => panel.dimensions.width = v);
+  bindNumber('input-side-height', v => panel.dimensions.height = v);
+  bindNumber('input-side-depth', v => panel.dimensions.depth = v);
+  bindNumber('input-side-pos-x', v => panel.position.x = v);
+  bindNumber('input-side-pos-z', v => panel.position.z = v);
+  bindNumber('input-side-pos-y', v => panel.position.y = v);
+
+  rightSidebar.querySelectorAll('.btn-side-rotate').forEach(btn => {
+    btn.addEventListener('click', () => {
+      panel.rotation = parseInt(btn.getAttribute('data-rot'), 10);
+      update3D();
+      updateSidebar();
+      initPropertiesPanel(); // zmiana aktywnego przycisku - wymaga przerysowania formularza
+    });
+  });
+
+  const delBtn = document.getElementById('btn-side-delete');
+  if (delBtn) delBtn.addEventListener('click', () => {
+    deleteSidePanel(panel.id);
+    update3D();
+    updateSidebar();
+    initPropertiesPanel();
+  });
+}
+
 export function initPropertiesPanel() {
   scheduleCheckpoint(); // patrz core/history.js — debounce'owany checkpoint historii cofnij/wprzód
   renderInteriorEditorIfVisible();
   const rightSidebar = document.querySelector(".sidebar-right");
+
+  const activeSidePanel = state.project.sidePanels.find(p => p.id === state.activeSidePanelId);
+  if (activeSidePanel) {
+    renderSidePanelProperties(rightSidebar, activeSidePanel);
+    return;
+  }
+
   const activeModule = getActiveModule();
 
   if (!activeModule) {
