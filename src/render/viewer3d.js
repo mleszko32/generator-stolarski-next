@@ -35,6 +35,15 @@ const dragPlane = new THREE.Plane();
 const SNAP_DIST = 40;
 let dragSelectionOrigins = new Map();
 let wasSelectedOnDown = false;
+// Przeciąganie boku dokładanego (core/state.js: addSidePanel) - osobny,
+// prostszy tor niż moduły (bez grup, bez blend, bez trybu pionowego Alt),
+// bo to pojedynczy, samodzielny obiekt. Współdzieli dragOffset/dragPlane
+// z modułami (to samo drzewo pointerdown/pointermove/pointerup, nigdy oba
+// naraz), ale ma własne isDragging*/dragSidePanel*, żeby nie mieszać się z
+// logiką modułów w handle3DClick i module'owym pointermove.
+let isDraggingSidePanel = false;
+let dragSidePanelTarget = null;
+let dragSidePanel = null;
 // Przeciąganie z wciśniętym Alt = tylko w pionie (Y), reszta myszką = tylko
 // po podłodze (X/Z) - patrz komentarz przy ustawianiu dragPlane niżej.
 let verticalDrag = false;
@@ -394,11 +403,96 @@ export function init3DViewer() {
               });
 
               dragTarget = cabinetGroup.children.find(g => g.userData.moduleId === dragModule.id);
+          } else if (group.userData && group.userData.sidePanelId) {
+              dragSidePanel = state.project.sidePanels.find(p => p.id === group.userData.sidePanelId);
+              if (dragSidePanel) {
+                  isDraggingSidePanel = true;
+                  controls.enabled = false;
+
+                  const normal = new THREE.Vector3(0, 1, 0);
+                  dragPlane.setFromNormalAndCoplanarPoint(normal, intersects[0].point);
+
+                  const wasActive = state.activeSidePanelId === dragSidePanel.id;
+                  if (!wasActive) {
+                      state.activeSidePanelId = dragSidePanel.id;
+                      state.activeModuleId = null;
+                      if (state.selectedModules) state.selectedModules.clear();
+                      updateSidebar();
+                      initPropertiesPanel();
+                      update3D();
+                      dragSidePanelTarget = cabinetGroup.children.find(g => g.userData && g.userData.sidePanelId === dragSidePanel.id);
+                  } else {
+                      dragSidePanelTarget = group;
+                  }
+
+                  dragOffset.copy(dragSidePanelTarget.position).sub(intersects[0].point);
+              }
           }
       }
   });
 
   window.addEventListener('pointermove', (e) => {
+      if (isDraggingSidePanel && dragSidePanelTarget && dragSidePanel) {
+          const rect = renderer.domElement.getBoundingClientRect();
+          mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+          mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+          raycaster.setFromCamera(mouse, camera);
+
+          const intersect = new THREE.Vector3();
+          raycaster.ray.intersectPlane(dragPlane, intersect);
+          if (!intersect) return;
+
+          const newGroupPos = intersect.clone().add(dragOffset);
+          const { worldW, worldD } = getWorldFootprint(dragSidePanel);
+          const room = getRoom();
+
+          let snapX = newGroupPos.x - worldW / 2;
+          let snapZ = newGroupPos.z - worldD / 2;
+
+          // Przyciąganie do ścian pokoju.
+          if (Math.abs(snapX) < SNAP_DIST) snapX = 0;
+          if (Math.abs(snapZ) < SNAP_DIST) snapZ = 0;
+          if (Math.abs((snapX + worldW) - room.width) < SNAP_DIST) snapX = room.width - worldW;
+          if (Math.abs((snapZ + worldD) - room.depth) < SNAP_DIST) snapZ = room.depth - worldD;
+
+          // Przyciąganie krawędzią do krawędzi modułów i innych boków
+          // dokładanych ("żeby się przyklejały" - zgłoszona potrzeba) -
+          // dokładnie ta sama logika co przy module, tylko bez cudzych blend
+          // (bok dokładany nie ma swoich, a sąsiad w kolizji liczy się i tak
+          // po jego własnym world-space AABB, patrz getModuleBox).
+          const neighborBoxes = [];
+          state.project.modules.forEach(m => {
+              const box = getModuleBox(m);
+              neighborBoxes.push({ x0: box.x0, x1: box.x1, z0: box.z0, z1: box.z1 });
+          });
+          state.project.sidePanels.forEach(p => {
+              if (p.id === dragSidePanel.id) return;
+              const fp = getWorldFootprint(p);
+              const px = parseFloat(p.position.x) || 0;
+              const pz = parseFloat(p.position.z) || 0;
+              neighborBoxes.push({ x0: px, x1: px + fp.worldW, z0: pz, z1: pz + fp.worldD });
+          });
+
+          neighborBoxes.forEach(box => {
+              if (Math.abs(snapX - box.x1) < SNAP_DIST) snapX = box.x1;
+              else if (Math.abs((snapX + worldW) - box.x0) < SNAP_DIST) snapX = box.x0 - worldW;
+
+              if (Math.abs(snapZ - box.z1) < SNAP_DIST) snapZ = box.z1;
+              else if (Math.abs((snapZ + worldD) - box.z0) < SNAP_DIST) snapZ = box.z0 - worldD;
+          });
+
+          snapX = Math.max(0, Math.min(room.width - worldW, snapX));
+          snapZ = Math.max(0, Math.min(room.depth - worldD, snapZ));
+
+          dragSidePanel.position.x = Math.round(snapX);
+          dragSidePanel.position.z = Math.round(snapZ);
+
+          const H = parseFloat(dragSidePanel.dimensions.height) || 0;
+          const y = parseFloat(dragSidePanel.position.y) || 0;
+          dragSidePanelTarget.position.set(snapX + worldW / 2, y + H / 2, snapZ + worldD / 2);
+          return;
+      }
+
       if (!isDragging || !dragTarget || !dragModule) return;
       
       const rect = renderer.domElement.getBoundingClientRect();
@@ -573,6 +667,15 @@ export function init3DViewer() {
           controls.enabled = true;
           updateSidebar();
           initPropertiesPanel();
+      }
+      if (isDraggingSidePanel) {
+          isDraggingSidePanel = false;
+          dragSidePanelTarget = null;
+          dragSidePanel = null;
+          controls.enabled = true;
+          update3D();
+          updateSidebar();
+          initPropertiesPanel(); // odśwież wartości X/Z w formularzu po snapowaniu
       }
   });
 
