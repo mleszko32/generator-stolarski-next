@@ -28,6 +28,26 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   const activeModLegH = (mod.legs && mod.legs.active) ? (parseFloat(mod.legs.height) || 0) : 0;
   const activeModAbsY = (parseFloat(mod.position.y) || 0) + activeModLegH;
 
+  // Grupa szafek stojących pod inną ścianą stoi obrócona (mod.rotation:
+  // 0/90/180/270 - patrz core/layout.js), więc jej lokalne "lewo/prawo" NIE
+  // zawsze pokrywa się z rosnącym world X/Z. Przy rotation 0/90 lokalne
+  // "prawo" leży w stronę rosnącego X (0°) / Z (90°); przy 180/270 - w stronę
+  // MALEJĄCEGO X (180°) / Z (270°) - dokładnie ta sama zależność, co przy
+  // mapowaniu blendy lewej/prawej na ściany w core/layout.js:
+  // clampModuleToRoom (nearIsLeft/onXAxis). Bez tego korekta pozycji
+  // "duchów"/frontów grupy w rysunku technicznym była poprawna tylko dla
+  // rotation===0 (np. Prawa w Białołęce), a dla rotation===180 (Lewa,
+  // przeciwległa ściana) wychodziła lustrzanie odwrócona - zgłoszony bug
+  // "3D nie zgadza się z rysunkiem" dla lewej grupy.
+  const activeRot = ((parseFloat(mod.rotation) || 0) % 360 + 360) % 360;
+  const activeAxisIsX = activeRot === 0 || activeRot === 180;
+  const activeRightSign = (activeRot === 0 || activeRot === 90) ? 1 : -1;
+  const getLocalRelX = (other) => {
+      const otherPos = activeAxisIsX ? (parseFloat(other.position.x) || 0) : (parseFloat(other.position.z) || 0);
+      const activePos = activeAxisIsX ? activeModAbsX : activeModAbsZ;
+      return activeRightSign * (otherPos - activePos);
+  };
+
   // "Duchy" (stackModules) mają pokazywać moduły faktycznie stojące w TYM SAMYM
   // pionowym ciągu co aktywny (np. szafka dolna + wisząca nad nią) - to
   // wymaga pokrywania się ZARÓWNO w X, JAK I W Z. Sam warunek X (bez Z) łapał
@@ -110,7 +130,7 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   stackModules.forEach(sm => {
       if (sm.id === mod.id) return;
       const smW = parseFloat(sm.dimensions.width) || 600;
-      const relX = (parseFloat(sm.position.x) || 0) - activeModAbsX;
+      const relX = getLocalRelX(sm);
       groupRightExtent = Math.max(groupRightExtent, relX + smW);
   });
 
@@ -197,9 +217,9 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
       const smH = parseFloat(sm.dimensions.height) || 720;
       const smW = parseFloat(sm.dimensions.width) || 600;
       
-      const relX = (parseFloat(sm.position.x) || 0) - activeModAbsX;
+      const relX = getLocalRelX(sm);
       const gX = cabX + relX;
-      const gY = sideH - (dy + smH); 
+      const gY = sideH - (dy + smH);
       
       const smCons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(config.construction || {}), ...(sm.construction || {}) };
       const smIsTBF = smCons.joinType === 'wience_przelotowe';
@@ -710,7 +730,7 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   const allOuterFronts = [];
   stackModules.forEach(sm => {
       const smDy = getDy(sm);
-      const smRelX = (parseFloat(sm.position.x) || 0) - activeModAbsX;
+      const smRelX = getLocalRelX(sm);
       const smCons = { joinType: 'boki_przelotowe', topType: 'pelny', ...config.construction, ...(sm.construction || {}) };
       const smIsTBF = smCons.joinType === 'wience_przelotowe';
       if (sm.elements) {
