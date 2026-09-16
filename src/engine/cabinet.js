@@ -310,47 +310,57 @@ export function calculateProjectHardware() {
   return Object.values(hardwareList);
 }
 
-// Szacunkowy kosztorys materiałowy - liczy powierzchnię płyty głównej i HDF
-// (plecy) z tej samej listy formatek co CSV/podgląd, oraz koszt każdej
-// pozycji okuć z listy zakupów, po cenach z state.project.pricing (patrz
-// core/state.js: ensurePricingDefaults). Ceny okuć trzymane są w słowniku
-// nazwa->cena, bo lista okuć jest dynamiczna (np. różne warianty wysokości
-// nóżek w tym samym projekcie) - nie da się z góry przewidzieć stałego
-// zestawu pozycji do wycenienia.
+// Szacunkowy kosztorys materiałowy - liczy powierzchnię formatek Z OSOBNA dla
+// każdej kategorii (Korpus/Front/Szuflada/Plecy, patrz PRICING_MATERIAL_
+// CATEGORIES w core/state.js), a nie jedną wspólną "płytą" - front to zwykle
+// inny, droższy materiał niż korpus (lakier, fornir, okleina), więc jedna
+// cena za m² dla obu myliła realny koszt (zgłoszona uwaga). Do tego koszt
+// każdej pozycji okuć z listy zakupów, po cenach z state.project.pricing
+// (patrz core/state.js: ensurePricingDefaults). Ceny okuć trzymane są w
+// słowniku nazwa->cena, bo lista okuć jest dynamiczna (np. różne warianty
+// wysokości nóżek w tym samym projekcie) - nie da się z góry przewidzieć
+// stałego zestawu pozycji do wycenienia. Tylko kategorie faktycznie obecne
+// w projekcie trafiają do wyniku (np. projekt bez szuflad nie pokaże
+// pustego wiersza "Szuflada").
+const MATERIAL_CATEGORY_ORDER = ['Korpus', 'Front', 'Szuflada', 'Plecy'];
+
 export function calculateProjectCost() {
-  const pricing = state.project.pricing || { boardPricePerM2: 0, hdfPricePerM2: 0, marginPercent: 0, hardware: {} };
+  const pricing = state.project.pricing || { materials: {}, marginPercent: 0, hardware: {} };
   const parts = calculateAllProjectParts();
   const hardware = calculateProjectHardware();
 
-  let boardAreaMm2 = 0;
-  let hdfAreaMm2 = 0;
+  const areaMm2ByCategory = {};
   parts.forEach(p => {
     const areaMm2 = (parseFloat(p.length) || 0) * (parseFloat(p.width) || 0) * (parseFloat(p.qty) || 0);
-    if (p.category === 'Plecy') hdfAreaMm2 += areaMm2;
-    else boardAreaMm2 += areaMm2;
+    const cat = p.category || 'Inne';
+    areaMm2ByCategory[cat] = (areaMm2ByCategory[cat] || 0) + areaMm2;
   });
 
-  const boardAreaM2 = boardAreaMm2 / 1e6;
-  const hdfAreaM2 = hdfAreaMm2 / 1e6;
-  const boardPricePerM2 = parseFloat(pricing.boardPricePerM2) || 0;
-  const hdfPricePerM2 = parseFloat(pricing.hdfPricePerM2) || 0;
-  const boardCost = boardAreaM2 * boardPricePerM2;
-  const hdfCost = hdfAreaM2 * hdfPricePerM2;
+  const categories = Object.keys(areaMm2ByCategory).sort((a, b) => {
+    const ia = MATERIAL_CATEGORY_ORDER.indexOf(a);
+    const ib = MATERIAL_CATEGORY_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  const materials = categories.map(cat => {
+    const areaM2 = areaMm2ByCategory[cat] / 1e6;
+    const pricePerM2 = parseFloat((pricing.materials || {})[cat]) || 0;
+    return { category: cat, areaM2, pricePerM2, cost: areaM2 * pricePerM2 };
+  });
 
   const hardwareLines = hardware.map(hw => {
     const price = parseFloat((pricing.hardware || {})[hw.name]) || 0;
     return { ...hw, price, cost: hw.qty * price };
   });
 
-  const materialsSubtotal = boardCost + hdfCost;
+  const materialsSubtotal = materials.reduce((sum, m) => sum + m.cost, 0);
   const hardwareSubtotal = hardwareLines.reduce((sum, l) => sum + l.cost, 0);
   const subtotal = materialsSubtotal + hardwareSubtotal;
   const marginPercent = parseFloat(pricing.marginPercent) || 0;
   const marginAmount = subtotal * (marginPercent / 100);
 
   return {
-    board: { areaM2: boardAreaM2, pricePerM2: boardPricePerM2, cost: boardCost },
-    hdf: { areaM2: hdfAreaM2, pricePerM2: hdfPricePerM2, cost: hdfCost },
+    materials,
     hardware: hardwareLines,
     materialsSubtotal,
     hardwareSubtotal,

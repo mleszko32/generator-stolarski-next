@@ -29,18 +29,37 @@ export function ensureRoomDefaults(project) {
 // `hardware` to słownik nazwa-okucia -> cena, bo lista okuć jest dynamiczna
 // (np. "Nóżka regulowana H-100" zależy od wysokości nóżek w projekcie) -
 // nie da się z góry przewidzieć stałego zestawu pozycji.
+//
+// `materials` to cena za m² PER KATEGORIA formatki (Korpus/Front/Szuflada/
+// Plecy, patrz engine/cabinet.js: kategorie części) - front jest zwykle
+// innym, droższym materiałem niż korpus (lakier, fornir, okleina), więc
+// jedna wspólna cena za "płytę" nie miała sensu (zgłoszona uwaga).
+export const PRICING_MATERIAL_CATEGORIES = ['Korpus', 'Front', 'Szuflada', 'Plecy'];
+
 export function ensurePricingDefaults(project) {
   if (!project.pricing || typeof project.pricing !== 'object') {
-    project.pricing = { boardPricePerM2: 0, hdfPricePerM2: 0, marginPercent: 0, hardware: {} };
-  } else {
-    project.pricing.boardPricePerM2 = parseFloat(project.pricing.boardPricePerM2) || 0;
-    project.pricing.hdfPricePerM2 = parseFloat(project.pricing.hdfPricePerM2) || 0;
-    project.pricing.marginPercent = parseFloat(project.pricing.marginPercent) || 0;
-    if (!project.pricing.hardware || typeof project.pricing.hardware !== 'object') {
-      project.pricing.hardware = {};
-    }
+    project.pricing = { materials: {}, marginPercent: 0, hardware: {} };
   }
-  return project.pricing;
+  const p = project.pricing;
+
+  // Migracja z pierwszej wersji kosztorysu (jedna cena "boardPricePerM2" na
+  // całą płytę meblową + osobna "hdfPricePerM2" na plecy) - rozbijamy ją na
+  // nowe kategorie, żeby użytkownicy, którzy zdążyli już wpisać ceny, ich
+  // nie stracili.
+  if (!p.materials || typeof p.materials !== 'object') {
+    const legacyBoard = parseFloat(p.boardPricePerM2) || 0;
+    p.materials = { Korpus: legacyBoard, Front: legacyBoard, Szuflada: legacyBoard, Plecy: parseFloat(p.hdfPricePerM2) || 0 };
+  }
+  delete p.boardPricePerM2;
+  delete p.hdfPricePerM2;
+
+  PRICING_MATERIAL_CATEGORIES.forEach(cat => {
+    p.materials[cat] = parseFloat(p.materials[cat]) || 0;
+  });
+  p.marginPercent = parseFloat(p.marginPercent) || 0;
+  if (!p.hardware || typeof p.hardware !== 'object') p.hardware = {};
+
+  return p;
 }
 
 export const state = {
@@ -52,7 +71,7 @@ export const state = {
     construction: { joinType: "boki_przelotowe", topType: "pelny", traverseWidth: 100 },
     front: { active: true, distribution: "1:1:1", drawerSystem: "merivobox", gap: 3, clearance: { sides: 1.5, top: 5, bottom: 0 } },
     room: { ...DEFAULT_ROOM },
-    pricing: { boardPricePerM2: 0, hdfPricePerM2: 0, marginPercent: 0, hardware: {} },
+    pricing: { materials: { Korpus: 0, Front: 0, Szuflada: 0, Plecy: 0 }, marginPercent: 0, hardware: {} },
     modules: []
   }
 };

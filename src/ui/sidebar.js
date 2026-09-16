@@ -286,7 +286,7 @@ function openKosztorysModal() {
         <div style="padding:18px 22px; display:flex; flex-direction:column; gap:20px; max-height:60vh; overflow-y:auto;">
 
             <section>
-                <h3 style="margin:0 0 8px 0; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#64748b;">Płyty</h3>
+                <h3 style="margin:0 0 8px 0; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#64748b;">Materiały płytowe</h3>
                 <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
                     <thead><tr>
                         <th style="text-align:left; font-size:10.5px; color:#64748b; font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid #cbd5e1;">Materiał</th>
@@ -294,20 +294,7 @@ function openKosztorysModal() {
                         <th style="text-align:right; font-size:10.5px; color:#64748b; font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid #cbd5e1;">Cena / m²</th>
                         <th style="text-align:right; font-size:10.5px; color:#64748b; font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid #cbd5e1;">Koszt</th>
                     </tr></thead>
-                    <tbody>
-                        <tr>
-                            <td style="padding:8px 8px 8px 0; border-bottom:1px solid #f1f5f9;">Płyta ${escapeHtml(String(state.project.materials?.boardThickness || 18))}&nbsp;mm</td>
-                            <td style="padding:8px 8px 8px 0; border-bottom:1px solid #f1f5f9; text-align:right;" id="kosztorys-board-area">—</td>
-                            <td style="padding:8px 8px 8px 0; border-bottom:1px solid #f1f5f9; text-align:right;"><input type="number" id="kosztorys-board-price" value="${pricing.boardPricePerM2}" step="1" min="0" style="width:70px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px; font-size:12.5px;">&nbsp;zł</td>
-                            <td style="padding:8px 8px 8px 0; border-bottom:1px solid #f1f5f9; text-align:right; font-weight:600;" id="kosztorys-board-cost">—</td>
-                        </tr>
-                        <tr>
-                            <td style="padding:8px 8px 8px 0;">HDF ${escapeHtml(String(state.project.materials?.backThickness || 3))}&nbsp;mm (plecy)</td>
-                            <td style="padding:8px 8px 8px 0; text-align:right;" id="kosztorys-hdf-area">—</td>
-                            <td style="padding:8px 8px 8px 0; text-align:right;"><input type="number" id="kosztorys-hdf-price" value="${pricing.hdfPricePerM2}" step="1" min="0" style="width:70px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px; font-size:12.5px;">&nbsp;zł</td>
-                            <td style="padding:8px 8px 8px 0; text-align:right; font-weight:600;" id="kosztorys-hdf-cost">—</td>
-                        </tr>
-                    </tbody>
+                    <tbody id="kosztorys-materials-tbody"></tbody>
                 </table>
             </section>
 
@@ -334,7 +321,7 @@ function openKosztorysModal() {
 
         </div>
         <div style="border-top:1px solid #e2e8f0; padding:16px 22px 20px 22px; display:flex; flex-direction:column; gap:6px; background:#f8fafc;">
-            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Płyty</span><span id="kosztorys-foot-plyty" style="color:#1e293b;">—</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Materiały</span><span id="kosztorys-foot-plyty" style="color:#1e293b;">—</span></div>
             <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Okucia</span><span id="kosztorys-foot-okucia" style="color:#1e293b;">—</span></div>
             <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Marża (<span id="kosztorys-foot-marginpct">0</span>%)</span><span id="kosztorys-foot-margin" style="color:#1e293b;">—</span></div>
             <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:6px; padding-top:10px; border-top:1px dashed #cbd5e1;">
@@ -348,25 +335,42 @@ function openKosztorysModal() {
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
 
+    // Etykiety kategorii formatek (patrz engine/cabinet.js: kategorie części)
+    // - front to zwykle inny, droższy materiał niż korpus (lakier, fornir,
+    //   okleina), stąd osobny, opisowy wiersz zamiast jednej wspólnej "płyty".
+    const MATERIAL_LABELS = {
+        Korpus: 'Korpus',
+        Front: 'Front (lakier / fornir / okleina)',
+        Szuflada: 'Szuflady (dno, tył)',
+        Plecy: 'Plecy (HDF)'
+    };
+
+    const materialsTbody = modal.querySelector('#kosztorys-materials-tbody');
     const hardwareTbody = modal.querySelector('#kosztorys-hardware-tbody');
 
     function recalc() {
-        pricing.boardPricePerM2 = parseFloat(modal.querySelector('#kosztorys-board-price').value) || 0;
-        pricing.hdfPricePerM2 = parseFloat(modal.querySelector('#kosztorys-hdf-price').value) || 0;
-        pricing.marginPercent = parseFloat(modal.querySelector('#kosztorys-margin').value) || 0;
-
+        modal.querySelectorAll('.kosztorys-mat-price').forEach(input => {
+            const cat = input.getAttribute('data-cat');
+            pricing.materials[cat] = parseFloat(input.value) || 0;
+        });
         modal.querySelectorAll('.kosztorys-hw-price').forEach(input => {
             const name = input.getAttribute('data-name');
             pricing.hardware[name] = parseFloat(input.value) || 0;
         });
+        pricing.marginPercent = parseFloat(modal.querySelector('#kosztorys-margin').value) || 0;
 
         const cost = calculateProjectCost();
 
-        modal.querySelector('#kosztorys-board-area').textContent = cost.board.areaM2.toFixed(2) + ' m²';
-        modal.querySelector('#kosztorys-hdf-area').textContent = cost.hdf.areaM2.toFixed(2) + ' m²';
-        modal.querySelector('#kosztorys-board-cost').textContent = formatPLN(cost.board.cost);
-        modal.querySelector('#kosztorys-hdf-cost').textContent = formatPLN(cost.hdf.cost);
-
+        modal.querySelectorAll('.kosztorys-mat-area').forEach(cell => {
+            const cat = cell.getAttribute('data-cat');
+            const line = cost.materials.find(m => m.category === cat);
+            cell.textContent = (line ? line.areaM2 : 0).toFixed(2) + ' m²';
+        });
+        modal.querySelectorAll('.kosztorys-mat-cost').forEach(cell => {
+            const cat = cell.getAttribute('data-cat');
+            const line = cost.materials.find(m => m.category === cat);
+            cell.textContent = formatPLN(line ? line.cost : 0);
+        });
         modal.querySelectorAll('.kosztorys-hw-cost').forEach(cell => {
             const name = cell.getAttribute('data-name');
             const line = cost.hardware.find(h => h.name === name);
@@ -378,6 +382,25 @@ function openKosztorysModal() {
         modal.querySelector('#kosztorys-foot-margin').textContent = formatPLN(cost.marginAmount);
         modal.querySelector('#kosztorys-foot-marginpct').textContent = cost.marginPercent;
         modal.querySelector('#kosztorys-foot-total').textContent = formatPLN(cost.total);
+    }
+
+    function renderMaterialRows() {
+        const cost = calculateProjectCost();
+        if (cost.materials.length === 0) {
+            materialsTbody.innerHTML = `<tr><td colspan="4" style="padding:12px 0; text-align:center; color:#94a3b8;">Projekt jest pusty</td></tr>`;
+            return;
+        }
+        materialsTbody.innerHTML = cost.materials.map((m, idx) => `
+            <tr>
+                <td style="padding:8px 8px 8px 0; ${idx < cost.materials.length - 1 ? 'border-bottom:1px solid #f1f5f9;' : ''}">${escapeHtml(MATERIAL_LABELS[m.category] || m.category)}</td>
+                <td class="kosztorys-mat-area" data-cat="${escapeHtml(m.category)}" style="padding:8px 8px 8px 0; ${idx < cost.materials.length - 1 ? 'border-bottom:1px solid #f1f5f9;' : ''} text-align:right;">${m.areaM2.toFixed(2)}&nbsp;m²</td>
+                <td style="padding:8px 8px 8px 0; ${idx < cost.materials.length - 1 ? 'border-bottom:1px solid #f1f5f9;' : ''} text-align:right;"><input type="number" class="kosztorys-mat-price" data-cat="${escapeHtml(m.category)}" value="${m.pricePerM2}" step="1" min="0" style="width:70px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px; font-size:12.5px;">&nbsp;zł</td>
+                <td class="kosztorys-mat-cost" data-cat="${escapeHtml(m.category)}" style="padding:8px 8px 8px 0; ${idx < cost.materials.length - 1 ? 'border-bottom:1px solid #f1f5f9;' : ''} text-align:right; font-weight:600;">${formatPLN(m.cost)}</td>
+            </tr>
+        `).join('');
+        materialsTbody.querySelectorAll('.kosztorys-mat-price').forEach(input => {
+            input.addEventListener('input', recalc);
+        });
     }
 
     function renderHardwareRows() {
@@ -399,11 +422,10 @@ function openKosztorysModal() {
         });
     }
 
+    renderMaterialRows();
     renderHardwareRows();
     recalc();
 
-    modal.querySelector('#kosztorys-board-price').addEventListener('input', recalc);
-    modal.querySelector('#kosztorys-hdf-price').addEventListener('input', recalc);
     modal.querySelector('#kosztorys-margin').addEventListener('input', recalc);
     modal.querySelector('#kosztorys-close').addEventListener('click', () => document.body.removeChild(overlay));
     overlay.addEventListener('click', (e) => { if (e.target === overlay) document.body.removeChild(overlay); });
