@@ -908,7 +908,13 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB) {
   const fsSmall = Math.round(unit * 0.062);
   const strokeThick = Math.max(2, Math.round(unit * 0.01));
   const strokeThin = Math.max(1, Math.round(unit * 0.005));
-  const margin = Math.round(unit * 0.26);
+  // Wszystkie 4 wymiary (legA/legB/depthA/depthB) leżą TERAZ na zewnątrz
+  // konturu - po jednym na każdym z 4 boków (góra/lewo/prawo/dół), żadna
+  // linia/etykieta nie przecina wypełnienia ani obrysu (zgłoszony bug:
+  // wcześniej głębokości rysowały się W ŚRODKU kształtu, nakładając się na
+  // jego własne krawędzie) - stąd margines musi pomieścić tekst na WSZYSTKICH
+  // czterech bokach, nie tylko góra/lewo jak wcześniej.
+  const margin = Math.round(unit * 0.3);
 
   const vbW = legA + margin * 2;
   const vbH = legB + margin * 2;
@@ -940,27 +946,42 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB) {
   // Realny obrys L po docięciu - wypełniony, na wierzchu.
   svg += `<polygon points="${pts}" fill="#fef3c7" stroke="#334155" stroke-width="${strokeThick * 1.3}" />`;
 
-  // Wymiary: legA (góra) / legB (lewo, obrócony o 90° - pozioma etykieta przy
-  // tak wąskim marginesie ucinałaby się poza viewBox, zgłoszony bug) /
-  // depthA (pod górnym pasem, na całej szerokości legA) / depthB (obrócony,
-  // wewnątrz lewego pasa, po prawej stronie jego linii).
-  const dimOffset = margin * 0.4;
-  const dimH = (x1, y1, x2, label) => {
-    let s = `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y1}" stroke="#0f172a" stroke-width="${strokeThin}" />`;
-    s += `<text x="${(x1 + x2) / 2}" y="${y1 - fsSmall * 0.5}" font-size="${fsSmall}" fill="#0f172a" font-weight="bold" text-anchor="middle">${label}</text>`;
+  // Wymiary - każdy na SWOIM boku marginesu, dokładnie nad/pod/obok
+  // odpowiadającego mu fragmentu obrysu (nie przez środek):
+  //   legA  - góra, cała szerokość
+  //   legB  - lewo, obrócony o 90°, cała wysokość
+  //   depthA - prawo, obrócony o 90°, TYLKO odcinek 0..depthA (to faktyczny
+  //            zasięg prawej krawędzi obrysu - dalej w dół obrysu tam nie ma)
+  //   depthB - dół, TYLKO odcinek 0..depthB (faktyczny zasięg dolnej krawędzi)
+  const dimGap = margin * 0.18; // odstęp linii wymiarowej od obrysu
+  const tickLen = margin * 0.12; // długość kresek na końcach linii wymiarowej
+
+  const dimH = (x1, x2, y, label, tickY1, tickY2, textSide) => {
+    let s = `<line x1="${x1}" y1="${tickY1}" x2="${x1}" y2="${tickY2}" stroke="#94a3b8" stroke-width="${strokeThin}" />`;
+    s += `<line x1="${x2}" y1="${tickY1}" x2="${x2}" y2="${tickY2}" stroke="#94a3b8" stroke-width="${strokeThin}" />`;
+    s += `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="#0f172a" stroke-width="${strokeThin}" />`;
+    const ty = y + (textSide === 'below' ? fsSmall * 0.85 : -fsSmall * 0.4);
+    s += `<text x="${(x1 + x2) / 2}" y="${ty}" font-size="${fsSmall}" fill="#0f172a" font-weight="bold" text-anchor="middle">${label}</text>`;
     return s;
   };
-  const dimV = (x1, y1, y2, label, textOffset) => {
-    let s = `<line x1="${x1}" y1="${y1}" x2="${x1}" y2="${y2}" stroke="#0f172a" stroke-width="${strokeThin}" />`;
+  const dimV = (y1, y2, x, label, tickX1, tickX2, textSide) => {
+    let s = `<line x1="${tickX1}" y1="${y1}" x2="${tickX2}" y2="${y1}" stroke="#94a3b8" stroke-width="${strokeThin}" />`;
+    s += `<line x1="${tickX1}" y1="${y2}" x2="${tickX2}" y2="${y2}" stroke="#94a3b8" stroke-width="${strokeThin}" />`;
+    s += `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="#0f172a" stroke-width="${strokeThin}" />`;
     const ty = (y1 + y2) / 2;
-    const tx = x1 + (textOffset ?? -fsSmall * 0.5);
+    const tx = x + (textSide === 'left' ? -fsSmall * 0.4 : fsSmall * 0.4);
     s += `<text x="${tx}" y="${ty}" font-size="${fsSmall}" fill="#0f172a" font-weight="bold" text-anchor="middle" transform="rotate(-90 ${tx} ${ty})">${label}</text>`;
     return s;
   };
-  svg += dimH(ox, oy - dimOffset, ox + legA, `${Math.round(legA)} mm`);
-  svg += dimV(ox - dimOffset, oy, oy + legB, `${Math.round(legB)} mm`);
-  svg += dimH(ox, oy + depthA + dimOffset, ox + legA, `głębokość ramienia A: ${Math.round(depthA)} mm`);
-  svg += dimV(ox + depthB, oy + dimOffset, oy + legB - dimOffset, `głębokość ramienia B: ${Math.round(depthB)} mm`, fsSmall * 0.6);
+
+  // Góra: legA
+  svg += dimH(ox, ox + legA, oy - dimGap, `Ramię A: ${Math.round(legA)} mm`, oy - dimGap - tickLen, oy);
+  // Lewo: legB
+  svg += dimV(oy, oy + legB, ox - dimGap, `Ramię B: ${Math.round(legB)} mm`, ox - dimGap - tickLen, ox, 'left');
+  // Prawo: depthA (tylko górny odcinek prawej krawędzi, 0..depthA)
+  svg += dimV(oy, oy + depthA, ox + legA + dimGap, `Głęb. A: ${Math.round(depthA)} mm`, ox + legA, ox + legA + dimGap + tickLen, 'right');
+  // Dół: depthB (tylko lewy odcinek dolnej krawędzi, 0..depthB)
+  svg += dimH(ox, ox + depthB, oy + legB + dimGap, `Głęb. B: ${Math.round(depthB)} mm`, oy + legB, oy + legB + dimGap + tickLen, 'below');
 
   svg += `</svg>`;
   return svg;
