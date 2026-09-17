@@ -1,4 +1,5 @@
 // src/core/state.js
+import { ensureCornerDefaults } from "./layout.js";
 // depth:600 z poprzedniego (martwego, nigdy nie renderowanego) pola room nie ma
 // sensu jako realny pokój - to szerokość korytarza, nie mieściłby się w nim nawet
 // jeden rząd szafek. Skoro pokój od teraz faktycznie się renderuje, domyślne
@@ -153,12 +154,14 @@ export function addModule(type = "base_cabinet") {
 // kątem prostym (patrz render/viewer3d.js: renderCornerCabinet, engine/
 // cabinet.js: getCornerCorpusParts). Oba fronty są tworzone od razu tutaj
 // - w przeciwieństwie do zwykłego modułu użytkownik NIE dokłada ich
-// ręcznie przez generyczny mechanizm stref, bo geometria narożnika jest
-// z góry ustalona. `cornerArm` mówi renderowi, na którym ramieniu (i którą
-// ścianą lokalną) dany front leży. baseZone to tylko placeholder - core/
-// layout.js: getCornerFrontZones() przelicza je zaraz po dodaniu (wołane
-// przez wywołującego, patrz ui/sidebar.js) i przy każdej zmianie wymiarów
-// w panelu (ui/properties.js).
+// ręcznie przez generyczny mechanizm stref - zamiast tego dostają od razu
+// jeden domyślny front drzwiowy każde (ensureCornerDefaults, core/layout.js),
+// przez ten sam generyczny mechanizm (core/zoneTree.js: assignFront) co
+// fronty zwykłych modułów, tylko z bound-tokenami corner-A-*/corner-B-*
+// zamiast cab-* - dzięki temu nadążają same za zmianą legA/legB/depth/
+// height, a dodatkowo można je dalej dzielić na więcej frontów/półek przez
+// ten sam edytor wnętrza co zwykły moduł (ui/interiorEditor.js,
+// ui/cornerConfigModal.js), tylko przypisany do konkretnego ramienia.
 export function addCornerModule() {
   const newId = 'mod-' + Date.now();
   const legA = 860, legB = 860, depth = 540, height = 720;
@@ -167,8 +170,6 @@ export function addCornerModule() {
   if (state.project.modules.length > 0) {
     nextX = Math.max(...state.project.modules.map(m => (parseFloat(m.position.x) || 0) + (parseFloat(m.dimensions.width) || 0)));
   }
-
-  const emptyZone = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
 
   const newModule = {
     id: newId,
@@ -180,22 +181,12 @@ export function addCornerModule() {
     backPanel: { type: "nakladane", offset: 20, grooveDepth: 7, nutBuild: "all", clearance: 2 },
     legs: { active: true, height: 100, plinth: true, plinthOffset: 40 },
     front: { hinges: { topOffset: 100, bottomOffset: 100, margin: 40 } },
-    elements: [
-      {
-        id: 'front-' + Date.now() + '-a',
-        typ: 'front', subtype: 'drzwi', cornerArm: 'A', openingSide: 'left',
-        baseZone: { ...emptyZone }
-      },
-      {
-        id: 'front-' + Date.now() + '-b',
-        typ: 'front', subtype: 'drzwi', cornerArm: 'B', openingSide: 'right',
-        baseZone: { ...emptyZone }
-      }
-    ]
+    elements: []
   };
 
   state.project.modules.push(newModule);
   state.activeModuleId = newId;
+  ensureCornerDefaults(newModule);
 
   return newModule;
 }

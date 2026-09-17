@@ -12,6 +12,7 @@
 // update3D()). Nie ma tu żadnej zależności od Three.js — czysta matematyka na
 // obiekcie state.
 import { state, DEFAULT_ROOM } from "./state.js";
+import { assignFront } from "./zoneTree.js";
 
 // Przelicza layout wszystkich modułów projektu. Wołaj przed każdym liczeniem
 // formatek/okuć całego projektu — fronty z sąsiednich modułów też muszą mieć
@@ -228,10 +229,32 @@ export function recalculateLayout(mod) {
   const isVerticalTraverse = cons.topType === 'trawersy_pion';
   const traverseWidth = cons.traverseWidth || 100;
 
+  // Dogrywa bound-tokeny starym, zapisanym przed wprowadzeniem generycznego
+  // systemu wnęk frontom narożnika (patrz migrateCornerElement wyżej) -
+  // jednorazowo na front, idempotentne (opiera się na `??`).
+  if (mod.type === 'corner_cabinet') {
+      mod.elements.forEach(el => {
+          if (el.typ === 'front' && el.cornerArm && el.baseZone && !el.baseZone.boundLeft) {
+              migrateCornerElement(el, el.cornerArm);
+          }
+      });
+  }
+
   mod.elements.forEach(el => {
       if (el.typ === 'front' && el.baseZone) {
           if (el.baseZone.boundBottom) {
               const getBound = (id, type, fallback) => {
+                  if (mod.type === 'corner_cabinet') {
+                      const armMatch = /^corner-([AB])-(left|right|bottom|top)$/.exec(id);
+                      if (armMatch) {
+                          const rect = getCornerArmRect(mod, armMatch[1]);
+                          const side = armMatch[2];
+                          if (side === 'left') return rect.minX;
+                          if (side === 'right') return rect.maxX;
+                          if (side === 'bottom') return rect.minY;
+                          if (side === 'top') return rect.maxY;
+                      }
+                  }
                   if (id === 'cab-left') return th;
                   if (id === 'cab-right') return width - th;
                   if (id === 'cab-bottom') return th;
@@ -358,22 +381,19 @@ export function recalculateLayout(mod) {
 }
 
 // Szafka narożna, kąt prosty bez ścięcia (mod.type === 'corner_cabinet',
-// core/state.js: addCornerModule) - liczy baseZone dwóch zwykłych,
-// prostych frontów (po jednym na ramię) z bieżących wymiarów modułu.
-// Wołaj raz przy tworzeniu modułu (ui/sidebar.js) i przy każdej zmianie
-// legA/legB/depth w panelu (ui/properties.js) - PRZED recalculateLayout
-// (mod), bo ten czyta już gotowe baseZone. Zapisuje wprost LICZBOWE
-// minX/maxX/minY/maxY (bez boundLeft/boundRight) i forceOuterLeft/
-// Right=true na obu frontach - stykają się ze sobą w ostrym, prostym
-// narożniku (nie sąsiadują wzdłuż wspólnej krawędzi jak fronty w module
-// prostokątnym), więc obie krawędzie każdego z nich traktujemy jak
-// zewnętrzne krawędzie korpusu (pełny luz cLeft/cRight).
-export function getCornerFrontZones(mod) {
+// core/state.js: addCornerModule). Zwraca "strefę" ramienia A/B - prostokąt
+// w LOKALNYCH współrzędnych tego ramienia (0,0 = wewnętrzny narożnik boku i
+// wieńca dolnego), do którego dziś pasuje front rozpinający całe ramię, a od
+// teraz też korzeń drzewa BSP tego ramienia (core/zoneTree.js: buildZoneTree
+// z opts.cornerArm) - piony/poziomy/fronty zagnieżdżone w ramieniu mierzą się
+// względem tego samego prostokąta.
+export function getCornerArmRect(mod, arm) {
   const th = parseFloat(state.project.materials?.boardThickness) || 18;
   const legA = parseFloat(mod.dimensions.width) || 860;
   const legB = parseFloat(mod.dimensions.legB) || 860;
   const depth = parseFloat(mod.dimensions.depth) || 540;
   const height = parseFloat(mod.dimensions.height) || 720;
+  const leg = arm === 'A' ? legA : legB;
 
   // Reszta danego ramienia poza strefą wspólnego narożnika (depth), pomniejszona
   // dodatkowo o grubość frontu SĄSIEDNIEGO ramienia (cornerGap) - oba fronty mają
@@ -384,8 +404,7 @@ export function getCornerFrontZones(mod) {
   // dalsza (zewnętrzna, przy boku) krawędź frontu została DOKŁADNIE tam, gdzie
   // była wcześniej - zmienia się tylko krawędź bliżej narożnika.
   const cornerGap = th;
-  const widthA = Math.max(50, legA - depth - th - cornerGap);
-  const widthB = Math.max(50, legB - depth - th - cornerGap);
+  const width = Math.max(50, leg - depth - th - cornerGap);
 
   // Zgłoszona korekta "fronty wystają poza szafkę": recalculateLayout() dokłada
   // na krawędzi forceOuterRight standardowy zakład "nakładane" (th - cRight,
@@ -399,14 +418,53 @@ export function getCornerFrontZones(mod) {
   const cRight = parseFloat(fc.right ?? fc.sides ?? 1.5) || 0;
   const overlayReach = th - cRight;
 
-  const zoneFor = (w) => ({
-      minX: th + cornerGap, maxX: th + cornerGap + w - overlayReach, minY: th, maxY: height - th,
-      forceOuterLeft: true, forceOuterRight: true
+  return { minX: th + cornerGap, maxX: th + cornerGap + width - overlayReach, minY: th, maxY: height - th };
+}
+
+// Dogrywa brakujące pola frontom narożnika zapisanym przed wprowadzeniem
+// generycznego systemu wnęk (mod.type === 'corner_cabinet', ale front ma już
+// `cornerArm`, a jeszcze nie ma `boundLeft`/`frontCount`/`frontIndex`/`gap`) -
+// bez zmiany obecnej, już poprawnej geometrii (te same liczby w baseZone na
+// starcie), tylko podpina bound-tokeny corner-{arm}-*, żeby front zaczął
+// nadążać za zmianą legA/legB/depth/height tak samo jak reszta systemu (patrz
+// getBound niżej w recalculateLayout). Wołane raz przy najbliższym
+// recalculateLayout dla modułu narożnego.
+function migrateCornerElement(el, arm) {
+  el.frontCount = el.frontCount ?? 1;
+  el.frontIndex = el.frontIndex ?? 0;
+  el.gap = el.gap ?? 3;
+  el.baseZone.boundLeft = el.baseZone.boundLeft ?? `corner-${arm}-left`;
+  el.baseZone.boundRight = el.baseZone.boundRight ?? `corner-${arm}-right`;
+  el.baseZone.boundBottom = el.baseZone.boundBottom ?? `corner-${arm}-bottom`;
+  el.baseZone.boundTop = el.baseZone.boundTop ?? `corner-${arm}-top`;
+  el.baseZone.offsetBottom = el.baseZone.offsetBottom ?? 0;
+  el.baseZone.offsetTop = el.baseZone.offsetTop ?? 0;
+}
+
+// Gwarantuje, że każde ramię (A/B) szafki narożnej ma co najmniej jeden
+// front. Wołaj raz przy tworzeniu modułu (core/state.js: addCornerModule).
+// Jeśli ramię ma już jakiekolwiek elementy (front/poziom/pion) - nic nie
+// robi, bo od teraz fronty narożnika są bound-based (corner-{arm}-left/right/
+// bottom/top, patrz getCornerArmRect + getBound w recalculateLayout) i same
+// nadążają za zmianą wymiarów; nie trzeba już ręcznie "przeliczać zon" po
+// każdej zmianie legA/legB/depth/height jak w starym getCornerFrontZones.
+export function ensureCornerDefaults(mod) {
+  ['A', 'B'].forEach(arm => {
+    const hasAny = (mod.elements || []).some(el => el.cornerArm === arm);
+    if (hasAny) return;
+    const rect = getCornerArmRect(mod, arm);
+    const node = {
+      type: 'leaf',
+      rect,
+      fronts: [],
+      boundLeftId: `corner-${arm}-left`,
+      boundRightId: `corner-${arm}-right`,
+      boundBottomId: `corner-${arm}-bottom`,
+      boundTopId: `corner-${arm}-top`,
+    };
+    assignFront(mod, node, 'drzwi', {
+      cornerArm: arm,
+      openingSide: arm === 'A' ? 'left' : 'right',
+    });
   });
-
-  const frontA = (mod.elements || []).find(el => el.typ === 'front' && el.cornerArm === 'A');
-  const frontB = (mod.elements || []).find(el => el.typ === 'front' && el.cornerArm === 'B');
-
-  if (frontA) frontA.baseZone = zoneFor(widthA);
-  if (frontB) frontB.baseZone = zoneFor(widthB);
 }

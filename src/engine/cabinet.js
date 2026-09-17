@@ -296,46 +296,62 @@ export function calculateProjectHardware() {
 
     if (!mod.elements) return;
 
-    const fronts = mod.elements.filter(el => el.typ === 'front');
-    const obstacles = mod.elements.filter(el => el.typ === 'poziom' || el.subtype === 'szuflada-wewnetrzna');
-    fronts.sort((a, b) => a.y - b.y);
+    const allFronts = mod.elements.filter(el => el.typ === 'front');
+    const allObstacles = mod.elements.filter(el => el.typ === 'poziom' || el.subtype === 'szuflada-wewnetrzna');
 
-    fronts.forEach((front, index) => {
-      const isInternalDrawer = front.subtype === 'szuflada-wewnetrzna';
-      
-      if (front.subtype === 'szuflada' || isInternalDrawer) {
-        const isBottomInZone = front.frontIndex === 0;
-        const isTopInZone = index === fronts.length - 1;
+    // Szafka narożna ma dwa NIEZALEŻNE ramiona (cornerArm 'A'/'B') - "góra
+    // stosu" i przeszkody dla zawiasów muszą liczyć się OSOBNO w każdym z nich,
+    // inaczej front najwyżej w jednym ramieniu mógłby przypadkiem "ukraść"
+    // status najwyższego frontowi w drugim (albo dostać kolizję z półką z
+    // sąsiedniego ramienia). Dla zwykłego modułu cornerArm jest zawsze
+    // undefined -> jedna grupa '_', zachowanie identyczne jak wcześniej.
+    const frontsByArm = {};
+    allFronts.forEach(f => {
+      const key = f.cornerArm || '_';
+      (frontsByArm[key] = frontsByArm[key] || []).push(f);
+    });
 
-        let availableSpace = front.h;
-        if (isBottomInZone) availableSpace -= (board - (parseFloat(fc.bottom) || 0));
-        if (isTopInZone) availableSpace -= (board - (parseFloat(fc.top) || 0));
+    Object.entries(frontsByArm).forEach(([armKey, fronts]) => {
+      const obstacles = allObstacles.filter(o => (o.cornerArm || '_') === armKey);
+      fronts.sort((a, b) => a.y - b.y);
 
-        const innerWidth = front.baseZone ? (front.baseZone.maxX - front.baseZone.minX) : W - (board * 2);
-        const userForcedVariant = front.forceVariant || 'auto';
-        
-        const sysName = f.drawerSystem || 'merivobox';
-        const drawerComps = getDrawerComponents(sysName, innerWidth, topBottomDepth, availableSpace, userForcedVariant);
+      fronts.forEach((front, index) => {
+        const isInternalDrawer = front.subtype === 'szuflada-wewnetrzna';
 
-        if (drawerComps) {
-          const nl = drawerComps.nominalLength;
-          const variantType = drawerComps.back.variantType ? drawerComps.back.variantType.toUpperCase() : 'M';
-          
-          const hwKey = `Komplet szuflady (${sysName.toUpperCase()} - H:${variantType} L-${nl})`;
-          
-          if (!hardwareList[hwKey]) hardwareList[hwKey] = { name: hwKey, qty: 0, unit: 'kpl.' };
-          hardwareList[hwKey].qty += 1;
+        if (front.subtype === 'szuflada' || isInternalDrawer) {
+          const isBottomInZone = front.frontIndex === 0;
+          const isTopInZone = index === fronts.length - 1;
+
+          let availableSpace = front.h;
+          if (isBottomInZone) availableSpace -= (board - (parseFloat(fc.bottom) || 0));
+          if (isTopInZone) availableSpace -= (board - (parseFloat(fc.top) || 0));
+
+          const innerWidth = front.baseZone ? (front.baseZone.maxX - front.baseZone.minX) : W - (board * 2);
+          const userForcedVariant = front.forceVariant || 'auto';
+
+          const sysName = f.drawerSystem || 'merivobox';
+          const drawerComps = getDrawerComponents(sysName, innerWidth, topBottomDepth, availableSpace, userForcedVariant);
+
+          if (drawerComps) {
+            const nl = drawerComps.nominalLength;
+            const variantType = drawerComps.back.variantType ? drawerComps.back.variantType.toUpperCase() : 'M';
+
+            const hwKey = `Komplet szuflady (${sysName.toUpperCase()} - H:${variantType} L-${nl})`;
+
+            if (!hardwareList[hwKey]) hardwareList[hwKey] = { name: hwKey, qty: 0, unit: 'kpl.' };
+            hardwareList[hwKey].qty += 1;
+          }
         }
-      } 
-      else if (front.subtype.includes('drzwi')) {
-        const side = front.subtype === 'drzwi-lp' ? (front.id.includes('-L-') ? 'left' : 'right') : (front.openingSide || 'left');
-        const hinges = calculateHinges(front, board, obstacles, side);
-        const hingeCount = hinges.length;
+        else if (front.subtype.includes('drzwi')) {
+          const side = front.subtype === 'drzwi-lp' ? (front.id.includes('-L-') ? 'left' : 'right') : (front.openingSide || 'left');
+          const hinges = calculateHinges(front, board, obstacles, side);
+          const hingeCount = hinges.length;
 
-        const hingeKey = `Zawias meblowy + prowadnik krzyżakowy (puszka 35mm)`;
-        if (!hardwareList[hingeKey]) hardwareList[hingeKey] = { name: hingeKey, qty: 0, unit: 'kpl.' };
-        hardwareList[hingeKey].qty += hingeCount;
-      }
+          const hingeKey = `Zawias meblowy + prowadnik krzyżakowy (puszka 35mm)`;
+          if (!hardwareList[hingeKey]) hardwareList[hingeKey] = { name: hingeKey, qty: 0, unit: 'kpl.' };
+          hardwareList[hingeKey].qty += hingeCount;
+        }
+      });
     });
   });
 

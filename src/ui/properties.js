@@ -4,13 +4,14 @@ import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
 import { calculateParts } from "../engine/cabinet.js";
 import { calculateHinges } from "../core/hingeMath.js";
-import { getTraverseConfig, clampModuleToRoom, restModuleOnNeighbors, getCornerFrontZones } from "../core/layout.js";
+import { getTraverseConfig, clampModuleToRoom, restModuleOnNeighbors } from "../core/layout.js";
 import { drawerSystems, DRAWER_VARIANT_ORDER, DRAWER_VARIANT_LABELS } from "../core/drawerSystems.js";
 import { getDrawerVariant } from "../core/drawerMath.js";
 import { escapeHtml } from "../utils/dom.js";
 import { evalDimensionExpr } from "../utils/math.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
+import { openCornerConfigModal } from "./cornerConfigModal.js";
 
 function getSelectedMods() {
     if (state.selectedModules && state.selectedModules.size > 0) {
@@ -125,10 +126,16 @@ function renderSidePanelProperties(rightSidebar, panel) {
 // state.js: addCornerModule) - PIERWSZY nieprostokątny moduł w aplikacji,
 // więc dostaje osobny, krótki formularz zamiast pełnych zakładek Wymiary/
 // Front/Szuflady/Konstrukcja/Zawiasy (te zakładają jeden prostokątny
-// korpus - nie mają tu zastosowania). Każda zmiana wymiaru przelicza
-// getCornerFrontZones (core/layout.js) PRZED update3D(), bo od tego
-// zależą baseZone obu ruchomych frontów.
+// korpus - nie mają tu zastosowania). Wymiary ramion i konfiguracja
+// frontów/półek per ramię przeniosły się do osobnego okna
+// (ui/cornerConfigModal.js) - tu zostają tylko częste, szybkie edycje
+// (nazwa/pozycja/obrót), tak jak w prawym panelu zwykłego modułu.
 function renderCornerModuleProperties(rightSidebar, mod) {
+  const legA = parseFloat(mod.dimensions.width) || 0;
+  const legB = parseFloat(mod.dimensions.legB) || 0;
+  const depth = parseFloat(mod.dimensions.depth) || 0;
+  const height = parseFloat(mod.dimensions.height) || 0;
+
   rightSidebar.innerHTML = `
     <h2>Parametry szafki narożnej</h2>
     <div class="property-group" style="background: #f8fafc; padding: 10px; border-radius: 4px; border: 1px solid #cbd5e1; margin-bottom: 15px;">
@@ -136,11 +143,10 @@ function renderCornerModuleProperties(rightSidebar, mod) {
       <input type="text" id="input-corner-name" value="${escapeHtml(mod.name)}" style="font-weight: bold; color: #1e293b;" />
     </div>
 
-    <h3>Wymiary</h3>
-    <div class="property-group"><label>Ramię A (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-legA" value="${mod.dimensions.width}" /></div>
-    <div class="property-group"><label>Ramię B (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-legB" value="${mod.dimensions.legB}" /></div>
-    <div class="property-group"><label>Głębokość ramion (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-depth" value="${mod.dimensions.depth}" /></div>
-    <div class="property-group"><label>Wysokość korpusu (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-height" value="${mod.dimensions.height}" /></div>
+    <div class="property-group" style="font-size: 12px; color: #475569; margin-bottom: 10px;">
+      Ramię A: <b>${legA}</b> mm · Ramię B: <b>${legB}</b> mm · Głębokość: <b>${depth}</b> mm · Wysokość: <b>${height}</b> mm
+    </div>
+    <button type="button" id="btn-corner-configure" class="btn btn-block" style="background:#2563eb; color:#fff; margin-bottom: 15px;">⚙️ Konfiguruj szafkę narożną</button>
 
     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
 
@@ -168,34 +174,18 @@ function renderCornerModuleProperties(rightSidebar, mod) {
       const el = document.getElementById(id);
       if (el) el.addEventListener('input', e => { apply(e.target.value); update3D(); updateSidebar(); });
   };
-  const bindDim = (id, apply) => {
-      const el = document.getElementById(id);
-      // Pole tekstowe (nie number) - pozwala wpisać działanie, np. "400+18"
-      // (patrz utils/math.js: evalDimensionExpr). Podczas pisania wyrażenie
-      // bywa chwilowo niepoprawne (np. samo "400+") - wtedy NIE aktualizujemy
-      // wymiaru, żeby nie nadpisać go zerem w połowie wpisywania.
-      if (el) el.addEventListener('input', e => {
-          const val = evalDimensionExpr(e.target.value);
-          if (val === null || Number.isNaN(val)) return;
-          apply(val);
-          getCornerFrontZones(mod);
-          update3D();
-          updateSidebar();
-      });
-  };
   const bindPos = (id, apply) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('input', e => { apply(parseFloat(e.target.value) || 0); update3D(); updateSidebar(); });
   };
 
   bindText('input-corner-name', v => mod.name = v);
-  bindDim('input-corner-legA', v => mod.dimensions.width = v);
-  bindDim('input-corner-legB', v => mod.dimensions.legB = v);
-  bindDim('input-corner-depth', v => mod.dimensions.depth = v);
-  bindDim('input-corner-height', v => mod.dimensions.height = v);
   bindPos('input-corner-pos-x', v => mod.position.x = v);
   bindPos('input-corner-pos-z', v => mod.position.z = v);
   bindPos('input-corner-pos-y', v => mod.position.y = v);
+
+  const configBtn = document.getElementById('btn-corner-configure');
+  if (configBtn) configBtn.addEventListener('click', () => openCornerConfigModal(mod));
 
   rightSidebar.querySelectorAll('.btn-corner-rotate').forEach(btn => {
       btn.addEventListener('click', () => {

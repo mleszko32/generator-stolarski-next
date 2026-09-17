@@ -5,7 +5,6 @@ import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel } from "./properties.js";
 import { escapeHtml } from "../utils/dom.js";
 import { scheduleCheckpoint } from "../core/history.js";
-import { getCornerFrontZones } from "../core/layout.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
 
 function showLoading(msg) {
@@ -701,8 +700,10 @@ export function updateSidebar() {
   const btnAddCorner = document.getElementById('btn-add-corner');
   if (btnAddCorner) {
     btnAddCorner.addEventListener('click', () => {
-      const mod = addCornerModule();
-      getCornerFrontZones(mod); // liczy baseZone dwóch frontów z domyślnych wymiarów
+      // addCornerModule() sam woła ensureCornerDefaults (core/layout.js) -
+      // domyślne fronty obu ramion są bound-based i nadążają za zmianą
+      // wymiarów bez ręcznego przeliczania (patrz core/state.js).
+      addCornerModule();
       initPropertiesPanel();
       update3D();
       updateSidebar();

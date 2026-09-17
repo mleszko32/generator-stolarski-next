@@ -1063,10 +1063,11 @@ function addCornerPanel(shape, thickness, y, isActiveModule, userData, parentGro
 // Lokalny układ (przed position/rotation, jak w generycznej ścieżce
 // modułu wyżej): origin w wewnętrznym rogu (styk dwóch ścian), +X wzdłuż
 // ramienia A (dimensions.width=legA), +Z wzdłuż ramienia B
-// (dimensions.legB). Oba fronty (mod.elements, rozróżnione przez
-// front.cornerArm) przechodzą przez ZWYKŁY recalculateLayout/
+// (dimensions.legB). Fronty (mod.elements, rozróżnione przez
+// front.cornerArm - dziś dowolnie wiele na ramię, patrz core/zoneTree.js:
+// assignFront z opts.cornerArm) przechodzą przez ZWYKŁY recalculateLayout/
 // calculateHinges bez żadnych zmian (patrz core/layout.js:
-// getCornerFrontZones) - są fizycznie płaskimi prostokątami, tylko inaczej
+// getCornerArmRect) - są fizycznie płaskimi prostokątami, tylko inaczej
 // tu pozycjonowanymi niż w prostokątnym module.
 function renderCornerCabinet(mod, isActive, th) {
   const legA = parseFloat(mod.dimensions.width) || 860;
@@ -1136,7 +1137,10 @@ function renderCornerCabinet(mod, isActive, th) {
   addBox(legA - th - battenW, H, backThick, battenW, posY, 0, 'hdf', isActive, udBack, innerGroup);
   addBox(backThick, H, legB - th - th, 0, posY, th, 'hdf', isActive, udBack, innerGroup);
 
-  // --- Fronty: zwykłe, płaskie drzwi, po jednym na ramię ---
+  // --- Fronty: zwykłe, płaskie drzwi/szuflady, dowolnie wiele na ramię ---
+  // (od wprowadzenia edytora wnętrza per ramię, ui/cornerConfigModal.js,
+  // ramię może mieć więcej niż jeden front - core/zoneTree.js: assignFront
+  // z opts.cornerArm).
   (mod.elements || []).forEach(front => {
       if (front.typ !== 'front') return;
       const fw = parseFloat(front.w) || 0;
@@ -1153,6 +1157,29 @@ function renderCornerCabinet(mod, isActive, th) {
           // Ramię B biegnie wzdłuż +Z, front na jego czole (X=depth):
           // lokalny front.x (0..widthB) mapuje się na Z = depth + front.x.
           addBox(th, fh, fw, depth, posY + fy, depth + fx, 'front', isActive, udFront, innerGroup);
+      }
+  });
+
+  // --- Półki/przegrody wewnątrz ramion (poziom/pion z cornerArm) ---
+  // Ten sam lokalny układ 2D (x wzdłuż ramienia, y = wysokość) co fronty
+  // wyżej, tylko rozciągnięte na całą głębokość ramienia (jak shelfDepth w
+  // generycznej ścieżce renderowania niżej w tym pliku), a nie tylko o
+  // grubość th jak front. Głębokość liczona od płyty pleców (backThick) do
+  // tuż przed czołem frontu (-2mm), żeby nie kolidować z drzwiami.
+  const armInnerDepth = Math.max(10, depth - 2 - backThick);
+  (mod.elements || []).forEach(el => {
+      if (el.typ !== 'poziom' && el.typ !== 'pion') return;
+      if (el.cornerArm !== 'A' && el.cornerArm !== 'B') return;
+      const ex = parseFloat(el.x) || 0;
+      const ey = parseFloat(el.y) || 0;
+      const ew = parseFloat(el.w) || 0;
+      const eh = parseFloat(el.h) || 0;
+      const udShelf = { moduleId: mod.id, type: 'shelf', elementId: el.id };
+
+      if (el.cornerArm === 'A') {
+          addBox(ew, eh, armInnerDepth, depth + ex, posY + ey, backThick, 'shelf', isActive, udShelf, innerGroup);
+      } else {
+          addBox(armInnerDepth, eh, ew, backThick, posY + ey, depth + ex, 'shelf', isActive, udShelf, innerGroup);
       }
   });
 

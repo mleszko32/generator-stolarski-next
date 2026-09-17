@@ -22,6 +22,7 @@
 // więc nadal pasuje do rect węzła 'split', który go teraz reprezentuje.
 import { state } from "./state.js";
 import { autoDistributeShelves } from "./shelfMath.js";
+import { getCornerArmRect } from "./layout.js";
 
 const EPS = 2; // mm tolerancji przy porównaniach geometrycznych (zaokrąglenia)
 
@@ -52,11 +53,12 @@ export function getCabinetInnerRect(mod) {
   return { minX: th, maxX: W - th, minY: th, maxY: topY };
 }
 
-function frontsMatchingZone(mod, rect) {
+function frontsMatchingZone(mod, rect, cornerArm) {
   return (mod.elements || []).filter(
     (el) =>
       el.typ === "front" &&
       el.baseZone &&
+      (cornerArm ? el.cornerArm === cornerArm : !el.cornerArm) &&
       Math.abs(parseFloat(el.baseZone.minX) - rect.minX) < EPS &&
       Math.abs(parseFloat(el.baseZone.maxX) - rect.maxX) < EPS &&
       Math.abs(parseFloat(el.baseZone.minY) - rect.minY) < EPS &&
@@ -72,13 +74,18 @@ function frontsMatchingZone(mod, rect) {
 //     komentarz na górze pliku - pozwala jednemu frontowi obejmować całe
 //     poddrzewo z zagnieżdżonymi półkami/przegrodami).
 // Węzeł 'leaf': { type:'leaf', rect, fronts: [...], boundLeftId, boundRightId, boundBottomId, boundTopId }
-export function buildZoneTree(mod) {
-  const piony = (mod.elements || []).filter((el) => el.typ === "pion");
-  const poziomy = (mod.elements || []).filter((el) => el.typ === "poziom");
-  const root = getCabinetInnerRect(mod);
+export function buildZoneTree(mod, opts = {}) {
+  const { cornerArm } = opts;
+  const armFilter = (el) => (cornerArm ? el.cornerArm === cornerArm : !el.cornerArm);
+  const piony = (mod.elements || []).filter((el) => el.typ === "pion" && armFilter(el));
+  const poziomy = (mod.elements || []).filter((el) => el.typ === "poziom" && armFilter(el));
+  const root = cornerArm ? getCornerArmRect(mod, cornerArm) : getCabinetInnerRect(mod);
+  const rootBoundIds = cornerArm
+    ? [`corner-${cornerArm}-left`, `corner-${cornerArm}-right`, `corner-${cornerArm}-bottom`, `corner-${cornerArm}-top`]
+    : ["cab-left", "cab-right", "cab-bottom", "cab-top"];
 
   function partition(rect, boundLeftId, boundRightId, boundBottomId, boundTopId) {
-    const fronts = frontsMatchingZone(mod, rect);
+    const fronts = frontsMatchingZone(mod, rect, cornerArm);
 
     const pionCandidates = piony
       .filter(
@@ -117,7 +124,7 @@ export function buildZoneTree(mod) {
     return { type: "leaf", rect, boundLeftId, boundRightId, boundBottomId, boundTopId, fronts };
   }
 
-  return partition(root, "cab-left", "cab-right", "cab-bottom", "cab-top");
+  return partition(root, ...rootBoundIds);
 }
 
 function randomSuffix() {
@@ -153,7 +160,7 @@ function collectFrontIds(node, into) {
 // się nie zmienia, więc po podziale nadal pasuje do rect nowego węzła 'split'
 // obejmującego obie powstałe pod-wnęki (patrz partition() wyżej), czyli
 // wizualnie nadal obejmuje całość, a nowa półka jest już za nim.
-export function splitZoneHorizontal(mod, node) {
+export function splitZoneHorizontal(mod, node, cornerArm) {
   if (node.type !== "leaf") return null;
   const th = getBoardThickness();
   const { minX, maxX, minY, maxY } = node.rect;
@@ -166,6 +173,7 @@ export function splitZoneHorizontal(mod, node) {
     w: maxX - minX,
     h: th,
     isStructural: false,
+    ...(cornerArm ? { cornerArm } : {}),
   };
   mod.elements.push(shelf);
   return shelf;
@@ -176,7 +184,7 @@ export function splitZoneHorizontal(mod, node) {
 // domyślnie od razu isStructural: true, więc od razu dostaje mocowanie na
 // kołek+wkręt do wieńca/półki nad i pod nią (patrz toggleStructural niżej i
 // nawierty w rysunku technicznym, engine/cabinet.js: getPionMountHoles).
-export function splitZoneVertical(mod, node) {
+export function splitZoneVertical(mod, node, cornerArm) {
   if (node.type !== "leaf") return null;
   const th = getBoardThickness();
   const { minX, maxX, minY, maxY } = node.rect;
@@ -189,6 +197,7 @@ export function splitZoneVertical(mod, node) {
     w: th,
     h: maxY - minY,
     isStructural: true,
+    ...(cornerArm ? { cornerArm } : {}),
   };
   mod.elements.push(divider);
   return divider;
@@ -197,7 +206,7 @@ export function splitZoneVertical(mod, node) {
 // Rozmieszcza N półek równomiernie w danej wnęce (odstępy liczone przez
 // core/shelfMath.js) - front przypisany do tej wnęki (jeśli był) przetrwa,
 // z tych samych powodów co przy splitZoneHorizontal.
-export function addEvenShelves(mod, node, count) {
+export function addEvenShelves(mod, node, count, cornerArm) {
   if (node.type !== "leaf" || count < 1) return [];
   const th = getBoardThickness();
   const { minX, maxX, minY, maxY } = node.rect;
@@ -211,6 +220,7 @@ export function addEvenShelves(mod, node, count) {
     w: maxX - minX,
     h: th,
     isStructural: false,
+    ...(cornerArm ? { cornerArm } : {}),
   }));
   shelves.forEach((s) => mod.elements.push(s));
   return shelves;
@@ -307,11 +317,25 @@ export function toggleStructural(node) {
 // na górze pliku: front na węźle 'split' obejmuje wizualnie całe poddrzewo,
 // z zagnieżdżonymi półkami/przegrodami w środku). subtype: 'drzwi' |
 // 'drzwi-lp' | 'szuflada' | 'szuflada-wewnetrzna'.
-// opts: { gap, openingSide, distribution, offsetBottom, offsetTop }
+// opts: { gap, openingSide, distribution, offsetBottom, offsetTop, cornerArm }
 export function assignFront(mod, node, subtype, opts = {}) {
   clearNodeFronts(mod, node);
 
   const { minX, maxX, minY, maxY } = node.rect;
+  const cornerArm = opts.cornerArm;
+  // Lokalne współrzędne ramienia narożnika nigdy nie sięgają blisko
+  // mod.dimensions.width/legB (patrz core/layout.js: getCornerArmRect - to
+  // osobna, znacznie mniejsza skala), więc domyślna heurystyka "zewnętrznej"
+  // krawędzi w recalculateLayout (core/layout.js: isLeftOuter/isRightOuter,
+  // minX<=th+1 / maxX>=width-th-1) nigdy by tam nie zadziałała - liczymy
+  // wprost, porównując bound-id węzła z tokenem prawdziwej zewnętrznej
+  // krawędzi TEGO ramienia (corner-{arm}-left/right). Działa na dowolnej
+  // głębokości zagnieżdżenia (nie tylko dla frontu na całym ramieniu), bo
+  // boundLeftId/boundRightId węzła propagują się przez podziały bez zmiany,
+  // dopóki nie miniemy dzielnika tej samej osi (patrz partition() w
+  // buildZoneTree wyżej).
+  const forceOuterLeft = cornerArm ? node.boundLeftId === `corner-${cornerArm}-left` : undefined;
+  const forceOuterRight = cornerArm ? node.boundRightId === `corner-${cornerArm}-right` : undefined;
   const baseZone = {
     minX,
     maxX,
@@ -323,8 +347,11 @@ export function assignFront(mod, node, subtype, opts = {}) {
     boundTop: node.boundTopId,
     offsetBottom: 0,
     offsetTop: 0,
+    ...(forceOuterLeft !== undefined ? { forceOuterLeft } : {}),
+    ...(forceOuterRight !== undefined ? { forceOuterRight } : {}),
   };
   const gap = opts.gap ?? (parseFloat(state.project.front?.gap) || 3);
+  const armTag = cornerArm ? { cornerArm } : {};
   const ts = Date.now();
 
   if (subtype === "drzwi") {
@@ -337,10 +364,11 @@ export function assignFront(mod, node, subtype, opts = {}) {
       frontCount: 1,
       frontIndex: 0,
       gap,
+      ...armTag,
     });
   } else if (subtype === "drzwi-lp") {
-    mod.elements.push({ id: "front-L-" + ts + "-" + randomSuffix(), typ: "front", subtype: "drzwi-lp", baseZone, frontCount: 2, frontIndex: 0, gap });
-    mod.elements.push({ id: "front-P-" + ts + "-" + randomSuffix(), typ: "front", subtype: "drzwi-lp", baseZone, frontCount: 2, frontIndex: 1, gap });
+    mod.elements.push({ id: "front-L-" + ts + "-" + randomSuffix(), typ: "front", subtype: "drzwi-lp", baseZone, frontCount: 2, frontIndex: 0, gap, ...armTag });
+    mod.elements.push({ id: "front-P-" + ts + "-" + randomSuffix(), typ: "front", subtype: "drzwi-lp", baseZone, frontCount: 2, frontIndex: 1, gap, ...armTag });
   } else if (subtype === "szuflada" || subtype === "szuflada-wewnetrzna") {
     const distStr = String(opts.distribution ?? "1").trim() || "1";
     let count;
@@ -364,6 +392,7 @@ export function assignFront(mod, node, subtype, opts = {}) {
         intGapY: isInner ? 5 : 0,
         forceVariant: "auto",
         forceNL: null,
+        ...armTag,
       });
     }
   }
