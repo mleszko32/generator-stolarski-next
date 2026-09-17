@@ -960,19 +960,25 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB) {
   // wycięcia dalej - i własny kolor (jak na szkicu): głębokość A/B na
   // czerwono, wycięcie A na pomarańczowo, wycięcie B na zielono, Ramię A/B
   // (wynikowe) w neutralnym granacie.
-  const laneGap = margin * 0.15; // odległość pierwszego pasa od obrysu
-  const laneStep = margin * 0.32; // odległość między pasami (gdy są 2 na tym samym boku)
+  const laneGap = margin * 0.16; // odległość linii pierwszego pasa od obrysu
+  const laneStep = margin * 0.42; // odległość między pasami (gdy są 2 na tym samym boku)
+  // Odstęp TEKSTU od jego własnej linii - musi być wyraźnie większy niż
+  // sama wysokość czcionki, bo polskie litery z ogonkami (ę, ą) mają
+  // description sięgający niżej niż zwykłe descendery, a przy zbyt małym
+  // odstępie linia zdawała się "przekreślać" tekst (zgłoszony bug, drugi
+  // raz - poprzedni odstęp 0.35-0.9×fsSmall wciąż był za mały).
+  const textGap = fsSmall * 1.3;
 
   const dimH = (x1, x2, y, label, color, textSide) => {
     let s = `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${color}" stroke-width="${strokeThick}" />`;
-    const ty = y + (textSide === 'below' ? fsSmall * 0.9 : -fsSmall * 0.35);
+    const ty = y + (textSide === 'below' ? textGap : -textGap);
     s += `<text x="${(x1 + x2) / 2}" y="${ty}" font-size="${fsSmall}" fill="${color}" font-weight="bold" text-anchor="middle">${label}</text>`;
     return s;
   };
   const dimV = (y1, y2, x, label, color, textSide) => {
     let s = `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="${color}" stroke-width="${strokeThick}" />`;
     const ty = (y1 + y2) / 2;
-    const tx = x + (textSide === 'left' ? -fsSmall * 0.35 : fsSmall * 0.35);
+    const tx = x + (textSide === 'left' ? -textGap : textGap);
     s += `<text x="${tx}" y="${ty}" font-size="${fsSmall}" fill="${color}" font-weight="bold" text-anchor="middle" transform="rotate(-90 ${tx} ${ty})">${label}</text>`;
     return s;
   };
