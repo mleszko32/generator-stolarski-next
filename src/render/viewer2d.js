@@ -934,13 +934,17 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB) {
   svg += `<rect x="${ox}" y="${oy}" width="${legA}" height="${legB}" fill="none" stroke="#94a3b8" stroke-width="${strokeThick}" stroke-dasharray="${strokeThick * 4},${strokeThick * 3}" />`;
 
   // Róg do odcięcia - zakreskowany, czerwona ramka, żeby jednoznacznie
-  // pokazać co znika.
+  // pokazać co znika. Sam wymiar wycięcia (Wycięcie A/B) rysuje się NA
+  // ZEWNĄTRZ konturu niżej (dół/prawo, jako ciąg dalszy Głęb. B/A) - tu w
+  // środku zostaje tylko krótka etykieta "ODCIĄĆ", i to wyłącznie gdy się
+  // realnie mieści (zgłoszony bug: przy wąskim wycięciu dłuższy tekst z
+  // wymiarami "WxH mm" wychodził poza czerwony prostokąt i nakładał się na
+  // czarny obrys bryły, wyglądając jak przekreślenie).
   if (cutW > 0 && cutH > 0) {
     svg += `<rect x="${ox + depthB}" y="${oy + depthA}" width="${cutW}" height="${cutH}" fill="#fee2e2" stroke="#dc2626" stroke-width="${strokeThick}" stroke-dasharray="${strokeThick * 2.5},${strokeThick * 2}" />`;
-    const cutCx = ox + depthB + cutW / 2;
-    const cutCy = oy + depthA + cutH / 2;
-    svg += `<text x="${cutCx}" y="${cutCy - fs * 0.5}" font-size="${fs}" fill="#b91c1c" font-weight="bold" text-anchor="middle">ODCIĄĆ</text>`;
-    svg += `<text x="${cutCx}" y="${cutCy + fs * 0.9}" font-size="${fsSmall}" fill="#b91c1c" font-weight="bold" text-anchor="middle">${Math.round(cutW)}×${Math.round(cutH)} mm</text>`;
+    if (cutW > fs * 3 && cutH > fs * 1.5) {
+      svg += `<text x="${ox + depthB + cutW / 2}" y="${oy + depthA + cutH / 2}" font-size="${fs}" fill="#b91c1c" font-weight="bold" text-anchor="middle" dominant-baseline="middle">ODCIĄĆ</text>`;
+    }
   }
 
   // Realny obrys L po docięciu - wypełniony, na wierzchu.
@@ -974,14 +978,28 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB) {
     return s;
   };
 
-  // Góra: legA
+  // Góra: legA (cała szerokość)
   svg += dimH(ox, ox + legA, oy - dimGap, `Ramię A: ${Math.round(legA)} mm`, oy - dimGap - tickLen, oy);
-  // Lewo: legB
+  // Lewo: legB (cała wysokość)
   svg += dimV(oy, oy + legB, ox - dimGap, `Ramię B: ${Math.round(legB)} mm`, ox - dimGap - tickLen, ox, 'left');
-  // Prawo: depthA (tylko górny odcinek prawej krawędzi, 0..depthA)
-  svg += dimV(oy, oy + depthA, ox + legA + dimGap, `Głęb. A: ${Math.round(depthA)} mm`, ox + legA, ox + legA + dimGap + tickLen, 'right');
-  // Dół: depthB (tylko lewy odcinek dolnej krawędzi, 0..depthB)
-  svg += dimH(ox, ox + depthB, oy + legB + dimGap, `Głęb. B: ${Math.round(depthB)} mm`, oy + legB, oy + legB + dimGap + tickLen, 'below');
+
+  // Prawo: depthA + wycięcie B, JEDNA linia wymiarowa podzielona na dwa
+  // ŁAŃCUCHOWO sąsiadujące odcinki (wspólna kreska w punkcie depthA) -
+  // razem sumują się do Ramię B po lewej, dokładnie jak przy realnym
+  // wymiarowaniu docinanej formatki.
+  const rightX = ox + legA + dimGap;
+  svg += dimV(oy, oy + depthA, rightX, `Głęb. A: ${Math.round(depthA)} mm`, ox + legA, rightX + tickLen, 'right');
+  if (cutH > 0) {
+    svg += dimV(oy + depthA, oy + legB, rightX, `Wycięcie B: ${Math.round(cutH)} mm`, ox + legA, rightX + tickLen, 'right');
+  }
+
+  // Dół: depthB + wycięcie A, tak samo łańcuchowo (wspólna kreska w punkcie
+  // depthB), razem sumują się do Ramię A na górze.
+  const bottomY = oy + legB + dimGap;
+  svg += dimH(ox, ox + depthB, bottomY, `Głęb. B: ${Math.round(depthB)} mm`, oy + legB, bottomY + tickLen, 'below');
+  if (cutW > 0) {
+    svg += dimH(ox + depthB, ox + legA, bottomY, `Wycięcie A: ${Math.round(cutW)} mm`, oy + legB, bottomY + tickLen, 'below');
+  }
 
   svg += `</svg>`;
   return svg;
