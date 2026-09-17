@@ -53,6 +53,16 @@ export function openCornerConfigModal(mod) {
     </div>
 
     <div style="margin-bottom:14px;">
+      <h3 style="font-size:13px; color:#1e3a8a; margin:0 0 4px 0;">Plecy</h3>
+      <div style="font-size:11px; color:#64748b; margin-bottom:6px;">Te same zasady co w zwykłej szafce - dotychczas narożnik zawsze liczył jak "nakładane", ignorując ten wybór.</div>
+      <div class="property-group" style="max-width:300px;"><label>Typ pleców:</label><select id="input-corner-back-type"><option value="nakladane" ${(!mod.backPanel || mod.backPanel.type !== 'nut') ? 'selected' : ''}>Nakładane</option><option value="nut" ${(mod.backPanel && mod.backPanel.type === 'nut') ? 'selected' : ''}>W nucie</option></select></div>
+      <div id="corner-nut-options" style="display:${(mod.backPanel && mod.backPanel.type === 'nut') ? 'block' : 'none'}; background:#f8fafc; padding:10px; border:1px dashed #cbd5e1; border-radius:4px; margin-top:6px; max-width:300px;">
+        <div class="property-group" style="margin-bottom:8px;"><label style="font-size:11px; font-weight:bold;">Konstrukcja nutu:</label><select id="input-corner-nut-build"><option value="all" ${(!mod.backPanel?.nutBuild || mod.backPanel.nutBuild === 'all') ? 'selected' : ''}>Boki i wieńce nutowane</option><option value="sides" ${mod.backPanel?.nutBuild === 'sides' ? 'selected' : ''}>Boki nutowane, wieńce skracane</option><option value="top_bottom" ${mod.backPanel?.nutBuild === 'top_bottom' ? 'selected' : ''}>Wieńce nutowane, boki skracane</option></select></div>
+        <div class="property-group" style="margin-bottom:0;"><label style="font-size:11px;">Głębokość nutu (mm):</label><input type="number" id="input-corner-nut-groove" value="${mod.backPanel?.grooveDepth ?? 6}" /></div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:14px;">
       <h3 style="font-size:13px; color:#1e3a8a; margin:0 0 4px 0;">Półki narożne (kształt L, na całą głębokość obu ramion)</h3>
       <div style="font-size:11px; color:#64748b; margin-bottom:6px;">W realnej szafce narożnej półka jest jedna, w kształcie L (jak wieniec górny/dolny) - nie dwie osobne, proste półki. Dlatego dodaje się je tutaj, wspólnie dla obu ramion, a nie osobno w każdym z nich.</div>
       <div id="corner-shelves-list"></div>
@@ -216,6 +226,36 @@ export function openCornerConfigModal(mod) {
     armAEditor.render();
     armBEditor.render();
     renderBlankPreview();
+  });
+
+  // Plecy: nakładane/nut - te same pola co w zwykłej szafce (ui/properties.js,
+  // zakładka Konstrukcja), tylko bez "Odsunięcia nutu" (backP.offset) - to
+  // pole steruje wyłącznie pozycją Z płyty w podglądzie 3D zwykłego modułu
+  // (render/viewer3d.js), a szafka narożna na razie zawsze rysuje plecy
+  // płasko/nakładane w 3D niezależnie od tego wyboru (dotyczy tylko
+  // wymiarów formatki na liście, patrz engine/cabinet.js: getCornerCorpusParts).
+  if (!mod.backPanel) mod.backPanel = { type: 'nakladane', grooveDepth: 6, clearance: 2, nutBuild: 'all' };
+  const backTypeEl = modal.querySelector('#input-corner-back-type');
+  const nutOptionsEl = modal.querySelector('#corner-nut-options');
+  if (backTypeEl) backTypeEl.addEventListener('change', e => {
+    mod.backPanel.type = e.target.value;
+    if (nutOptionsEl) nutOptionsEl.style.display = e.target.value === 'nut' ? 'block' : 'none';
+    update3D();
+    updateSidebar();
+  });
+  const nutBuildEl = modal.querySelector('#input-corner-nut-build');
+  if (nutBuildEl) nutBuildEl.addEventListener('change', e => {
+    mod.backPanel.nutBuild = e.target.value;
+    update3D();
+    updateSidebar();
+  });
+  const nutGrooveEl = modal.querySelector('#input-corner-nut-groove');
+  if (nutGrooveEl) nutGrooveEl.addEventListener('input', e => {
+    const val = parseFloat(e.target.value);
+    if (!Number.isFinite(val)) return;
+    mod.backPanel.grooveDepth = val;
+    update3D();
+    updateSidebar();
   });
 
   const close = () => {

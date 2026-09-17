@@ -1161,6 +1161,19 @@ function renderCornerCabinet(mod, isActive, th) {
   // (od wprowadzenia edytora wnętrza per ramię, ui/cornerConfigModal.js,
   // ramię może mieć więcej niż jeden front - core/zoneTree.js: assignFront
   // z opts.cornerArm).
+  //
+  // Te same zasady co front zwykłego modułu (generyczna ścieżka niżej w tym
+  // pliku, zmienna zForFront) - zgłoszona korekta, wcześniej front narożnika
+  // siedział sztywno w linii z licem korpusu (Z=depthA/X=depthB), bez
+  // zapasu montażowego i bez rozróżnienia nakładane/wpuszczane:
+  //   nakładane (domyślne) - front 2mm PRZED licem korpusu (miejsce na
+  //     domykanie się drzwi na zawiasach bez ocierania o bok).
+  //   wpuszczane - front cofnięty o własną grubość (th), w linii z bokami.
+  const frontCfg = { ...(state.project.front || {}), ...(mod.front || {}) };
+  const isInsetFront = frontCfg.type === 'wpuszczane';
+  const frontZA = isInsetFront ? depthA - th : depthA + 2; // czoło ramienia A (Z)
+  const frontZB = isInsetFront ? depthB - th : depthB + 2; // czoło ramienia B (X)
+
   (mod.elements || []).forEach(front => {
       if (front.typ !== 'front') return;
       const fw = parseFloat(front.w) || 0;
@@ -1170,15 +1183,15 @@ function renderCornerCabinet(mod, isActive, th) {
       const udFront = { moduleId: mod.id, type: 'front', frontId: front.id };
 
       if (front.cornerArm === 'A') {
-          // Ramię A biegnie wzdłuż +X, front na jego czole (Z=depthA): lokalny
-          // front.x (0..widthA) mapuje się na X = depthB + front.x (bieg
-          // ramienia A zaczyna się dopiero za narożnym prostokątem, którego
-          // szerokość w X wyznacza głębokość DRUGIEGO ramienia - depthB).
-          addBox(fw, fh, th, depthB + fx, posY + fy, depthA, 'front', isActive, udFront, innerGroup);
+          // Ramię A biegnie wzdłuż +X, front na jego czole: lokalny front.x
+          // (0..widthA) mapuje się na X = depthB + front.x (bieg ramienia A
+          // zaczyna się dopiero za narożnym prostokątem, którego szerokość w
+          // X wyznacza głębokość DRUGIEGO ramienia - depthB).
+          addBox(fw, fh, th, depthB + fx, posY + fy, frontZA, 'front', isActive, udFront, innerGroup);
       } else {
-          // Ramię B biegnie wzdłuż +Z, front na jego czole (X=depthB):
-          // lokalny front.x (0..widthB) mapuje się na Z = depthA + front.x.
-          addBox(th, fh, fw, depthB, posY + fy, depthA + fx, 'front', isActive, udFront, innerGroup);
+          // Ramię B biegnie wzdłuż +Z, front na jego czole: lokalny front.x
+          // (0..widthB) mapuje się na Z = depthA + front.x.
+          addBox(th, fh, fw, frontZB, posY + fy, depthA + fx, 'front', isActive, udFront, innerGroup);
       }
   });
 

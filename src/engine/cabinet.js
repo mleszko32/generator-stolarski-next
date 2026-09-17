@@ -643,11 +643,40 @@ function getCornerCorpusParts(mod, config) {
   // płyty plecy.
   parts.push({ name: "Listwa narożna pionowa", length: parseFloat(height.toFixed(1)), width: battenW, qty: 1, category: "Korpus" });
 
-  // Plecy "nakładane" - szerokość pomniejszona o bok (th) i listwę narożną
-  // (battenW dla ramienia A, th dla ramienia B), zgodnie z render/viewer3d.js:
-  // renderCornerCabinet (plecy sięgają od listwy do boku).
-  parts.push({ name: `Plecy narożne ${Math.round(height)}x${Math.round(legA)} (Ramię A)`, length: parseFloat((height - 4).toFixed(1)), width: parseFloat((legA - th - battenW - 4).toFixed(1)), qty: 1, category: "Plecy" });
-  parts.push({ name: `Plecy narożne ${Math.round(height)}x${Math.round(legB)} (Ramię B)`, length: parseFloat((height - 4).toFixed(1)), width: parseFloat((legB - 2 * th - 4).toFixed(1)), qty: 1, category: "Plecy" });
+  // Plecy - te same zasady nakładane/nut co getBackPanelParts() zwykłego
+  // modułu niżej (zgłoszona korekta, wcześniej narożnik ZAWSZE liczył jak
+  // nakładane, ignorując mod.backPanel.type/grooveDepth/clearance/nutBuild).
+  // Różnica: KAŻDA płyta plecy narożnika ma tylko JEDNĄ prawdziwą krawędź
+  // boku (bok narożny), druga krawędź to zawsze płaska listwa narożna (nie
+  // osobny bok) - listwa nie ma z czym się "wpuścić" w rowek, więc zostaje
+  // płaska (nakładana) niezależnie od backPanel.type. Rowek (grooveDepth) i
+  // pojedynczy luz (clearance, nie clearance*2 jak przy dwóch bokach w
+  // zwykłym module) dotyczą więc tylko strony boku, nie strony listwy.
+  const backP = mod.backPanel || { type: 'nakladane', grooveDepth: 6, clearance: 2, nutBuild: 'all' };
+  const isNutBack = backP.type === 'nut';
+  const nutBuild = backP.nutBuild || 'all';
+  const grooveDepth = parseFloat(backP.grooveDepth) || 6;
+  const clearance = backP.clearance !== undefined ? parseFloat(backP.clearance) : 2;
+  const nutSides = isNutBack && (nutBuild === 'all' || nutBuild === 'sides');
+  const nutTopBottom = isNutBack && (nutBuild === 'all' || nutBuild === 'top_bottom');
+
+  // Wysokość (krawędzie góra/dół = prawdziwy wieniec z obu stron, tak samo
+  // jak w zwykłym module) - identyczna dla obu ramion.
+  const plecyLength = nutTopBottom
+    ? height - (th * 2) + (grooveDepth * 2) - (clearance * 2)
+    : height - 4;
+
+  // Szerokość (jedna krawędź = bok narożny -> rowek gdy nut, druga krawędź
+  // = listwa narożna -> zawsze płasko, luz -2mm jak dotąd).
+  const plecyWidthA = nutSides
+    ? legA - th - battenW - 2 + grooveDepth - clearance
+    : legA - th - battenW - 4;
+  const plecyWidthB = nutSides
+    ? legB - (th * 2) - 2 + grooveDepth - clearance
+    : legB - (th * 2) - 4;
+
+  parts.push({ name: `Plecy narożne ${Math.round(height)}x${Math.round(legA)} (Ramię A)`, length: parseFloat(plecyLength.toFixed(1)), width: parseFloat(plecyWidthA.toFixed(1)), qty: 1, category: "Plecy" });
+  parts.push({ name: `Plecy narożne ${Math.round(height)}x${Math.round(legB)} (Ramię B)`, length: parseFloat(plecyLength.toFixed(1)), width: parseFloat(plecyWidthB.toFixed(1)), qty: 1, category: "Plecy" });
 
   // Półki narożne (typ:'poziom-narozny', ui/cornerConfigModal.js) - w realnej
   // stolarce półka w szafce narożnej jest w KSZTAŁCIE L (jak wieniec wyżej),
