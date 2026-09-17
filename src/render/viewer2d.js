@@ -908,13 +908,15 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB) {
   const fsSmall = Math.round(unit * 0.062);
   const strokeThick = Math.max(2, Math.round(unit * 0.01));
   const strokeThin = Math.max(1, Math.round(unit * 0.005));
-  // Wszystkie 4 wymiary (legA/legB/depthA/depthB) leżą TERAZ na zewnątrz
-  // konturu - po jednym na każdym z 4 boków (góra/lewo/prawo/dół), żadna
-  // linia/etykieta nie przecina wypełnienia ani obrysu (zgłoszony bug:
-  // wcześniej głębokości rysowały się W ŚRODKU kształtu, nakładając się na
-  // jego własne krawędzie) - stąd margines musi pomieścić tekst na WSZYSTKICH
-  // czterech bokach, nie tylko góra/lewo jak wcześniej.
-  const margin = Math.round(unit * 0.3);
+  // Wszystkie wymiary (Ramię A/B, Głęb. A/B, Wycięcie A/B) leżą NA ZEWNĄTRZ
+  // konturu, żadna linia/etykieta nie przecina wypełnienia ani obrysu
+  // (zgłoszony bug: wcześniej głębokości rysowały się W ŚRODKU kształtu).
+  // Prawy i dolny bok mieszczą PO DWA wymiary naraz (głębokość + wycięcie) w
+  // osobnych, odizolowanych pasach - margines musi być na tyle duży, żeby
+  // oba pasy plus ich tekst zmieściły się bez zachodzenia na siebie
+  // (zgłoszony bug: przy zbyt ciasnym marginesie linie/kreski pomocnicze
+  // zasłaniały tekst sąsiedniego wymiaru).
+  const margin = Math.round(unit * 0.55);
 
   const vbW = legA + margin * 2;
   const vbH = legB + margin * 2;
@@ -950,55 +952,53 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB) {
   // Realny obrys L po docięciu - wypełniony, na wierzchu.
   svg += `<polygon points="${pts}" fill="#fef3c7" stroke="#334155" stroke-width="${strokeThick * 1.3}" />`;
 
-  // Wymiary - każdy na SWOIM boku marginesu, dokładnie nad/pod/obok
-  // odpowiadającego mu fragmentu obrysu (nie przez środek):
-  //   legA  - góra, cała szerokość
-  //   legB  - lewo, obrócony o 90°, cała wysokość
-  //   depthA - prawo, obrócony o 90°, TYLKO odcinek 0..depthA (to faktyczny
-  //            zasięg prawej krawędzi obrysu - dalej w dół obrysu tam nie ma)
-  //   depthB - dół, TYLKO odcinek 0..depthB (faktyczny zasięg dolnej krawędzi)
-  const dimGap = margin * 0.18; // odstęp linii wymiarowej od obrysu
-  const tickLen = margin * 0.12; // długość kresek na końcach linii wymiarowej
+  // Wymiary - proste kolorowe linie TUŻ PRZY odpowiadającym im fragmencie
+  // obrysu (nie przez środek, ale też bez kresek pomocniczych/łańcuchowania -
+  // zgłoszony bug: przy dwóch wymiarach na tym samym boku linie/kreski
+  // pomocnicze zaczęły zasłaniać tekst). Każdy wymiar dostaje WŁASNY,
+  // odizolowany "pas" na zewnątrz konturu - głębokości bliżej bryły,
+  // wycięcia dalej - i własny kolor (jak na szkicu): głębokość A/B na
+  // czerwono, wycięcie A na pomarańczowo, wycięcie B na zielono, Ramię A/B
+  // (wynikowe) w neutralnym granacie.
+  const laneGap = margin * 0.15; // odległość pierwszego pasa od obrysu
+  const laneStep = margin * 0.32; // odległość między pasami (gdy są 2 na tym samym boku)
 
-  const dimH = (x1, x2, y, label, tickY1, tickY2, textSide) => {
-    let s = `<line x1="${x1}" y1="${tickY1}" x2="${x1}" y2="${tickY2}" stroke="#94a3b8" stroke-width="${strokeThin}" />`;
-    s += `<line x1="${x2}" y1="${tickY1}" x2="${x2}" y2="${tickY2}" stroke="#94a3b8" stroke-width="${strokeThin}" />`;
-    s += `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="#0f172a" stroke-width="${strokeThin}" />`;
-    const ty = y + (textSide === 'below' ? fsSmall * 0.85 : -fsSmall * 0.4);
-    s += `<text x="${(x1 + x2) / 2}" y="${ty}" font-size="${fsSmall}" fill="#0f172a" font-weight="bold" text-anchor="middle">${label}</text>`;
+  const dimH = (x1, x2, y, label, color, textSide) => {
+    let s = `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${color}" stroke-width="${strokeThick}" />`;
+    const ty = y + (textSide === 'below' ? fsSmall * 0.9 : -fsSmall * 0.35);
+    s += `<text x="${(x1 + x2) / 2}" y="${ty}" font-size="${fsSmall}" fill="${color}" font-weight="bold" text-anchor="middle">${label}</text>`;
     return s;
   };
-  const dimV = (y1, y2, x, label, tickX1, tickX2, textSide) => {
-    let s = `<line x1="${tickX1}" y1="${y1}" x2="${tickX2}" y2="${y1}" stroke="#94a3b8" stroke-width="${strokeThin}" />`;
-    s += `<line x1="${tickX1}" y1="${y2}" x2="${tickX2}" y2="${y2}" stroke="#94a3b8" stroke-width="${strokeThin}" />`;
-    s += `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="#0f172a" stroke-width="${strokeThin}" />`;
+  const dimV = (y1, y2, x, label, color, textSide) => {
+    let s = `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="${color}" stroke-width="${strokeThick}" />`;
     const ty = (y1 + y2) / 2;
-    const tx = x + (textSide === 'left' ? -fsSmall * 0.4 : fsSmall * 0.4);
-    s += `<text x="${tx}" y="${ty}" font-size="${fsSmall}" fill="#0f172a" font-weight="bold" text-anchor="middle" transform="rotate(-90 ${tx} ${ty})">${label}</text>`;
+    const tx = x + (textSide === 'left' ? -fsSmall * 0.35 : fsSmall * 0.35);
+    s += `<text x="${tx}" y="${ty}" font-size="${fsSmall}" fill="${color}" font-weight="bold" text-anchor="middle" transform="rotate(-90 ${tx} ${ty})">${label}</text>`;
     return s;
   };
 
-  // Góra: legA (cała szerokość)
-  svg += dimH(ox, ox + legA, oy - dimGap, `Ramię A: ${Math.round(legA)} mm`, oy - dimGap - tickLen, oy);
-  // Lewo: legB (cała wysokość)
-  svg += dimV(oy, oy + legB, ox - dimGap, `Ramię B: ${Math.round(legB)} mm`, ox - dimGap - tickLen, ox, 'left');
+  const COLOR_LEG = '#1e3a8a';
+  const COLOR_DEPTH = '#dc2626';
+  const COLOR_CUT_A = '#d97706';
+  const COLOR_CUT_B = '#16a34a';
 
-  // Prawo: depthA + wycięcie B, JEDNA linia wymiarowa podzielona na dwa
-  // ŁAŃCUCHOWO sąsiadujące odcinki (wspólna kreska w punkcie depthA) -
-  // razem sumują się do Ramię B po lewej, dokładnie jak przy realnym
-  // wymiarowaniu docinanej formatki.
-  const rightX = ox + legA + dimGap;
-  svg += dimV(oy, oy + depthA, rightX, `Głęb. A: ${Math.round(depthA)} mm`, ox + legA, rightX + tickLen, 'right');
+  // Góra: Ramię A (wynikowe, cała szerokość)
+  svg += dimH(ox, ox + legA, oy - laneGap, `Ramię A: ${Math.round(legA)} mm`, COLOR_LEG);
+  // Lewo: Ramię B (wynikowe, cała wysokość)
+  svg += dimV(oy, oy + legB, ox - laneGap, `Ramię B: ${Math.round(legB)} mm`, COLOR_LEG, 'left');
+
+  // Prawo, dwa oddzielne pasy (bliższy = głębokość A, dalszy = wycięcie B) -
+  // NIE łańcuchowo/stykająco się, każdy ma własny odstęp od obrysu, żeby ich
+  // linie/etykiety się nie stykały.
+  svg += dimV(oy, oy + depthA, ox + legA + laneGap, `Głęb. A: ${Math.round(depthA)} mm`, COLOR_DEPTH, 'right');
   if (cutH > 0) {
-    svg += dimV(oy + depthA, oy + legB, rightX, `Wycięcie B: ${Math.round(cutH)} mm`, ox + legA, rightX + tickLen, 'right');
+    svg += dimV(oy + depthA, oy + legB, ox + legA + laneGap + laneStep, `Wycięcie B: ${Math.round(cutH)} mm`, COLOR_CUT_B, 'right');
   }
 
-  // Dół: depthB + wycięcie A, tak samo łańcuchowo (wspólna kreska w punkcie
-  // depthB), razem sumują się do Ramię A na górze.
-  const bottomY = oy + legB + dimGap;
-  svg += dimH(ox, ox + depthB, bottomY, `Głęb. B: ${Math.round(depthB)} mm`, oy + legB, bottomY + tickLen, 'below');
+  // Dół, tak samo dwa oddzielne pasy (bliższy = głębokość B, dalszy = wycięcie A).
+  svg += dimH(ox, ox + depthB, oy + legB + laneGap, `Głęb. B: ${Math.round(depthB)} mm`, COLOR_DEPTH, 'below');
   if (cutW > 0) {
-    svg += dimH(ox + depthB, ox + legA, bottomY, `Wycięcie A: ${Math.round(cutW)} mm`, oy + legB, bottomY + tickLen, 'below');
+    svg += dimH(ox + depthB, ox + legA, oy + legB + laneGap + laneStep, `Wycięcie A: ${Math.round(cutW)} mm`, COLOR_CUT_A, 'below');
   }
 
   svg += `</svg>`;
