@@ -206,13 +206,32 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
   // dzielnika, który by nim rządził (np. cała, niepodzielona jeszcze wnęka),
   // rysuje się tą samą linią ze strzałkami, ale liczba zostaje statyczna
   // (nie ma czego przesuwać).
-  function appendDimTag(parentEl, node, mod, parentH, parentV) {
-    appendDimLine(parentEl, true, node, mod, parentV, dividerSide(node, parentV, false));
-    appendDimLine(parentEl, false, node, mod, parentH, dividerSide(node, parentH, true));
+  // editFront: pojedynczy front zajmujący CAŁY node.rect (renderFrontOverlay,
+  // node.fronts.length===1) - pozwala wpisać wymiar z ręki nawet bez
+  // dzielnika, który by nim rządził (zgłoszona prośba: "wykorzystajmy te
+  // rysunki frontów... wpisywanie z ręki wymiarów w tych kwadracikach").
+  // Zapisuje się jako front.forceW/forceH (core/layout.js:
+  // recalculateLayout już to czyta - ten sam mechanizm co "Wymuś
+  // szerokość/wysokość" w ui/properties.js, zakładka Front). Dla pustej
+  // wnęki (renderLeaf) albo grupy >1 frontów w tej samej strefie
+  // (dystrybucja szuflad) editFront jest `null` - wymiar zostaje statyczny,
+  // bo nie ma jednego jasnego frontu do nadpisania.
+  function appendDimTag(parentEl, node, mod, parentH, parentV, editFront = null) {
+    appendDimLine(parentEl, true, node, mod, parentV, dividerSide(node, parentV, false), editFront);
+    appendDimLine(parentEl, false, node, mod, parentH, dividerSide(node, parentH, true), editFront);
   }
 
-  function appendDimLine(parentEl, isH, node, mod, parentSplit, side) {
-    const valueMm = isH ? node.rect.maxX - node.rect.minX : node.rect.maxY - node.rect.minY;
+  function appendDimLine(parentEl, isH, node, mod, parentSplit, side, editFront = null) {
+    // Dla edytowalnego frontu bez dzielnika (editFront, patrz appendDimTag)
+    // liczba pokazuje PRAWDZIWY, gotowy wymiar frontu (front.w/h, już z
+    // zakładem/nadkładem) - nie surowy wymiar wnęki (node.rect) jak wszędzie
+    // indziej - bo to właśnie front.w/h nadpisuje wpisana tu wartość
+    // (forceW/forceH), więc pokazywana liczba musi się z nią zgadzać jeden
+    // do jednego (inaczej wpisanie tej samej liczby, co widoczna, zmieniałoby
+    // realny wymiar frontu - myląco).
+    const valueMm = (!parentSplit && editFront)
+      ? (isH ? editFront.w : editFront.h)
+      : (isH ? node.rect.maxX - node.rect.minX : node.rect.maxY - node.rect.minY);
     const locked = !!parentSplit && (side === "a" ? !!parentSplit.divider.lockA : !!parentSplit.divider.lockB);
     const color = !parentSplit ? "#94a3b8" : locked ? "#b45309" : "#0284c7";
 
@@ -271,7 +290,12 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     parentEl.appendChild(windowEl);
 
     appendDimNumber(windowEl, valueMm, parentSplit, side, (mm) => {
-      if (isH) {
+      if (!parentSplit && editFront) {
+        // Front bez dzielnika (patrz appendDimTag) - liczba wpisana z ręki
+        // idzie wprost na front.forceW/forceH, nie na pozycję dzielnika
+        // (którego tu nie ma).
+        editFront[isH ? "forceW" : "forceH"] = mm;
+      } else if (isH) {
         const newX = side === "a" ? node.rect.minX + mm : node.rect.maxX - mm - parentSplit.divider.w;
         moveSplit(mod, parentSplit, newX);
       } else {
@@ -279,15 +303,67 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
         moveSplit(mod, parentSplit, newY);
       }
       refreshAfterEdit();
-    });
+    }, editFront ? { front: editFront, axis: isH ? "forceW" : "forceH" } : null);
   }
 
-  function appendDimNumber(container, valueMm, parentSplit, side, onCommit) {
+  function appendDimNumber(container, valueMm, parentSplit, side, onCommit, editInfo = null) {
     const rounded = Math.round(valueMm);
     if (!parentSplit) {
-      const span = document.createElement("span");
-      span.innerText = rounded;
-      container.appendChild(span);
+      if (!editInfo) {
+        const span = document.createElement("span");
+        span.innerText = rounded;
+        container.appendChild(span);
+        return;
+      }
+      // Front bez dzielnika, który by rządził tym wymiarem (np. cała wnęka
+      // ramienia narożnika) - da się mimo to wpisać wartość z ręki, zapisuje
+      // się jako front.forceW/forceH (ten sam mechanizm co "Wymuś szerokość/
+      // wysokość" w ui/properties.js, zakładka Front - core/layout.js:
+      // recalculateLayout).
+      const isForced = editInfo.front[editInfo.axis] !== undefined && editInfo.front[editInfo.axis] !== null;
+      const forcedSpan = document.createElement("span");
+      forcedSpan.innerText = rounded;
+      forcedSpan.title = "Kliknij, żeby wpisać dokładny wymiar";
+      Object.assign(forcedSpan.style, {
+        cursor: "pointer",
+        borderBottom: "1px dotted #7c3aed",
+        color: isForced ? "#6d28d9" : "#94a3b8",
+        fontWeight: isForced ? "bold" : "normal",
+      });
+      forcedSpan.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const input = document.createElement("input");
+        input.type = "number";
+        input.value = rounded;
+        Object.assign(input.style, { width: "36px", fontSize: "9px", padding: "0 2px", verticalAlign: "middle" });
+        input.addEventListener("click", (ev) => ev.stopPropagation());
+        input.addEventListener("keydown", (ev) => {
+          ev.stopPropagation();
+          if (ev.key === "Enter") input.blur();
+          if (ev.key === "Escape") { input.value = rounded; input.blur(); }
+        });
+        input.addEventListener("blur", () => {
+          const mm = parseFloat(input.value);
+          if (Number.isFinite(mm) && mm > 0 && Math.round(mm) !== rounded) onCommit(mm);
+          else if (input.parentNode) input.parentNode.replaceChild(forcedSpan, input);
+        });
+        container.replaceChild(input, forcedSpan);
+        input.focus();
+        input.select();
+      });
+      container.appendChild(forcedSpan);
+      if (isForced) {
+        const resetBtn = document.createElement("span");
+        resetBtn.innerText = "↺";
+        resetBtn.title = "Wróć do automatycznego wymiaru";
+        Object.assign(resetBtn.style, { cursor: "pointer", fontSize: "9px", color: "#6d28d9" });
+        resetBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          delete editInfo.front[editInfo.axis];
+          refreshAfterEdit();
+        });
+        container.appendChild(resetBtn);
+      }
       return;
     }
 
@@ -470,7 +546,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     });
 
     stage.appendChild(el);
-    appendDimTag(el, node, mod, parentH, parentV);
+    appendDimTag(el, node, mod, parentH, parentV, isMultiFront ? null : node.fronts[0]);
 
     if (isMultiFront && !hidden) {
       node.fronts.forEach((front) => {

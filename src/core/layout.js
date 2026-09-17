@@ -406,17 +406,38 @@ function applyCornerFrontOverlap(mod) {
   const th = parseFloat(state.project.materials?.boardThickness) || 18;
   const gap = parseFloat(mod.front?.gap ?? state.project.front?.gap) || 3;
 
+  // Prawa (zewnętrzna, przy boku korpusu) krawędź liczona NIEZALEŻNIE od
+  // tego, co akurat siedzi w el.w po głównym przebiegu wyżej - ten front
+  // mógł dostać ręczne forceW (ui/interiorEditor.js: "wpisywanie wymiaru z
+  // ręki" w kwadraciku), które nadpisało el.w i zepsułoby wyliczenie
+  // krawędzi, gdyby czytać ją z el.x+el.w. Ten sam wzór co isRightOuter w
+  // głównym przebiegu wyżej (dla forceOuterRight=true, nie-wpuszczane:
+  // maxX+th-cRight) - po prostu policzony wprost z armRect.
+  const f = { ...(state.project.front || {}), ...(mod.front || {}) };
+  const fc = { ...(state.project.front?.clearance || {}), ...(mod.front?.clearance || {}) };
+  const isInset = f.type === 'wpuszczane';
+  const cRight = parseFloat(fc.right ?? fc.sides ?? 1.5) || 0;
+  const overRight = isInset ? -cRight : th - cRight;
+
   ['A', 'B'].forEach(arm => {
     const fronts = (mod.elements || []).filter(el =>
       el.typ === 'front' && el.cornerArm === arm && el.baseZone?.boundLeft === `corner-${arm}-left`
     );
     if (fronts.length === 0) return;
 
-    const rightEdge = fronts[0].x + fronts[0].w; // krawędź przy boku korpusu - już poprawna, nie ruszamy
+    const rightEdge = getCornerArmRect(mod, arm).maxX + overRight;
     const isPrimary = arm === primaryArm;
     const newX = isPrimary ? gap : gap + th;
-    const newW = Math.max(10, rightEdge - newX);
-    fronts.forEach(f => { f.x = newX; f.w = newW; });
+    fronts.forEach(el => {
+      el.x = newX;
+      // Front bez ręcznego forceW - szerokość liczona automatycznie (sięga
+      // do prawdziwej krawędzi boku). Z forceW - zostaje to, co wpisał
+      // użytkownik (ui/interiorEditor.js), tylko lewa krawędź (newX) i tak
+      // musi zostać fizycznym minimum (luz przy zakładce), więc ją zawsze
+      // ustawiamy.
+      const hasForceW = el.forceW !== undefined && el.forceW !== null && !isNaN(el.forceW);
+      if (!hasForceW) el.w = Math.max(10, rightEdge - newX);
+    });
   });
 }
 
