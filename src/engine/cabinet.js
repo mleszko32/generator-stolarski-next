@@ -298,6 +298,10 @@ export function calculateProjectHardware() {
 
     const allFronts = mod.elements.filter(el => el.typ === 'front');
     const allObstacles = mod.elements.filter(el => el.typ === 'poziom' || el.subtype === 'szuflada-wewnetrzna');
+    // Półka narożna (typ:'poziom-narozny', ui/cornerConfigModal.js) jest
+    // wspólna dla OBU ramion (kształt L) - liczy się jako przeszkoda dla
+    // zawiasów w każdym z nich, nie tylko w jednym.
+    const cornerShelfObstacles = mod.elements.filter(el => el.typ === 'poziom-narozny');
 
     // Szafka narożna ma dwa NIEZALEŻNE ramiona (cornerArm 'A'/'B') - "góra
     // stosu" i przeszkody dla zawiasów muszą liczyć się OSOBNO w każdym z nich,
@@ -312,7 +316,7 @@ export function calculateProjectHardware() {
     });
 
     Object.entries(frontsByArm).forEach(([armKey, fronts]) => {
-      const obstacles = allObstacles.filter(o => (o.cornerArm || '_') === armKey);
+      const obstacles = allObstacles.filter(o => (o.cornerArm || '_') === armKey).concat(cornerShelfObstacles);
       fronts.sort((a, b) => a.y - b.y);
 
       fronts.forEach((front, index) => {
@@ -642,6 +646,19 @@ function getCornerCorpusParts(mod, config) {
   // renderCornerCabinet (plecy sięgają od listwy do boku).
   parts.push({ name: `Plecy narożne ${Math.round(height)}x${Math.round(legA)} (Ramię A)`, length: parseFloat((height - 4).toFixed(1)), width: parseFloat((legA - th - battenW - 4).toFixed(1)), qty: 1, category: "Plecy" });
   parts.push({ name: `Plecy narożne ${Math.round(height)}x${Math.round(legB)} (Ramię B)`, length: parseFloat((height - 4).toFixed(1)), width: parseFloat((legB - 2 * th - 4).toFixed(1)), qty: 1, category: "Plecy" });
+
+  // Półki narożne (typ:'poziom-narozny', ui/cornerConfigModal.js) - w realnej
+  // stolarce półka w szafce narożnej jest w KSZTAŁCIE L (jak wieniec wyżej),
+  // NIE dwiema niezależnymi prostymi półkami po jednej na ramię (zgłoszona
+  // korekta) - dlatego to osobny typ elementu, wspólny dla obu ramion
+  // (bez cornerArm), zamiast zwykłego 'poziom' z core/zoneTree.js. Ten sam
+  // bounding box legA×legB co wieniec - realny kawałek docina się z blanku
+  // na miejscu, tak samo jak przy wieńcu.
+  const cornerShelves = (mod.elements || []).filter(el => el.typ === 'poziom-narozny');
+  if (cornerShelves.length > 0) {
+    const shelfName = `Półka narożna ${Math.round(legA)}x${Math.round(legB)} (naroże do wycięcia - patrz rysunek 3D)`;
+    parts.push({ name: shelfName, length: parseFloat(legA.toFixed(1)), width: parseFloat(legB.toFixed(1)), qty: cornerShelves.length, category: "Korpus" });
+  }
 
   return parts;
 }

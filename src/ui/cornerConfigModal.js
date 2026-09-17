@@ -43,6 +43,13 @@ export function openCornerConfigModal(mod) {
       <div class="property-group" style="flex:1; min-width:110px;"><label>Wysokość korpusu (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-height" value="${mod.dimensions.height}" /></div>
     </div>
 
+    <div style="margin-bottom:14px;">
+      <h3 style="font-size:13px; color:#1e3a8a; margin:0 0 4px 0;">Półki narożne (kształt L, na całą głębokość obu ramion)</h3>
+      <div style="font-size:11px; color:#64748b; margin-bottom:6px;">W realnej szafce narożnej półka jest jedna, w kształcie L (jak wieniec górny/dolny) - nie dwie osobne, proste półki. Dlatego dodaje się je tutaj, wspólnie dla obu ramion, a nie osobno w każdym z nich.</div>
+      <div id="corner-shelves-list"></div>
+      <button type="button" id="btn-corner-add-shelf" class="btn btn-neutral btn-sm" style="margin-top:6px;">+ Dodaj półkę narożną</button>
+    </div>
+
     <div style="display:flex; gap:14px; flex-wrap:wrap;">
       <div style="flex:1; min-width:280px;">
         <h3 style="font-size:13px; color:#1e3a8a; margin:0 0 6px 0;">Ramię A</h3>
@@ -70,6 +77,67 @@ export function openCornerConfigModal(mod) {
 
   armAEditor.render();
   armBEditor.render();
+
+  // Półki narożne (typ:'poziom-narozny') - lista wysokości, wspólna dla obu
+  // ramion (patrz komentarz w markupie wyżej i engine/cabinet.js:
+  // getCornerCorpusParts / render/viewer3d.js: renderCornerCabinet). Nie
+  // dotykają drzew BSP ramion (core/zoneTree.js filtruje po typ:'pion'/
+  // 'poziom', więc ten typ jest dla nich niewidoczny) - dlatego zmiana tej
+  // listy NIE wymaga odświeżenia armAEditor/armBEditor, tylko update3D().
+  const shelvesListEl = modal.querySelector('#corner-shelves-list');
+  const randomSuffix = () => Math.random().toString(36).slice(2, 6);
+
+  function renderShelvesList() {
+    const shelves = (mod.elements || [])
+      .filter(el => el.typ === 'poziom-narozny')
+      .sort((a, b) => (parseFloat(a.y) || 0) - (parseFloat(b.y) || 0));
+
+    shelvesListEl.innerHTML = shelves.length === 0
+      ? `<div style="font-size:11px; color:#94a3b8; font-style:italic;">Brak półek narożnych.</div>`
+      : '';
+
+    shelves.forEach(shelf => {
+      const row = document.createElement('div');
+      Object.assign(row.style, { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' });
+      row.innerHTML = `
+        <span style="font-size:11px; color:#475569; min-width:70px;">Wysokość od dołu:</span>
+        <input type="number" step="1" value="${Math.round(parseFloat(shelf.y) || 0)}" style="width:90px;" />
+        <span style="font-size:11px; color:#94a3b8;">mm</span>
+        <button type="button" class="btn btn-danger btn-sm" style="padding:2px 8px;">🗑️</button>
+      `;
+      const input = row.querySelector('input');
+      const delBtn = row.querySelector('button');
+      input.addEventListener('input', () => {
+        const v = parseFloat(input.value);
+        if (!Number.isFinite(v)) return;
+        shelf.y = v;
+        update3D();
+        updateSidebar();
+      });
+      delBtn.addEventListener('click', () => {
+        mod.elements = mod.elements.filter(el => el !== shelf);
+        update3D();
+        updateSidebar();
+        renderShelvesList();
+      });
+      shelvesListEl.appendChild(row);
+    });
+  }
+
+  renderShelvesList();
+
+  modal.querySelector('#btn-corner-add-shelf').addEventListener('click', () => {
+    const height = parseFloat(mod.dimensions.height) || 720;
+    mod.elements.push({
+      id: 'poziom-narozny-' + Date.now() + '-' + randomSuffix(),
+      typ: 'poziom-narozny',
+      y: Math.round(height / 2),
+      isStructural: false,
+    });
+    update3D();
+    updateSidebar();
+    renderShelvesList();
+  });
 
   const bindDim = (id, apply) => {
     const el = modal.querySelector(id);

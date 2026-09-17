@@ -1124,6 +1124,17 @@ function renderCornerCabinet(mod, isActive, th) {
   addCornerPanel(shape, th, posY, isActive, udCorp, innerGroup);
   addCornerPanel(shape, th, posY + H - th, isActive, udCorp, innerGroup);
 
+  // --- Półki narożne (typ:'poziom-narozny', ui/cornerConfigModal.js) ---
+  // Ten sam obrys L co wieniec wyżej (addCornerPanel/shape) - w realnej
+  // stolarce półka w szafce narożnej jest w kształcie L, wspólna dla obu
+  // ramion na danej wysokości, NIE dwiema niezależnymi prostymi półkami
+  // (zgłoszona korekta - patrz engine/cabinet.js: getCornerCorpusParts).
+  (mod.elements || []).forEach(el => {
+      if (el.typ !== 'poziom-narozny') return;
+      const udShelf = { moduleId: mod.id, type: 'shelf', elementId: el.id };
+      addCornerPanel(shape, th, posY + (parseFloat(el.y) || 0), isActive, udShelf, innerGroup);
+  });
+
   // --- Listwa narożna pionowa (w tylnym, wewnętrznym rogu) ---
   // Zgłoszona korekta: dwie płyty plecy (HDF) osobno nie mają się do czego
   // przykleić w rogu, gdzie się stykają - płaska listwa 18(gr.)×100(szer.),

@@ -83,7 +83,10 @@ export function calculateHinges(front, boardThick, obstacles, side) {
           collision = true;
       } else {
           for (const obs of obstacles) {
-            if (obs.typ === 'poziom') {
+            // 'poziom-narozny' = półka narożna w kształcie L, wspólna dla obu
+            // ramion szafki narożnej (ui/cornerConfigModal.js) - dla unikania
+            // kolizji zawiasu liczy się identycznie jak zwykła półka.
+            if (obs.typ === 'poziom' || obs.typ === 'poziom-narozny') {
               const shelfBottomEdge = Number(obs.y);
               const shelfTopEdge = Number(obs.y) + (Number(obs.h) || Number(boardThick));
               

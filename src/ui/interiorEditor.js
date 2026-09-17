@@ -633,10 +633,18 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     };
 
     if (mode === "empty") {
-      addBtn("⬍ Podziel poziomo", "Dodaj półkę na środku wysokości", () => {
-        splitZoneHorizontal(mod, selectedNode, cornerArm);
-        refreshAfterEdit();
-      });
+      // Pozioma półka WEWNĄTRZ jednego ramienia byłaby prostym prostokątem
+      // ograniczonym do tego ramienia - w realnej stolarce półka w szafce
+      // narożnej ma być w KSZTAŁCIE L, wspólna dla obu ramion na danej
+      // wysokości (zgłoszona korekta), więc dla ramienia narożnika (cornerArm)
+      // ten przycisk jest wyłączony - półki narożne dodaje się osobną sekcją
+      // w ui/cornerConfigModal.js (wspólną dla Ramienia A i B), nie tutaj.
+      if (!cornerArm) {
+        addBtn("⬍ Podziel poziomo", "Dodaj półkę na środku wysokości", () => {
+          splitZoneHorizontal(mod, selectedNode, cornerArm);
+          refreshAfterEdit();
+        });
+      }
       addBtn("⬌ Podziel pionowo", "Dodaj przegrodę na środku szerokości", () => {
         splitZoneVertical(mod, selectedNode, cornerArm);
         refreshAfterEdit();
@@ -651,7 +659,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       });
       appendDrawerPicker(toolbar, mod, "szuflada", "📦 Szuflady zewn.");
       appendDrawerPicker(toolbar, mod, "szuflada-wewnetrzna", "📥 Szuflady wewn.");
-      appendAutoShelvesPicker(toolbar, mod, selectedNode);
+      if (!cornerArm) appendAutoShelvesPicker(toolbar, mod, selectedNode);
     } else if (mode === "occupied") {
       const subtype = selectedNode.fronts[0]?.subtype;
       const label = FRONT_LABELS[subtype] || subtype;
@@ -673,15 +681,17 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       // klikając bezpośrednio w konkretną, pustą pod-wnękę (widoczną "przez"
       // ten front, bo rysuje się na wierzchu - patrz renderNode).
       if (selectedNode.type === "leaf") {
-        addBtn("⬍ Podziel poziomo", "Dodaj półkę za frontem (front zostaje)", () => {
-          splitZoneHorizontal(mod, selectedNode, cornerArm);
-          refreshAfterEdit();
-        });
+        if (!cornerArm) {
+          addBtn("⬍ Podziel poziomo", "Dodaj półkę za frontem (front zostaje)", () => {
+            splitZoneHorizontal(mod, selectedNode, cornerArm);
+            refreshAfterEdit();
+          });
+        }
         addBtn("⬌ Podziel pionowo", "Dodaj przegrodę za frontem (front zostaje)", () => {
           splitZoneVertical(mod, selectedNode, cornerArm);
           refreshAfterEdit();
         });
-        appendAutoShelvesPicker(toolbar, mod, selectedNode);
+        if (!cornerArm) appendAutoShelvesPicker(toolbar, mod, selectedNode);
       }
       addBtn("🗑️ Usuń front", "Usuwa front, wnęka zostaje pusta", () => {
         // usunięcie frontu = przypisanie "pustego" -> wystarczy usunąć elementy z fronts
