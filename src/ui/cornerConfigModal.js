@@ -16,6 +16,7 @@ import { update3D } from "../render/viewer3d.js";
 import { updateSidebar } from "./sidebar.js";
 import { initPropertiesPanel } from "./properties.js";
 import { createZoneEditor } from "./interiorEditor.js";
+import { generateCornerBlankSVG } from "../render/viewer2d.js";
 
 export function openCornerConfigModal(mod) {
   const overlay = document.createElement('div');
@@ -36,11 +37,18 @@ export function openCornerConfigModal(mod) {
     <h2 style="margin:0 0 4px 0; color:#1e293b; font-size:16px;">📐 Konfigurator szafki narożnej: <span style="color:#2563eb;">${escapeHtml(mod.name)}</span></h2>
     <div style="font-size:11px; color:#64748b; margin-bottom:14px;">Kąt prosty 90°, dwa ramiona. Kliknij wnękę w ramieniu, żeby ją podzielić albo obsadzić frontem - tak samo jak w edytorze wnętrza zwykłej szafki.</div>
 
-    <div style="display:flex; flex-wrap:wrap; gap:10px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:10px; margin-bottom:14px;">
-      <div class="property-group" style="flex:1; min-width:110px;"><label>Ramię A (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-legA" value="${mod.dimensions.width}" /></div>
-      <div class="property-group" style="flex:1; min-width:110px;"><label>Ramię B (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-legB" value="${mod.dimensions.legB}" /></div>
-      <div class="property-group" style="flex:1; min-width:110px;"><label>Głębokość ramion (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-depth" value="${mod.dimensions.depth}" /></div>
-      <div class="property-group" style="flex:1; min-width:110px;"><label>Wysokość korpusu (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-height" value="${mod.dimensions.height}" /></div>
+    <div style="display:flex; gap:14px; flex-wrap:wrap; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:10px; margin-bottom:14px;">
+      <div style="flex:1; min-width:220px;">
+        <div style="font-size:11px; color:#64748b; margin-bottom:6px;">Wykrój wieńca/półki narożnej — wpisz wymiary blachy/płyty i wycięcia, tak jak przy realnym docinaniu.</div>
+        <div class="property-group"><label>Szerokość wieńca — Ramię A (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-legA" value="${mod.dimensions.width}" /></div>
+        <div class="property-group"><label>Wysokość wieńca — Ramię B (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-legB" value="${mod.dimensions.legB}" /></div>
+        <div class="property-group"><label>Głębokość ramion (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-depth" value="${mod.dimensions.depth}" /></div>
+        <div class="property-group"><label>Wysokość korpusu (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-height" value="${mod.dimensions.height}" /></div>
+        <div id="corner-blank-cutout-info" style="font-size:12px; color:#b91c1c; font-weight:bold; margin-top:4px;"></div>
+      </div>
+      <div style="flex:1; min-width:220px; display:flex; align-items:center; justify-content:center;">
+        <div id="corner-blank-preview" style="width:100%; max-width:280px;"></div>
+      </div>
     </div>
 
     <div style="margin-bottom:14px;">
@@ -77,6 +85,30 @@ export function openCornerConfigModal(mod) {
 
   armAEditor.render();
   armBEditor.render();
+
+  // Podgląd wykroju na żywo - te same 3 liczby (legA/legB/depth), które
+  // sterują polami wyżej, w pełni określają kształt L (patrz
+  // render/viewer2d.js: generateCornerBlankSVG - ten sam generator, którego
+  // używa "📄 Wykrój narożny" w ui/properties.js do druku). "Wycięcie" nie
+  // jest osobnym, niezależnym polem - to policzony (legA-depth)×(legB-depth)
+  // róg, pokazany tu jako informacja zwrotna, żeby było widać efekt wpisanych
+  // wymiarów tak samo, jak na wydrukowanym wykroju.
+  const blankPreviewEl = modal.querySelector('#corner-blank-preview');
+  const cutoutInfoEl = modal.querySelector('#corner-blank-cutout-info');
+
+  function renderBlankPreview() {
+    const legA = parseFloat(mod.dimensions.width) || 0;
+    const legB = parseFloat(mod.dimensions.legB) || 0;
+    const depth = parseFloat(mod.dimensions.depth) || 0;
+    blankPreviewEl.innerHTML = generateCornerBlankSVG(legA, legB, depth);
+    const cutW = legA - depth;
+    const cutH = legB - depth;
+    cutoutInfoEl.textContent = (cutW > 0 && cutH > 0)
+      ? `Wycięcie (róg do odcięcia): ${Math.round(cutW)} × ${Math.round(cutH)} mm`
+      : '';
+  }
+
+  renderBlankPreview();
 
   // Półki narożne (typ:'poziom-narozny') - lista wysokości, wspólna dla obu
   // ramion (patrz komentarz w markupie wyżej i engine/cabinet.js:
@@ -154,6 +186,7 @@ export function openCornerConfigModal(mod) {
       updateSidebar();
       armAEditor.render();
       armBEditor.render();
+      renderBlankPreview();
     });
   };
 
