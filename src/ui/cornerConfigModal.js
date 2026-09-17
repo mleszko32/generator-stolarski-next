@@ -40,15 +40,15 @@ export function openCornerConfigModal(mod) {
     <div style="font-size:11px; color:#64748b; margin-bottom:14px;">Kąt prosty 90°, dwa ramiona. Kliknij wnękę w ramieniu, żeby ją podzielić albo obsadzić frontem - tak samo jak w edytorze wnętrza zwykłej szafki.</div>
 
     <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:12px; margin-bottom:14px;">
-      <div style="font-size:11px; color:#64748b; margin-bottom:8px;">Wykrój wieńca/półki narożnej — wpisz wymiary blachy/płyty i wycięcia, tak jak przy realnym docinaniu.</div>
+      <div style="font-size:11px; color:#64748b; margin-bottom:8px;">Wykrój wieńca/półki narożnej — konfigurujesz głębokość każdego ramienia i wycięcie w rogu, tak jak przy realnym docinaniu na miejscu. Ramię A/B (wielkość wieńca) wylicza się z tych czterech liczb.</div>
       <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
-        <div class="property-group" style="flex:1; min-width:150px;"><label>Szerokość wieńca — Ramię A (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-legA" value="${mod.dimensions.width}" /></div>
-        <div class="property-group" style="flex:1; min-width:150px;"><label>Wysokość wieńca — Ramię B (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-legB" value="${mod.dimensions.legB}" /></div>
-        <div class="property-group" style="flex:1; min-width:150px;"><label>Głębokość ramienia A — lewy bok (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-depthA" value="${getCornerDepths(mod).depthA}" /></div>
-        <div class="property-group" style="flex:1; min-width:150px;"><label>Głębokość ramienia B — prawy bok (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-depthB" value="${getCornerDepths(mod).depthB}" /></div>
+        <div class="property-group" style="flex:1; min-width:150px;"><label>Głębokość ramienia A (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-depthA" value="${getCornerDepths(mod).depthA}" /></div>
+        <div class="property-group" style="flex:1; min-width:150px;"><label>Głębokość ramienia B (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-depthB" value="${getCornerDepths(mod).depthB}" /></div>
+        <div class="property-group" style="flex:1; min-width:150px;"><label>Wycięcie A (mm):</label><input type="text" inputmode="decimal" title="O tyle krótsze jest Ramię A przez narożnik. Można wpisać działanie, np. 400+18" id="input-corner-modal-cutA" value="${Math.round((parseFloat(mod.dimensions.width) || 0) - getCornerDepths(mod).depthB)}" /></div>
+        <div class="property-group" style="flex:1; min-width:150px;"><label>Wycięcie B (mm):</label><input type="text" inputmode="decimal" title="O tyle krótsze jest Ramię B przez narożnik. Można wpisać działanie, np. 400+18" id="input-corner-modal-cutB" value="${Math.round((parseFloat(mod.dimensions.legB) || 0) - getCornerDepths(mod).depthA)}" /></div>
         <div class="property-group" style="flex:1; min-width:150px;"><label>Wysokość korpusu (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-height" value="${mod.dimensions.height}" /></div>
       </div>
-      <div id="corner-blank-cutout-info" style="font-size:14px; color:#b91c1c; font-weight:bold; margin-bottom:6px;"></div>
+      <div id="corner-blank-cutout-info" style="font-size:14px; color:#1e3a8a; font-weight:bold; margin-bottom:6px;"></div>
       <div id="corner-blank-preview" style="width:100%; max-width:520px; margin:0 auto;"></div>
     </div>
 
@@ -87,26 +87,35 @@ export function openCornerConfigModal(mod) {
   armAEditor.render();
   armBEditor.render();
 
-  // Podgląd wykroju na żywo - te same 4 liczby (legA/legB/depthA/depthB),
-  // które sterują polami wyżej, w pełni określają kształt L (patrz
-  // render/viewer2d.js: generateCornerBlankSVG - ten sam generator, którego
-  // używa "📄 Wykrój narożny" w ui/properties.js do druku). "Wycięcie" nie
-  // jest osobnym, niezależnym polem - to policzony (legA-depthB)×(legB-depthA)
-  // róg, pokazany tu jako informacja zwrotna, żeby było widać efekt wpisanych
-  // wymiarów tak samo, jak na wydrukowanym wykroju.
+  // Podgląd wykroju na żywo. Zgłoszona zmiana kierunku konfiguracji: zamiast
+  // wpisywać Ramię A/B wprost i patrzeć na wyliczone wycięcie (jak wcześniej),
+  // teraz KONFIGUROWALNE są głębokość + wycięcie każdego ramienia, a Ramię A/B
+  // (rozmiar wieńca) jest WYNIKOWE - liczone jako suma:
+  //   legA (Ramię A) = głębokość B + wycięcie A
+  //   legB (Ramię B) = głębokość A + wycięcie B
+  // (legA zależy od depthB, nie depthA - to drugie ramię fizycznie wyznacza,
+  // gdzie zaczyna się wolny bieg ramienia A, patrz core/layout.js:
+  // getCornerArmRect, komentarz przy otherDepth). mod.dimensions.width/legB
+  // zostają jedynym źródłem prawdy dla reszty aplikacji (pozycjonowanie w
+  // pokoju, lista modułów itd.) - tu tylko piszemy do nich wyliczoną wartość
+  // zamiast czytać wprost z pola.
   const blankPreviewEl = modal.querySelector('#corner-blank-preview');
   const cutoutInfoEl = modal.querySelector('#corner-blank-cutout-info');
+
+  function recomputeLegsFromDepthsAndCutouts() {
+    const cutA = parseFloat(modal.querySelector('#input-corner-modal-cutA').value) || 0;
+    const cutB = parseFloat(modal.querySelector('#input-corner-modal-cutB').value) || 0;
+    const { depthA, depthB } = getCornerDepths(mod);
+    mod.dimensions.width = Math.max(50, depthB + cutA);
+    mod.dimensions.legB = Math.max(50, depthA + cutB);
+  }
 
   function renderBlankPreview() {
     const legA = parseFloat(mod.dimensions.width) || 0;
     const legB = parseFloat(mod.dimensions.legB) || 0;
     const { depthA, depthB } = getCornerDepths(mod);
     blankPreviewEl.innerHTML = generateCornerBlankSVG(legA, legB, depthA, depthB);
-    const cutW = legA - depthB;
-    const cutH = legB - depthA;
-    cutoutInfoEl.textContent = (cutW > 0 && cutH > 0)
-      ? `Wycięcie (róg do odcięcia): ${Math.round(cutW)} × ${Math.round(cutH)} mm`
-      : '';
+    cutoutInfoEl.textContent = `Wynikowo: Ramię A = ${Math.round(legA)} mm, Ramię B = ${Math.round(legB)} mm`;
   }
 
   renderBlankPreview();
@@ -183,6 +192,7 @@ export function openCornerConfigModal(mod) {
       const val = evalDimensionExpr(e.target.value);
       if (val === null || Number.isNaN(val)) return;
       apply(val);
+      recomputeLegsFromDepthsAndCutouts();
       update3D();
       updateSidebar();
       armAEditor.render();
@@ -191,11 +201,22 @@ export function openCornerConfigModal(mod) {
     });
   };
 
-  bindDim('#input-corner-modal-legA', v => mod.dimensions.width = v);
-  bindDim('#input-corner-modal-legB', v => mod.dimensions.legB = v);
   bindDim('#input-corner-modal-depthA', v => mod.dimensions.depth = v);
   bindDim('#input-corner-modal-depthB', v => mod.dimensions.depthB = v);
-  bindDim('#input-corner-modal-height', v => mod.dimensions.height = v);
+  bindDim('#input-corner-modal-cutA', () => {}); // legA przeliczany w recomputeLegsFromDepthsAndCutouts()
+  bindDim('#input-corner-modal-cutB', () => {}); // legB przeliczany w recomputeLegsFromDepthsAndCutouts()
+
+  const heightEl = modal.querySelector('#input-corner-modal-height');
+  if (heightEl) heightEl.addEventListener('input', e => {
+    const val = evalDimensionExpr(e.target.value);
+    if (val === null || Number.isNaN(val)) return;
+    mod.dimensions.height = val;
+    update3D();
+    updateSidebar();
+    armAEditor.render();
+    armBEditor.render();
+    renderBlankPreview();
+  });
 
   const close = () => {
     document.body.removeChild(overlay);
