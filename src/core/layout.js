@@ -378,6 +378,46 @@ export function recalculateLayout(mod) {
           if (el.forceOffsetY) el.y += el.forceOffsetY;
       }
   });
+
+  if (mod.type === 'corner_cabinet') applyCornerFrontOverlap(mod);
+}
+
+// Fronty dwóch ramion spotykają się w ostrym, wewnętrznym rogu (zgłoszona
+// korekta) - fizycznie NIE mogą oba sięgać do samego rogu (kolidowałyby przy
+// otwieraniu pod kątem 90°), więc jeden musi zachodzić na drugi "na
+// zakładkę", jak przy dwóch drzwiach bez słupka pośrodku:
+//   - front WYBRANEGO ramienia (mod.cornerFrontOverlap.primaryArm) sięga
+//     niemal do rogu (luz `gap`, ten sam co domyślny odstęp między
+//     sąsiednimi frontami w całej appce) - zamyka się JAKO PIERWSZY.
+//   - front DRUGIEGO ramienia jest dodatkowo skrócony o grubość pierwszego
+//     (th) - żeby zmieścić się ZA nim przy zamkniętych drzwiach i nie
+//     kolidować przy otwieraniu - zamyka się JAKO DRUGIE.
+// Obie krawędzie zewnętrzne (przy bokach korpusu) zostają bez zmian -
+// liczy je już poprawnie zwykły przebieg wyżej (forceOuterRight). Tu
+// nadpisujemy WYŁĄCZNIE krawędź przy rogu (lokalne x=0 w obu ramionach to
+// ten sam punkt - miejsce, gdzie się stykają, patrz core/layout.js:
+// getCornerArmRect / render/viewer3d.js: renderCornerCabinet).
+// Działa też na grupy sąsiadujących frontów (np. szuflady) współdzielące tę
+// samą strefę (ten sam baseZone.boundLeft) - wszystkie dostają identyczne
+// x/w, bo w poziomie (X) mają tę samą szerokość niezależnie od podziału w
+// pionie (frontIndex).
+function applyCornerFrontOverlap(mod) {
+  const primaryArm = mod.cornerFrontOverlap?.primaryArm || 'A';
+  const th = parseFloat(state.project.materials?.boardThickness) || 18;
+  const gap = parseFloat(mod.front?.gap ?? state.project.front?.gap) || 3;
+
+  ['A', 'B'].forEach(arm => {
+    const fronts = (mod.elements || []).filter(el =>
+      el.typ === 'front' && el.cornerArm === arm && el.baseZone?.boundLeft === `corner-${arm}-left`
+    );
+    if (fronts.length === 0) return;
+
+    const rightEdge = fronts[0].x + fronts[0].w; // krawędź przy boku korpusu - już poprawna, nie ruszamy
+    const isPrimary = arm === primaryArm;
+    const newX = isPrimary ? gap : gap + th;
+    const newW = Math.max(10, rightEdge - newX);
+    fronts.forEach(f => { f.x = newX; f.w = newW; });
+  });
 }
 
 // Głębokości obu ramion szafki narożnej - NIEZALEŻNE (zgłoszona korekta:

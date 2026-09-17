@@ -19,8 +19,10 @@ import { initPropertiesPanel } from "./properties.js";
 import { createZoneEditor } from "./interiorEditor.js";
 import { generateCornerBlankSVG } from "../render/viewer2d.js";
 import { getCornerDepths } from "../core/layout.js";
+import { state } from "../core/state.js";
 
 export function openCornerConfigModal(mod) {
+  const cornerFrontGap = parseFloat(mod.front?.gap ?? state.project.front?.gap) || 3;
   const overlay = document.createElement('div');
   Object.assign(overlay.style, {
     position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
@@ -50,6 +52,12 @@ export function openCornerConfigModal(mod) {
       </div>
       <div id="corner-blank-cutout-info" style="font-size:14px; color:#1e3a8a; font-weight:bold; margin-bottom:6px;"></div>
       <div id="corner-blank-preview" style="width:100%; max-width:520px; margin:0 auto;"></div>
+    </div>
+
+    <div style="margin-bottom:14px;">
+      <h3 style="font-size:13px; color:#1e3a8a; margin:0 0 4px 0;">Fronty w rogu — zakładka</h3>
+      <div style="font-size:11px; color:#64748b; margin-bottom:6px;">Oba fronty nie mogą sięgać do samego naroża naraz (zderzyłyby się przy otwieraniu pod kątem 90°) - jeden zamyka się jako pierwszy i sięga niemal do rogu (luz ${cornerFrontGap} mm), drugi jako drugi i chowa się za nim (dodatkowo skrócony o grubość płyty).</div>
+      <div class="property-group" style="max-width:340px;"><label>Który front zamyka się jako pierwszy (sięga do rogu):</label><select id="input-corner-front-primary"><option value="A" ${(!mod.cornerFrontOverlap || mod.cornerFrontOverlap.primaryArm !== 'B') ? 'selected' : ''}>Ramię A</option><option value="B" ${(mod.cornerFrontOverlap && mod.cornerFrontOverlap.primaryArm === 'B') ? 'selected' : ''}>Ramię B</option></select></div>
     </div>
 
     <div style="margin-bottom:14px;">
@@ -226,6 +234,18 @@ export function openCornerConfigModal(mod) {
     armAEditor.render();
     armBEditor.render();
     renderBlankPreview();
+  });
+
+  // Fronty w rogu - który front zamyka się jako pierwszy (core/layout.js:
+  // applyCornerFrontOverlap, wołane automatycznie z recalculateLayout dla
+  // każdego modułu narożnego).
+  const frontPrimaryEl = modal.querySelector('#input-corner-front-primary');
+  if (frontPrimaryEl) frontPrimaryEl.addEventListener('change', e => {
+    mod.cornerFrontOverlap = { primaryArm: e.target.value };
+    update3D();
+    updateSidebar();
+    armAEditor.render();
+    armBEditor.render();
   });
 
   // Plecy: nakładane/nut - te same pola co w zwykłej szafce (ui/properties.js,
