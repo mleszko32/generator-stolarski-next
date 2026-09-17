@@ -893,7 +893,20 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
 // renderCornerCabinet (`shape`), tylko w 2D i ze znakiem Y odwróconym do
 // zwykłego układu ekranowego (dodatni Y w dół).
 export function generateCornerBlankSVG(legA, legB, depth) {
-  const margin = 70;
+  // Rozmiary w SVG są w "mm" viewBoxa, skalowanym przez CSS do szerokości
+  // kontenera (ui/cornerConfigModal.js, ui/properties.js: print) - stały
+  // rozmiar czcionki/linii w mm (np. 13) wychodził nieczytelnie mały przy
+  // typowych wymiarach szafki (800-1200mm zmieszczone w np. 500px szerokości
+  // ekranu = kilka pikseli). Liczymy je więc jako UŁAMEK najmniejszego boku,
+  // żeby tekst/linie zostały czytelne niezależnie od wymiarów szafki i
+  // rozmiaru kontenera.
+  const unit = Math.max(1, Math.min(legA, legB, depth || legA));
+  const fs = Math.round(unit * 0.075); // font-size bazowy
+  const fsSmall = Math.round(unit * 0.062);
+  const strokeThick = Math.max(2, Math.round(unit * 0.01));
+  const strokeThin = Math.max(1, Math.round(unit * 0.005));
+  const margin = Math.round(unit * 0.22);
+
   const vbW = legA + margin * 2;
   const vbH = legB + margin * 2;
   const ox = margin, oy = margin;
@@ -909,32 +922,39 @@ export function generateCornerBlankSVG(legA, legB, depth) {
 
   // Pełny prostokątny blank (przerywany) - to jest to, co realnie zamawia
   // się/tnie z płyty jako pierwszy krok (patrz Lista formatek: legA×legB).
-  svg += `<rect x="${ox}" y="${oy}" width="${legA}" height="${legB}" fill="none" stroke="#94a3b8" stroke-width="2" stroke-dasharray="8,6" />`;
+  svg += `<rect x="${ox}" y="${oy}" width="${legA}" height="${legB}" fill="none" stroke="#94a3b8" stroke-width="${strokeThick}" stroke-dasharray="${strokeThick * 4},${strokeThick * 3}" />`;
 
   // Róg do odcięcia - zakreskowany, czerwona ramka, żeby jednoznacznie
   // pokazać co znika.
   if (cutW > 0 && cutH > 0) {
-    svg += `<rect x="${ox + depth}" y="${oy + depth}" width="${cutW}" height="${cutH}" fill="#fee2e2" stroke="#dc2626" stroke-width="2" stroke-dasharray="5,4" />`;
+    svg += `<rect x="${ox + depth}" y="${oy + depth}" width="${cutW}" height="${cutH}" fill="#fee2e2" stroke="#dc2626" stroke-width="${strokeThick}" stroke-dasharray="${strokeThick * 2.5},${strokeThick * 2}" />`;
     const cutCx = ox + depth + cutW / 2;
     const cutCy = oy + depth + cutH / 2;
-    svg += `<text x="${cutCx}" y="${cutCy - 8}" font-size="15" fill="#b91c1c" font-weight="bold" text-anchor="middle">ODCIĄĆ</text>`;
-    svg += `<text x="${cutCx}" y="${cutCy + 12}" font-size="13" fill="#b91c1c" font-weight="bold" text-anchor="middle">${Math.round(cutW)}×${Math.round(cutH)} mm</text>`;
+    svg += `<text x="${cutCx}" y="${cutCy - fs * 0.5}" font-size="${fs}" fill="#b91c1c" font-weight="bold" text-anchor="middle">ODCIĄĆ</text>`;
+    svg += `<text x="${cutCx}" y="${cutCy + fs * 0.9}" font-size="${fsSmall}" fill="#b91c1c" font-weight="bold" text-anchor="middle">${Math.round(cutW)}×${Math.round(cutH)} mm</text>`;
   }
 
   // Realny obrys L po docięciu - wypełniony, na wierzchu.
-  svg += `<polygon points="${pts}" fill="#fef3c7" stroke="#334155" stroke-width="2.5" />`;
+  svg += `<polygon points="${pts}" fill="#fef3c7" stroke="#334155" stroke-width="${strokeThick * 1.3}" />`;
 
-  // Wymiary legA (góra) / legB (lewo) / depth (obie krawędzie węższego pasa).
-  const dim = (x1, y1, x2, y2, label, isH) => {
-    let s = `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#0f172a" stroke-width="1" />`;
-    const tx = isH ? (x1 + x2) / 2 : x1 - 8;
-    const ty = isH ? y1 - 8 : (y1 + y2) / 2;
-    s += `<text x="${tx}" y="${ty}" font-size="13" fill="#0f172a" font-weight="bold" text-anchor="${isH ? 'middle' : 'end'}">${label}</text>`;
+  // Wymiary legA (góra) / legB (lewo, obrócony o 90° - pozioma etykieta przy
+  // tak wąskim marginesie ucinałaby się poza viewBox, zgłoszony bug) / depth
+  // (obie krawędzie węższego pasa).
+  const dimOffset = margin * 0.4;
+  const dimH = (x1, y1, x2, label) => {
+    let s = `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y1}" stroke="#0f172a" stroke-width="${strokeThin}" />`;
+    s += `<text x="${(x1 + x2) / 2}" y="${y1 - fsSmall * 0.5}" font-size="${fsSmall}" fill="#0f172a" font-weight="bold" text-anchor="middle">${label}</text>`;
     return s;
   };
-  svg += dim(ox, oy - 20, ox + legA, oy - 20, `${Math.round(legA)} mm`, true);
-  svg += dim(ox - 20, oy, ox - 20, oy + legB, `${Math.round(legB)} mm`, false);
-  svg += dim(ox, oy + depth + 16, ox + legA, oy + depth + 16, `głębokość ramienia (przy krawędzi): ${Math.round(depth)} mm`, true);
+  const dimV = (x1, y1, y2, label) => {
+    let s = `<line x1="${x1}" y1="${y1}" x2="${x1}" y2="${y2}" stroke="#0f172a" stroke-width="${strokeThin}" />`;
+    const ty = (y1 + y2) / 2;
+    s += `<text x="${x1 - fsSmall * 0.5}" y="${ty}" font-size="${fsSmall}" fill="#0f172a" font-weight="bold" text-anchor="middle" transform="rotate(-90 ${x1 - fsSmall * 0.5} ${ty})">${label}</text>`;
+    return s;
+  };
+  svg += dimH(ox, oy - dimOffset, ox + legA, `${Math.round(legA)} mm`);
+  svg += dimV(ox - dimOffset, oy, oy + legB, `${Math.round(legB)} mm`);
+  svg += dimH(ox, oy + depth + dimOffset, ox + legA, `głębokość ramienia: ${Math.round(depth)} mm`);
 
   svg += `</svg>`;
   return svg;
