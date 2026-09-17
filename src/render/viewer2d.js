@@ -881,3 +881,61 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   svg += `</g></svg>`;
   return svg;
 }
+
+// Wykrój formatki narożnej w kształcie L (Wieniec narożny / Półka narożna,
+// engine/cabinet.js: getCornerCorpusParts) - do tej pory ich cut-listowy
+// opis "naroże do wycięcia - patrz rysunek 3D" nie odsyłał do żadnego
+// realnego, drukowalnego rysunku (tylko do interaktywnej sceny 3D) -
+// zgłoszony brak. Pokazuje pełny prostokątny blank legA×legB (linia
+// przerywana) i faktyczny obrys L po docięciu (linia ciągła, wypełniona) -
+// różnica między nimi to prostokąt (legA-depth)×(legB-depth) do odcięcia
+// z jednego rogu. Te same punkty co THREE.Shape w render/viewer3d.js:
+// renderCornerCabinet (`shape`), tylko w 2D i ze znakiem Y odwróconym do
+// zwykłego układu ekranowego (dodatni Y w dół).
+export function generateCornerBlankSVG(legA, legB, depth) {
+  const margin = 70;
+  const vbW = legA + margin * 2;
+  const vbH = legB + margin * 2;
+  const ox = margin, oy = margin;
+
+  const cutW = legA - depth; // szerokość odcinanego rogu
+  const cutH = legB - depth; // wysokość odcinanego rogu
+
+  const pts = [
+    [0, 0], [legA, 0], [legA, depth], [depth, depth], [depth, legB], [0, legB],
+  ].map(([x, y]) => `${ox + x},${oy + y}`).join(' ');
+
+  let svg = `<svg viewBox="0 0 ${vbW} ${vbH}" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif">`;
+
+  // Pełny prostokątny blank (przerywany) - to jest to, co realnie zamawia
+  // się/tnie z płyty jako pierwszy krok (patrz Lista formatek: legA×legB).
+  svg += `<rect x="${ox}" y="${oy}" width="${legA}" height="${legB}" fill="none" stroke="#94a3b8" stroke-width="2" stroke-dasharray="8,6" />`;
+
+  // Róg do odcięcia - zakreskowany, czerwona ramka, żeby jednoznacznie
+  // pokazać co znika.
+  if (cutW > 0 && cutH > 0) {
+    svg += `<rect x="${ox + depth}" y="${oy + depth}" width="${cutW}" height="${cutH}" fill="#fee2e2" stroke="#dc2626" stroke-width="2" stroke-dasharray="5,4" />`;
+    const cutCx = ox + depth + cutW / 2;
+    const cutCy = oy + depth + cutH / 2;
+    svg += `<text x="${cutCx}" y="${cutCy - 8}" font-size="15" fill="#b91c1c" font-weight="bold" text-anchor="middle">ODCIĄĆ</text>`;
+    svg += `<text x="${cutCx}" y="${cutCy + 12}" font-size="13" fill="#b91c1c" font-weight="bold" text-anchor="middle">${Math.round(cutW)}×${Math.round(cutH)} mm</text>`;
+  }
+
+  // Realny obrys L po docięciu - wypełniony, na wierzchu.
+  svg += `<polygon points="${pts}" fill="#fef3c7" stroke="#334155" stroke-width="2.5" />`;
+
+  // Wymiary legA (góra) / legB (lewo) / depth (obie krawędzie węższego pasa).
+  const dim = (x1, y1, x2, y2, label, isH) => {
+    let s = `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#0f172a" stroke-width="1" />`;
+    const tx = isH ? (x1 + x2) / 2 : x1 - 8;
+    const ty = isH ? y1 - 8 : (y1 + y2) / 2;
+    s += `<text x="${tx}" y="${ty}" font-size="13" fill="#0f172a" font-weight="bold" text-anchor="${isH ? 'middle' : 'end'}">${label}</text>`;
+    return s;
+  };
+  svg += dim(ox, oy - 20, ox + legA, oy - 20, `${Math.round(legA)} mm`, true);
+  svg += dim(ox - 20, oy, ox - 20, oy + legB, `${Math.round(legB)} mm`, false);
+  svg += dim(ox, oy + depth + 16, ox + legA, oy + depth + 16, `głębokość ramienia (przy krawędzi): ${Math.round(depth)} mm`, true);
+
+  svg += `</svg>`;
+  return svg;
+}
