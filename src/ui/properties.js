@@ -4,7 +4,7 @@ import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
 import { calculateParts } from "../engine/cabinet.js";
 import { calculateHinges } from "../core/hingeMath.js";
-import { getTraverseConfig, clampModuleToRoom, restModuleOnNeighbors } from "../core/layout.js";
+import { getTraverseConfig, clampModuleToRoom, restModuleOnNeighbors, getCornerDepths } from "../core/layout.js";
 import { drawerSystems, DRAWER_VARIANT_ORDER, DRAWER_VARIANT_LABELS } from "../core/drawerSystems.js";
 import { getDrawerVariant } from "../core/drawerMath.js";
 import { escapeHtml } from "../utils/dom.js";
@@ -134,10 +134,10 @@ function renderSidePanelProperties(rightSidebar, panel) {
 function openCornerBlankPrintView(mod) {
   const legA = parseFloat(mod.dimensions.width) || 860;
   const legB = parseFloat(mod.dimensions.legB) || 860;
-  const depth = parseFloat(mod.dimensions.depth) || 540;
+  const { depthA, depthB } = getCornerDepths(mod);
   const shelfCount = (mod.elements || []).filter(el => el.typ === 'poziom-narozny').length;
 
-  const svgContent = generateCornerBlankSVG(legA, legB, depth);
+  const svgContent = generateCornerBlankSVG(legA, legB, depthA, depthB);
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -188,7 +188,7 @@ function openCornerBlankPrintView(mod) {
 function renderCornerModuleProperties(rightSidebar, mod) {
   const legA = parseFloat(mod.dimensions.width) || 0;
   const legB = parseFloat(mod.dimensions.legB) || 0;
-  const depth = parseFloat(mod.dimensions.depth) || 0;
+  const { depthA, depthB } = getCornerDepths(mod);
   const height = parseFloat(mod.dimensions.height) || 0;
 
   rightSidebar.innerHTML = `
@@ -199,7 +199,7 @@ function renderCornerModuleProperties(rightSidebar, mod) {
     </div>
 
     <div class="property-group" style="font-size: 12px; color: #475569; margin-bottom: 10px;">
-      Ramię A: <b>${legA}</b> mm · Ramię B: <b>${legB}</b> mm · Głębokość: <b>${depth}</b> mm · Wysokość: <b>${height}</b> mm
+      Ramię A: <b>${legA}</b> mm · Ramię B: <b>${legB}</b> mm · Głębokość A/B: <b>${depthA}/${depthB}</b> mm · Wysokość: <b>${height}</b> mm
     </div>
     <button type="button" id="btn-corner-configure" class="btn btn-block" style="background:#2563eb; color:#fff; margin-bottom: 8px;">⚙️ Konfiguruj szafkę narożną</button>
     <button type="button" id="btn-corner-blank-print" class="btn btn-block btn-sm" style="margin-bottom: 15px;">📄 Wykrój narożny (jak wyciąć wieniec/półkę)</button>

@@ -8,7 +8,7 @@ import { state, DEFAULT_ROOM } from '../core/state.js';
 import { getDrawerComponents, calculateDrawerHoles } from '../core/drawerMath.js';
 import { drawerSystems } from '../core/drawerSystems.js';
 import { calculateHinges } from '../core/hingeMath.js';
-import { recalculateLayout, getTraverseConfig, getWorldFootprint, clampModuleToRoom, getModuleBox } from '../core/layout.js';
+import { recalculateLayout, getTraverseConfig, getWorldFootprint, clampModuleToRoom, getModuleBox, getCornerDepths } from '../core/layout.js';
 import { buildZoneTree, moveSplit } from '../core/zoneTree.js';
 import { scheduleCheckpoint } from '../core/history.js';
 import { toggleInteriorEditor, renderInteriorEditorIfVisible } from '../ui/interiorEditor.js';
@@ -1072,7 +1072,11 @@ function addCornerPanel(shape, thickness, y, isActiveModule, userData, parentGro
 function renderCornerCabinet(mod, isActive, th) {
   const legA = parseFloat(mod.dimensions.width) || 860;
   const legB = parseFloat(mod.dimensions.legB) || 860;
-  const depth = parseFloat(mod.dimensions.depth) || 540;
+  // Każde ramię ma WŁASNĄ głębokość (core/layout.js: getCornerDepths) -
+  // zgłoszona korekta, wcześniej jedna wspólna "depth" dla obu ramion.
+  // depthA mierzona wzdłuż Z (głębokość ramienia A, biegnącego wzdłuż X),
+  // depthB wzdłuż X (głębokość ramienia B, biegnącego wzdłuż Z).
+  const { depthA, depthB } = getCornerDepths(mod);
   const H = parseFloat(mod.dimensions.height) || 720;
 
   let baseOffsetY = 0;
@@ -1104,8 +1108,8 @@ function renderCornerCabinet(mod, isActive, th) {
   // wpuszczane), a nie jako osobna płyta przykładana na zamkniętą od tyłu
   // krawędź boków.
   const backThick = 3;
-  addBox(th, H, depth - backThick, legA - th, posY, backThick, 'corpus', isActive, udCorp, innerGroup);
-  addBox(depth - backThick, H, th, backThick, posY, legB - th, 'corpus', isActive, udCorp, innerGroup);
+  addBox(th, H, depthA - backThick, legA - th, posY, backThick, 'corpus', isActive, udCorp, innerGroup);
+  addBox(depthB - backThick, H, th, backThick, posY, legB - th, 'corpus', isActive, udCorp, innerGroup);
 
   // --- Wieniec dolny/górny: obrys L, ostry kąt 90° (bez ścięcia) ---
   // THREE.Shape rysuje w płaszczyźnie XY, a addCornerPanel obraca wytłoczoną
@@ -1113,12 +1117,17 @@ function renderCornerCabinet(mod, isActive, th) {
   // Y kształtu na ŚWIATOWE -Z, więc podajemy tu od razu -Z (drugi argument
   // lineTo), żeby po obrocie wylądować na +Z, zgodnie z resztą lokalnego
   // układu (boki/plecy liczone są dla Z rosnącego w stronę pokoju).
+  // Narożny "kwadrat" (a od teraz prostokąt, gdy depthA≠depthB) ma rogi
+  // (depthB, depthA) - X-owa krawędź wcięcia wyznaczona jest przez głębokość
+  // DRUGIEGO ramienia (B), bo to ono fizycznie sięga aż tam wzdłuż X (i
+  // odwrotnie dla Z/depthA) - patrz core/layout.js: getCornerArmRect,
+  // komentarz przy otherDepth.
   const shape = new THREE.Shape();
   shape.moveTo(0, 0);
   shape.lineTo(legA, 0);
-  shape.lineTo(legA, -depth);
-  shape.lineTo(depth, -depth);
-  shape.lineTo(depth, -legB);
+  shape.lineTo(legA, -depthA);
+  shape.lineTo(depthB, -depthA);
+  shape.lineTo(depthB, -legB);
   shape.lineTo(0, -legB);
   shape.closePath();
   addCornerPanel(shape, th, posY, isActive, udCorp, innerGroup);
@@ -1161,23 +1170,27 @@ function renderCornerCabinet(mod, isActive, th) {
       const udFront = { moduleId: mod.id, type: 'front', frontId: front.id };
 
       if (front.cornerArm === 'A') {
-          // Ramię A biegnie wzdłuż +X, front na jego czole (Z=depth):
-          // lokalny front.x (0..widthA) mapuje się na X = depth + front.x.
-          addBox(fw, fh, th, depth + fx, posY + fy, depth, 'front', isActive, udFront, innerGroup);
+          // Ramię A biegnie wzdłuż +X, front na jego czole (Z=depthA): lokalny
+          // front.x (0..widthA) mapuje się na X = depthB + front.x (bieg
+          // ramienia A zaczyna się dopiero za narożnym prostokątem, którego
+          // szerokość w X wyznacza głębokość DRUGIEGO ramienia - depthB).
+          addBox(fw, fh, th, depthB + fx, posY + fy, depthA, 'front', isActive, udFront, innerGroup);
       } else {
-          // Ramię B biegnie wzdłuż +Z, front na jego czole (X=depth):
-          // lokalny front.x (0..widthB) mapuje się na Z = depth + front.x.
-          addBox(th, fh, fw, depth, posY + fy, depth + fx, 'front', isActive, udFront, innerGroup);
+          // Ramię B biegnie wzdłuż +Z, front na jego czole (X=depthB):
+          // lokalny front.x (0..widthB) mapuje się na Z = depthA + front.x.
+          addBox(th, fh, fw, depthB, posY + fy, depthA + fx, 'front', isActive, udFront, innerGroup);
       }
   });
 
   // --- Półki/przegrody wewnątrz ramion (poziom/pion z cornerArm) ---
   // Ten sam lokalny układ 2D (x wzdłuż ramienia, y = wysokość) co fronty
-  // wyżej, tylko rozciągnięte na całą głębokość ramienia (jak shelfDepth w
-  // generycznej ścieżce renderowania niżej w tym pliku), a nie tylko o
-  // grubość th jak front. Głębokość liczona od płyty pleców (backThick) do
-  // tuż przed czołem frontu (-2mm), żeby nie kolidować z drzwiami.
-  const armInnerDepth = Math.max(10, depth - 2 - backThick);
+  // wyżej, tylko rozciągnięte na całą głębokość WŁASNEGO ramienia (jak
+  // shelfDepth w generycznej ścieżce renderowania niżej w tym pliku), a nie
+  // tylko o grubość th jak front. Głębokość liczona od płyty pleców
+  // (backThick) do tuż przed czołem frontu (-2mm), żeby nie kolidować z
+  // drzwiami - osobno dla każdego ramienia (depthA/depthB).
+  const armInnerDepthA = Math.max(10, depthA - 2 - backThick);
+  const armInnerDepthB = Math.max(10, depthB - 2 - backThick);
   (mod.elements || []).forEach(el => {
       if (el.typ !== 'poziom' && el.typ !== 'pion') return;
       if (el.cornerArm !== 'A' && el.cornerArm !== 'B') return;
@@ -1188,9 +1201,9 @@ function renderCornerCabinet(mod, isActive, th) {
       const udShelf = { moduleId: mod.id, type: 'shelf', elementId: el.id };
 
       if (el.cornerArm === 'A') {
-          addBox(ew, eh, armInnerDepth, depth + ex, posY + ey, backThick, 'shelf', isActive, udShelf, innerGroup);
+          addBox(ew, eh, armInnerDepthA, depthB + ex, posY + ey, backThick, 'shelf', isActive, udShelf, innerGroup);
       } else {
-          addBox(armInnerDepth, eh, ew, backThick, posY + ey, depth + ex, 'shelf', isActive, udShelf, innerGroup);
+          addBox(armInnerDepthB, eh, ew, backThick, posY + ey, depthA + ex, 'shelf', isActive, udShelf, innerGroup);
       }
   });
 
@@ -1207,9 +1220,9 @@ function renderCornerCabinet(mod, isActive, th) {
       const udLeg = { moduleId: mod.id, type: 'plinth' };
       addBox(30, legH, 30, 50, rootY, 50, 'corpus', false, udLeg, innerGroup);
       addBox(30, legH, 30, legA - 80, rootY, 50, 'corpus', false, udLeg, innerGroup);
-      addBox(30, legH, 30, legA - 80, rootY, depth - 80, 'corpus', false, udLeg, innerGroup);
+      addBox(30, legH, 30, legA - 80, rootY, depthA - 80, 'corpus', false, udLeg, innerGroup);
       addBox(30, legH, 30, 50, rootY, legB - 80, 'corpus', false, udLeg, innerGroup);
-      addBox(30, legH, 30, depth - 80, rootY, legB - 80, 'corpus', false, udLeg, innerGroup);
+      addBox(30, legH, 30, depthB - 80, rootY, legB - 80, 'corpus', false, udLeg, innerGroup);
   }
 
   cabinetGroup.add(modGroup);

@@ -3,7 +3,7 @@ import { state } from "../core/state.js";
 import { calculateDrawerHoles, getDrawerComponents } from "../core/drawerMath.js";
 import { drawerSystems } from "../core/drawerSystems.js";
 import { calculateHinges } from "../core/hingeMath.js";
-import { recalculateAllLayouts, getTraverseConfig, getWorldFootprint } from "../core/layout.js";
+import { recalculateAllLayouts, getTraverseConfig, getWorldFootprint, getCornerDepths } from "../core/layout.js";
 
 export function calculateParts() {
   // Fronty muszą mieć aktualne el.x/y/w/h zanim policzymy z nich formatki.
@@ -621,7 +621,7 @@ function getCornerCorpusParts(mod, config) {
   const parts = [];
   const legA = parseFloat(mod.dimensions.width) || 860;
   const legB = parseFloat(mod.dimensions.legB) || 860;
-  const depth = parseFloat(mod.dimensions.depth) || 540;
+  const { depthA, depthB } = getCornerDepths(mod);
   const height = parseFloat(mod.dimensions.height) || 720;
   const th = parseFloat(config.materials?.boardThickness) || 18;
   const backThick = parseFloat(config.materials?.backThickness) || 3;
@@ -629,9 +629,11 @@ function getCornerCorpusParts(mod, config) {
 
   // Boki skrócone od tyłu o backThick - plecy "nakładane" (render/viewer3d.js:
   // renderCornerCabinet), tak samo jak sideDepth = depth - backThick w
-  // getCorpusParts() dla zwykłego modułu.
-  parts.push({ name: "Bok narożny (Ramię A)", length: parseFloat(height.toFixed(1)), width: parseFloat((depth - backThick).toFixed(1)), qty: 1, category: "Korpus" });
-  parts.push({ name: "Bok narożny (Ramię B)", length: parseFloat(height.toFixed(1)), width: parseFloat((depth - backThick).toFixed(1)), qty: 1, category: "Korpus" });
+  // getCorpusParts() dla zwykłego modułu. Każde ramię ma TERAZ własną
+  // głębokość (depthA/depthB, core/layout.js: getCornerDepths) - zgłoszona
+  // korekta, wcześniej jedna wspólna "depth" dla obu.
+  parts.push({ name: "Bok narożny (Ramię A)", length: parseFloat(height.toFixed(1)), width: parseFloat((depthA - backThick).toFixed(1)), qty: 1, category: "Korpus" });
+  parts.push({ name: "Bok narożny (Ramię B)", length: parseFloat(height.toFixed(1)), width: parseFloat((depthB - backThick).toFixed(1)), qty: 1, category: "Korpus" });
 
   const wieniecName = `Wieniec narożny ${Math.round(legA)}x${Math.round(legB)} (naroże do wycięcia - patrz rysunek 3D)`;
   parts.push({ name: wieniecName, length: parseFloat(legA.toFixed(1)), width: parseFloat(legB.toFixed(1)), qty: 2, category: "Korpus" });
@@ -671,17 +673,26 @@ function getInteriorParts(mod, config) {
   const board = config.materials.boardThickness;
   const backThick = config.materials.backThickness;
   const backP = mod.backPanel || { type: 'nakladane', offset: 16 };
-  
+
   const f = { ...(config.front || {}), ...(mod.front || {}) };
   const frontType = f.type || 'nakladane';
   const isInset = frontType === 'wpuszczane';
 
-  const topBottomDepth = backP.type === 'nut' ? depth - backP.offset - backThick : depth - backThick;
-  const innerPartDepth = topBottomDepth - (isInset ? board : 0);
+  const depthFor = (d) => (backP.type === 'nut' ? d - backP.offset - backThick : d - backThick) - (isInset ? board : 0);
+  const innerPartDepth = depthFor(depth);
+  // Szafka narożna ma DWIE niezależne głębokości ramion (core/layout.js:
+  // getCornerDepths) - półka/przegroda w ramieniu B musi liczyć się z
+  // depthB, nie ze wspólnym `depth` (=depthA) jak reszta modułów, inaczej
+  // przy depthA≠depthB formatka wychodziłaby błędnej głębokości.
+  const cornerDepths = mod.type === 'corner_cabinet' ? getCornerDepths(mod) : null;
+  const innerPartDepthForEl = (el) => {
+    if (!cornerDepths) return innerPartDepth;
+    return depthFor(el.cornerArm === 'B' ? cornerDepths.depthB : cornerDepths.depthA);
+  };
 
   mod.elements.forEach(el => {
     if (el.typ === 'pion') {
-      parts.push({ name: `Przegroda pionowa`, length: parseFloat((el.h || 0).toFixed(1)), width: innerPartDepth, qty: 1, category: "Korpus" });
+      parts.push({ name: `Przegroda pionowa`, length: parseFloat((el.h || 0).toFixed(1)), width: innerPartDepthForEl(el), qty: 1, category: "Korpus" });
     } else if (el.typ === 'poziom' && !el.isStructural) {
       // NAPRAWA: sama nazwa "P<szerokość_modułu>" myliła, gdy przegroda pionowa
       // dzieli moduł na wnęki węższe niż cały korpus - półka miała np. 458mm,
@@ -690,7 +701,7 @@ function getInteriorParts(mod, config) {
       // w nazwie w nawiasie - zawsze, niezależnie czy półka jest na całą
       // szerokość czy nie, żeby format był przewidywalny na liście formatek.
       const realW = Math.round(el.w || 0);
-      parts.push({ name: `P${width} (${realW})`, length: parseFloat((el.w || 0).toFixed(1)), width: innerPartDepth - 5, qty: 1, category: "Korpus" });
+      parts.push({ name: `P${width} (${realW})`, length: parseFloat((el.w || 0).toFixed(1)), width: innerPartDepthForEl(el) - 5, qty: 1, category: "Korpus" });
     }
   });
 

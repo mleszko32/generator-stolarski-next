@@ -380,6 +380,19 @@ export function recalculateLayout(mod) {
   });
 }
 
+// Głębokości obu ramion szafki narożnej - NIEZALEŻNE (zgłoszona korekta:
+// realne kuchnie/zabudowy miewają różną głębokość na każdej ścianie, np.
+// blat 600mm z jednej strony i 560mm z drugiej). `mod.dimensions.depth`
+// pozostaje głębokością ramienia A (bez zmiany nazwy pola - kompatybilność
+// wstecz z zapisanymi projektami), nowe `mod.dimensions.depthB` to głębokość
+// ramienia B, domyślnie równa depth (stary zapisany projekt bez depthB
+// zachowuje się DOKŁADNIE jak dziś - symetrycznie).
+export function getCornerDepths(mod) {
+  const depthA = parseFloat(mod.dimensions.depth) || 540;
+  const depthB = parseFloat(mod.dimensions.depthB) || depthA;
+  return { depthA, depthB };
+}
+
 // Szafka narożna, kąt prosty bez ścięcia (mod.type === 'corner_cabinet',
 // core/state.js: addCornerModule). Zwraca "strefę" ramienia A/B - prostokąt
 // w LOKALNYCH współrzędnych tego ramienia (0,0 = wewnętrzny narożnik boku i
@@ -391,20 +404,26 @@ export function getCornerArmRect(mod, arm) {
   const th = parseFloat(state.project.materials?.boardThickness) || 18;
   const legA = parseFloat(mod.dimensions.width) || 860;
   const legB = parseFloat(mod.dimensions.legB) || 860;
-  const depth = parseFloat(mod.dimensions.depth) || 540;
+  const { depthA, depthB } = getCornerDepths(mod);
   const height = parseFloat(mod.dimensions.height) || 720;
   const leg = arm === 'A' ? legA : legB;
+  // Ile z biegu TEGO ramienia zjada narożny "kwadrat" (a od teraz prostokąt,
+  // bo depthA≠depthB możliwe) zależy od głębokości DRUGIEGO ramienia - to ono
+  // fizycznie sięga w poprzek aż do linii otherDepth (patrz render/viewer3d.js:
+  // renderCornerCabinet, shape). Przy depthA===depthB (domyślnie, stare
+  // projekty) to dokładnie ta sama wartość co wcześniej.
+  const otherDepth = arm === 'A' ? depthB : depthA;
 
-  // Reszta danego ramienia poza strefą wspólnego narożnika (depth), pomniejszona
+  // Reszta danego ramienia poza strefą wspólnego narożnika (otherDepth), pomniejszona
   // dodatkowo o grubość frontu SĄSIEDNIEGO ramienia (cornerGap) - oba fronty mają
-  // swój płat grubości `th` sięgający dokładnie do linii `depth` w OSI DRUGIEGO
+  // swój płat grubości `th` sięgający dokładnie do linii `otherDepth` w OSI DRUGIEGO
   // ramienia (patrz render/viewer3d.js: renderCornerCabinet), więc bez tego
   // odsunięcia ich bliższe naroża fizycznie by się przenikały w rogu (zgłoszone
   // jako "fronty jakoś wystają"). minX/maxX są przesunięte o cornerGap, żeby
   // dalsza (zewnętrzna, przy boku) krawędź frontu została DOKŁADNIE tam, gdzie
   // była wcześniej - zmienia się tylko krawędź bliżej narożnika.
   const cornerGap = th;
-  const width = Math.max(50, leg - depth - th - cornerGap);
+  const width = Math.max(50, leg - otherDepth - th - cornerGap);
 
   // Zgłoszona korekta "fronty wystają poza szafkę": recalculateLayout() dokłada
   // na krawędzi forceOuterRight standardowy zakład "nakładane" (th - cRight,

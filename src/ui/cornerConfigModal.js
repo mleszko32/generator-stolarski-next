@@ -5,11 +5,12 @@
 // ma Zapisz/Anuluj - tak jak reszta aplikacji, edycje mutują state.project na
 // żywo (patrz CLAUDE.md: "Update flow"), więc "Zamknij" to jedyny przycisk.
 //
-// Wymiary ramion (legA/legB/depth/height) są bound-based (core/layout.js:
-// getCornerArmRect, resolveowane w recalculateLayout) - zmiana wymiaru tu NIE
-// wymaga ręcznego przeliczenia zon frontów, tylko update3D() (który i tak
-// woła recalculateAllLayouts) + odświeżenie obu edytorów wnętrza poniżej,
-// żeby zobaczyć nowy układ.
+// Wymiary ramion (legA/legB/depthA/depthB/height, core/layout.js:
+// getCornerDepths - depthA/depthB niezależne per ramię) są bound-based
+// (core/layout.js: getCornerArmRect, resolveowane w recalculateLayout) -
+// zmiana wymiaru tu NIE wymaga ręcznego przeliczenia zon frontów, tylko
+// update3D() (który i tak woła recalculateAllLayouts) + odświeżenie obu
+// edytorów wnętrza poniżej, żeby zobaczyć nowy układ.
 import { escapeHtml } from "../utils/dom.js";
 import { evalDimensionExpr } from "../utils/math.js";
 import { update3D } from "../render/viewer3d.js";
@@ -17,6 +18,7 @@ import { updateSidebar } from "./sidebar.js";
 import { initPropertiesPanel } from "./properties.js";
 import { createZoneEditor } from "./interiorEditor.js";
 import { generateCornerBlankSVG } from "../render/viewer2d.js";
+import { getCornerDepths } from "../core/layout.js";
 
 export function openCornerConfigModal(mod) {
   const overlay = document.createElement('div');
@@ -42,7 +44,8 @@ export function openCornerConfigModal(mod) {
       <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
         <div class="property-group" style="flex:1; min-width:150px;"><label>Szerokość wieńca — Ramię A (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-legA" value="${mod.dimensions.width}" /></div>
         <div class="property-group" style="flex:1; min-width:150px;"><label>Wysokość wieńca — Ramię B (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-legB" value="${mod.dimensions.legB}" /></div>
-        <div class="property-group" style="flex:1; min-width:150px;"><label>Głębokość ramion (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-depth" value="${mod.dimensions.depth}" /></div>
+        <div class="property-group" style="flex:1; min-width:150px;"><label>Głębokość ramienia A — lewy bok (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-depthA" value="${getCornerDepths(mod).depthA}" /></div>
+        <div class="property-group" style="flex:1; min-width:150px;"><label>Głębokość ramienia B — prawy bok (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-depthB" value="${getCornerDepths(mod).depthB}" /></div>
         <div class="property-group" style="flex:1; min-width:150px;"><label>Wysokość korpusu (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-height" value="${mod.dimensions.height}" /></div>
       </div>
       <div id="corner-blank-cutout-info" style="font-size:14px; color:#b91c1c; font-weight:bold; margin-bottom:6px;"></div>
@@ -84,11 +87,11 @@ export function openCornerConfigModal(mod) {
   armAEditor.render();
   armBEditor.render();
 
-  // Podgląd wykroju na żywo - te same 3 liczby (legA/legB/depth), które
-  // sterują polami wyżej, w pełni określają kształt L (patrz
+  // Podgląd wykroju na żywo - te same 4 liczby (legA/legB/depthA/depthB),
+  // które sterują polami wyżej, w pełni określają kształt L (patrz
   // render/viewer2d.js: generateCornerBlankSVG - ten sam generator, którego
   // używa "📄 Wykrój narożny" w ui/properties.js do druku). "Wycięcie" nie
-  // jest osobnym, niezależnym polem - to policzony (legA-depth)×(legB-depth)
+  // jest osobnym, niezależnym polem - to policzony (legA-depthB)×(legB-depthA)
   // róg, pokazany tu jako informacja zwrotna, żeby było widać efekt wpisanych
   // wymiarów tak samo, jak na wydrukowanym wykroju.
   const blankPreviewEl = modal.querySelector('#corner-blank-preview');
@@ -97,10 +100,10 @@ export function openCornerConfigModal(mod) {
   function renderBlankPreview() {
     const legA = parseFloat(mod.dimensions.width) || 0;
     const legB = parseFloat(mod.dimensions.legB) || 0;
-    const depth = parseFloat(mod.dimensions.depth) || 0;
-    blankPreviewEl.innerHTML = generateCornerBlankSVG(legA, legB, depth);
-    const cutW = legA - depth;
-    const cutH = legB - depth;
+    const { depthA, depthB } = getCornerDepths(mod);
+    blankPreviewEl.innerHTML = generateCornerBlankSVG(legA, legB, depthA, depthB);
+    const cutW = legA - depthB;
+    const cutH = legB - depthA;
     cutoutInfoEl.textContent = (cutW > 0 && cutH > 0)
       ? `Wycięcie (róg do odcięcia): ${Math.round(cutW)} × ${Math.round(cutH)} mm`
       : '';
@@ -190,7 +193,8 @@ export function openCornerConfigModal(mod) {
 
   bindDim('#input-corner-modal-legA', v => mod.dimensions.width = v);
   bindDim('#input-corner-modal-legB', v => mod.dimensions.legB = v);
-  bindDim('#input-corner-modal-depth', v => mod.dimensions.depth = v);
+  bindDim('#input-corner-modal-depthA', v => mod.dimensions.depth = v);
+  bindDim('#input-corner-modal-depthB', v => mod.dimensions.depthB = v);
   bindDim('#input-corner-modal-height', v => mod.dimensions.height = v);
 
   const close = () => {
