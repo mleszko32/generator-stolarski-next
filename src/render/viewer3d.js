@@ -17,6 +17,12 @@ import { updateSidebar } from '../ui/sidebar.js';
 import { initPropertiesPanel } from '../ui/properties.js';
 
 let alignMode = { active: false, sourceMod: null, sourceEl: null, banner: null };
+// Miarka - tryb "klik pierwszy punkt, klik drugi punkt" w scenie 3D, do
+// szybkiego sprawdzania dowolnego odstępu bez liczenia ręcznie (zgłoszona
+// prośba). Punkty łapane raycasterem z DOWOLNEJ widocznej powierzchni
+// (szafki, ściany, podłoga) - nie tylko elementów modułu jak handle3DClick.
+let measureMode = { active: false, pointA: null, banner: null, btn: null };
+let measureGroup;
 let isXrayMode = true;
 let isFrontsVisible = true;
 
@@ -325,11 +331,18 @@ export function init3DViewer() {
   cabinetGroup = new THREE.Group();
   scene.add(cabinetGroup);
 
+  // Miarka (measureMode niżej) - osobna grupa DOTAJĘTA WPROST DO SCENE, nie
+  // do cabinetGroup, bo update3D() czyści cabinetGroup przy KAŻDYM
+  // przeliczeniu (np. przy zwykłym wpisywaniu w polach) - markery/linia
+  // pomiaru musiałyby znikać przy każdej niepowiązanej zmianie.
+  measureGroup = new THREE.Group();
+  scene.add(measureGroup);
+
   reframeCameraToRoom();
 
   renderer.domElement.addEventListener('pointerdown', (e) => {
       pointerDownPos.set(e.clientX, e.clientY);
-      if (alignMode.active) return;
+      if (alignMode.active || measureMode.active) return;
 
       const rect = renderer.domElement.getBoundingClientRect();
       mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -747,9 +760,21 @@ export function init3DViewer() {
       }
   };
 
+  const toggleMeasureBtn = document.createElement('button');
+  toggleMeasureBtn.innerText = '📏 Miarka';
+  toggleMeasureBtn.title = 'Kliknij dwa punkty na scenie, żeby zmierzyć odległość między nimi';
+  Object.assign(toggleMeasureBtn.style, {
+      padding: '10px 16px', background: '#f59e0b', color: '#fff', border: 'none',
+      borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px',
+      boxShadow: '0 4px 6px rgba(0,0,0,0.1)', transition: 'background 0.2s'
+  });
+  toggleMeasureBtn.onclick = () => toggleMeasureMode();
+  measureMode.btn = toggleMeasureBtn;
+
   uiOverlay.appendChild(toggleBtn);
   uiOverlay.appendChild(toggleFrontsBtn);
   uiOverlay.appendChild(toggleInteriorBtn);
+  uiOverlay.appendChild(toggleMeasureBtn);
   // NAPRAWA: overlay wpięty w .center-panel (nie w #editor-3d-container), bo
   // przełącznik "Wnętrze 2D" chowa cały #editor-3d-container display:none —
   // gdyby overlay był jego dzieckiem, przycisk powrotu do 3D zniknąłby razem z nim.
@@ -771,6 +796,117 @@ function animate() {
   controls.update();
   updateWallVisibility();
   renderer.render(scene, camera);
+}
+
+// Miarka - "klik pierwszy punkt, klik drugi punkt", odległość w mm (jednostki
+// sceny Three.js SĄ milimetrami w całej appce, patrz CLAUDE.md). Markery/
+// linia to zwykłe siatki w measureGroup (dodanej wprost do scene, nie do
+// cabinetGroup - przeżywają update3D()), depthTest:false żeby zawsze były
+// widoczne na wierzchu, niezależnie co akurat zasłania dany punkt.
+export function toggleMeasureMode() {
+  if (measureMode.active) exitMeasureMode(); else enterMeasureMode();
+}
+
+export function isMeasureModeActive() {
+  return measureMode.active;
+}
+
+function enterMeasureMode() {
+  measureMode.active = true;
+  measureMode.pointA = null;
+  clearMeasureVisuals();
+  ensureMeasureBanner();
+  setMeasureBannerText('📏 Kliknij pierwszy punkt do zmierzenia...');
+  if (measureMode.btn) {
+      measureMode.btn.innerText = '📏 Wyłącz miarkę';
+      measureMode.btn.style.background = '#b45309';
+  }
+}
+
+function exitMeasureMode() {
+  measureMode.active = false;
+  measureMode.pointA = null;
+  clearMeasureVisuals();
+  if (measureMode.banner) { measureMode.banner.remove(); measureMode.banner = null; }
+  if (measureMode.btn) {
+      measureMode.btn.innerText = '📏 Miarka';
+      measureMode.btn.style.background = '#f59e0b';
+  }
+}
+
+function clearMeasureVisuals() {
+  if (!measureGroup) return;
+  while (measureGroup.children.length > 0) measureGroup.remove(measureGroup.children[0]);
+}
+
+function addMeasurePoint(point) {
+  const geo = new THREE.SphereGeometry(6, 12, 12);
+  const mat = new THREE.MeshBasicMaterial({ color: 0xf59e0b, depthTest: false });
+  const sphere = new THREE.Mesh(geo, mat);
+  sphere.position.copy(point);
+  sphere.renderOrder = 999;
+  measureGroup.add(sphere);
+}
+
+function addMeasureLine(a, b) {
+  const geo = new THREE.BufferGeometry().setFromPoints([a, b]);
+  const mat = new THREE.LineBasicMaterial({ color: 0xf59e0b, depthTest: false });
+  const line = new THREE.Line(geo, mat);
+  line.renderOrder = 999;
+  measureGroup.add(line);
+}
+
+function ensureMeasureBanner() {
+  if (measureMode.banner) return measureMode.banner;
+  const banner = document.createElement('div');
+  Object.assign(banner.style, {
+      position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)',
+      background: '#f59e0b', color: 'white', padding: '12px 24px', borderRadius: '8px',
+      fontWeight: 'bold', zIndex: '2000', boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+      display: 'flex', alignItems: 'center', gap: '15px', fontFamily: 'sans-serif', fontSize: '14px'
+  });
+  const textSpan = document.createElement('span');
+  const closeBtn = document.createElement('button');
+  closeBtn.innerText = 'Zamknij miarkę';
+  Object.assign(closeBtn.style, { background: 'white', color: '#b45309', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' });
+  closeBtn.onclick = (e) => { e.stopPropagation(); exitMeasureMode(); };
+  banner.appendChild(textSpan);
+  banner.appendChild(closeBtn);
+  banner._textSpan = textSpan;
+  (container || document.body).appendChild(banner);
+  measureMode.banner = banner;
+  return banner;
+}
+
+function setMeasureBannerText(text) {
+  const banner = ensureMeasureBanner();
+  banner._textSpan.innerText = text;
+}
+
+// Raycast BEZ ograniczenia do obj.userData.moduleId (w przeciwieństwie do
+// zwykłego handle3DClick) - miarka ma łapać punkt na DOWOLNEJ widocznej
+// powierzchni: szafce, ścianie, podłodze.
+function handleMeasureClick() {
+  raycaster.setFromCamera(mouse, camera);
+  const targets = [cabinetGroup, roomGroup].filter(Boolean);
+  if (targets.length === 0) return;
+  const hits = raycaster.intersectObjects(targets, true).filter(h => !h.object.userData?.isMeasureTool);
+  if (hits.length === 0) return;
+
+  const point = hits[0].point.clone();
+
+  if (!measureMode.pointA) {
+      clearMeasureVisuals();
+      measureMode.pointA = point;
+      addMeasurePoint(point);
+      setMeasureBannerText('📏 Kliknij drugi punkt...');
+  } else {
+      addMeasurePoint(point);
+      addMeasureLine(measureMode.pointA, point);
+      const distMm = Math.round(measureMode.pointA.distanceTo(point));
+      setMeasureBannerText(`📏 Odległość: ${distMm} mm — kliknij, żeby zmierzyć od nowa`);
+      measureMode.pointA = null;
+  }
 }
 
 export function enterAlignMode(mod, el) {
@@ -833,6 +969,11 @@ function handle3DClick(event) {
   const rect = renderer.domElement.getBoundingClientRect();
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+  if (measureMode.active) {
+      handleMeasureClick();
+      return;
+  }
 
   raycaster.setFromCamera(mouse, camera);
   const intersects = raycaster.intersectObjects(cabinetGroup.children, true);
