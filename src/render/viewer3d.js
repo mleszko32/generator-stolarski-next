@@ -23,6 +23,14 @@ let alignMode = { active: false, sourceMod: null, sourceEl: null, banner: null }
 // (szafki, ściany, podłoga) - nie tylko elementów modułu jak handle3DClick.
 let measureMode = { active: false, pointA: null, banner: null, btn: null };
 let measureGroup;
+// Punkt pod kursorem (dokładnie ten, który zatwierdza klik - WYSIWYG),
+// przyciągany do najbliższego rogu bryły w promieniu SNAP_PX pikseli
+// ekranu, jeśli taki się znajdzie w zasięgu (zgłoszona prośba o precyzję).
+const measureHoverMouse = new THREE.Vector2();
+let measureHoverPoint = null;
+let measureHoverSnapped = false;
+let measureHoverMarker = null;
+const MEASURE_SNAP_PX = 20;
 let isXrayMode = true;
 let isFrontsVisible = true;
 
@@ -698,6 +706,16 @@ export function init3DViewer() {
       }
   });
 
+  // Tylko aktualizuje współrzędne kursora (tanie) - faktyczny raycast/snap
+  // (updateMeasureHover) liczy się raz na klatkę w animate(), nie na każdy
+  // mousemove (który potrafi odpalać się kilkaset razy/s).
+  renderer.domElement.addEventListener('mousemove', (e) => {
+      if (!measureMode.active) return;
+      const r = renderer.domElement.getBoundingClientRect();
+      measureHoverMouse.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+      measureHoverMouse.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+  });
+
   const uiOverlay = document.createElement('div');
   uiOverlay.style.position = 'absolute';
   uiOverlay.style.top = '15px';
@@ -795,6 +813,7 @@ function animate() {
   requestAnimationFrame(animate);
   controls.update();
   updateWallVisibility();
+  if (measureMode.active) updateMeasureHover();
   renderer.render(scene, camera);
 }
 
@@ -815,6 +834,7 @@ function enterMeasureMode() {
   measureMode.active = true;
   measureMode.pointA = null;
   clearMeasureVisuals();
+  ensureHoverMarker();
   ensureMeasureBanner();
   setMeasureBannerText('📏 Kliknij pierwszy punkt do zmierzenia...');
   if (measureMode.btn) {
@@ -826,7 +846,9 @@ function enterMeasureMode() {
 function exitMeasureMode() {
   measureMode.active = false;
   measureMode.pointA = null;
+  measureHoverPoint = null;
   clearMeasureVisuals();
+  if (measureHoverMarker) measureHoverMarker.visible = false;
   if (measureMode.banner) { measureMode.banner.remove(); measureMode.banner = null; }
   if (measureMode.btn) {
       measureMode.btn.innerText = '📏 Miarka';
@@ -856,6 +878,92 @@ function addMeasureLine(a, b) {
   measureGroup.add(line);
 }
 
+// Punkt pod kursorem - osobna, TRWAŁA siatka poza measureGroup (nie znika przy
+// clearMeasureVisuals, tylko się chowa/pokazuje i przesuwa) - inaczej
+// migałaby przy każdym kliknięciu, które czyści measureGroup. Dwa style: biały
+// pierścień = przyciągnięty do rogu formatki (precyzyjnie), mniejsza szara
+// kropka = swobodny punkt na powierzchni (zgłoszona prośba o widoczny
+// "punkcik pod myszką" i przyciąganie do punktów w modułach).
+function ensureHoverMarker() {
+  if (measureHoverMarker) return measureHoverMarker;
+  const group = new THREE.Group();
+  const dot = new THREE.Mesh(
+      new THREE.SphereGeometry(4, 10, 10),
+      new THREE.MeshBasicMaterial({ color: 0x94a3b8, depthTest: false })
+  );
+  const ring = new THREE.Mesh(
+      new THREE.RingGeometry(9, 12, 20),
+      new THREE.MeshBasicMaterial({ color: 0x22d3ee, depthTest: false, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
+  );
+  ring.name = 'snapRing';
+  dot.name = 'freeDot';
+  group.add(dot, ring);
+  group.renderOrder = 1000;
+  group.visible = false;
+  scene.add(group);
+  measureHoverMarker = group;
+  return group;
+}
+
+// Raz na klatkę (patrz animate()): łapie raycastem punkt pod kursorem i - jeśli
+// trafiony obiekt to prostopadłościenna formatka (wszystkie w tej appce są,
+// patrz addBox) - sprawdza, czy któryś z jej 8 rogów w przestrzeni świata
+// wypada bliżej niż MEASURE_SNAP_PX pikseli ekranu od kursora; jeśli tak,
+// PRZYCIĄGA do tego rogu zamiast do surowego punktu na powierzchni. To
+// dokładnie ten punkt, który zatwierdza klik (handleMeasureClick) - podgląd i
+// realny wynik są zawsze tym samym punktem (WYSIWYG, zgłoszona prośba o
+// precyzję).
+function updateMeasureHover() {
+  const marker = ensureHoverMarker();
+  raycaster.setFromCamera(measureHoverMouse, camera);
+  const targets = [cabinetGroup, roomGroup].filter(Boolean);
+  const hits = targets.length ? raycaster.intersectObjects(targets, true).filter(h => !h.object.userData?.isMeasureTool) : [];
+
+  if (hits.length === 0) {
+      measureHoverPoint = null;
+      marker.visible = false;
+      return;
+  }
+
+  const hit = hits[0];
+  let point = hit.point.clone();
+  let snapped = false;
+
+  if (hit.object.isMesh && hit.object.geometry) {
+      const box = new THREE.Box3().setFromObject(hit.object);
+      if (isFinite(box.min.x)) {
+          const corners = [
+              [box.min.x, box.min.y, box.min.z], [box.min.x, box.min.y, box.max.z],
+              [box.min.x, box.max.y, box.min.z], [box.min.x, box.max.y, box.max.z],
+              [box.max.x, box.min.y, box.min.z], [box.max.x, box.min.y, box.max.z],
+              [box.max.x, box.max.y, box.min.z], [box.max.x, box.max.y, box.max.z],
+          ];
+          const rect = renderer.domElement.getBoundingClientRect();
+          const mousePx = (measureHoverMouse.x * 0.5 + 0.5) * rect.width;
+          const mousePy = (-measureHoverMouse.y * 0.5 + 0.5) * rect.height;
+          let bestDist = MEASURE_SNAP_PX;
+          let best = null;
+          corners.forEach(([x, y, z]) => {
+              const v = new THREE.Vector3(x, y, z).project(camera);
+              const px = (v.x * 0.5 + 0.5) * rect.width;
+              const py = (-v.y * 0.5 + 0.5) * rect.height;
+              const d = Math.hypot(px - mousePx, py - mousePy);
+              if (d < bestDist) { bestDist = d; best = new THREE.Vector3(x, y, z); }
+          });
+          if (best) { point = best; snapped = true; }
+      }
+  }
+
+  measureHoverPoint = point;
+  measureHoverSnapped = snapped;
+  marker.position.copy(point);
+  marker.getObjectByName('freeDot').visible = !snapped;
+  const ring = marker.getObjectByName('snapRing');
+  ring.visible = snapped;
+  if (snapped) ring.lookAt(camera.position); // pierścień płaski w swojej płaszczyźnie - obróć do kamery jak billboard
+  marker.visible = true;
+}
+
 function ensureMeasureBanner() {
   if (measureMode.banner) return measureMode.banner;
   const banner = document.createElement('div');
@@ -883,17 +991,12 @@ function setMeasureBannerText(text) {
   banner._textSpan.innerText = text;
 }
 
-// Raycast BEZ ograniczenia do obj.userData.moduleId (w przeciwieństwie do
-// zwykłego handle3DClick) - miarka ma łapać punkt na DOWOLNEJ widocznej
-// powierzchni: szafce, ścianie, podłodze.
+// Zatwierdza DOKŁADNIE ten punkt, który w danej chwili pokazuje marker pod
+// kursorem (measureHoverPoint, liczony co klatkę w updateMeasureHover) - nie
+// osobny raycast na klik, żeby podgląd i realny wynik nigdy się nie rozjechały.
 function handleMeasureClick() {
-  raycaster.setFromCamera(mouse, camera);
-  const targets = [cabinetGroup, roomGroup].filter(Boolean);
-  if (targets.length === 0) return;
-  const hits = raycaster.intersectObjects(targets, true).filter(h => !h.object.userData?.isMeasureTool);
-  if (hits.length === 0) return;
-
-  const point = hits[0].point.clone();
+  if (!measureHoverPoint) return;
+  const point = measureHoverPoint.clone();
 
   if (!measureMode.pointA) {
       clearMeasureVisuals();
@@ -971,6 +1074,12 @@ function handle3DClick(event) {
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
   if (measureMode.active) {
+      // Przelicz punkt/snap DOKŁADNIE z współrzędnych tego kliknięcia zamiast
+      // polegać na ostatnim zdarzeniu mousemove (mogło nie zdążyć się odpalić
+      // tuż przed kliknięciem - dawało nieprecyzyjny/nieaktualny punkt,
+      // zgłoszona prośba o precyzję).
+      measureHoverMouse.copy(mouse);
+      updateMeasureHover();
       handleMeasureClick();
       return;
   }
