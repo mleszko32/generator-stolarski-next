@@ -132,7 +132,8 @@ export function openCornerConfigModal(mod) {
     const legA = parseFloat(mod.dimensions.width) || 0;
     const legB = parseFloat(mod.dimensions.legB) || 0;
     const { depthA, depthB } = getCornerDepths(mod);
-    blankPreviewEl.innerHTML = generateCornerBlankSVG(legA, legB, depthA, depthB);
+    const th = parseFloat(state.project.materials?.boardThickness) || 18;
+    blankPreviewEl.innerHTML = generateCornerBlankSVG(legA, legB, depthA, depthB, th);
     cutoutInfoEl.textContent = `Wynikowo: Ramię A = ${Math.round(legA)} mm, Ramię B = ${Math.round(legB)} mm`;
   }
 

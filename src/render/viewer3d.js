@@ -1372,13 +1372,20 @@ function renderCornerCabinet(mod, isActive, th) {
   // DRUGIEGO ramienia (B), bo to ono fizycznie sięga aż tam wzdłuż X (i
   // odwrotnie dla Z/depthA) - patrz core/layout.js: getCornerArmRect,
   // komentarz przy otherDepth.
+  // Zewnętrzne krawędzie (X=legA, Z=legB) pomniejszone o th - wieniec/półka
+  // siedzi MIĘDZY bokami (boki przelotowe, jak addBox wyżej: bok A kończy
+  // się na X=legA-th, bok B na Z=legB-th), a nie na całej szerokości
+  // korpusu (zgłoszona korekta - patrz engine/cabinet.js:
+  // getCornerCorpusParts, wieniecA/wieniecB).
+  const wieniecA = legA - th;
+  const wieniecB = legB - th;
   const shape = new THREE.Shape();
   shape.moveTo(0, 0);
-  shape.lineTo(legA, 0);
-  shape.lineTo(legA, -depthA);
+  shape.lineTo(wieniecA, 0);
+  shape.lineTo(wieniecA, -depthA);
   shape.lineTo(depthB, -depthA);
-  shape.lineTo(depthB, -legB);
-  shape.lineTo(0, -legB);
+  shape.lineTo(depthB, -wieniecB);
+  shape.lineTo(0, -wieniecB);
   shape.closePath();
   addCornerPanel(shape, th, posY, isActive, udCorp, innerGroup);
   addCornerPanel(shape, th, posY + H - th, isActive, udCorp, innerGroup);

@@ -136,8 +136,9 @@ function openCornerBlankPrintView(mod) {
   const legB = parseFloat(mod.dimensions.legB) || 860;
   const { depthA, depthB } = getCornerDepths(mod);
   const shelfCount = (mod.elements || []).filter(el => el.typ === 'poziom-narozny').length;
+  const th = parseFloat(state.project.materials?.boardThickness) || 18;
 
-  const svgContent = generateCornerBlankSVG(legA, legB, depthA, depthB);
+  const svgContent = generateCornerBlankSVG(legA, legB, depthA, depthB, th);
 
   const htmlContent = `
     <!DOCTYPE html>

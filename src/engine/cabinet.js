@@ -643,8 +643,16 @@ function getCornerCorpusParts(mod, config) {
   parts.push({ name: "Bok (L/P)", length: parseFloat(height.toFixed(1)), width: parseFloat((depthA - backThick).toFixed(1)), qty: 1, category: "Korpus" });
   parts.push({ name: "Bok (L/P)", length: parseFloat(height.toFixed(1)), width: parseFloat((depthB - backThick).toFixed(1)), qty: 1, category: "Korpus" });
 
-  const wieniecName = `Wieniec narożny ${Math.round(legA)}x${Math.round(legB)} (naroże do wycięcia - patrz rysunek 3D)`;
-  parts.push({ name: wieniecName, length: parseFloat(legA.toFixed(1)), width: parseFloat(legB.toFixed(1)), qty: 2, category: "Korpus" });
+  // Wymiar Ramię A/B w konfiguratorze to CAŁY korpus (do zewnętrznej
+  // krawędzi boku). Sam wieniec siedzi MIĘDZY bokami (boki przelotowe -
+  // patrz getCorpusParts niżej, width - board*2 dla zwykłego modułu), więc
+  // formatka wieńca jest pomniejszona o grubość boku (th) na każdym
+  // ramieniu - tylko RAZ na ramię, bo drugi koniec wieńca graniczy z
+  // listwą narożną/wycięciem, nie z drugim bokiem (zgłoszona korekta).
+  const wieniecA = legA - th;
+  const wieniecB = legB - th;
+  const wieniecName = `Wieniec narożny ${Math.round(wieniecA)}x${Math.round(wieniecB)} (naroże do wycięcia - patrz rysunek 3D)`;
+  parts.push({ name: wieniecName, length: parseFloat(wieniecA.toFixed(1)), width: parseFloat(wieniecB.toFixed(1)), qty: 2, category: "Korpus" });
 
   // Listwa narożna pionowa (render/viewer3d.js: renderCornerCabinet) - płaska
   // listwa 18(gr.)x100(szer.) na pełną wysokość, do której mocują się obie
@@ -691,12 +699,14 @@ function getCornerCorpusParts(mod, config) {
   // NIE dwiema niezależnymi prostymi półkami po jednej na ramię (zgłoszona
   // korekta) - dlatego to osobny typ elementu, wspólny dla obu ramion
   // (bez cornerArm), zamiast zwykłego 'poziom' z core/zoneTree.js. Ten sam
-  // bounding box legA×legB co wieniec - realny kawałek docina się z blanku
-  // na miejscu, tak samo jak przy wieńcu.
+  // bounding box co wieniec (pomniejszony o grubość boku na ramię - siedzi
+  // MIĘDZY bokami tak samo jak wieniec, patrz komentarz przy
+  // wieniecA/wieniecB wyżej) - realny kawałek docina się z blanku na
+  // miejscu, tak samo jak przy wieńcu.
   const cornerShelves = (mod.elements || []).filter(el => el.typ === 'poziom-narozny');
   if (cornerShelves.length > 0) {
-    const shelfName = `Półka narożna ${Math.round(legA)}x${Math.round(legB)} (naroże do wycięcia - patrz rysunek 3D)`;
-    parts.push({ name: shelfName, length: parseFloat(legA.toFixed(1)), width: parseFloat(legB.toFixed(1)), qty: cornerShelves.length, category: "Korpus" });
+    const shelfName = `Półka narożna ${Math.round(wieniecA)}x${Math.round(wieniecB)} (naroże do wycięcia - patrz rysunek 3D)`;
+    parts.push({ name: shelfName, length: parseFloat(wieniecA.toFixed(1)), width: parseFloat(wieniecB.toFixed(1)), qty: cornerShelves.length, category: "Korpus" });
   }
 
   return parts;
