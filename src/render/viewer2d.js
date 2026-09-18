@@ -886,26 +886,25 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
 // engine/cabinet.js: getCornerCorpusParts) - do tej pory ich cut-listowy
 // opis "naroże do wycięcia - patrz rysunek 3D" nie odsyłał do żadnego
 // realnego, drukowalnego rysunku (tylko do interaktywnej sceny 3D) -
-// zgłoszony brak. Pokazuje pełny prostokątny blank blankA×blankB (linia
+// zgłoszony brak. Pokazuje pełny prostokątny blank legA×legB (linia
 // przerywana) i faktyczny obrys L po docięciu (linia ciągła, wypełniona) -
-// różnica między nimi to prostokąt (blankA-depthB)×(blankB-depthA) do
-// odcięcia z jednego rogu. legA/legB to wymiar CAŁEGO korpusu (jak w
-// konfiguratorze), blankA/blankB = legA/legB - th (zgłoszona korekta -
-// formatka wieńca/półki siedzi MIĘDZY bokami, jest mniejsza niż cały
-// korpus). Ramiona mają NIEZALEŻNE głębokości (zgłoszona korekta,
+// różnica między nimi to prostokąt (legA-depthB)×(legB-depthA) do odcięcia
+// z jednego rogu. Ramiona mają NIEZALEŻNE głębokości (zgłoszona korekta,
 // core/layout.js: getCornerDepths) - narożny prostokąt ma rogi (depthB,
-// depthA), nie (depth,depth) jak przy wspólnej głębokości. Te same punkty co
-// THREE.Shape w render/viewer3d.js: renderCornerCabinet (`shape`), tylko w
-// 2D i ze znakiem Y odwróconym do zwykłego układu ekranowego (dodatni Y w
-// dół).
+// depthA), nie (depth,depth) jak przy wspólnej głębokości.
+//
+// Główne wymiary (Ramię A/B, Głęb. A/B, Wycięcie A/B) celowo liczone od
+// PEŁNEGO korpusu (legA/legB), 1:1 z polami w konfiguratorze - inna baza
+// (np. pomniejszona formatka) dawała inną liczbę niż użytkownik właśnie
+// wpisał, co wyglądało jak błąd (zgłoszona korekta - "wpisałem 500 a na
+// rysunku jest 482"). Sam wieniec/półka siedzi MIĘDZY bokami (boki
+// przelotowe), więc realna formatka jest mniejsza o grubość boku (th) na
+// dalszej krawędzi każdego ramienia (patrz engine/cabinet.js:
+// getCornerCorpusParts, render/viewer3d.js: renderCornerCabinet `shape`) -
+// pokazana tu jako DODATKOWY, cieńszy obrys wewnątrz + boki narysowane na
+// swoim realnym miejscu, żeby było widać skąd bierze się różnica, bez
+// zmiany głównych wymiarów.
 export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18) {
-  // legA/legB to wymiar CAŁEGO korpusu (jak w konfiguratorze - "Ramię A/B"),
-  // ale sama formatka wieńca/półki siedzi MIĘDZY bokami (boki przelotowe),
-  // więc jest pomniejszona o grubość boku (th) na każde ramię - zgłoszona
-  // korekta, patrz engine/cabinet.js: getCornerCorpusParts,
-  // render/viewer3d.js: renderCornerCabinet (`shape`). To, co rysujemy tu
-  // (obrys, wycięcie, wymiary) to WŁAŚNIE ta pomniejszona formatka - realny
-  // kawałek do zamówienia/wycięcia, nie cały korpus.
   const blankA = legA - th;
   const blankB = legB - th;
   // Rozmiary w SVG są w "mm" viewBoxa, skalowanym przez CSS do szerokości
@@ -915,9 +914,10 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18) {
   // ekranu = kilka pikseli). Liczymy je więc jako UŁAMEK najmniejszego boku,
   // żeby tekst/linie zostały czytelne niezależnie od wymiarów szafki i
   // rozmiaru kontenera.
-  const unit = Math.max(1, Math.min(blankA, blankB, depthA || blankA, depthB || blankB));
+  const unit = Math.max(1, Math.min(legA, legB, depthA || legA, depthB || legB));
   const fs = Math.round(unit * 0.075); // font-size bazowy
   const fsSmall = Math.round(unit * 0.062);
+  const fsTiny = Math.round(unit * 0.052);
   const strokeThick = Math.max(2, Math.round(unit * 0.01));
   const strokeThin = Math.max(1, Math.round(unit * 0.005));
   // Wszystkie wymiary (Ramię A/B, Głęb. A/B, Wycięcie A/B) leżą NA ZEWNĄTRZ
@@ -930,23 +930,22 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18) {
   // zasłaniały tekst sąsiedniego wymiaru).
   const margin = Math.round(unit * 0.55);
 
-  const vbW = blankA + margin * 2;
-  const vbH = blankB + margin * 2;
+  const vbW = legA + margin * 2;
+  const vbH = legB + margin * 2;
   const ox = margin, oy = margin;
 
-  const cutW = blankA - depthB; // szerokość odcinanego rogu (wyznaczona przez głębokość ramienia B)
-  const cutH = blankB - depthA; // wysokość odcinanego rogu (wyznaczona przez głębokość ramienia A)
+  const cutW = legA - depthB; // szerokość odcinanego rogu (wyznaczona przez głębokość ramienia B)
+  const cutH = legB - depthA; // wysokość odcinanego rogu (wyznaczona przez głębokość ramienia A)
 
   const pts = [
-    [0, 0], [blankA, 0], [blankA, depthA], [depthB, depthA], [depthB, blankB], [0, blankB],
+    [0, 0], [legA, 0], [legA, depthA], [depthB, depthA], [depthB, legB], [0, legB],
   ].map(([x, y]) => `${ox + x},${oy + y}`).join(' ');
 
   let svg = `<svg viewBox="0 0 ${vbW} ${vbH}" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif">`;
 
   // Pełny prostokątny blank (przerywany) - to jest to, co realnie zamawia
-  // się/tnie z płyty jako pierwszy krok (patrz Lista formatek: blankA×blankB,
-  // już pomniejszone o grubość boku).
-  svg += `<rect x="${ox}" y="${oy}" width="${blankA}" height="${blankB}" fill="none" stroke="#94a3b8" stroke-width="${strokeThick}" stroke-dasharray="${strokeThick * 4},${strokeThick * 3}" />`;
+  // się/tnie z płyty jako pierwszy krok (patrz Lista formatek: legA×legB).
+  svg += `<rect x="${ox}" y="${oy}" width="${legA}" height="${legB}" fill="none" stroke="#94a3b8" stroke-width="${strokeThick}" stroke-dasharray="${strokeThick * 4},${strokeThick * 3}" />`;
 
   // Róg do odcięcia - zakreskowany, czerwona ramka, żeby jednoznacznie
   // pokazać co znika. Sam wymiar wycięcia (Wycięcie A/B) rysuje się NA
@@ -964,6 +963,34 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18) {
 
   // Realny obrys L po docięciu - wypełniony, na wierzchu.
   svg += `<polygon points="${pts}" fill="#fef3c7" stroke="#334155" stroke-width="${strokeThick * 1.3}" />`;
+
+  // Boki (płyty boczne, ui/właściwe formatki "Bok (L/P)" w Liście formatek) -
+  // narysowane na swoim realnym miejscu (dalsza krawędź każdego ramienia),
+  // żeby było widać, DLACZEGO formatka wieńca (linia przerywana fioletowa
+  // niżej) jest węższa niż cały korpus - to właśnie w to miejsce wchodzi
+  // (boki przelotowe, wieniec między nimi), a nie osobny, niezależny
+  // "ubytek". Tylko wizualny kontekst, nie osobna formatka do zamawiania tu.
+  const COLOR_BOK = '#78716c';
+  svg += `<rect x="${ox + legA - th}" y="${oy}" width="${th}" height="${depthA}" fill="#e7e5e4" stroke="${COLOR_BOK}" stroke-width="${strokeThin}" />`;
+  svg += `<rect x="${ox}" y="${oy + legB - th}" width="${depthB}" height="${th}" fill="#e7e5e4" stroke="${COLOR_BOK}" stroke-width="${strokeThin}" />`;
+  if (th > fsTiny * 2) {
+    svg += `<text x="${ox + legA - th / 2}" y="${oy + depthA / 2}" font-size="${fsTiny}" fill="${COLOR_BOK}" text-anchor="middle" dominant-baseline="middle" transform="rotate(-90 ${ox + legA - th / 2} ${oy + depthA / 2})">bok</text>`;
+    svg += `<text x="${ox + depthB / 2}" y="${oy + legB - th / 2}" font-size="${fsTiny}" fill="${COLOR_BOK}" text-anchor="middle" dominant-baseline="middle">bok</text>`;
+  }
+
+  // Formatka wieńca/półki (linia przerywana fioletowa) - obrys L wsunięty o
+  // grubość boku (th) od dalszej krawędzi każdego ramienia (siedzi MIĘDZY
+  // bokami, patrz komentarz nad funkcją). To realny rozmiar do zamówienia -
+  // patrz Lista formatek: "Wieniec narożny {blankA}x{blankB}". Rysowany jako
+  // DODATKOWY kontur na wierzchu głównego obrysu, nie zamiast niego, żeby
+  // główne wymiary (Ramię/Głęb./Wycięcie) zostały 1:1 z konfiguratorem.
+  if (blankA > depthB && blankB > depthA) {
+    const blankPts = [
+      [0, 0], [blankA, 0], [blankA, depthA], [depthB, depthA], [depthB, blankB], [0, blankB],
+    ].map(([x, y]) => `${ox + x},${oy + y}`).join(' ');
+    svg += `<polygon points="${blankPts}" fill="none" stroke="#7c3aed" stroke-width="${strokeThin * 1.5}" stroke-dasharray="${strokeThin * 3},${strokeThin * 2}" />`;
+    svg += `<text x="${ox + blankA - fsTiny * 0.6}" y="${oy + fsTiny * 1.4}" font-size="${fsTiny}" fill="#7c3aed" font-weight="bold" text-anchor="end">Formatka wieńca: ${Math.round(blankA)}×${Math.round(blankB)} mm (-${Math.round(th)} mm bok)</text>`;
+  }
 
   // Wymiary - proste kolorowe linie TUŻ PRZY odpowiadającym im fragmencie
   // obrysu (nie przez środek, ale też bez kresek pomocniczych/łańcuchowania -
@@ -1001,25 +1028,23 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18) {
   const COLOR_CUT_A = '#d97706';
   const COLOR_CUT_B = '#16a34a';
 
-  // Góra: wymiar formatki (Ramię A pomniejszone o grubość boku) - inna
-  // etykieta niż "Ramię A" w konfiguratorze celowo, żeby nie mylić wymiaru
-  // CAŁEGO korpusu z wymiarem SAMEJ formatki do wycięcia.
-  svg += dimH(ox, ox + blankA, oy - laneGap, `Formatka A: ${Math.round(blankA)} mm`, COLOR_LEG);
-  // Lewo: wymiar formatki (Ramię B pomniejszone o grubość boku)
-  svg += dimV(oy, oy + blankB, ox - laneGap, `Formatka B: ${Math.round(blankB)} mm`, COLOR_LEG, 'left');
+  // Góra: Ramię A (cały korpus, 1:1 z konfiguratorem)
+  svg += dimH(ox, ox + legA, oy - laneGap, `Ramię A: ${Math.round(legA)} mm`, COLOR_LEG);
+  // Lewo: Ramię B (cały korpus, 1:1 z konfiguratorem)
+  svg += dimV(oy, oy + legB, ox - laneGap, `Ramię B: ${Math.round(legB)} mm`, COLOR_LEG, 'left');
 
   // Prawo, dwa oddzielne pasy (bliższy = głębokość A, dalszy = wycięcie B) -
   // NIE łańcuchowo/stykająco się, każdy ma własny odstęp od obrysu, żeby ich
   // linie/etykiety się nie stykały.
-  svg += dimV(oy, oy + depthA, ox + blankA + laneGap, `Głęb. A: ${Math.round(depthA)} mm`, COLOR_DEPTH, 'right');
+  svg += dimV(oy, oy + depthA, ox + legA + laneGap, `Głęb. A: ${Math.round(depthA)} mm`, COLOR_DEPTH, 'right');
   if (cutH > 0) {
-    svg += dimV(oy + depthA, oy + blankB, ox + blankA + laneGap + laneStep, `Wycięcie B: ${Math.round(cutH)} mm`, COLOR_CUT_B, 'right');
+    svg += dimV(oy + depthA, oy + legB, ox + legA + laneGap + laneStep, `Wycięcie B: ${Math.round(cutH)} mm`, COLOR_CUT_B, 'right');
   }
 
   // Dół, tak samo dwa oddzielne pasy (bliższy = głębokość B, dalszy = wycięcie A).
-  svg += dimH(ox, ox + depthB, oy + blankB + laneGap, `Głęb. B: ${Math.round(depthB)} mm`, COLOR_DEPTH, 'below');
+  svg += dimH(ox, ox + depthB, oy + legB + laneGap, `Głęb. B: ${Math.round(depthB)} mm`, COLOR_DEPTH, 'below');
   if (cutW > 0) {
-    svg += dimH(ox + depthB, ox + blankA, oy + blankB + laneGap + laneStep, `Wycięcie A: ${Math.round(cutW)} mm`, COLOR_CUT_A, 'below');
+    svg += dimH(ox + depthB, ox + legA, oy + legB + laneGap + laneStep, `Wycięcie A: ${Math.round(cutW)} mm`, COLOR_CUT_A, 'below');
   }
 
   svg += `</svg>`;
