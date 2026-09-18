@@ -632,8 +632,16 @@ function getCornerCorpusParts(mod, config) {
   // getCorpusParts() dla zwykłego modułu. Każde ramię ma TERAZ własną
   // głębokość (depthA/depthB, core/layout.js: getCornerDepths) - zgłoszona
   // korekta, wcześniej jedna wspólna "depth" dla obu.
-  parts.push({ name: "Bok narożny (Ramię A)", length: parseFloat(height.toFixed(1)), width: parseFloat((depthA - backThick).toFixed(1)), qty: 1, category: "Korpus" });
-  parts.push({ name: "Bok narożny (Ramię B)", length: parseFloat(height.toFixed(1)), width: parseFloat((depthB - backThick).toFixed(1)), qty: 1, category: "Korpus" });
+  //
+  // Nazwa CELOWO taka sama jak "Bok (L/P)" zwykłego modułu (getCorpusParts
+  // niżej) - to fizycznie ten sam, płaski prostokątny bok (bez wcięcia,
+  // narożnik tnie tylko wieniec/półkę), więc przy takich samych wymiarach ma
+  // się zliczyć w Menedżerze Formatek do jednej pozycji zamiast dublować się
+  // pod inną nazwą (zgłoszony bug - agregacja w calculateAllProjectParts
+  // niżej klucza po category+name+length+width, więc różna nazwa = różny
+  // wiersz mimo identycznej formatki do wycięcia).
+  parts.push({ name: "Bok (L/P)", length: parseFloat(height.toFixed(1)), width: parseFloat((depthA - backThick).toFixed(1)), qty: 1, category: "Korpus" });
+  parts.push({ name: "Bok (L/P)", length: parseFloat(height.toFixed(1)), width: parseFloat((depthB - backThick).toFixed(1)), qty: 1, category: "Korpus" });
 
   const wieniecName = `Wieniec narożny ${Math.round(legA)}x${Math.round(legB)} (naroże do wycięcia - patrz rysunek 3D)`;
   parts.push({ name: wieniecName, length: parseFloat(legA.toFixed(1)), width: parseFloat(legB.toFixed(1)), qty: 2, category: "Korpus" });
