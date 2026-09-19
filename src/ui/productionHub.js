@@ -8,8 +8,11 @@ import { escapeHtml } from "../utils/dom.js";
 import { state, getActiveModule } from "../core/state.js";
 import { collectProjectParts, calculateAllProjectParts, calculateProjectHardware } from "../engine/cabinet.js";
 import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "../engine/edgeBanding.js";
+import { getCornerDepths } from "../core/layout.js";
+import { update3D } from "../render/viewer3d.js";
+import { initPropertiesPanel } from "./properties.js";
 import { mountCutPlan } from "./cutPlanModal.js";
-import { openCsvExport, printHardwareList, openTechnicalDrawing, openKosztorysModal } from "./sidebar.js";
+import { openCsvExport, printHardwareList, openTechnicalDrawing, openKosztorysModal, updateSidebar } from "./sidebar.js";
 
 const SECTIONS = [
   { id: 'formatki', label: 'Formatki', icon: 'ti-list-details' },
@@ -104,17 +107,55 @@ function renderFormatki(el) {
   el.querySelector('#hub-csv').addEventListener('click', () => openCsvExport());
 }
 
+const MODULE_TYPE_LABELS = {
+  base_cabinet: 'Szafka dolna',
+  upper_cabinet: 'Szafka wisząca',
+  tall_cabinet: 'Słupek',
+  corner_cabinet: 'Szafka narożna',
+};
+
+// Opis szafki z wymiarami - czytelny także wtedy, gdy nie ma nazwy.
+function moduleLabel(mod) {
+  const type = MODULE_TYPE_LABELS[mod.type] || 'Szafka';
+  const d = mod.dimensions || {};
+  const h = fmt(d.height);
+  let dims;
+  if (mod.type === 'corner_cabinet') {
+    const { depthA, depthB } = getCornerDepths(mod);
+    dims = `ramię A ${fmt(d.width)} · ramię B ${fmt(d.legB)} · wys. ${h} · głęb. ${fmt(depthA)}/${fmt(depthB)}`;
+  } else {
+    dims = `${fmt(d.width)} × ${h} × ${fmt(d.depth)} mm (szer. × wys. × głęb.)`;
+  }
+  return { name: (mod.name || '').trim() || type, type, dims };
+}
+
 function renderRysunki(el) {
-  const mod = getActiveModule();
+  const mods = state.project.modules || [];
+  const activeId = state.activeModuleId;
   el.innerHTML = `
-    <div class="hub-bar"><div><h3>Rysunki 2D</h3><div class="hub-sub">Rysunek wykonawczy z nawiertami (System 32, wkręty i kołki, zawiasy, podpórki) dla aktywnej szafki.</div></div></div>
-    <div class="hub-card">
-      <div class="hub-sub">Aktywna szafka</div>
-      <div class="hub-strong">${mod ? escapeHtml(mod.name) : 'brak - wybierz szafkę na liście'}</div>
-      ${mod && mod.type === 'corner_cabinet' ? `<div class="hub-sub" style="margin-top:6px;">Szafka narożna: wydruk zawiera rzut z góry oraz rysunki wieńca, półki, boków i listwy.</div>` : ''}
-      <button type="button" id="hub-draw" class="btn btn-primary btn-sm" style="margin-top:12px;" ${mod ? '' : 'disabled'}>Otwórz rysunek wykonawczy</button>
-    </div>`;
-  el.querySelector('#hub-draw').addEventListener('click', () => openTechnicalDrawing());
+    <div class="hub-bar"><div><h3>Rysunki 2D</h3><div class="hub-sub">Rysunek wykonawczy z nawiertami (System 32, wkręty i kołki, zawiasy, podpórki). Wybierz szafkę, dla której chcesz otworzyć rysunek.</div></div></div>
+    ${mods.length === 0 ? '<p class="hub-empty">Projekt nie ma jeszcze szafek.</p>' : `
+    <table class="hub-table">
+      <thead><tr><th>Szafka</th><th>Wymiary</th><th></th></tr></thead>
+      <tbody>${mods.map(m => {
+        const l = moduleLabel(m);
+        return `<tr class="${m.id === activeId ? 'hub-row-active' : ''}">
+          <td><div class="hub-strong" style="font-size:13px;">${escapeHtml(l.name)}${m.id === activeId ? ' <span class="hub-sub">· aktywna</span>' : ''}</div><div class="hub-sub">${escapeHtml(l.type)}${m.type === 'corner_cabinet' ? ' · wydruk z rzutem z góry i formatkami' : ''}</div></td>
+          <td>${escapeHtml(l.dims)}</td>
+          <td class="num" style="width:150px;"><button type="button" class="btn btn-sm hub-draw" data-id="${m.id}">Otwórz rysunek</button></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`}`;
+  el.querySelectorAll('.hub-draw').forEach(btn => btn.addEventListener('click', () => {
+    // Rysunek liczy się dla aktywnej szafki - przełączamy ją tak samo jak kliknięcie
+    // na liście (panel boczny i 3D idą za wyborem).
+    state.activeModuleId = btn.dataset.id;
+    update3D();
+    updateSidebar();
+    initPropertiesPanel();
+    openTechnicalDrawing();
+    renderRysunki(el);
+  }));
 }
 
 function renderOkucia(el) {

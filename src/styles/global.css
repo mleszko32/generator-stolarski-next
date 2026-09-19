@@ -359,3 +359,4 @@ body {
 .mode-tab:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
 .mode-tab.active { background: #fff; color: var(--text-primary); }
 .top-nav .btn-primary i, .top-nav .btn i { font-size: 15px; }
+.hub-table tr.hub-row-active td { background: #eff6ff; }
