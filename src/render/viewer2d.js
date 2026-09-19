@@ -5,6 +5,13 @@ import { getCornerPartsGeometry, getCornerWieniecHoles, getCornerShelfHoles } fr
 
 const formatVal = (val) => Number(Number(val).toFixed(1));
 
+// Środek otworu pod podpórkę półki ruchomej leży 2.5 mm NIŻEJ niż wysokość półki
+// (promień podpórki fi 5) - dzięki temu górna krawędź podpórki jest równo z
+// wysokością półki i wymiar przestrzeni między półkami zostaje dokładny. Tak
+// liczyło to core/shelfMath.js: calculateShelfHoles; refaktor rysunku z 3.09
+// przestał z niego korzystać i otwory wypadły na samej wysokości półki.
+const SHELF_PIN_DROP = 2.5;
+
 // Opis wysokości otworu w stylu rysunku boku zwykłej szafki: bliższa krawędź
 // (DÓŁ/GÓRA) wyróżniona, druga w nawiasie.
 function getDimText(localY, panelH, color, addRc = false) {
@@ -567,8 +574,8 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
                       let rPin = 2.5; 
                       [0, 32, -32].forEach(dy => {
                           [37, depth - 37].forEach(hx => {
-                              svg += `<circle cx="${getSvgX(hx)}" cy="${svgY - dy}" r="${rPin}" fill="${baseColor}" />`;
-                              if (dy === 0 && hx === 37) shelfYs.add(calcY);
+                              svg += `<circle cx="${getSvgX(hx)}" cy="${svgY + SHELF_PIN_DROP - dy}" r="${rPin}" fill="${baseColor}" />`;
+                              if (dy === 0 && hx === 37) shelfYs.add(calcY - SHELF_PIN_DROP);
                           });
                       });
                   }
