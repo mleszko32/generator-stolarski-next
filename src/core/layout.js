@@ -379,7 +379,10 @@ export function recalculateLayout(mod) {
       }
   });
 
-  if (mod.type === 'corner_cabinet') applyCornerFrontOverlap(mod);
+  if (mod.type === 'corner_cabinet') {
+    migrateCornerHingesToSide(mod);
+    applyCornerFrontOverlap(mod);
+  }
 }
 
 // Fronty dwóch ramion spotykają się w ostrym, wewnętrznym rogu (zgłoszona
@@ -401,6 +404,19 @@ export function recalculateLayout(mod) {
 // samą strefę (ten sam baseZone.boundLeft) - wszystkie dostają identyczne
 // x/w, bo w poziomie (X) mają tę samą szerokość niezależnie od podziału w
 // pionie (frontIndex).
+// Zawiasy drzwi narożnika: oba fronty (oddzielne) wiszą na zewnętrznej krawędzi,
+// przy boku korpusu (lokalne 'right'), a nie ramię A przy narożniku jak było
+// domyślnie. Zapisane projekty mają stare 'left' na ramieniu A - jednorazowo
+// ustawiamy 'right' (znacznik mod.cornerHingesAtSide), a dalsze ręczne zmiany
+// strony (edytor wnęk) już się zachowują.
+function migrateCornerHingesToSide(mod) {
+  if (mod.cornerHingesAtSide) return;
+  (mod.elements || []).forEach(el => {
+    if (el.typ === 'front' && el.cornerArm && el.subtype === 'drzwi') el.openingSide = 'right';
+  });
+  mod.cornerHingesAtSide = true;
+}
+
 function applyCornerFrontOverlap(mod) {
   const primaryArm = mod.cornerFrontOverlap?.primaryArm || 'A';
   const th = parseFloat(state.project.materials?.boardThickness) || 18;
@@ -563,7 +579,7 @@ export function ensureCornerDefaults(mod) {
     };
     assignFront(mod, node, 'drzwi', {
       cornerArm: arm,
-      openingSide: arm === 'A' ? 'left' : 'right',
+      openingSide: 'right',
     });
   });
 }

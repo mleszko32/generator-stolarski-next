@@ -17,12 +17,21 @@ describe('zawiasy drzwi szafki narożnej', () => {
     doors.forEach(d => expect(d.hinges.length).toBeGreaterThanOrEqual(2));
   });
 
-  it('w trybie oddzielnych frontów strona wynika z openingSide (A: przy narożniku, B: przy boku)', () => {
+  it('oddzielne fronty: oba wiszą przy boku korpusu', () => {
     const doors = getCornerDoorHinges(mod);
-    expect(doors.find(d => d.arm === 'A').side).toBe('left');
-    expect(doors.find(d => d.arm === 'B').side).toBe('right');
-    expect(doors.find(d => d.arm === 'B').atBok).toBe(true);
-    expect(doors.find(d => d.arm === 'A').atBok).toBe(false);
+    doors.forEach(d => {
+      expect(d.side).toBe('right');
+      expect(d.atBok).toBe(true);
+    });
+  });
+
+  it('zapisany projekt ze starym left na ramieniu A jest jednorazowo przeniesiony do boku, a ręczna zmiana zostaje', () => {
+    const frontA = mod.elements.find(e => e.typ === 'front' && e.cornerArm === 'A');
+    delete mod.cornerHingesAtSide;
+    frontA.openingSide = 'left';
+    expect(getCornerDoorHinges(mod).find(d => d.arm === 'A').side).toBe('right');
+    frontA.openingSide = 'left';
+    expect(getCornerDoorHinges(mod).find(d => d.arm === 'A').side).toBe('left');
   });
 
   it('front łamany: skrzydło przy korpusie na boku, drugie od strony narożnika', () => {

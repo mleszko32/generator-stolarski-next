@@ -767,7 +767,7 @@ export function getCornerDoorHingeSide(mod, front) {
     return front.cornerArm === primary ? 'right' : 'left';
   }
   if (front.subtype === 'drzwi-lp') return front.id.includes('-L-') ? 'left' : 'right';
-  return front.openingSide || (front.cornerArm === 'B' ? 'right' : 'left');
+  return front.openingSide || 'right';
 }
 
 // Zawiasy wszystkich drzwi szafki narożnej (pozycje pod puszki i płytki).
