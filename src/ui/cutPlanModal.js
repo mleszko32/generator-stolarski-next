@@ -215,6 +215,15 @@ export function openCutPlanModal() {
     boxShadow: '0 10px 25px rgba(0,0,0,0.2)', fontFamily: 'sans-serif',
   });
 
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  mountCutPlan(modal, () => document.body.removeChild(overlay));
+}
+
+// Buduje zawartość okna rozkroju w podanym kontenerze - używane zarówno przez
+// samodzielne okno (openCutPlanModal), jak i sekcję "Rozkrój i etykiety" w oknie
+// Produkcja (ui/productionHub.js). onClose != null dodaje przycisk Zamknij.
+export function mountCutPlan(modal, onClose = null) {
   const s = getSettings();
   modal.innerHTML = `
     <h2 style="margin:0 0 4px; color:#1e293b; font-size:16px;">🪚 Rozkrój i etykiety</h2>
@@ -228,13 +237,11 @@ export function openCutPlanModal() {
     </div>
     <div id="cp-results"></div>
     <div style="display:flex; gap:8px; margin-top:14px; justify-content:flex-end; flex-wrap:wrap;">
-      <button type="button" id="cp-print-plan" class="btn btn-success btn-sm">🖨️ Drukuj rozkrój</button>
-      <button type="button" id="cp-print-labels" class="btn btn-warning btn-sm">🏷️ Drukuj etykiety</button>
-      <button type="button" id="cp-close" class="btn btn-primary btn-sm">Zamknij</button>
+      <button type="button" id="cp-print-plan" class="btn btn-sm">🖨️ Drukuj rozkrój</button>
+      <button type="button" id="cp-print-labels" class="btn btn-sm">🏷️ Drukuj etykiety</button>
+      ${onClose ? '<button type="button" id="cp-close" class="btn btn-primary btn-sm">Zamknij</button>' : ''}
     </div>
   `;
-  overlay.appendChild(modal);
-  document.body.appendChild(overlay);
 
   const resultsEl = modal.querySelector('#cp-results');
   let plan = null;
@@ -276,7 +283,7 @@ export function openCutPlanModal() {
 
   modal.querySelector('#cp-print-plan').addEventListener('click', () => plan && plan.pieces.length && printCutPlan(plan));
   modal.querySelector('#cp-print-labels').addEventListener('click', () => plan && plan.pieces.length && printLabels(plan));
-  modal.querySelector('#cp-close').addEventListener('click', () => document.body.removeChild(overlay));
+  if (onClose) modal.querySelector('#cp-close').addEventListener('click', onClose);
 
   render();
 }

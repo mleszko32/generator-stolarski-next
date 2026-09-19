@@ -15,6 +15,7 @@
     "vitest": "^2.1.9"
   },
   "dependencies": {
+    "@tabler/icons-webfont": "^3.47.0",
     "firebase": "^12.16.0",
     "qrcode-generator": "^2.0.4",
     "three": "^0.185.1"

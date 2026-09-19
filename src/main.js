@@ -1,4 +1,5 @@
 // src/main.js
+import "@tabler/icons-webfont/dist/tabler-icons.min.css";
 import "./styles/global.css";
 import { initLayout } from "./ui/layout.js"; 
 import { initPropertiesPanel } from "./ui/properties.js";

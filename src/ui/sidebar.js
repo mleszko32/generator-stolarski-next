@@ -4,6 +4,7 @@ import { state, getActiveModule, addModule, deleteModule, duplicateModule, addSi
 import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel, openCornerBlankPrintView } from "./properties.js";
 import { openCutPlanModal } from "./cutPlanModal.js";
+import { openProductionHub } from "./productionHub.js";
 import { escapeHtml } from "../utils/dom.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
@@ -432,6 +433,308 @@ function openKosztorysModal() {
     overlay.addEventListener('click', (e) => { if (e.target === overlay) document.body.removeChild(overlay); });
 }
 
+
+// Akcje wyjściowe wyciągnięte z updateSidebar - wołane z lewego panelu i z okna
+// Produkcja (ui/productionHub.js). Każda liczy potrzebne dane w chwili
+// wywołania, nie polega na zmiennych z renderu panelu.
+export function openCsvExport() {
+  const allParts = calculateAllProjectParts();
+  if (allParts.length === 0) {
+    alert("Twój projekt jest pusty. Dodaj szafkę, aby wygenerować formatki.");
+    return;
+  }
+  openCsvEditorModal(allParts);
+}
+
+export function printHardwareList() {
+  const projectHardware = calculateProjectHardware();
+    if (projectHardware.length === 0) {
+        alert("Lista zakupów jest pusta.");
+        return;
+    }
+    
+    const dateStr = new Date().toLocaleDateString('pl-PL');
+    
+    let htmlContent = `
+      <!DOCTYPE html>
+      <html lang="pl">
+      <head>
+          <meta charset="UTF-8">
+          <title>Lista Zakupów - ${escapeHtml(state.project.name)}</title>
+          <style>
+              body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1e293b; max-width: 900px; margin: 0 auto; }
+              .header { border-bottom: 2px solid #cbd5e1; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
+              .header h1 { margin: 0; color: #0f172a; font-size: 28px; }
+              .header p { margin: 5px 0 0 0; color: #64748b; font-size: 14px; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+              th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+              th { background-color: #f8fafc; color: #334155; font-weight: bold; border-bottom: 2px solid #cbd5e1; }
+              td.qty { font-weight: bold; color: #0f172a; text-align: center; width: 80px; font-size: 15px; }
+              td.unit { color: #64748b; text-align: center; width: 80px; }
+              tr:nth-child(even) { background-color: #f8fafc; }
+              
+              @media print {
+                  body { padding: 0; max-width: 100%; }
+                  .no-print { display: none !important; }
+                  .header { border-bottom: 2px solid #000; }
+                  th { border-bottom: 2px solid #000; background-color: transparent; }
+                  tr:nth-child(even) { background-color: transparent; }
+              }
+          </style>
+      </head>
+      <body>
+          <div class="no-print" style="margin-bottom: 30px; display: flex; justify-content: flex-end;">
+              <button onclick="window.print()" style="padding: 12px 24px; background-color: #059669; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                  🖨️ Drukuj / Zapisz jako PDF
+              </button>
+          </div>
+          <div class="header">
+              <div>
+                  <h1>Lista Zakupów: Okucia</h1>
+                  <p>Projekt: <strong style="color: #0f172a;">${escapeHtml(state.project.name)}</strong></p>
+              </div>
+              <div style="text-align: right; color: #64748b; font-size: 14px;">
+                  Data wygenerowania: <strong>${dateStr}</strong>
+              </div>
+          </div>
+          <table>
+              <thead>
+                  <tr>
+                      <th>Nazwa okucia / Elementu</th>
+                      <th style="text-align: center;">Ilość</th>
+                      <th style="text-align: center;">J.m.</th>
+                  </tr>
+              </thead>
+              <tbody>
+    `;
+    
+    projectHardware.forEach(hw => {
+        htmlContent += `
+          <tr>
+              <td>${escapeHtml(hw.name)}</td>
+              <td class="qty">${hw.qty}</td>
+              <td class="unit">${escapeHtml(hw.unit)}</td>
+          </tr>
+        `;
+    });
+    
+    htmlContent += `
+              </tbody>
+          </table>
+          
+          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 12px;">
+              Wygenerowano automatycznie z systemu Generator Stolarski Next
+          </div>
+      </body>
+      </html>
+    `;
+    
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    window.open(URL.createObjectURL(blob), '_blank');
+}
+
+export function openTechnicalDrawing() {
+  const activeMod = getActiveModule();
+  if (!activeMod) {
+    alert("Wybierz szafkę, aby wygenerować rysunek.");
+    return;
+  }
+  const { parts, mountingData } = calculateParts();
+    // Szafka narożna ma własny wydruk (rzut z góry + rysunki wieńca, półki,
+    // boków i listwy) - interaktywny rysunek boku niżej zakłada prostokątny
+    // korpus.
+    if (activeMod.type === 'corner_cabinet') {
+        openCornerBlankPrintView(activeMod);
+        return;
+    }
+    try {
+        const sidePanel = parts.find(p => p.name.toLowerCase().includes('bok'));
+        let drawHeight = sidePanel ? sidePanel.length : (parseFloat(activeMod.dimensions.height) || 720);
+        let drawDepth = sidePanel ? sidePanel.width : (parseFloat(activeMod.dimensions.depth) || 510);
+
+        const svgContent = generateSidePanelSVG(drawHeight, drawDepth, mountingData || []);
+
+        // Szafa złożona z kilku zgrupowanych modułów (patrz ui/properties.js:
+        // "Połącz zaznaczone w grupę") - widok KORPUS już pokazuje całą grupę
+        // naraz (viewer2d.js: stackModules), ale klikalny do nawiertów jest
+        // tylko AKTYWNY moduł. Guziki niżej pozwalają przełączyć, który to
+        // jest, BEZ zamykania okna wydruku - klikając wywołują z powrotem
+        // funkcję w oknie aplikacji (window.opener, ta sama origin co blob:),
+        // która realnie przełącza state.activeModuleId (dokładnie tak samo,
+        // jakby użytkownik kliknął ten moduł na liście po lewej w aplikacji)
+        // i oddaje świeży SVG dla nowego aktywnego modułu.
+        const groupId = activeMod.groupId;
+        const groupModules = groupId
+            ? state.project.modules.filter(m => m.groupId === groupId)
+            : [];
+        window.__printSelectModule = (moduleId) => {
+            state.activeModuleId = moduleId;
+            update3D();
+            updateSidebar();
+            initPropertiesPanel();
+            const m = state.project.modules.find(mm => mm.id === moduleId);
+            if (!m) return null;
+            const { parts: mParts, mountingData: mMountingData } = calculateParts();
+            const mSidePanel = mParts.find(p => p.name.toLowerCase().includes('bok'));
+            const mDrawHeight = mSidePanel ? mSidePanel.length : (parseFloat(m.dimensions.height) || 720);
+            const mDrawDepth = mSidePanel ? mSidePanel.width : (parseFloat(m.dimensions.depth) || 510);
+            return generateSidePanelSVG(mDrawHeight, mDrawDepth, mMountingData || []);
+        };
+
+        const tabsHtml = groupModules.length > 1 ? `
+              <div class="module-tabs">
+                  ${groupModules.map(m => `<button class="module-tab${m.id === activeMod.id ? ' active' : ''}" data-module-id="${m.id}" onclick="switchModule('${m.id}', this)">${escapeHtml(m.name)}</button>`).join('')}
+              </div>
+        ` : '';
+
+        const htmlContent = `
+          <!DOCTYPE html>
+          <html lang="pl">
+          <head>
+              <meta charset="UTF-8">
+              <title>Wydruk na produkcję (Interaktywny)</title>
+              <style>
+                  body { margin: 0; padding: 0; background-color: #f1f5f9; display: flex; flex-direction: column; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+                  .header { background-color: #ffffff; padding: 16px 24px; border-bottom: 1px solid #cbd5e1; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); z-index: 10; display: flex; flex-direction: column; gap: 10px; }
+                  .header-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+                  .header-text h1 { margin: 0 0 6px 0; font-size: 20px; color: #0f172a; }
+                  .header-text p { margin: 0; font-size: 13px; color: #64748b; }
+                  .controls { display: flex; flex-wrap: wrap; gap: 12px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; font-weight: bold; color: #334155; align-items: center;}
+                  .controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+                  .controls input { cursor: pointer; width: 16px; height: 16px; }
+                  .svg-container { flex-grow: 1; width: 100%; height: 100%; overflow: hidden; background-color: #f8fafc; cursor: grab; }
+                  .svg-container:active { cursor: grabbing; }
+                  .btn-front { padding: 6px 12px; background: #fff; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: bold; color: #1e3a8a; cursor: pointer; transition: background 0.2s;}
+                  .btn-front:hover { background: #e0f2fe; border-color: #3b82f6;}
+                  .module-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+                  .module-tab { padding: 6px 14px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 999px; font-weight: bold; color: #334155; cursor: pointer; font-size: 12px; transition: all 0.15s; }
+                  .module-tab:hover { background: #e0f2fe; border-color: #3b82f6; }
+                  .module-tab.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+                  @media print {
+                      body { height: auto; overflow: visible; display: block; background: white; }
+                      .header { display: none; }
+                      .svg-container { display: block; overflow: visible; background: white; }
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="header">
+                  <div class="header-top">
+                      <div class="header-text">
+                          <h1>Interaktywny Rysunek Techniczny</h1>
+                          <p><b>Kliknij element na korpusie</b> by zobaczyć jego nawierty. Przeciągaj LKM (przesunięcie) | Kółko myszy (Zoom).</p>
+                      </div>
+                      <div class="controls">
+                          <label style="color:#9333ea;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-corpus', this)"> Wieńce/Stałe</label>
+                          <label style="color:#ea580c;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-shelf', this)"> Podpórki</label>
+                          <label style="color:#16a34a;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-hinge', this)"> Zawiasy</label>
+                          <label style="color:#0284c7;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-drawer', this)"> Szuflady</label>
+                          <div style="width: 2px; height: 20px; background: #cbd5e1; margin: 0 5px;"></div>
+                          <button class="btn-front" onclick="toggleFront('detail-front', this)">🚪 Fronty Zewn.</button>
+                          <button class="btn-front" onclick="toggleFront('detail-front-inner', this)">📥 Fronty Wewn.</button>
+                      </div>
+                  </div>
+                  ${tabsHtml}
+              </div>
+              <div class="svg-container" id="svg-viewport">
+                  ${svgContent}
+              </div>
+              <script>
+                  function toggleLayer(layerName, checkbox) {
+                      const elements = document.querySelectorAll('.' + layerName);
+                      elements.forEach(el => { el.style.display = checkbox.checked ? '' : 'none'; });
+                  }
+
+                  function toggleFront(id, btn) {
+                      const el = document.getElementById(id);
+                      if (el) {
+                          if (el.style.display === 'none') {
+                              el.style.display = '';
+                              btn.style.background = '#e0f2fe';
+                              btn.style.borderColor = '#3b82f6';
+                          } else {
+                              el.style.display = 'none';
+                              btn.style.background = '#fff';
+                              btn.style.borderColor = '#cbd5e1';
+                          }
+                      }
+                  }
+
+                  function showDetail(id) {
+                      document.querySelectorAll('.detail-view').forEach(el => {
+                          el.style.display = 'none';
+                      });
+                      document.querySelectorAll('.clickable-rect').forEach(el => {
+                          el.classList.remove('active-part');
+                      });
+
+                      if (id) {
+                          const target = document.getElementById(id);
+                          if (target) target.style.display = '';
+
+                          const mapRect = document.getElementById('map-' + id);
+                          if (mapRect) mapRect.classList.add('active-part');
+                      }
+                  }
+
+                  function bindSvgPanZoom() {
+                      const svg = document.getElementById('side-panel-svg');
+                      if (!svg) return;
+                      let isPanning = false; let startPoint = { x: 0, y: 0 }; let startViewBox = { x: 0, y: 0 };
+                      svg.addEventListener('mousedown', (e) => {
+                          isPanning = true; startPoint = { x: e.clientX, y: e.clientY };
+                          startViewBox = { x: svg.viewBox.baseVal.x, y: svg.viewBox.baseVal.y }; svg.style.cursor = 'grabbing';
+                      });
+                      window.addEventListener('mousemove', (e) => {
+                          if (!isPanning) return; const CTM = svg.getScreenCTM();
+                          const dx = (e.clientX - startPoint.x) / CTM.a; const dy = (e.clientY - startPoint.y) / CTM.d;
+                          svg.viewBox.baseVal.x = startViewBox.x - dx; svg.viewBox.baseVal.y = startViewBox.y - dy;
+                      });
+                      window.addEventListener('mouseup', () => { isPanning = false; svg.style.cursor = 'grab'; });
+                      window.addEventListener('mouseleave', () => { isPanning = false; svg.style.cursor = 'grab'; });
+                      svg.addEventListener('wheel', (e) => {
+                          e.preventDefault(); const zoom = e.deltaY > 0 ? 1.1 : 0.9; const pt = svg.createSVGPoint();
+                          pt.x = e.clientX; pt.y = e.clientY; const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+                          svg.viewBox.baseVal.x = svgP.x - (svgP.x - svg.viewBox.baseVal.x) * zoom;
+                          svg.viewBox.baseVal.y = svgP.y - (svgP.y - svg.viewBox.baseVal.y) * zoom;
+                          svg.viewBox.baseVal.width *= zoom; svg.viewBox.baseVal.height *= zoom;
+                      }, { passive: false });
+                  }
+
+                  // Przełącza, KTÓRY moduł grupy jest aktywny - woła z powrotem funkcję
+                  // w oknie aplikacji (window.opener.__printSelectModule, patrz
+                  // ui/sidebar.js), która realnie zmienia state.activeModuleId (jakby
+                  // kliknięto ten moduł na liście po lewej w aplikacji) i oddaje świeży
+                  // SVG - dzięki temu nie trzeba zamykać okna wydruku, żeby zobaczyć
+                  // nawierty innego modułu z tej samej grupy.
+                  function switchModule(moduleId, btn) {
+                      if (!window.opener || window.opener.closed || !window.opener.__printSelectModule) return;
+                      const svg = window.opener.__printSelectModule(moduleId);
+                      if (!svg) return;
+                      document.getElementById('svg-viewport').innerHTML = svg;
+                      bindSvgPanZoom();
+                      showDetail('detail-left');
+                      document.querySelectorAll('.module-tab').forEach(t => {
+                          t.classList.toggle('active', t === btn);
+                      });
+                  }
+
+                  document.body.style.userSelect = 'none';
+                  window.onload = () => { showDetail('detail-left'); bindSvgPanZoom(); };
+              </script>
+          </body>
+          </html>`;
+
+        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+        window.open(URL.createObjectURL(blob), '_blank');
+    } catch (err) {
+        console.error("Błąd generowania rysunku:", err);
+        alert("Wystąpił błąd podczas generowania SVG: " + err.message);
+    }
+}
+
+export { openKosztorysModal };
+
 export function updateSidebar() {
   scheduleCheckpoint(); // patrz core/history.js — debounce'owany checkpoint historii cofnij/wprzód
   renderInteriorEditorIfVisible(); // patrz ui/interiorEditor.js
@@ -538,21 +841,10 @@ export function updateSidebar() {
   if (state.project.modules.length > 0) {
     html += `
       <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 15px;">
-        <button id="btn-print-2d" class="btn btn-primary btn-block btn-sm" ${!activeMod ? 'disabled' : ''}>
-          📄 Drukuj 2D (Rysunek Wykonawczy)
+        <button id="btn-production" class="btn btn-primary btn-block">
+          <i class="ti ti-building-factory-2" aria-hidden="true"></i> Produkcja i raporty
         </button>
-        <button id="btn-export-csv" class="btn btn-success btn-block btn-sm">
-          📊 Menedżer Formatek (CSV)
-        </button>
-        <button id="btn-export-hardware" class="btn btn-warning btn-block btn-sm">
-          🛒 Wydrukuj / PDF (Lista Zakupów)
-        </button>
-        <button id="btn-cutplan" class="btn btn-success btn-block btn-sm">
-          🪚 Rozkrój i etykiety
-        </button>
-        <button id="btn-kosztorys" class="btn btn-gold btn-block btn-sm">
-          💰 Kosztorys Projektu
-        </button>
+        <div style="font-size: 11px; color: var(--text-secondary); text-align: center;">Formatki, rozkrój, etykiety, rysunki 2D, okucia, kosztorys</div>
       </div>
     `;
     if (!activeMod) {
@@ -561,7 +853,7 @@ export function updateSidebar() {
   }
 
   if (activeMod) {
-    html += `<details open style="margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">`;
+    html += `<details style="margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">`;
     html += `<summary style="font-weight: bold; cursor: pointer; outline: none;">Lista formatek (Aktywna)</summary>`;
     
     html += `
@@ -870,301 +1162,21 @@ export function updateSidebar() {
 
  const printBtn = document.getElementById('btn-print-2d');
   if (printBtn && activeMod) {
-    printBtn.addEventListener('click', () => {
-      // Szafka narożna ma własny wydruk (rzut z góry + rysunki wieńca, półki,
-      // boków i listwy) - interaktywny rysunek boku niżej zakłada prostokątny
-      // korpus.
-      if (activeMod.type === 'corner_cabinet') {
-          openCornerBlankPrintView(activeMod);
-          return;
-      }
-      try {
-          const sidePanel = parts.find(p => p.name.toLowerCase().includes('bok'));
-          let drawHeight = sidePanel ? sidePanel.length : (parseFloat(activeMod.dimensions.height) || 720);
-          let drawDepth = sidePanel ? sidePanel.width : (parseFloat(activeMod.dimensions.depth) || 510);
-
-          const svgContent = generateSidePanelSVG(drawHeight, drawDepth, mountingData || []);
-
-          // Szafa złożona z kilku zgrupowanych modułów (patrz ui/properties.js:
-          // "Połącz zaznaczone w grupę") - widok KORPUS już pokazuje całą grupę
-          // naraz (viewer2d.js: stackModules), ale klikalny do nawiertów jest
-          // tylko AKTYWNY moduł. Guziki niżej pozwalają przełączyć, który to
-          // jest, BEZ zamykania okna wydruku - klikając wywołują z powrotem
-          // funkcję w oknie aplikacji (window.opener, ta sama origin co blob:),
-          // która realnie przełącza state.activeModuleId (dokładnie tak samo,
-          // jakby użytkownik kliknął ten moduł na liście po lewej w aplikacji)
-          // i oddaje świeży SVG dla nowego aktywnego modułu.
-          const groupId = activeMod.groupId;
-          const groupModules = groupId
-              ? state.project.modules.filter(m => m.groupId === groupId)
-              : [];
-          window.__printSelectModule = (moduleId) => {
-              state.activeModuleId = moduleId;
-              update3D();
-              updateSidebar();
-              initPropertiesPanel();
-              const m = state.project.modules.find(mm => mm.id === moduleId);
-              if (!m) return null;
-              const { parts: mParts, mountingData: mMountingData } = calculateParts();
-              const mSidePanel = mParts.find(p => p.name.toLowerCase().includes('bok'));
-              const mDrawHeight = mSidePanel ? mSidePanel.length : (parseFloat(m.dimensions.height) || 720);
-              const mDrawDepth = mSidePanel ? mSidePanel.width : (parseFloat(m.dimensions.depth) || 510);
-              return generateSidePanelSVG(mDrawHeight, mDrawDepth, mMountingData || []);
-          };
-
-          const tabsHtml = groupModules.length > 1 ? `
-                <div class="module-tabs">
-                    ${groupModules.map(m => `<button class="module-tab${m.id === activeMod.id ? ' active' : ''}" data-module-id="${m.id}" onclick="switchModule('${m.id}', this)">${escapeHtml(m.name)}</button>`).join('')}
-                </div>
-          ` : '';
-
-          const htmlContent = `
-            <!DOCTYPE html>
-            <html lang="pl">
-            <head>
-                <meta charset="UTF-8">
-                <title>Wydruk na produkcję (Interaktywny)</title>
-                <style>
-                    body { margin: 0; padding: 0; background-color: #f1f5f9; display: flex; flex-direction: column; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-                    .header { background-color: #ffffff; padding: 16px 24px; border-bottom: 1px solid #cbd5e1; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); z-index: 10; display: flex; flex-direction: column; gap: 10px; }
-                    .header-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-                    .header-text h1 { margin: 0 0 6px 0; font-size: 20px; color: #0f172a; }
-                    .header-text p { margin: 0; font-size: 13px; color: #64748b; }
-                    .controls { display: flex; flex-wrap: wrap; gap: 12px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; font-weight: bold; color: #334155; align-items: center;}
-                    .controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
-                    .controls input { cursor: pointer; width: 16px; height: 16px; }
-                    .svg-container { flex-grow: 1; width: 100%; height: 100%; overflow: hidden; background-color: #f8fafc; cursor: grab; }
-                    .svg-container:active { cursor: grabbing; }
-                    .btn-front { padding: 6px 12px; background: #fff; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: bold; color: #1e3a8a; cursor: pointer; transition: background 0.2s;}
-                    .btn-front:hover { background: #e0f2fe; border-color: #3b82f6;}
-                    .module-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
-                    .module-tab { padding: 6px 14px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 999px; font-weight: bold; color: #334155; cursor: pointer; font-size: 12px; transition: all 0.15s; }
-                    .module-tab:hover { background: #e0f2fe; border-color: #3b82f6; }
-                    .module-tab.active { background: #2563eb; border-color: #2563eb; color: #fff; }
-                    @media print {
-                        body { height: auto; overflow: visible; display: block; background: white; }
-                        .header { display: none; }
-                        .svg-container { display: block; overflow: visible; background: white; }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <div class="header-top">
-                        <div class="header-text">
-                            <h1>Interaktywny Rysunek Techniczny</h1>
-                            <p><b>Kliknij element na korpusie</b> by zobaczyć jego nawierty. Przeciągaj LKM (przesunięcie) | Kółko myszy (Zoom).</p>
-                        </div>
-                        <div class="controls">
-                            <label style="color:#9333ea;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-corpus', this)"> Wieńce/Stałe</label>
-                            <label style="color:#ea580c;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-shelf', this)"> Podpórki</label>
-                            <label style="color:#16a34a;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-hinge', this)"> Zawiasy</label>
-                            <label style="color:#0284c7;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-drawer', this)"> Szuflady</label>
-                            <div style="width: 2px; height: 20px; background: #cbd5e1; margin: 0 5px;"></div>
-                            <button class="btn-front" onclick="toggleFront('detail-front', this)">🚪 Fronty Zewn.</button>
-                            <button class="btn-front" onclick="toggleFront('detail-front-inner', this)">📥 Fronty Wewn.</button>
-                        </div>
-                    </div>
-                    ${tabsHtml}
-                </div>
-                <div class="svg-container" id="svg-viewport">
-                    ${svgContent}
-                </div>
-                <script>
-                    function toggleLayer(layerName, checkbox) {
-                        const elements = document.querySelectorAll('.' + layerName);
-                        elements.forEach(el => { el.style.display = checkbox.checked ? '' : 'none'; });
-                    }
-
-                    function toggleFront(id, btn) {
-                        const el = document.getElementById(id);
-                        if (el) {
-                            if (el.style.display === 'none') {
-                                el.style.display = '';
-                                btn.style.background = '#e0f2fe';
-                                btn.style.borderColor = '#3b82f6';
-                            } else {
-                                el.style.display = 'none';
-                                btn.style.background = '#fff';
-                                btn.style.borderColor = '#cbd5e1';
-                            }
-                        }
-                    }
-
-                    function showDetail(id) {
-                        document.querySelectorAll('.detail-view').forEach(el => {
-                            el.style.display = 'none';
-                        });
-                        document.querySelectorAll('.clickable-rect').forEach(el => {
-                            el.classList.remove('active-part');
-                        });
-
-                        if (id) {
-                            const target = document.getElementById(id);
-                            if (target) target.style.display = '';
-
-                            const mapRect = document.getElementById('map-' + id);
-                            if (mapRect) mapRect.classList.add('active-part');
-                        }
-                    }
-
-                    function bindSvgPanZoom() {
-                        const svg = document.getElementById('side-panel-svg');
-                        if (!svg) return;
-                        let isPanning = false; let startPoint = { x: 0, y: 0 }; let startViewBox = { x: 0, y: 0 };
-                        svg.addEventListener('mousedown', (e) => {
-                            isPanning = true; startPoint = { x: e.clientX, y: e.clientY };
-                            startViewBox = { x: svg.viewBox.baseVal.x, y: svg.viewBox.baseVal.y }; svg.style.cursor = 'grabbing';
-                        });
-                        window.addEventListener('mousemove', (e) => {
-                            if (!isPanning) return; const CTM = svg.getScreenCTM();
-                            const dx = (e.clientX - startPoint.x) / CTM.a; const dy = (e.clientY - startPoint.y) / CTM.d;
-                            svg.viewBox.baseVal.x = startViewBox.x - dx; svg.viewBox.baseVal.y = startViewBox.y - dy;
-                        });
-                        window.addEventListener('mouseup', () => { isPanning = false; svg.style.cursor = 'grab'; });
-                        window.addEventListener('mouseleave', () => { isPanning = false; svg.style.cursor = 'grab'; });
-                        svg.addEventListener('wheel', (e) => {
-                            e.preventDefault(); const zoom = e.deltaY > 0 ? 1.1 : 0.9; const pt = svg.createSVGPoint();
-                            pt.x = e.clientX; pt.y = e.clientY; const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
-                            svg.viewBox.baseVal.x = svgP.x - (svgP.x - svg.viewBox.baseVal.x) * zoom;
-                            svg.viewBox.baseVal.y = svgP.y - (svgP.y - svg.viewBox.baseVal.y) * zoom;
-                            svg.viewBox.baseVal.width *= zoom; svg.viewBox.baseVal.height *= zoom;
-                        }, { passive: false });
-                    }
-
-                    // Przełącza, KTÓRY moduł grupy jest aktywny - woła z powrotem funkcję
-                    // w oknie aplikacji (window.opener.__printSelectModule, patrz
-                    // ui/sidebar.js), która realnie zmienia state.activeModuleId (jakby
-                    // kliknięto ten moduł na liście po lewej w aplikacji) i oddaje świeży
-                    // SVG - dzięki temu nie trzeba zamykać okna wydruku, żeby zobaczyć
-                    // nawierty innego modułu z tej samej grupy.
-                    function switchModule(moduleId, btn) {
-                        if (!window.opener || window.opener.closed || !window.opener.__printSelectModule) return;
-                        const svg = window.opener.__printSelectModule(moduleId);
-                        if (!svg) return;
-                        document.getElementById('svg-viewport').innerHTML = svg;
-                        bindSvgPanZoom();
-                        showDetail('detail-left');
-                        document.querySelectorAll('.module-tab').forEach(t => {
-                            t.classList.toggle('active', t === btn);
-                        });
-                    }
-
-                    document.body.style.userSelect = 'none';
-                    window.onload = () => { showDetail('detail-left'); bindSvgPanZoom(); };
-                </script>
-            </body>
-            </html>`;
-
-          const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-          window.open(URL.createObjectURL(blob), '_blank');
-      } catch (err) {
-          console.error("Błąd generowania rysunku:", err);
-          alert("Wystąpił błąd podczas generowania SVG: " + err.message);
-      }
-    });
+    printBtn.addEventListener('click', () => openTechnicalDrawing());
   }
 
   const exportBtn = document.getElementById('btn-export-csv');
   if (exportBtn) {
-    exportBtn.addEventListener('click', () => {
-      const allParts = calculateAllProjectParts();
-      if(allParts.length === 0) {
-          alert("Twój projekt jest pusty. Dodaj szafkę, aby wygenerować formatki.");
-          return;
-      }
-      openCsvEditorModal(allParts);
-    });
+    exportBtn.addEventListener('click', () => openCsvExport());
   }
 
   const exportHardwareBtn = document.getElementById('btn-export-hardware');
   if (exportHardwareBtn) {
-    exportHardwareBtn.addEventListener('click', () => {
-      if (projectHardware.length === 0) {
-          alert("Lista zakupów jest pusta.");
-          return;
-      }
-      
-      const dateStr = new Date().toLocaleDateString('pl-PL');
-      
-      let htmlContent = `
-        <!DOCTYPE html>
-        <html lang="pl">
-        <head>
-            <meta charset="UTF-8">
-            <title>Lista Zakupów - ${escapeHtml(state.project.name)}</title>
-            <style>
-                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1e293b; max-width: 900px; margin: 0 auto; }
-                .header { border-bottom: 2px solid #cbd5e1; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
-                .header h1 { margin: 0; color: #0f172a; font-size: 28px; }
-                .header p { margin: 5px 0 0 0; color: #64748b; font-size: 14px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e2e8f0; }
-                th { background-color: #f8fafc; color: #334155; font-weight: bold; border-bottom: 2px solid #cbd5e1; }
-                td.qty { font-weight: bold; color: #0f172a; text-align: center; width: 80px; font-size: 15px; }
-                td.unit { color: #64748b; text-align: center; width: 80px; }
-                tr:nth-child(even) { background-color: #f8fafc; }
-                
-                @media print {
-                    body { padding: 0; max-width: 100%; }
-                    .no-print { display: none !important; }
-                    .header { border-bottom: 2px solid #000; }
-                    th { border-bottom: 2px solid #000; background-color: transparent; }
-                    tr:nth-child(even) { background-color: transparent; }
-                }
-            </style>
-        </head>
-        <body>
-            <div class="no-print" style="margin-bottom: 30px; display: flex; justify-content: flex-end;">
-                <button onclick="window.print()" style="padding: 12px 24px; background-color: #059669; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                    🖨️ Drukuj / Zapisz jako PDF
-                </button>
-            </div>
-            <div class="header">
-                <div>
-                    <h1>Lista Zakupów: Okucia</h1>
-                    <p>Projekt: <strong style="color: #0f172a;">${escapeHtml(state.project.name)}</strong></p>
-                </div>
-                <div style="text-align: right; color: #64748b; font-size: 14px;">
-                    Data wygenerowania: <strong>${dateStr}</strong>
-                </div>
-            </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Nazwa okucia / Elementu</th>
-                        <th style="text-align: center;">Ilość</th>
-                        <th style="text-align: center;">J.m.</th>
-                    </tr>
-                </thead>
-                <tbody>
-      `;
-      
-      projectHardware.forEach(hw => {
-          htmlContent += `
-            <tr>
-                <td>${escapeHtml(hw.name)}</td>
-                <td class="qty">${hw.qty}</td>
-                <td class="unit">${escapeHtml(hw.unit)}</td>
-            </tr>
-          `;
-      });
-      
-      htmlContent += `
-                </tbody>
-            </table>
-            
-            <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 12px;">
-                Wygenerowano automatycznie z systemu Generator Stolarski Next
-            </div>
-        </body>
-        </html>
-      `;
-      
-      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-      window.open(URL.createObjectURL(blob), '_blank');
-    });
+    exportHardwareBtn.addEventListener('click', () => printHardwareList());
   }
+
+  const productionBtn = document.getElementById('btn-production');
+  if (productionBtn) productionBtn.addEventListener('click', () => openProductionHub());
 
   const cutPlanBtn = document.getElementById('btn-cutplan');
   if (cutPlanBtn) {
