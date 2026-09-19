@@ -882,6 +882,33 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   return svg;
 }
 
+// Rysunek boków szafki narożnej z nawiertami pod podpórki półek L
+// (engine/cabinet.js: getCornerShelfHoles) - dwa boki obok siebie, otwory
+// fi 5 (środkowy w kolorze pomarańczowym z opisem wysokości od dołu).
+export function generateCornerSidesHolesSVG(sides) {
+  const gap = 80, pad = 50;
+  const maxH = Math.max(...sides.map(s => s.height));
+  const totalW = sides.reduce((sum, s) => sum + s.depth, 0) + gap * (sides.length - 1) + pad * 2;
+  const totalH = maxH + pad * 2 + 30;
+  let svg = `<svg viewBox="0 0 ${totalW} ${totalH}" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif">`;
+  let ox = pad;
+  sides.forEach(s => {
+    const top = pad + 20;
+    const yOf = (y) => top + s.height - y;
+    svg += `<text x="${ox + s.depth / 2}" y="${pad}" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="middle">${escapeHtml(s.name)} (${Math.round(s.height)}×${Math.round(s.depth)})</text>`;
+    svg += `<rect x="${ox}" y="${top}" width="${s.depth}" height="${s.height}" fill="#fef3c7" stroke="#334155" stroke-width="2" />`;
+    s.holes.forEach(h => {
+      svg += `<circle cx="${ox + h.x}" cy="${yOf(h.y)}" r="2.5" fill="${h.isCenter ? '#ea580c' : '#fcd34d'}" stroke="#78350f" stroke-width="0.5" />`;
+      if (h.isCenter) {
+        svg += `<text x="${ox + h.x + (h.x < s.depth / 2 ? 8 : -8)}" y="${yOf(h.y) + 4}" font-size="11" fill="#9a3412" text-anchor="${h.x < s.depth / 2 ? 'start' : 'end'}">${Math.round(h.y)}</text>`;
+      }
+    });
+    ox += s.depth + gap;
+  });
+  svg += `</svg>`;
+  return svg;
+}
+
 // Wykrój formatki narożnej w kształcie L (Wieniec narożny / Półka narożna,
 // engine/cabinet.js: getCornerCorpusParts) - do tej pory ich cut-listowy
 // opis "naroże do wycięcia - patrz rysunek 3D" nie odsyłał do żadnego

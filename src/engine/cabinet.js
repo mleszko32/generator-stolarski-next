@@ -712,6 +712,37 @@ function getCornerCorpusParts(mod, config) {
   return parts;
 }
 
+// Nawierty pod podpórki półek narożnych (System 32, jak półka ruchoma w
+// core/shelfMath.js: calculateShelfHoles) - półka L opiera się na OBU bokach
+// (bok ramienia A i bok ramienia B), więc każdy z nich dostaje dwa rzędy
+// (37 mm od przodu i od tyłu) po 3 otwory na każdą półkę. Zwraca opis obu
+// boków w układzie rysunku: x = odległość od tylnej krawędzi boku, y = od dołu.
+export function getCornerShelfHoles(mod, config = state.project) {
+  const shelves = (mod.elements || []).filter(el => el.typ === 'poziom-narozny');
+  const backThick = parseFloat(config.materials?.backThickness) || 3;
+  const height = parseFloat(mod.dimensions.height) || 720;
+  const { depthA, depthB } = getCornerDepths(mod);
+  const pinR = 2.5;
+
+  const build = (name, sideDepth) => {
+    const holes = [];
+    shelves.forEach(sh => {
+      const yBase = (parseFloat(sh.y) || 0) - pinR;
+      [37, sideDepth - 37].forEach(x => {
+        [-32, 0, 32].forEach(dy => {
+          holes.push({ x, y: yBase + dy, isCenter: dy === 0 });
+        });
+      });
+    });
+    return { name, depth: sideDepth, height, holes };
+  };
+
+  return [
+    build('Bok ramienia A', depthA - backThick),
+    build('Bok ramienia B', depthB - backThick),
+  ];
+}
+
 function getInteriorParts(mod, config) {
   const parts = [];
   if (!mod.elements || mod.elements.length === 0) return parts;

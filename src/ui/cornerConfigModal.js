@@ -17,7 +17,9 @@ import { update3D } from "../render/viewer3d.js";
 import { updateSidebar } from "./sidebar.js";
 import { initPropertiesPanel } from "./properties.js";
 import { createZoneEditor } from "./interiorEditor.js";
-import { generateCornerBlankSVG } from "../render/viewer2d.js";
+import { generateCornerBlankSVG, generateCornerSidesHolesSVG } from "../render/viewer2d.js";
+import { getCornerShelfHoles } from "../engine/cabinet.js";
+import { autoDistributeShelves } from "../core/shelfMath.js";
 import { getCornerDepths } from "../core/layout.js";
 import { state } from "../core/state.js";
 
@@ -74,7 +76,13 @@ export function openCornerConfigModal(mod) {
       <h3 style="font-size:13px; color:#1e3a8a; margin:0 0 4px 0;">Półki narożne (kształt L, na całą głębokość obu ramion)</h3>
       <div style="font-size:11px; color:#64748b; margin-bottom:6px;">W realnej szafce narożnej półka jest jedna, w kształcie L (jak wieniec górny/dolny) - nie dwie osobne, proste półki. Dlatego dodaje się je tutaj, wspólnie dla obu ramion, a nie osobno w każdym z nich.</div>
       <div id="corner-shelves-list"></div>
-      <button type="button" id="btn-corner-add-shelf" class="btn btn-neutral btn-sm" style="margin-top:6px;">+ Dodaj półkę narożną</button>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:6px;">
+        <button type="button" id="btn-corner-add-shelf" class="btn btn-neutral btn-sm">+ Dodaj półkę narożną</button>
+        <span style="font-size:11px; color:#475569;">lub rozmieść równo:</span>
+        <input type="number" id="input-corner-even-count" min="1" max="10" value="3" style="width:60px;" />
+        <button type="button" id="btn-corner-even-shelves" class="btn btn-neutral btn-sm">Rozmieść równo</button>
+      </div>
+      <div id="corner-shelf-holes" style="margin-top:10px;"></div>
     </div>
 
     <div style="display:flex; gap:14px; flex-wrap:wrap;">
@@ -183,9 +191,37 @@ export function openCornerConfigModal(mod) {
       });
       shelvesListEl.appendChild(row);
     });
+    renderShelfHoles();
   }
 
+  const holesEl = modal.querySelector('#corner-shelf-holes');
+  function renderShelfHoles() {
+    const hasShelves = (mod.elements || []).some(el => el.typ === 'poziom-narozny');
+    holesEl.innerHTML = hasShelves
+      ? `<div style="font-size:11px; color:#64748b; margin-bottom:4px;">Nawierty pod podpórki (System 32) na bokach - pomarańczowy = środek, opis = wysokość od dołu:</div>${generateCornerSidesHolesSVG(getCornerShelfHoles(mod))}`
+      : '';
+  }
   renderShelvesList();
+
+  modal.querySelector('#btn-corner-even-shelves').addEventListener('click', () => {
+    const count = Math.max(1, Math.min(10, parseInt(modal.querySelector('#input-corner-even-count').value, 10) || 1));
+    const th = parseFloat(state.project.materials?.boardThickness) || 18;
+    const height = parseFloat(mod.dimensions.height) || 720;
+    // Zastępuje dotychczasowe półki narożne - "rozmieść równo N" ma dać
+    // dokładnie N, nie doklejać do istniejących.
+    mod.elements = (mod.elements || []).filter(el => el.typ !== 'poziom-narozny');
+    autoDistributeShelves(height - th * 2, th, count).forEach(o => {
+      mod.elements.push({
+        id: 'poziom-narozny-' + Date.now() + '-' + randomSuffix(),
+        typ: 'poziom-narozny',
+        y: th + o.y,
+        isStructural: false,
+      });
+    });
+    update3D();
+    updateSidebar();
+    renderShelvesList();
+  });
 
   modal.querySelector('#btn-corner-add-shelf').addEventListener('click', () => {
     const height = parseFloat(mod.dimensions.height) || 720;

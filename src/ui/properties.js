@@ -12,7 +12,8 @@ import { evalDimensionExpr } from "../utils/math.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
 import { openCornerConfigModal } from "./cornerConfigModal.js";
-import { generateCornerBlankSVG } from "../render/viewer2d.js";
+import { generateCornerBlankSVG, generateCornerSidesHolesSVG } from "../render/viewer2d.js";
+import { getCornerShelfHoles } from "../engine/cabinet.js";
 
 function getSelectedMods() {
     if (state.selectedModules && state.selectedModules.size > 0) {
@@ -170,6 +171,7 @@ function openCornerBlankPrintView(mod) {
         </ul>
       </div>
       ${svgContent}
+      ${shelfCount > 0 ? `<h2 style="font-size:16px; margin:24px 0 8px;">Nawierty pod podpórki półek (System 32)</h2>${generateCornerSidesHolesSVG(getCornerShelfHoles(mod))}` : ''}
     </body>
     </html>
   `;
