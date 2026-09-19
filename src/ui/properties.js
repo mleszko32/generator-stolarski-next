@@ -131,7 +131,7 @@ function renderSidePanelProperties(rightSidebar, panel) {
 // listy zakupów niżej w tym pliku - nie na złożonym, interaktywnym
 // "Drukuj 2D (Rysunek Wykonawczy)" z sidebar.js (pan/zoom/warstwy), żeby nie
 // dotykać tamtej, już rozbudowanej logiki.
-function openCornerBlankPrintView(mod) {
+export function openCornerBlankPrintView(mod) {
   const legA = parseFloat(mod.dimensions.width) || 860;
   const legB = parseFloat(mod.dimensions.legB) || 860;
   const { depthA, depthB } = getCornerDepths(mod);

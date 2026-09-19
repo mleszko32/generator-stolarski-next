@@ -2,7 +2,7 @@ import { calculateParts, calculateAllProjectParts, calculateProjectHardware, cal
 import { generateSidePanelSVG } from "../render/viewer2d.js"; 
 import { state, getActiveModule, addModule, deleteModule, duplicateModule, addSidePanel, deleteSidePanel, addCornerModule } from "../core/state.js";
 import { update3D } from "../render/viewer3d.js";
-import { initPropertiesPanel } from "./properties.js";
+import { initPropertiesPanel, openCornerBlankPrintView } from "./properties.js";
 import { escapeHtml } from "../utils/dom.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
@@ -867,6 +867,13 @@ export function updateSidebar() {
  const printBtn = document.getElementById('btn-print-2d');
   if (printBtn && activeMod) {
     printBtn.addEventListener('click', () => {
+      // Szafka narożna ma własny wydruk (rzut z góry + rysunki wieńca, półki,
+      // boków i listwy) - interaktywny rysunek boku niżej zakłada prostokątny
+      // korpus.
+      if (activeMod.type === 'corner_cabinet') {
+          openCornerBlankPrintView(activeMod);
+          return;
+      }
       try {
           const sidePanel = parts.find(p => p.name.toLowerCase().includes('bok'));
           let drawHeight = sidePanel ? sidePanel.length : (parseFloat(activeMod.dimensions.height) || 720);
