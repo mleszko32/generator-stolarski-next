@@ -25,15 +25,62 @@ function getSelectedMods() {
 // Panel jest odświeżany po każdej zmianie (patrz setupEventListeners -> 'change'),
 // więc żeby klik w zakładkę "Front" nie wracał do "Wymiary" po każdej edycji,
 // aktywna zakładka żyje w module-level zmiennej, nie w DOM.
+// Sekcje panelu właściwości (zwijane, kilka może być otwartych naraz). Stan
+// otwarcia pamiętany w localStorage, żeby panel nie "zapominał" układu.
 const TABS = [
-  { id: "wymiary", label: "📐 Wymiary" },
-  { id: "front", label: "🚪 Front" },
-  { id: "szuflady", label: "📦 Szuflady" },
-  { id: "konstrukcja", label: "🧱 Konstrukcja" },
-  { id: "nogi", label: "🦵 Nóżki / Blendy" },
-  { id: "zawiasy", label: "🔩 Zawiasy" },
+  { id: "wymiary", label: "Wymiary", icon: "ti-ruler-2" },
+  { id: "front", label: "Front", icon: "ti-door" },
+  { id: "szuflady", label: "Szuflady", icon: "ti-box" },
+  { id: "konstrukcja", label: "Konstrukcja", icon: "ti-layout-board" },
+  { id: "nogi", label: "Nóżki i blendy", icon: "ti-arrows-vertical" },
+  { id: "zawiasy", label: "Zawiasy", icon: "ti-settings" },
 ];
-let activeTab = "wymiary";
+const OPEN_SECTIONS_KEY = "propertiesOpenSections";
+function loadOpenSections() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(OPEN_SECTIONS_KEY));
+    if (Array.isArray(raw)) return new Set(raw.filter(id => TABS.some(t => t.id === id)));
+  } catch (e) { /* localStorage niedostępny - domyślnie tylko Wymiary */ }
+  return new Set(["wymiary"]);
+}
+function saveOpenSections(set) {
+  try { localStorage.setItem(OPEN_SECTIONS_KEY, JSON.stringify([...set])); } catch (e) { /* brak zapisu jest nieszkodliwy */ }
+}
+let openSections = loadOpenSections();
+
+// Nadpisaniem jest klucz, którego wartość w szafce RÓŻNI SIĘ od ustawienia
+// projektu (samo istnienie klucza nic nie znaczy - szafki dostają np.
+// front.hinges już przy tworzeniu). Plecy nie mają ustawienia projektu, więc
+// nie biorą udziału w porównaniu.
+function computeOverridden(mod) {
+  const diffKeys = (local, base, skip = []) => Object.keys(local || {})
+    .filter(k => !skip.includes(k) && JSON.stringify(local[k]) !== JSON.stringify((base || {})[k]));
+  const proj = state.project;
+  return {
+    front: diffKeys(mod.front, proj.front, ['hinges', 'distribution', 'drawerSystem']).length > 0,
+    szuflady: diffKeys(mod.front, proj.front, Object.keys(mod.front || {}).filter(k => k !== 'drawerSystem')).length > 0,
+    konstrukcja: diffKeys(mod.construction, proj.construction).length > 0,
+  };
+}
+
+function refreshOverrideDots() {
+  const mod = getActiveModule();
+  if (!mod) return;
+  const overridden = computeOverridden(mod);
+  document.querySelectorAll('.pacc').forEach(sec => {
+    const id = sec.dataset.section;
+    const head = sec.querySelector('.pacc-head');
+    const dot = head.querySelector('.pacc-dot');
+    if (overridden[id] && !dot) {
+      const d = document.createElement('span');
+      d.className = 'pacc-dot';
+      d.title = 'Ta szafka ma własne ustawienia, różne od domyślnych projektu';
+      head.insertBefore(d, head.querySelector('.pacc-chev'));
+    } else if (!overridden[id] && dot) {
+      dot.remove();
+    }
+  });
+}
 
 // Kolejność i znaczenie indeksów 0-3 MUSI się zgadzać z kolejnością addBox()
 // dla nóżek w render/viewer3d.js oraz z pętlą w engine/cabinet.js
@@ -386,30 +433,32 @@ export function initPropertiesPanel() {
       });
   })();
 
-  if (!TABS.some(t => t.id === activeTab)) activeTab = "wymiary";
+  // Sekcje, w których TA szafka ma własne ustawienia nadpisujące domyślne
+  // projektu (mod.front / mod.construction są scalane nad ustawieniami projektu).
+  const overridden = computeOverridden(activeModule);
 
-  const tabBar = TABS.map(t => `
-    <button type="button" class="ptab-btn${t.id === activeTab ? ' active' : ''}" data-tab="${t.id}">${t.label}</button>
-  `).join("");
-
-  const tabContent = (id, html) => `<div class="ptab-panel" data-tab="${id}" style="display:${id === activeTab ? 'block' : 'none'};">${html}</div>`;
+  const tabContent = (id, html) => {
+    const t = TABS.find(x => x.id === id);
+    const open = openSections.has(id);
+    return `<section class="pacc${open ? ' open' : ''}" data-section="${id}">
+      <button type="button" class="pacc-head" data-section="${id}" aria-expanded="${open}">
+        <i class="ti ${t.icon}" aria-hidden="true"></i>
+        <span class="pacc-label">${t.label}</span>
+        ${overridden[id] ? '<span class="pacc-dot" title="Ta szafka ma własne ustawienia, różne od domyślnych projektu"></span>' : ''}
+        <i class="ti ti-chevron-down pacc-chev" aria-hidden="true"></i>
+      </button>
+      <div class="pacc-body">${html}</div>
+    </section>`;
+  };
 
   rightSidebar.innerHTML = `
-    <style>
-      .ptabs { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid #cbd5e1; margin-bottom: 14px; }
-      .ptab-btn { flex: 1 1 auto; padding: 7px 6px; font-size: 11px; font-weight: bold; color: #64748b; background: #f1f5f9; border: 1px solid #e2e8f0; border-bottom: none; border-radius: 6px 6px 0 0; cursor: pointer; white-space: nowrap; }
-      .ptab-btn:hover { background: #e2e8f0; color: #1e293b; }
-      .ptab-btn.active { background: #fff; color: #1d4ed8; border-color: #cbd5e1; box-shadow: inset 0 2px 0 #2563eb; }
-    </style>
-
-    <h2>Parametry szafki ${multiCount > 1 ? `<span style="color:#2563eb;">(Edytujesz ${multiCount} obiekty)</span>` : ''}</h2>
-
-    <div class="property-group" style="background: #f8fafc; padding: 10px; border-radius: 4px; border: 1px solid #cbd5e1; margin-bottom: 15px;">
-      <label style="font-weight: bold; color: #0f172a;">Nazwa szafki:</label>
-      <input type="text" id="input-mod-name" value="${escapeHtml(activeModule.name)}" style="font-weight: bold; color: #1e293b;" />
+    <div class="prop-sticky">
+      <h2>${escapeHtml(activeModule.name)} <span style="font-weight:400; color:var(--text-secondary); font-size:12px;">${activeModule.dimensions.width}×${activeModule.dimensions.height}×${activeModule.dimensions.depth}${multiCount > 1 ? ` · zaznaczono ${multiCount}` : ''}</span></h2>
+      <div class="property-group" style="margin-top:6px;">
+        <label>Nazwa szafki:</label>
+        <input type="text" id="input-mod-name" value="${escapeHtml(activeModule.name)}" style="font-weight: 600;" />
+      </div>
     </div>
-
-    <div class="ptabs">${tabBar}</div>
 
     ${tabContent("wymiary", `
       <h3>Wymiary Modułu</h3>
@@ -703,11 +752,22 @@ export function initPropertiesPanel() {
 function setupEventListeners() {
   if(!getActiveModule()) return;
 
-  document.querySelectorAll('.ptab-btn').forEach(btn => {
+  // Delegowane: po zmianie dowolnego pola odśwież kropki "własne ustawienia".
+  const rs = document.querySelector('.sidebar-right');
+  if (rs && !rs.dataset.dotsBound) {
+    rs.dataset.dotsBound = '1';
+    ['input', 'change'].forEach(ev => rs.addEventListener(ev, () => setTimeout(refreshOverrideDots, 0)));
+  }
+
+  document.querySelectorAll('.pacc-head').forEach(btn => {
     btn.addEventListener('click', () => {
-      activeTab = btn.dataset.tab;
-      document.querySelectorAll('.ptab-btn').forEach(b => b.classList.toggle('active', b === btn));
-      document.querySelectorAll('.ptab-panel').forEach(p => { p.style.display = p.dataset.tab === activeTab ? 'block' : 'none'; });
+      const id = btn.dataset.section;
+      const section = btn.closest('.pacc');
+      const nowOpen = !section.classList.contains('open');
+      section.classList.toggle('open', nowOpen);
+      btn.setAttribute('aria-expanded', String(nowOpen));
+      if (nowOpen) openSections.add(id); else openSections.delete(id);
+      saveOpenSections(openSections);
     });
   });
 

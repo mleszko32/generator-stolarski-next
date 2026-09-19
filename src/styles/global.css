@@ -325,3 +325,27 @@ body {
 .hub-table th { text-align: left; font-weight: 600; color: var(--text-secondary); padding: 6px 8px; border-bottom: 1px solid var(--border); background: var(--surface-subtle); }
 .hub-table td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; }
 .hub-table .num { text-align: right; width: 70px; }
+
+/* Prawy panel: zwijane sekcje (ui/properties.js) */
+.prop-sticky {
+  position: sticky; top: -15px; z-index: 5;
+  background: var(--surface-panel);
+  margin: -15px -15px 12px; padding: 14px 15px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.prop-sticky h2 { margin: 0 0 2px; }
+.pacc { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; background: var(--surface-panel); }
+.pacc-head {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 10px 12px; background: transparent; border: none; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--text-primary); text-align: left;
+}
+.pacc-head:hover { background: var(--surface-subtle); border-radius: 8px; }
+.pacc-head > i:first-child { font-size: 17px; color: var(--text-secondary); }
+.pacc-label { flex: 1; }
+.pacc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.pacc-chev { font-size: 15px; color: var(--text-secondary); transition: transform 0.15s; }
+.pacc.open .pacc-chev { transform: rotate(180deg); }
+.pacc-body { display: none; padding: 0 12px 12px; }
+.pacc.open .pacc-body { display: block; }
+.pacc-body > h3:first-child { margin-top: 4px; }
