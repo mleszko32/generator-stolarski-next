@@ -137,6 +137,7 @@ function openCornerBlankPrintView(mod) {
   const { depthA, depthB } = getCornerDepths(mod);
   const shelfCount = (mod.elements || []).filter(el => el.typ === 'poziom-narozny').length;
   const th = parseFloat(state.project.materials?.boardThickness) || 18;
+  const backThick = parseFloat(state.project.materials?.backThickness) || 3;
 
   const svgContent = generateCornerBlankSVG(legA, legB, depthA, depthB, th, null, {
     title: 'RZUT SZAFKI Z GÓRY', plain: true,
@@ -168,7 +169,7 @@ function openCornerBlankPrintView(mod) {
         <ul>
           <li>Wieniec narożny (dolny) — 1 szt.</li>
           <li>Wieniec narożny (górny) — 1 szt.</li>
-          ${shelfCount > 0 ? `<li>Półka narożna — ${shelfCount} szt. (dodatkowo wycięcie 100×${Math.round(th)} mm w tylnym rogu na listwę narożną)</li>` : ''}
+          ${shelfCount > 0 ? `<li>Półka narożna — ${shelfCount} szt. (dodatkowo wycięcie ${100 - backThick}×${Math.round(th - backThick)} mm w tylnym rogu na listwę narożną)</li>` : ''}
         </ul>
       </div>
       ${svgContent}

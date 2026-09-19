@@ -649,8 +649,10 @@ function getCornerCorpusParts(mod, config) {
   // formatka wieńca jest pomniejszona o grubość boku (th) na każdym
   // ramieniu - tylko RAZ na ramię, bo drugi koniec wieńca graniczy z
   // listwą narożną/wycięciem, nie z drugim bokiem (zgłoszona korekta).
-  const wieniecA = legA - th;
-  const wieniecB = legB - th;
+  // Dodatkowo tył cofnięty o grubość pleców (jak wieniec zwykłej szafki:
+  // depth - backThick) - wymiar Ramię/Głębokość liczy się z plecami.
+  const wieniecA = legA - th - backThick;
+  const wieniecB = legB - th - backThick;
   const wieniecName = `Wieniec narożny ${Math.round(wieniecA)}x${Math.round(wieniecB)} (naroże do wycięcia - patrz rysunek 3D)`;
   parts.push({ name: wieniecName, length: parseFloat(wieniecA.toFixed(1)), width: parseFloat(wieniecB.toFixed(1)), qty: 2, category: "Korpus" });
 
@@ -705,7 +707,7 @@ function getCornerCorpusParts(mod, config) {
   // miejscu, tak samo jak przy wieńcu.
   const cornerShelves = (mod.elements || []).filter(el => el.typ === 'poziom-narozny');
   if (cornerShelves.length > 0) {
-    const shelfName = `Półka narożna ${Math.round(wieniecA)}x${Math.round(wieniecB)} (naroże do wycięcia + wycięcie ${battenW}x${Math.round(th)} na listwę, przód cofnięty o 5 mm - patrz Wykrój narożny)`;
+    const shelfName = `Półka narożna ${Math.round(wieniecA)}x${Math.round(wieniecB)} (naroże do wycięcia + wycięcie ${battenW - backThick}x${Math.round(th - backThick)} na listwę, przód cofnięty o 5 mm - patrz Wykrój narożny)`;
     parts.push({ name: shelfName, length: parseFloat(wieniecA.toFixed(1)), width: parseFloat(wieniecB.toFixed(1)), qty: cornerShelves.length, category: "Korpus" });
   }
 
@@ -738,7 +740,8 @@ export function getCornerWieniecHoles(mod, config = state.project) {
   });
   // Listwa narożna (100 x th) stoi końcami na wieńcu - dwa kołki pod nią.
   [20, 80].forEach(x => holes.push({ x, y: th / 2, type: 'dowel', side: 'batten' }));
-  return holes;
+  // Układ formatki zaczyna się w tylnym rogu wieńca, cofniętym o plecy.
+  return holes.map(h => ({ ...h, x: h.x - backThick, y: h.y - backThick }));
 }
 
 // Wymiary formatek wieńca i półki narożnej w układzie rysunku (0,0 = tylny
@@ -747,14 +750,15 @@ export function getCornerWieniecHoles(mod, config = state.project) {
 // i render/viewer3d.js: renderCornerCabinet.
 export function getCornerPartsGeometry(mod, config = state.project) {
   const th = parseFloat(config.materials?.boardThickness) || 18;
+  const backThick = parseFloat(config.materials?.backThickness) || 3;
   const legA = parseFloat(mod.dimensions.width) || 860;
   const legB = parseFloat(mod.dimensions.legB) || 860;
   const { depthA, depthB } = getCornerDepths(mod);
   const shelfCount = (mod.elements || []).filter(el => el.typ === 'poziom-narozny').length;
   return {
-    th, legA, legB, depthA, depthB, shelfCount,
-    wieniec: { blankA: legA - th, blankB: legB - th, depthA, depthB },
-    polka: { blankA: legA - th, blankB: legB - th, depthA: depthA - 5, depthB: depthB - 5, notch: { w: 100, h: th } },
+    th, backThick, legA, legB, depthA, depthB, shelfCount,
+    wieniec: { blankA: legA - th - backThick, blankB: legB - th - backThick, depthA: depthA - backThick, depthB: depthB - backThick },
+    polka: { blankA: legA - th - backThick, blankB: legB - th - backThick, depthA: depthA - backThick - 5, depthB: depthB - backThick - 5, notch: { w: 100 - backThick, h: th - backThick } },
   };
 }
 

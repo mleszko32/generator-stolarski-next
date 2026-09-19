@@ -1380,12 +1380,15 @@ function renderCornerCabinet(mod, isActive, th) {
   const wieniecA = legA - th;
   const wieniecB = legB - th;
   const shape = new THREE.Shape();
-  shape.moveTo(0, 0);
-  shape.lineTo(wieniecA, 0);
+  // Tył wieńca/półki (obie ściany) cofnięty o grubość pleców (backThick) -
+  // wymiar głębokości (np. 513) liczy się Z plecami, sama formatka jest o
+  // grubość pleców krótsza (510), jak wieniec zwykłej szafki: depth - backThick.
+  shape.moveTo(backThick, -backThick);
+  shape.lineTo(wieniecA, -backThick);
   shape.lineTo(wieniecA, -depthA);
   shape.lineTo(depthB, -depthA);
   shape.lineTo(depthB, -wieniecB);
-  shape.lineTo(0, -wieniecB);
+  shape.lineTo(backThick, -wieniecB);
   shape.closePath();
   addCornerPanel(shape, th, posY, isActive, udCorp, innerGroup);
   addCornerPanel(shape, th, posY + H - th, isActive, udCorp, innerGroup);
@@ -1399,17 +1402,17 @@ function renderCornerCabinet(mod, isActive, th) {
   // ma w tylnym rogu wycięcie battenW×th na tę listwę (zgłoszona korekta).
   const battenW = 100;
   const shelfShape = new THREE.Shape();
-  shelfShape.moveTo(0, -th);
+  shelfShape.moveTo(backThick, -th);
   shelfShape.lineTo(battenW, -th);
-  shelfShape.lineTo(battenW, 0);
-  shelfShape.lineTo(wieniecA, 0);
+  shelfShape.lineTo(battenW, -backThick);
+  shelfShape.lineTo(wieniecA, -backThick);
   // Przód półki cofnięty o 5 mm względem wieńca - tak samo jak zwykła półka
   // ruchoma (engine/cabinet.js: getInteriorParts, innerPartDepth - 5).
   const shelfSetback = 5;
   shelfShape.lineTo(wieniecA, -(depthA - shelfSetback));
   shelfShape.lineTo(depthB - shelfSetback, -(depthA - shelfSetback));
   shelfShape.lineTo(depthB - shelfSetback, -wieniecB);
-  shelfShape.lineTo(0, -wieniecB);
+  shelfShape.lineTo(backThick, -wieniecB);
   shelfShape.closePath();
   (mod.elements || []).forEach(el => {
       if (el.typ !== 'poziom-narozny') return;
