@@ -435,15 +435,15 @@ function applyCornerFrontOverlap(mod) {
       // (frontu) prostopadłego, czyli (długość ramienia - głębokość drugiego
       // ramienia) - th. cRight = nasz luz od krawędzi korpusu (domyślnie 1.5 mm,
       // we wzorze katalogowym 2 mm).
-      //   skrzydło przy korpusie: wnęka - cRight - luz łamania (domyślnie 2 mm)
-      //   drugie skrzydło:        wnęka - cRight - th (chowa się za pierwszym)
+      // Oba skrzydła liczone tak samo (grubość frontu odejmowana RAZ, wnęka już ją
+      // zawiera): wnęka - cRight - luz łamania (domyślnie 2 mm).
       // Odległości liczone od zewnętrznej krawędzi (cut - cRight) do środka.
       const { depthA, depthB } = getCornerDepths(mod);
       const leg = arm === 'A' ? (parseFloat(mod.dimensions.width) || 860) : (parseFloat(mod.dimensions.legB) || 860);
       const cut = leg - (arm === 'A' ? depthB : depthA);
       const breakGap = parseFloat(mod.cornerBifold?.breakGap ?? 2);
       const hollow = cut - th;
-      const width = isPrimary ? hollow - cRight - breakGap : hollow - cRight - th;
+      const width = hollow - cRight - breakGap;
       bifoldRight = cut - cRight;
       newX = bifoldRight - Math.max(10, width);
     }

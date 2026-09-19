@@ -283,7 +283,7 @@ export function openCornerConfigModal(mod) {
   function renderFrontModeHint() {
     if (mod.cornerFrontMode === 'bifold') {
       const cR = parseFloat((mod.front?.clearance ?? state.project.front?.clearance ?? {}).right ?? (mod.front?.clearance ?? state.project.front?.clearance ?? {}).sides ?? 1.5) || 1.5;
-      frontModeHintEl.textContent = `Front łamany: dwa skrzydła (po jednym na ramię) połączone zawiasem uzupełniającym CLIP top 60° (Blum 79T8500) - otwierają się razem. Skrzydło przy korpusie wisi na zawiasie 155°/170°, drugie tylko na zawiasie 60°. Wnęka = długość ramienia - głębokość drugiego ramienia - grubość płyty. Skrzydło przy korpusie = wnęka - ${cR} mm (luz od korpusu) - luz łamania; drugie skrzydło = wnęka - ${cR} mm - grubość frontu (chowa się za pierwszym).`;
+      frontModeHintEl.textContent = `Front łamany: dwa skrzydła (po jednym na ramię) połączone zawiasem uzupełniającym CLIP top 60° (Blum 79T8500) - otwierają się razem. Skrzydło przy korpusie wisi na zawiasie 155°/170°, drugie tylko na zawiasie 60°. Oba skrzydła liczone tak samo: długość ramienia - głębokość drugiego ramienia - grubość frontu - luz łamania - ${cR} mm (luz od korpusu).`;
       frontPrimaryLabelEl.textContent = 'Które skrzydło wisi na korpusie (sięga do rogu):';
     } else {
       frontModeHintEl.textContent = `Dwa oddzielne fronty nie mogą sięgać do samego naroża naraz (zderzyłyby się przy otwieraniu pod kątem 90°) - jeden zamyka się jako pierwszy i sięga niemal do rogu (luz ${cornerFrontGap} mm), drugi jako drugi i chowa się za nim (dodatkowo skrócony o grubość płyty).`;
