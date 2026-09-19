@@ -984,21 +984,29 @@ export function generateCornerPartSVG({ blankA, blankB, depthA, depthB, notch = 
     svg += `<text x="${ox + h.x}" y="${oy + h.y + 22}" font-size="10" font-weight="bold" fill="${PURPLE}" text-anchor="middle">${formatVal(h.x)}</text>`;
   });
 
-  // Wymiary całkowite i głębokości.
-  const dimH = (x1, x2, y, label) =>
-    `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${NAVY}" stroke-width="1" />` +
-    `<line x1="${x1}" y1="${y - 4}" x2="${x1}" y2="${y + 4}" stroke="${NAVY}" stroke-width="1" />` +
-    `<line x1="${x2}" y1="${y - 4}" x2="${x2}" y2="${y + 4}" stroke="${NAVY}" stroke-width="1" />` +
-    `<text x="${(x1 + x2) / 2}" y="${y - 7}" font-size="13" font-weight="bold" fill="${NAVY}" text-anchor="middle">${label}</text>`;
-  const dimV = (y1, y2, x, label) =>
-    `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="${NAVY}" stroke-width="1" />` +
-    `<line x1="${x - 4}" y1="${y1}" x2="${x + 4}" y2="${y1}" stroke="${NAVY}" stroke-width="1" />` +
-    `<line x1="${x - 4}" y1="${y2}" x2="${x + 4}" y2="${y2}" stroke="${NAVY}" stroke-width="1" />` +
-    `<text x="${x - 7}" y="${(y1 + y2) / 2}" font-size="13" font-weight="bold" fill="${NAVY}" text-anchor="middle" transform="rotate(-90 ${x - 7} ${(y1 + y2) / 2})">${label}</text>`;
+  // Wymiary całkowite, głębokości i wycięcie w rogu (kolory jak w rzucie z góry:
+  // głębokość - granat, wycięcie A - pomarańczowy, wycięcie B - zielony).
+  const dimH = (x1, x2, y, label, c = NAVY) =>
+    `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${c}" stroke-width="1" />` +
+    `<line x1="${x1}" y1="${y - 4}" x2="${x1}" y2="${y + 4}" stroke="${c}" stroke-width="1" />` +
+    `<line x1="${x2}" y1="${y - 4}" x2="${x2}" y2="${y + 4}" stroke="${c}" stroke-width="1" />` +
+    `<text x="${(x1 + x2) / 2}" y="${y - 7}" font-size="13" font-weight="bold" fill="${c}" text-anchor="middle">${label}</text>`;
+  const dimV = (y1, y2, x, label, c = NAVY) =>
+    `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="${c}" stroke-width="1" />` +
+    `<line x1="${x - 4}" y1="${y1}" x2="${x + 4}" y2="${y1}" stroke="${c}" stroke-width="1" />` +
+    `<line x1="${x - 4}" y1="${y2}" x2="${x + 4}" y2="${y2}" stroke="${c}" stroke-width="1" />` +
+    `<text x="${x - 7}" y="${(y1 + y2) / 2}" font-size="13" font-weight="bold" fill="${c}" text-anchor="middle" transform="rotate(-90 ${x - 7} ${(y1 + y2) / 2})">${label}</text>`;
   svg += dimH(ox, ox + blankA, oy - 32, `${Math.round(blankA)} mm`);
   svg += dimV(oy, oy + blankB, ox - 36, `${Math.round(blankB)} mm`);
   svg += dimV(oy, oy + depthA, ox + blankA + 110, `${Math.round(depthA)} mm`);
   svg += dimH(ox, ox + depthB, oy + blankB + 84, `${Math.round(depthB)} mm`);
+  const cutW = blankA - depthB, cutH = blankB - depthA;
+  if (cutH > 0) svg += dimV(oy + depthA, oy + blankB, ox + blankA + 110, `wycięcie ${Math.round(cutH)} mm`, '#16a34a');
+  if (cutW > 0) svg += dimH(ox + depthB, ox + blankA, oy + blankB + 84, `wycięcie ${Math.round(cutW)} mm`, '#d97706');
+  if (notch) {
+    svg += dimH(ox, ox + notch.w, oy + notch.h + 34, `${Math.round(notch.w)}`, RED);
+    svg += dimV(oy, oy + notch.h, ox + notch.w + 44, `${Math.round(notch.h)}`, RED);
+  }
 
   svg += `</svg>`;
   return svg;
