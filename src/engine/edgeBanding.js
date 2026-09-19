@@ -6,6 +6,8 @@
 // półka narożna) ma ten sam obwód co jej prostokąt opisany, bo wcięcie w rogu
 // nie zmienia obwodu, więc wystarczy length/width.
 export const EDGE_BANDING_EXCLUDED_CATEGORIES = ['Plecy'];
+// Zapas okleiny doliczany do zamówienia (odpad na końcach, docinanie).
+export const EDGE_BANDING_RESERVE = 0.10;
 
 export function isEdgeBanded(part) {
   return !EDGE_BANDING_EXCLUDED_CATEGORIES.includes(part.category);

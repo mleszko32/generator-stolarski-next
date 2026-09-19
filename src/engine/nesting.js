@@ -82,7 +82,7 @@ function packOnce(pieces, sheetW, sheetH, kerf, trim, rotPolicy, transposed) {
 // h = szerokość formatki). opts: { sheetW, sheetH, kerf, trim }.
 export function nestParts(pieces, opts) {
   const sheetW = opts.sheetW, sheetH = opts.sheetH;
-  const kerf = opts.kerf ?? 4;
+  const kerf = opts.kerf ?? 3;
   const trim = opts.trim ?? 10;
 
   const strategies = [];

@@ -10,9 +10,9 @@ import { escapeHtml } from "../utils/dom.js";
 import { state } from "../core/state.js";
 import { collectProjectParts } from "../engine/cabinet.js";
 import { nestParts } from "../engine/nesting.js";
-import { isEdgeBanded, totalEdgeBandingMeters } from "../engine/edgeBanding.js";
+import { isEdgeBanded, totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "../engine/edgeBanding.js";
 
-const DEFAULTS = { sheetW: 2800, sheetH: 2070, kerf: 4, trim: 10, rotateFronts: false };
+const DEFAULTS = { sheetW: 2800, sheetH: 2070, kerf: 3, trim: 10, rotateFronts: false };
 const CATEGORY_ORDER = ['Korpus', 'Front', 'Szuflada', 'Plecy'];
 const PALETTE = ['#fde68a', '#bfdbfe', '#bbf7d0', '#fecaca', '#e9d5ff', '#fed7aa', '#a5f3fc', '#fbcfe8', '#d9f99d', '#ddd6fe'];
 
@@ -149,7 +149,7 @@ function printCutPlan(plan) {
   const colors = new Map();
   const s = plan.settings;
   let body = `<h1 style="font-size:20px; margin:0 0 4px;">Rozkrój płyt: ${escapeHtml(state.project.name || 'projekt')}</h1>
-    <div style="font-size:12px; color:#64748b; margin-bottom:12px;">Arkusz ${s.sheetW}×${s.sheetH} mm · cięcie ${s.kerf} mm · obrzeże ${s.trim} mm · okleina: wszystkie formatki dookoła, razem ${plan.edgeMeters.toFixed(1)} mb</div>
+    <div style="font-size:12px; color:#64748b; margin-bottom:12px;">Arkusz ${s.sheetW}×${s.sheetH} mm · cięcie ${s.kerf} mm · obrzeże ${s.trim} mm · okleina: wszystkie formatki dookoła, razem ${plan.edgeMeters.toFixed(1)} mb (do zamówienia ${(plan.edgeMeters * (1 + EDGE_BANDING_RESERVE)).toFixed(1)} mb z ${Math.round(EDGE_BANDING_RESERVE * 100)}% zapasu)</div>
     ${summaryTable(plan)}`;
   plan.groups.forEach(g => {
     g.result.sheets.forEach(sh => {
@@ -248,7 +248,7 @@ export function openCutPlanModal() {
       html = `<div style="font-size:12px; color:#94a3b8; font-style:italic;">Projekt nie ma jeszcze formatek.</div>`;
     } else {
       html += summaryTable(plan);
-      html += `<div style="font-size:12px; color:#334155; margin-top:8px;">Razem <b>${totalSheets}</b> arkuszy · okleina dookoła: <b>${plan.edgeMeters.toFixed(1)} mb</b> (bez zapasu, plecy HDF bez okleiny)</div>`;
+      html += `<div style="font-size:12px; color:#334155; margin-top:8px;">Razem <b>${totalSheets}</b> arkuszy · okleina dookoła: <b>${plan.edgeMeters.toFixed(1)} mb</b>, do zamówienia z ${Math.round(EDGE_BANDING_RESERVE * 100)}% zapasu: <b>${(plan.edgeMeters * (1 + EDGE_BANDING_RESERVE)).toFixed(1)} mb</b> (plecy HDF bez okleiny)</div>`;
       html += unplacedHtml(plan);
       plan.groups.forEach(g => {
         g.result.sheets.forEach((sh, i) => {

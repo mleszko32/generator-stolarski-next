@@ -3,7 +3,7 @@ import { state } from "../core/state.js";
 import { calculateDrawerHoles, getDrawerComponents } from "../core/drawerMath.js";
 import { drawerSystems } from "../core/drawerSystems.js";
 import { calculateHinges } from "../core/hingeMath.js";
-import { totalEdgeBandingMeters } from "./edgeBanding.js";
+import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "./edgeBanding.js";
 import { recalculateAllLayouts, getTraverseConfig, getWorldFootprint, getCornerDepths } from "../core/layout.js";
 
 export function calculateParts() {
@@ -391,11 +391,11 @@ export function calculateProjectHardware() {
   });
 
   // Okleina krawędziowa: wszystkie formatki dookoła (poza plecami HDF) - patrz
-  // engine/edgeBanding.js. Ilość w metrach bieżących, bez zapasu.
+  // engine/edgeBanding.js. Ilość w metrach bieżących z zapasem (EDGE_BANDING_RESERVE).
   const edgeMeters = totalEdgeBandingMeters(calculateAllProjectParts());
   if (edgeMeters > 0) {
-    const edgeKey = `Okleina krawędziowa (mb, wszystkie formatki dookoła)`;
-    hardwareList[edgeKey] = { name: edgeKey, qty: Math.ceil(edgeMeters * 10) / 10, unit: 'mb' };
+    const edgeKey = `Okleina krawędziowa (mb, formatki dookoła + ${Math.round(EDGE_BANDING_RESERVE * 100)}% zapasu)`;
+    hardwareList[edgeKey] = { name: edgeKey, qty: Math.ceil(edgeMeters * (1 + EDGE_BANDING_RESERVE) * 10) / 10, unit: 'mb' };
   }
 
   return Object.values(hardwareList);
