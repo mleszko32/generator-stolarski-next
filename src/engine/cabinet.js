@@ -728,17 +728,34 @@ export function getCornerWieniecHoles(mod, config = state.project) {
 
   // Bok ramienia A: krawędź x = legA - th, oś wzdłuż y (0..depthA).
   [backThick + 37, depthA - 37].forEach((y, i) => {
-    holes.push({ x: legA - th - edgeInset, y, type: 'screw' });
-    holes.push({ x: legA - th - edgeInset, y: i === 0 ? y + 32 : y - 32, type: 'dowel' });
+    holes.push({ x: legA - th - edgeInset, y, type: 'screw', side: 'A' });
+    holes.push({ x: legA - th - edgeInset, y: i === 0 ? y + 32 : y - 32, type: 'dowel', side: 'A' });
   });
   // Bok ramienia B: krawędź y = legB - th, oś wzdłuż x (0..depthB).
   [backThick + 37, depthB - 37].forEach((x, i) => {
-    holes.push({ x, y: legB - th - edgeInset, type: 'screw' });
-    holes.push({ x: i === 0 ? x + 32 : x - 32, y: legB - th - edgeInset, type: 'dowel' });
+    holes.push({ x, y: legB - th - edgeInset, type: 'screw', side: 'B' });
+    holes.push({ x: i === 0 ? x + 32 : x - 32, y: legB - th - edgeInset, type: 'dowel', side: 'B' });
   });
   // Listwa narożna (100 x th) stoi końcami na wieńcu - dwa kołki pod nią.
-  [20, 80].forEach(x => holes.push({ x, y: th / 2, type: 'dowel' }));
+  [20, 80].forEach(x => holes.push({ x, y: th / 2, type: 'dowel', side: 'batten' }));
   return holes;
+}
+
+// Wymiary formatek wieńca i półki narożnej w układzie rysunku (0,0 = tylny
+// róg): blank pomniejszony o grubość boku, przód półki cofnięty o 5 mm, a
+// wycięcie na listwę tylko w półce - te same liczby co w getCornerCorpusParts
+// i render/viewer3d.js: renderCornerCabinet.
+export function getCornerPartsGeometry(mod, config = state.project) {
+  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const legA = parseFloat(mod.dimensions.width) || 860;
+  const legB = parseFloat(mod.dimensions.legB) || 860;
+  const { depthA, depthB } = getCornerDepths(mod);
+  const shelfCount = (mod.elements || []).filter(el => el.typ === 'poziom-narozny').length;
+  return {
+    th, legA, legB, depthA, depthB, shelfCount,
+    wieniec: { blankA: legA - th, blankB: legB - th, depthA, depthB },
+    polka: { blankA: legA - th, blankB: legB - th, depthA: depthA - 5, depthB: depthB - 5, notch: { w: 100, h: th } },
+  };
 }
 
 // Nawierty pod podpórki półek narożnych (System 32, jak półka ruchoma w
@@ -758,7 +775,7 @@ export function getCornerShelfHoles(mod, config = state.project) {
   // bottom: wysokość dolnej krawędzi elementu nad dołem korpusu (listwa stoi
   // między wieńcami, więc th). Wysokości otworów są zawsze liczone od dołu
   // KORPUSU, dzięki czemu otwory listwy zgrywają się z otworami boków.
-  const build = (name, sideDepth, xs, h, bottom) => {
+  const build = (name, sideDepth, xs, h, bottom, withJoints = false) => {
     const holes = [];
     shelves.forEach(sh => {
       const yBase = (parseFloat(sh.y) || 0) - pinR;
@@ -768,14 +785,24 @@ export function getCornerShelfHoles(mod, config = state.project) {
         });
       });
     });
-    return { name, depth: sideDepth, height: h, bottom, holes };
+    // Łączenia z wieńcem dolnym i górnym (jak getCorpusHoles zwykłego
+    // modułu): wkręt 37 mm od przodu/tyłu, kołek 32 mm dalej, w połowie
+    // grubości wieńca. Listwa nie ma ich na płaszczyźnie (idą w jej krawędź).
+    const joints = [];
+    if (withJoints) {
+      [th / 2, height - th / 2].forEach(y => {
+        joints.push({ x: 37, y, type: 'screw' }, { x: 37 + 32, y, type: 'dowel' });
+        joints.push({ x: sideDepth - 37, y, type: 'screw' }, { x: sideDepth - 37 - 32, y, type: 'dowel' });
+      });
+    }
+    return { name, depth: sideDepth, height: h, bottom, holes, joints };
   };
 
   const sideA = depthA - backThick;
   const sideB = depthB - backThick;
   return [
-    build('Bok ramienia A', sideA, [37, sideA - 37], height, 0),
-    build('Bok ramienia B', sideB, [37, sideB - 37], height, 0),
+    build('Bok ramienia A', sideA, [37, sideA - 37], height, 0, true),
+    build('Bok ramienia B', sideB, [37, sideB - 37], height, 0, true),
     // Półka ma wycięcie na listwę, więc opiera się też na podpórkach w
     // listwie (dwa pionowe rzędy 20 mm od jej krawędzi).
     build('Listwa narożna', battenW, [20, battenW - 20], height - th * 2, th),

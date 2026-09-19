@@ -1,6 +1,24 @@
 // src/render/viewer2d.js
 import { state } from '../core/state.js';
 import { escapeHtml } from '../utils/dom.js';
+import { getCornerPartsGeometry, getCornerWieniecHoles, getCornerShelfHoles } from '../engine/cabinet.js';
+
+const formatVal = (val) => Number(Number(val).toFixed(1));
+
+// Opis wysokości otworu w stylu rysunku boku zwykłej szafki: bliższa krawędź
+// (DÓŁ/GÓRA) wyróżniona, druga w nawiasie.
+function getDimText(localY, panelH, color, addRc = false) {
+    let primary = Math.min(localY, panelH - localY);
+    let secondary = Math.max(localY, panelH - localY);
+    let isBottomCloser = localY <= (panelH / 2);
+
+    let rcText = addRc ? `<tspan fill="#059669" font-size="9" font-weight="bold"> [Rc: ${formatVal(localY - 32)}]</tspan> ` : ` `;
+
+    return `<tspan fill="${color}" font-weight="bold" font-size="11">${formatVal(primary)}</tspan> ` +
+           `<tspan fill="${color}" font-size="9" font-weight="bold">${isBottomCloser ? 'DÓŁ' : 'GÓRA'}</tspan>` +
+           rcText +
+           `<tspan fill="#94a3b8" font-size="9" font-weight="normal">(${formatVal(secondary)} ${isBottomCloser ? 'GÓRA' : 'DÓŁ'})</tspan>`;
+}
 
 export function generateSidePanelSVG(height, depth, mountingData = []) {
   const mod = state.project.modules.find(m => m.id === state.activeModuleId) || state.project.modules[0];
@@ -155,21 +173,6 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   
   const vBoxY = svgTopY - marginY;
   const vBoxH = totalSvgHeight + (marginY * 2);
-
-  const formatVal = (val) => Number(Number(val).toFixed(1));
-
-  function getDimText(localY, panelH, color, addRc = false) {
-      let primary = Math.min(localY, panelH - localY);
-      let secondary = Math.max(localY, panelH - localY);
-      let isBottomCloser = localY <= (panelH / 2);
-      
-      let rcText = addRc ? `<tspan fill="#059669" font-size="9" font-weight="bold"> [Rc: ${formatVal(localY - 32)}]</tspan> ` : ` `;
-
-      return `<tspan fill="${color}" font-weight="bold" font-size="11">${formatVal(primary)}</tspan> ` +
-             `<tspan fill="${color}" font-size="9" font-weight="bold">${isBottomCloser ? 'DÓŁ' : 'GÓRA'}</tspan>` +
-             rcText +
-             `<tspan fill="#94a3b8" font-size="9" font-weight="normal">(${formatVal(secondary)} ${isBottomCloser ? 'GÓRA' : 'DÓŁ'})</tspan>`;
-  }
 
   let svg = `<svg id="side-panel-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 ${vBoxY} ${svgWidth} ${vBoxH}" width="100%" height="100%" style="background-color: #f8fafc; font-family: 'Segoe UI', sans-serif; cursor: grab;">`;
 
@@ -882,32 +885,146 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   return svg;
 }
 
-// Rysunek boków szafki narożnej z nawiertami pod podpórki półek L
-// (engine/cabinet.js: getCornerShelfHoles) - dwa boki obok siebie, otwory
-// fi 5 (środkowy w kolorze pomarańczowym z opisem wysokości od dołu).
+// Rysunki formatek szafki narożnej (boki + listwa) w stylu rysunku boku
+// zwykłej szafki (generateSidePanelSVG): biały panel, fioletowe otwory łączeń
+// (wkręt r=1.5, kołek r=4), pomarańczowe podpórki półek z linią pomocniczą i
+// opisem DÓŁ/GÓRA. Każdy element ma PRZÓD po lewej, TYŁ po prawej.
+// side = { name, depth, height, bottom, holes (podpórki), joints (łączenia) }
+// - wysokości otworów liczone od dołu KORPUSU (bottom = dół elementu), żeby
+// otwory boków i listwy się zgrywały.
 export function generateCornerSidesHolesSVG(sides) {
-  const gap = 80, pad = 50;
-  const maxH = Math.max(...sides.map(s => s.height));
-  const totalW = sides.reduce((sum, s) => sum + s.depth, 0) + gap * (sides.length - 1) + pad * 2;
-  const totalH = maxH + pad * 2 + 30;
-  let svg = `<svg viewBox="0 0 ${totalW} ${totalH}" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif">`;
+  const gap = 40, pad = 40, textW = 200;
+  const maxH = Math.max(...sides.map(s => (s.bottom || 0) + s.height));
+  const totalW = sides.reduce((sum, s) => sum + s.depth + textW + gap, 0) + pad * 2 - gap;
+  const totalH = maxH + pad * 2 + 50;
+  const PURPLE = '#9333ea', ORANGE = '#ea580c';
+  let svg = `<svg viewBox="0 0 ${totalW} ${totalH}" xmlns="http://www.w3.org/2000/svg" style="background:#f8fafc" font-family="'Segoe UI', sans-serif">`;
   let ox = pad;
+  const top = pad + 30;
+  const yOf = (y) => top + maxH - y;
   sides.forEach(s => {
-    const top = pad + 20;
     const bottom = s.bottom || 0;
-    const yOf = (y) => top + maxH - y;
-    svg += `<text x="${ox + s.depth / 2}" y="${pad}" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="middle">${escapeHtml(s.name)} (${Math.round(s.height)}×${Math.round(s.depth)})</text>`;
-    svg += `<rect x="${ox}" y="${yOf(bottom + s.height)}" width="${s.depth}" height="${s.height}" fill="#fef3c7" stroke="#334155" stroke-width="2" />`;
+    svg += `<text x="${ox + s.depth / 2}" y="${pad + 10}" font-size="16" font-weight="bold" fill="#1e3a8a" text-anchor="middle">${escapeHtml(s.name.toUpperCase())}</text>`;
+    svg += `<text x="${ox + s.depth / 2}" y="${pad + 26}" font-size="11" fill="#64748b" text-anchor="middle">${Math.round(s.height)} × ${Math.round(s.depth)} mm</text>`;
+    svg += `<rect x="${ox}" y="${yOf(bottom + s.height)}" width="${s.depth}" height="${s.height}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+    svg += `<text x="${ox}" y="${yOf(bottom + s.height) - 6}" font-size="10" fill="#94a3b8" font-weight="bold">PRZÓD</text>`;
+    svg += `<text x="${ox + s.depth}" y="${yOf(bottom + s.height) - 6}" font-size="10" fill="#94a3b8" font-weight="bold" text-anchor="end">TYŁ</text>`;
+
+    (s.joints || []).forEach(j => {
+      svg += `<circle cx="${ox + j.x}" cy="${yOf(j.y)}" r="${j.type === 'dowel' ? 4 : 1.5}" fill="${PURPLE}" />`;
+    });
+
+    const rightX = ox + s.depth;
+    const maxX = Math.max(...(s.holes.length ? s.holes.map(h => h.x) : [0]));
     s.holes.forEach(h => {
-      svg += `<circle cx="${ox + h.x}" cy="${yOf(h.y)}" r="2.5" fill="${h.isCenter ? '#ea580c' : '#fcd34d'}" stroke="#78350f" stroke-width="0.5" />`;
-      if (h.isCenter) {
-        svg += `<text x="${ox + h.x + (h.x < s.depth / 2 ? 8 : -8)}" y="${yOf(h.y) + 4}" font-size="11" fill="#9a3412" text-anchor="${h.x < s.depth / 2 ? 'start' : 'end'}">${Math.round(h.y)}</text>`;
+      svg += `<circle cx="${ox + h.x}" cy="${yOf(h.y)}" r="2.5" fill="${ORANGE}" opacity="${h.isCenter ? 1 : 0.6}" />`;
+      if (h.x === maxX) {
+        svg += `<line x1="${rightX}" y1="${yOf(h.y)}" x2="${rightX + 30}" y2="${yOf(h.y)}" stroke="${ORANGE}" stroke-width="0.5" stroke-dasharray="2,2" />`;
+        svg += `<text x="${rightX + 36}" y="${yOf(h.y) + 4}" font-family="sans-serif" opacity="${h.isCenter ? 1 : 0.6}">${getDimText(h.y - bottom, s.height, ORANGE, true)}</text>`;
       }
     });
-    ox += s.depth + gap;
+    ox += s.depth + textW + gap;
   });
   svg += `</svg>`;
   return svg;
+}
+
+// Rysunek formatki L szafki narożnej (wieniec albo półka) w stylu rysunków
+// zwykłych szafek: biały obrys, fioletowe otwory (wkręt r=1.5, kołek r=4) z
+// liniami pomocniczymi i opisami, wymiary całkowite i wycięcia. Układ
+// formatki: 0,0 = tylny róg, X wzdłuż ramienia A, Y wzdłuż ramienia B, przód
+// to krawędzie wycięcia w rogu (depthA/depthB).
+// notch = {w, h} - wycięcie na listwę w tylnym rogu (tylko półka).
+export function generateCornerPartSVG({ blankA, blankB, depthA, depthB, notch = null, holes = [], title, subtitle }) {
+  const M = 130;
+  const ox = M, oy = M;
+  const vbW = blankA + M * 2, vbH = blankB + M * 2;
+  const PURPLE = '#9333ea', NAVY = '#1e3a8a', RED = '#dc2626';
+  const outline = notch
+    ? [[0, notch.h], [notch.w, notch.h], [notch.w, 0], [blankA, 0], [blankA, depthA], [depthB, depthA], [depthB, blankB], [0, blankB]]
+    : [[0, 0], [blankA, 0], [blankA, depthA], [depthB, depthA], [depthB, blankB], [0, blankB]];
+  const pts = outline.map(([x, y]) => `${ox + x},${oy + y}`).join(' ');
+
+  let svg = `<svg viewBox="0 0 ${vbW} ${vbH}" xmlns="http://www.w3.org/2000/svg" style="background:#f8fafc" font-family="'Segoe UI', sans-serif">`;
+  svg += `<text x="${ox + blankA / 2}" y="34" font-size="20" font-weight="bold" fill="${NAVY}" text-anchor="middle">${escapeHtml(title)} (WIDOK Z GÓRY)</text>`;
+  svg += `<text x="${ox + blankA / 2}" y="56" font-size="14" fill="#64748b" text-anchor="middle">${escapeHtml(subtitle)}</text>`;
+  svg += `<polygon points="${pts}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+
+  if (notch) {
+    svg += `<rect x="${ox}" y="${oy}" width="${notch.w}" height="${notch.h}" fill="#fee2e2" stroke="${RED}" stroke-width="1" stroke-dasharray="4,3" />`;
+    svg += `<text x="${ox + notch.w + 8}" y="${oy + notch.h + 14}" font-size="12" font-weight="bold" fill="${RED}">wycięcie na listwę ${Math.round(notch.w)}×${Math.round(notch.h)} mm</text>`;
+  }
+
+  // PRZÓD = krawędzie wycięcia w rogu, TYŁ = ściany.
+  svg += `<text x="${ox + (depthB + blankA) / 2}" y="${oy + depthA + 16}" font-size="11" fill="#94a3b8" font-weight="bold" text-anchor="middle" letter-spacing="1">PRZÓD</text>`;
+  svg += `<text x="${ox + depthB + 16}" y="${oy + (depthA + blankB) / 2}" font-size="11" fill="#94a3b8" font-weight="bold" text-anchor="middle" letter-spacing="1" transform="rotate(-90 ${ox + depthB + 16} ${oy + (depthA + blankB) / 2})">PRZÓD</text>`;
+  svg += `<text x="${ox + blankA / 2}" y="${oy - 8}" font-size="11" fill="#94a3b8" font-weight="bold" text-anchor="middle" letter-spacing="1">TYŁ</text>`;
+
+  holes.forEach(h => {
+    svg += `<circle cx="${ox + h.x}" cy="${oy + h.y}" r="${h.type === 'dowel' ? 4 : 1.5}" fill="${PURPLE}" />`;
+  });
+
+  // Linie pomocnicze i opisy pozycji wkrętów (jak w widoku wieńca zwykłej
+  // szafki): przy boku ramienia A - odległość od tyłu, przy boku B - od lewej.
+  const seen = new Set();
+  holes.filter(h => h.type === 'screw').forEach(h => {
+    if (h.side === 'A') {
+      const key = 'A' + Math.round(h.y);
+      if (seen.has(key)) return; seen.add(key);
+      svg += `<line x1="${ox + h.x}" y1="${oy + h.y}" x2="${ox + blankA + 40}" y2="${oy + h.y}" stroke="${PURPLE}" stroke-width="0.75" stroke-dasharray="2,2" />`;
+      svg += `<text x="${ox + blankA + 46}" y="${oy + h.y + 4}" font-size="11" font-weight="bold" fill="${PURPLE}">${formatVal(h.y)} <tspan font-size="9" font-weight="normal">od tyłu</tspan></text>`;
+    } else if (h.side === 'B') {
+      const key = 'B' + Math.round(h.x);
+      if (seen.has(key)) return; seen.add(key);
+      svg += `<line x1="${ox + h.x}" y1="${oy + h.y}" x2="${ox + h.x}" y2="${oy + blankB + 40}" stroke="${PURPLE}" stroke-width="0.75" stroke-dasharray="2,2" />`;
+      svg += `<text x="${ox + h.x}" y="${oy + blankB + 54}" font-size="11" font-weight="bold" fill="${PURPLE}" text-anchor="middle">${formatVal(h.x)} <tspan font-size="9" font-weight="normal">od lewej</tspan></text>`;
+    }
+  });
+  holes.filter(h => h.type === 'dowel' && h.side === 'batten').forEach(h => {
+    svg += `<text x="${ox + h.x}" y="${oy + h.y + 22}" font-size="10" font-weight="bold" fill="${PURPLE}" text-anchor="middle">${formatVal(h.x)}</text>`;
+  });
+
+  // Wymiary całkowite i głębokości.
+  const dimH = (x1, x2, y, label) =>
+    `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${NAVY}" stroke-width="1" />` +
+    `<line x1="${x1}" y1="${y - 4}" x2="${x1}" y2="${y + 4}" stroke="${NAVY}" stroke-width="1" />` +
+    `<line x1="${x2}" y1="${y - 4}" x2="${x2}" y2="${y + 4}" stroke="${NAVY}" stroke-width="1" />` +
+    `<text x="${(x1 + x2) / 2}" y="${y - 7}" font-size="13" font-weight="bold" fill="${NAVY}" text-anchor="middle">${label}</text>`;
+  const dimV = (y1, y2, x, label) =>
+    `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="${NAVY}" stroke-width="1" />` +
+    `<line x1="${x - 4}" y1="${y1}" x2="${x + 4}" y2="${y1}" stroke="${NAVY}" stroke-width="1" />` +
+    `<line x1="${x - 4}" y1="${y2}" x2="${x + 4}" y2="${y2}" stroke="${NAVY}" stroke-width="1" />` +
+    `<text x="${x - 7}" y="${(y1 + y2) / 2}" font-size="13" font-weight="bold" fill="${NAVY}" text-anchor="middle" transform="rotate(-90 ${x - 7} ${(y1 + y2) / 2})">${label}</text>`;
+  svg += dimH(ox, ox + blankA, oy - 32, `${Math.round(blankA)} mm`);
+  svg += dimV(oy, oy + blankB, ox - 36, `${Math.round(blankB)} mm`);
+  svg += dimV(oy, oy + depthA, ox + blankA + 110, `${Math.round(depthA)} mm`);
+  svg += dimH(ox, ox + depthB, oy + blankB + 84, `${Math.round(depthB)} mm`);
+
+  svg += `</svg>`;
+  return svg;
+}
+
+// Komplet rysunków formatek szafki narożnej pod rzutem z góry: wieniec (z
+// otworami łączeń), półka (z wycięciem na listwę, tylko gdy są półki) oraz
+// boki i listwa (łączenia + podpórki półek). Zwraca HTML z nagłówkami.
+export function generateCornerPartsDrawings(mod) {
+  const g = getCornerPartsGeometry(mod);
+  const h2 = (t) => `<h3 style="font-size:14px; color:#1e3a8a; margin:18px 0 6px;">${t}</h3>`;
+  let html = h2('Wieniec narożny (dolny + górny)');
+  html += generateCornerPartSVG({
+    ...g.wieniec, holes: getCornerWieniecHoles(mod),
+    title: 'WIENIEC', subtitle: `2 szt. (dolny + górny) · ${Math.round(g.wieniec.blankA)} × ${Math.round(g.wieniec.blankB)} mm`,
+  });
+  if (g.shelfCount > 0) {
+    html += h2('Półka narożna');
+    html += generateCornerPartSVG({
+      ...g.polka,
+      title: 'PÓŁKA', subtitle: `${g.shelfCount} szt. · ${Math.round(g.polka.blankA)} × ${Math.round(g.polka.blankB)} mm · przód cofnięty o 5 mm`,
+    });
+  }
+  html += h2('Boki i listwa narożna');
+  html += generateCornerSidesHolesSVG(getCornerShelfHoles(mod));
+  return html;
 }
 
 // Wykrój formatki narożnej w kształcie L (Wieniec narożny / Półka narożna,
@@ -1023,7 +1140,7 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18, notc
   // patrz Lista formatek: "Wieniec narożny {blankA}x{blankB}". Rysowany jako
   // DODATKOWY kontur na wierzchu głównego obrysu, nie zamiast niego, żeby
   // główne wymiary (Ramię/Głęb./Wycięcie) zostały 1:1 z konfiguratorem.
-  if (blankA > depthB && blankB > depthA) {
+  if (!extra?.plain && blankA > depthB && blankB > depthA) {
     const blankPts = outline(blankA, blankB);
     svg += `<polygon points="${blankPts}" fill="none" stroke="#7c3aed" stroke-width="${strokeThin * 1.5}" stroke-dasharray="${strokeThin * 3},${strokeThin * 2}" />`;
     svg += `<text x="${ox + blankA - fsTiny * 0.6}" y="${oy + fsTiny * 1.4}" font-size="${fsTiny}" fill="#7c3aed" font-weight="bold" text-anchor="end">${notch ? 'Formatka półki' : 'Formatka wieńca'}:${Math.round(blankA)}×${Math.round(blankB)} mm (-${Math.round(th)} mm bok)</text>`;
@@ -1041,8 +1158,8 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18, notc
     svg += `<circle cx="${lx + fs * 0.6}" cy="${lyy - fsTiny * 0.3}" r="${rDowel}" fill="#bbf7d0" stroke="#16a34a" stroke-width="${strokeThin}" /><text x="${lx + fs * 1.4}" y="${lyy}" font-size="${fsTiny}" fill="#475569">kołek</text>`;
   }
   if (extra?.title) {
-    const cx = ox + depthB / 2, cy = oy + depthA / 2;
-    svg += `<text x="${cx}" y="${cy - fs * 0.2}" font-size="${fs * 1.5}" fill="#0f172a" font-weight="bold" text-anchor="middle">${escapeHtml(extra.title)}</text>`;
+    const cx = extra.plain ? ox + legA / 2 : ox + depthB / 2, cy = oy + depthA / 2;
+    svg += `<text x="${cx}" y="${cy - fs * 0.2}" font-size="${extra.plain ? fs * 1.05 : fs * 1.5}" fill="#0f172a" font-weight="bold" text-anchor="middle">${escapeHtml(extra.title)}</text>`;
     if (extra.subtitle) svg += `<text x="${cx}" y="${cy + fs * 1.2}" font-size="${fs}" fill="#334155" text-anchor="middle">${escapeHtml(extra.subtitle)}</text>`;
   }
 
