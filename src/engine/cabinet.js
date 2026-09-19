@@ -351,6 +351,28 @@ export function calculateProjectHardware() {
           const hinges = calculateHinges(front, board, obstacles, side);
           const hingeCount = hinges.length;
 
+          // Front łamany szafki narożnej (mod.cornerFrontMode === 'bifold', wybór
+          // w ui/cornerConfigModal.js): dwa skrzydła połączone zawiasem
+          // uzupełniającym CLIP top 60° (Blum 79T8500), a skrzydło przy korpusie
+          // wisi na zawiasie 155°/170°. Puszka zawiasu 60° siedzi w tym samym
+          // skrzydle co puszka 155°/170° (katalog Blum, drzwi składane), więc obu
+          // jest tyle samo, co zawiasów tego skrzydła; drugie skrzydło nie ma
+          // własnych zawiasów przy korpusie.
+          if (mod.type === 'corner_cabinet' && mod.cornerFrontMode === 'bifold' && front.cornerArm) {
+            const primaryArm = mod.cornerFrontOverlap?.primaryArm || 'A';
+            if (front.cornerArm === primaryArm) {
+              const wideKey = `Zawias 155°/170° do drzwi składanych (skrzydło przy korpusie)`;
+              const foldKey = `Zawias uzupełniający 60° do drzwi składanych (Blum 79T8500)`;
+              [wideKey, foldKey].forEach(k => {
+                if (!hardwareList[k]) hardwareList[k] = { name: k, qty: 0, unit: 'kpl.' };
+                hardwareList[k].qty += hingeCount;
+              });
+              return;
+            }
+            const hasPartner = allFronts.some(o => o.cornerArm === primaryArm && (o.subtype || '').includes('drzwi') && o.y < front.y + front.h && o.y + o.h > front.y);
+            if (hasPartner) return;
+          }
+
           const hingeKey = `Zawias meblowy + prowadnik krzyżakowy (puszka 35mm)`;
           if (!hardwareList[hingeKey]) hardwareList[hingeKey] = { name: hingeKey, qty: 0, unit: 'kpl.' };
           hardwareList[hingeKey].qty += hingeCount;
