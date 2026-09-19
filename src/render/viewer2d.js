@@ -932,7 +932,10 @@ export function generateCornerSidesHolesSVG(sides) {
 // pokazana tu jako DODATKOWY, cieńszy obrys wewnątrz + boki narysowane na
 // swoim realnym miejscu, żeby było widać skąd bierze się różnica, bez
 // zmiany głównych wymiarów.
-export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18, notch = null) {
+// extra = { title, subtitle, holes }: podpis na środku rysunku (co to za
+// część) i otwory łączeń (kołek/wkręt) w układzie formatki - wieniec dostaje
+// otwory, półka wycięcie (notch) zamiast nich.
+export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18, notch = null, extra = null) {
   const blankA = legA - th;
   const blankB = legB - th;
   // Rozmiary w SVG są w "mm" viewBoxa, skalowanym przez CSS do szerokości
@@ -1024,6 +1027,23 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18, notc
     const blankPts = outline(blankA, blankB);
     svg += `<polygon points="${blankPts}" fill="none" stroke="#7c3aed" stroke-width="${strokeThin * 1.5}" stroke-dasharray="${strokeThin * 3},${strokeThin * 2}" />`;
     svg += `<text x="${ox + blankA - fsTiny * 0.6}" y="${oy + fsTiny * 1.4}" font-size="${fsTiny}" fill="#7c3aed" font-weight="bold" text-anchor="end">${notch ? 'Formatka półki' : 'Formatka wieńca'}:${Math.round(blankA)}×${Math.round(blankB)} mm (-${Math.round(th)} mm bok)</text>`;
+  }
+
+  if (extra?.holes?.length) {
+    const rScrew = Math.max(3, unit * 0.011);
+    const rDowel = Math.max(4, unit * 0.016);
+    extra.holes.forEach(h => {
+      const isDowel = h.type === 'dowel';
+      svg += `<circle cx="${ox + h.x}" cy="${oy + h.y}" r="${isDowel ? rDowel : rScrew}" fill="${isDowel ? '#bbf7d0' : '#94a3b8'}" stroke="${isDowel ? '#16a34a' : '#475569'}" stroke-width="${strokeThin}" />`;
+    });
+    const lx = ox + depthB / 2, lyy = oy + depthA / 2 + fs * 3.2;
+    svg += `<circle cx="${lx - fs * 3}" cy="${lyy - fsTiny * 0.3}" r="${rScrew}" fill="#94a3b8" stroke="#475569" stroke-width="${strokeThin}" /><text x="${lx - fs * 2.4}" y="${lyy}" font-size="${fsTiny}" fill="#475569">wkręt</text>`;
+    svg += `<circle cx="${lx + fs * 0.6}" cy="${lyy - fsTiny * 0.3}" r="${rDowel}" fill="#bbf7d0" stroke="#16a34a" stroke-width="${strokeThin}" /><text x="${lx + fs * 1.4}" y="${lyy}" font-size="${fsTiny}" fill="#475569">kołek</text>`;
+  }
+  if (extra?.title) {
+    const cx = ox + depthB / 2, cy = oy + depthA / 2;
+    svg += `<text x="${cx}" y="${cy - fs * 0.2}" font-size="${fs * 1.5}" fill="#0f172a" font-weight="bold" text-anchor="middle">${escapeHtml(extra.title)}</text>`;
+    if (extra.subtitle) svg += `<text x="${cx}" y="${cy + fs * 1.2}" font-size="${fs}" fill="#334155" text-anchor="middle">${escapeHtml(extra.subtitle)}</text>`;
   }
 
   // Wymiary - proste kolorowe linie TUŻ PRZY odpowiadającym im fragmencie

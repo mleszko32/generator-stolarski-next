@@ -712,6 +712,35 @@ function getCornerCorpusParts(mod, config) {
   return parts;
 }
 
+// Otwory łączeń (wkręt + kołek, 37 mm od przodu/tyłu i kołek 32 mm dalej -
+// jak w getCorpusHoles zwykłego modułu) w wieńcu narożnym, w układzie
+// formatki (x wzdłuż ramienia A, y wzdłuż ramienia B, 0,0 = tylny róg): przy
+// bokach ramion A i B oraz dwa kołki pod listwę narożną. Półka ich nie ma
+// (opiera się na podpórkach), ma wycięcie na listwę.
+export function getCornerWieniecHoles(mod, config = state.project) {
+  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const backThick = parseFloat(config.materials?.backThickness) || 3;
+  const legA = parseFloat(mod.dimensions.width) || 860;
+  const legB = parseFloat(mod.dimensions.legB) || 860;
+  const { depthA, depthB } = getCornerDepths(mod);
+  const edgeInset = th / 2;
+  const holes = [];
+
+  // Bok ramienia A: krawędź x = legA - th, oś wzdłuż y (0..depthA).
+  [backThick + 37, depthA - 37].forEach((y, i) => {
+    holes.push({ x: legA - th - edgeInset, y, type: 'screw' });
+    holes.push({ x: legA - th - edgeInset, y: i === 0 ? y + 32 : y - 32, type: 'dowel' });
+  });
+  // Bok ramienia B: krawędź y = legB - th, oś wzdłuż x (0..depthB).
+  [backThick + 37, depthB - 37].forEach((x, i) => {
+    holes.push({ x, y: legB - th - edgeInset, type: 'screw' });
+    holes.push({ x: i === 0 ? x + 32 : x - 32, y: legB - th - edgeInset, type: 'dowel' });
+  });
+  // Listwa narożna (100 x th) stoi końcami na wieńcu - dwa kołki pod nią.
+  [20, 80].forEach(x => holes.push({ x, y: th / 2, type: 'dowel' }));
+  return holes;
+}
+
 // Nawierty pod podpórki półek narożnych (System 32, jak półka ruchoma w
 // core/shelfMath.js: calculateShelfHoles) - półka L opiera się na OBU bokach
 // (bok ramienia A i bok ramienia B), więc każdy z nich dostaje dwa rzędy

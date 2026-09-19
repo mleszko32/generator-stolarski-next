@@ -13,7 +13,7 @@ import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
 import { openCornerConfigModal } from "./cornerConfigModal.js";
 import { generateCornerBlankSVG, generateCornerSidesHolesSVG } from "../render/viewer2d.js";
-import { getCornerShelfHoles } from "../engine/cabinet.js";
+import { getCornerShelfHoles, getCornerWieniecHoles } from "../engine/cabinet.js";
 
 function getSelectedMods() {
     if (state.selectedModules && state.selectedModules.size > 0) {
@@ -139,7 +139,9 @@ function openCornerBlankPrintView(mod) {
   const shelfCount = (mod.elements || []).filter(el => el.typ === 'poziom-narozny').length;
   const th = parseFloat(state.project.materials?.boardThickness) || 18;
 
-  const svgContent = generateCornerBlankSVG(legA, legB, depthA, depthB, th);
+  const svgContent = generateCornerBlankSVG(legA, legB, depthA, depthB, th, null, {
+    title: 'WIENIEC', subtitle: 'dolny + górny (2 szt.)', holes: getCornerWieniecHoles(mod),
+  });
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -171,7 +173,7 @@ function openCornerBlankPrintView(mod) {
         </ul>
       </div>
       ${svgContent}
-      ${shelfCount > 0 ? `<h2 style="font-size:16px; margin:24px 0 8px;">Wykrój półki narożnej (wycięcie na listwę, przód cofnięty o 5 mm)</h2>${generateCornerBlankSVG(legA, legB, depthA - 5, depthB - 5, th, { w: 100, h: th })}` : ''}
+      ${shelfCount > 0 ? `<h2 style="font-size:16px; margin:24px 0 8px;">Wykrój półki narożnej (wycięcie na listwę, przód cofnięty o 5 mm)</h2>${generateCornerBlankSVG(legA, legB, depthA - 5, depthB - 5, th, { w: 100, h: th }, { title: 'PÓŁKA', subtitle: `${shelfCount} szt.` })}` : ''}
       ${shelfCount > 0 ? `<h2 style="font-size:16px; margin:24px 0 8px;">Nawierty pod podpórki półek (System 32)</h2>${generateCornerSidesHolesSVG(getCornerShelfHoles(mod))}` : ''}
     </body>
     </html>

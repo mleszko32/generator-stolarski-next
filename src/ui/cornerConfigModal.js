@@ -18,7 +18,7 @@ import { updateSidebar } from "./sidebar.js";
 import { initPropertiesPanel } from "./properties.js";
 import { createZoneEditor } from "./interiorEditor.js";
 import { generateCornerBlankSVG, generateCornerSidesHolesSVG } from "../render/viewer2d.js";
-import { getCornerShelfHoles } from "../engine/cabinet.js";
+import { getCornerShelfHoles, getCornerWieniecHoles } from "../engine/cabinet.js";
 import { autoDistributeShelves } from "../core/shelfMath.js";
 import { getCornerDepths } from "../core/layout.js";
 import { state } from "../core/state.js";
@@ -141,7 +141,9 @@ export function openCornerConfigModal(mod) {
     const legB = parseFloat(mod.dimensions.legB) || 0;
     const { depthA, depthB } = getCornerDepths(mod);
     const th = parseFloat(state.project.materials?.boardThickness) || 18;
-    blankPreviewEl.innerHTML = generateCornerBlankSVG(legA, legB, depthA, depthB, th);
+    blankPreviewEl.innerHTML = generateCornerBlankSVG(legA, legB, depthA, depthB, th, null, {
+      title: 'WIENIEC', subtitle: 'dolny + górny (2 szt.)', holes: getCornerWieniecHoles(mod),
+    });
     cutoutInfoEl.textContent = `Wynikowo: Ramię A = ${Math.round(legA)} mm, Ramię B = ${Math.round(legB)} mm`;
   }
 
@@ -198,7 +200,7 @@ export function openCornerConfigModal(mod) {
   function renderShelfHoles() {
     const hasShelves = (mod.elements || []).some(el => el.typ === 'poziom-narozny');
     holesEl.innerHTML = hasShelves
-      ? `<div style="font-size:11px; color:#64748b; margin-bottom:4px;">Wykrój półki (wycięcie na listwę, przód cofnięty o 5 mm):</div>${generateCornerBlankSVG(parseFloat(mod.dimensions.width) || 0, parseFloat(mod.dimensions.legB) || 0, getCornerDepths(mod).depthA - 5, getCornerDepths(mod).depthB - 5, parseFloat(state.project.materials?.boardThickness) || 18, { w: 100, h: parseFloat(state.project.materials?.boardThickness) || 18 })}<div style="font-size:11px; color:#64748b; margin:10px 0 4px;">Nawierty pod podpórki (System 32) na bokach - pomarańczowy = środek, opis = wysokość od dołu:</div>${generateCornerSidesHolesSVG(getCornerShelfHoles(mod))}`
+      ? `<div style="font-size:11px; color:#64748b; margin-bottom:4px;">Wykrój półki (wycięcie na listwę, przód cofnięty o 5 mm):</div>${generateCornerBlankSVG(parseFloat(mod.dimensions.width) || 0, parseFloat(mod.dimensions.legB) || 0, getCornerDepths(mod).depthA - 5, getCornerDepths(mod).depthB - 5, parseFloat(state.project.materials?.boardThickness) || 18, { w: 100, h: parseFloat(state.project.materials?.boardThickness) || 18 }, { title: 'PÓŁKA', subtitle: `${(mod.elements || []).filter(el => el.typ === 'poziom-narozny').length} szt.` })}<div style="font-size:11px; color:#64748b; margin:10px 0 4px;">Nawierty pod podpórki (System 32) na bokach - pomarańczowy = środek, opis = wysokość od dołu:</div>${generateCornerSidesHolesSVG(getCornerShelfHoles(mod))}`
       : '';
   }
   renderShelvesList();
