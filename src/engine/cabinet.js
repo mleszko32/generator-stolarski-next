@@ -655,9 +655,9 @@ function getCornerCorpusParts(mod, config) {
   parts.push({ name: wieniecName, length: parseFloat(wieniecA.toFixed(1)), width: parseFloat(wieniecB.toFixed(1)), qty: 2, category: "Korpus" });
 
   // Listwa narożna pionowa (render/viewer3d.js: renderCornerCabinet) - płaska
-  // listwa 18(gr.)x100(szer.) na pełną wysokość, do której mocują się obie
-  // płyty plecy.
-  parts.push({ name: "Listwa narożna pionowa", length: parseFloat(height.toFixed(1)), width: battenW, qty: 1, category: "Korpus" });
+  // listwa 18(gr.)x100(szer.), do której mocują się obie płyty plecy. Stoi
+  // między wieńcami (height - 2*th), nie na pełną wysokość.
+  parts.push({ name: "Listwa narożna pionowa", length: parseFloat((height - th * 2).toFixed(1)), width: battenW, qty: 1, category: "Korpus" });
 
   // Plecy - te same zasady nakładane/nut co getBackPanelParts() zwykłego
   // modułu niżej (zgłoszona korekta, wcześniej narożnik ZAWSZE liczył jak
@@ -705,7 +705,7 @@ function getCornerCorpusParts(mod, config) {
   // miejscu, tak samo jak przy wieńcu.
   const cornerShelves = (mod.elements || []).filter(el => el.typ === 'poziom-narozny');
   if (cornerShelves.length > 0) {
-    const shelfName = `Półka narożna ${Math.round(wieniecA)}x${Math.round(wieniecB)} (naroże do wycięcia - patrz rysunek 3D)`;
+    const shelfName = `Półka narożna ${Math.round(wieniecA)}x${Math.round(wieniecB)} (naroże do wycięcia + wycięcie ${battenW}x${Math.round(th)} na listwę - patrz rysunek 3D)`;
     parts.push({ name: shelfName, length: parseFloat(wieniecA.toFixed(1)), width: parseFloat(wieniecB.toFixed(1)), qty: cornerShelves.length, category: "Korpus" });
   }
 
@@ -722,24 +722,33 @@ export function getCornerShelfHoles(mod, config = state.project) {
   const backThick = parseFloat(config.materials?.backThickness) || 3;
   const height = parseFloat(mod.dimensions.height) || 720;
   const { depthA, depthB } = getCornerDepths(mod);
+  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const battenW = 100;
   const pinR = 2.5;
 
-  const build = (name, sideDepth) => {
+  // yOffset: początek osi Y elementu względem dołu korpusu (listwa stoi
+  // między wieńcami, więc jej dół to th).
+  const build = (name, sideDepth, xs, h, yOffset) => {
     const holes = [];
     shelves.forEach(sh => {
-      const yBase = (parseFloat(sh.y) || 0) - pinR;
-      [37, sideDepth - 37].forEach(x => {
+      const yBase = (parseFloat(sh.y) || 0) - yOffset - pinR;
+      xs.forEach(x => {
         [-32, 0, 32].forEach(dy => {
           holes.push({ x, y: yBase + dy, isCenter: dy === 0 });
         });
       });
     });
-    return { name, depth: sideDepth, height, holes };
+    return { name, depth: sideDepth, height: h, holes };
   };
 
+  const sideA = depthA - backThick;
+  const sideB = depthB - backThick;
   return [
-    build('Bok ramienia A', depthA - backThick),
-    build('Bok ramienia B', depthB - backThick),
+    build('Bok ramienia A', sideA, [37, sideA - 37], height, 0),
+    build('Bok ramienia B', sideB, [37, sideB - 37], height, 0),
+    // Półka ma wycięcie na listwę, więc opiera się też na podpórkach w
+    // listwie (dwa pionowe rzędy 20 mm od jej krawędzi).
+    build('Listwa narożna', battenW, [20, battenW - 20], height - th * 2, th),
   ];
 }
 

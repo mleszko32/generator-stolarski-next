@@ -1395,19 +1395,32 @@ function renderCornerCabinet(mod, isActive, th) {
   // stolarce półka w szafce narożnej jest w kształcie L, wspólna dla obu
   // ramion na danej wysokości, NIE dwiema niezależnymi prostymi półkami
   // (zgłoszona korekta - patrz engine/cabinet.js: getCornerCorpusParts).
+  // Listwa narożna (niżej) stoi WEWNĄTRZ korpusu między wieńcami, więc półka
+  // ma w tylnym rogu wycięcie battenW×th na tę listwę (zgłoszona korekta).
+  const battenW = 100;
+  const shelfShape = new THREE.Shape();
+  shelfShape.moveTo(0, -th);
+  shelfShape.lineTo(battenW, -th);
+  shelfShape.lineTo(battenW, 0);
+  shelfShape.lineTo(wieniecA, 0);
+  shelfShape.lineTo(wieniecA, -depthA);
+  shelfShape.lineTo(depthB, -depthA);
+  shelfShape.lineTo(depthB, -wieniecB);
+  shelfShape.lineTo(0, -wieniecB);
+  shelfShape.closePath();
   (mod.elements || []).forEach(el => {
       if (el.typ !== 'poziom-narozny') return;
       const udShelf = { moduleId: mod.id, type: 'shelf', elementId: el.id };
-      addCornerPanel(shape, th, posY + (parseFloat(el.y) || 0), isActive, udShelf, innerGroup);
+      addCornerPanel(shelfShape, th, posY + (parseFloat(el.y) || 0), isActive, udShelf, innerGroup);
   });
 
   // --- Listwa narożna pionowa (w tylnym, wewnętrznym rogu) ---
   // Zgłoszona korekta: dwie płyty plecy (HDF) osobno nie mają się do czego
   // przykleić w rogu, gdzie się stykają - płaska listwa 18(gr.)×100(szer.),
-  // na pełną wysokość, przykręcona płasko do ściany ramienia A (Z=0), do
-  // której mocują się obie płyty plecy.
-  const battenW = 100;
-  addBox(battenW, H, th, 0, posY, 0, 'corpus', isActive, udCorp, innerGroup);
+  // przykręcona płasko do ściany ramienia A (Z=0), do której mocują się obie
+  // płyty plecy. Wysokość H-2*th: siedzi MIĘDZY wieńcami (nie przechodzi
+  // przez nie), a półki opierają się na podpórkach wierconych w niej.
+  addBox(battenW, H - th * 2, th, 0, posY + th, 0, 'corpus', isActive, udCorp, innerGroup);
 
   // --- Plecy (2, cienkie płyty HDF "nakładane" - przykręcone płasko na
   // skróconą od tyłu krawędź boków, patrz boki wyżej) ---
