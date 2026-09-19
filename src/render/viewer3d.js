@@ -1402,9 +1402,12 @@ function renderCornerCabinet(mod, isActive, th) {
   // ma w tylnym rogu wycięcie battenW×th na tę listwę (zgłoszona korekta).
   const battenW = 100;
   const shelfShape = new THREE.Shape();
-  shelfShape.moveTo(backThick, -th);
-  shelfShape.lineTo(battenW, -th);
-  shelfShape.lineTo(battenW, -backThick);
+  // Listwa stoi ZA plecami (plecy przybijane do niej od zewnątrz): zajmuje
+  // X:[backThick, backThick+battenW], Z:[backThick, backThick+th] - wycięcie w
+  // półce to dokładnie battenW×th.
+  shelfShape.moveTo(backThick, -(backThick + th));
+  shelfShape.lineTo(backThick + battenW, -(backThick + th));
+  shelfShape.lineTo(backThick + battenW, -backThick);
   shelfShape.lineTo(wieniecA, -backThick);
   // Przód półki cofnięty o 5 mm względem wieńca - tak samo jak zwykła półka
   // ruchoma (engine/cabinet.js: getInteriorParts, innerPartDepth - 5).
@@ -1426,12 +1429,12 @@ function renderCornerCabinet(mod, isActive, th) {
   // przykręcona płasko do ściany ramienia A (Z=0), do której mocują się obie
   // płyty plecy. Wysokość H-2*th: siedzi MIĘDZY wieńcami (nie przechodzi
   // przez nie), a półki opierają się na podpórkach wierconych w niej.
-  addBox(battenW, H - th * 2, th, 0, posY + th, 0, 'corpus', isActive, udCorp, innerGroup);
+  addBox(battenW, H - th * 2, th, backThick, posY + th, backThick, 'corpus', isActive, udCorp, innerGroup);
 
   // --- Plecy (2, cienkie płyty HDF "nakładane" - przykręcone płasko na
   // skróconą od tyłu krawędź boków, patrz boki wyżej) ---
-  addBox(legA - th - battenW, H, backThick, battenW, posY, 0, 'hdf', isActive, udBack, innerGroup);
-  addBox(backThick, H, legB - th - th, 0, posY, th, 'hdf', isActive, udBack, innerGroup);
+  addBox(legA - th - backThick, H, backThick, backThick, posY, 0, 'hdf', isActive, udBack, innerGroup);
+  addBox(backThick, H, legB - th - backThick, 0, posY, backThick, 'hdf', isActive, udBack, innerGroup);
 
   // --- Fronty: zwykłe, płaskie drzwi/szuflady, dowolnie wiele na ramię ---
   // (od wprowadzenia edytora wnętrza per ramię, ui/cornerConfigModal.js,

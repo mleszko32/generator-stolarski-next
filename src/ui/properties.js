@@ -169,7 +169,7 @@ function openCornerBlankPrintView(mod) {
         <ul>
           <li>Wieniec narożny (dolny) — 1 szt.</li>
           <li>Wieniec narożny (górny) — 1 szt.</li>
-          ${shelfCount > 0 ? `<li>Półka narożna — ${shelfCount} szt. (dodatkowo wycięcie ${100 - backThick}×${Math.round(th - backThick)} mm w tylnym rogu na listwę narożną)</li>` : ''}
+          ${shelfCount > 0 ? `<li>Półka narożna — ${shelfCount} szt. (dodatkowo wycięcie 100×${Math.round(th)} mm w tylnym rogu na listwę narożną)</li>` : ''}
         </ul>
       </div>
       ${svgContent}

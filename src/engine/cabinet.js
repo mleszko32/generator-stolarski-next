@@ -686,12 +686,15 @@ function getCornerCorpusParts(mod, config) {
 
   // Szerokość (jedna krawędź = bok narożny -> rowek gdy nut, druga krawędź
   // = listwa narożna -> zawsze płasko, luz -2mm jak dotąd).
+  // Plecy są przybijane do listwy NA ZEWNĄTRZ (listwa stoi za plecami - patrz
+  // render/viewer3d.js), więc obie płyty sięgają aż do narożnika (od
+  // backThick, żeby się nie nakładały na siebie), a nie kończą przed listwą.
   const plecyWidthA = nutSides
-    ? legA - th - battenW - 2 + grooveDepth - clearance
-    : legA - th - battenW - 4;
+    ? legA - th - backThick - 2 + grooveDepth - clearance
+    : legA - th - backThick - 4;
   const plecyWidthB = nutSides
-    ? legB - (th * 2) - 2 + grooveDepth - clearance
-    : legB - (th * 2) - 4;
+    ? legB - th - backThick - 2 + grooveDepth - clearance
+    : legB - th - backThick - 4;
 
   parts.push({ name: `Plecy narożne ${Math.round(height)}x${Math.round(legA)} (Ramię A)`, length: parseFloat(plecyLength.toFixed(1)), width: parseFloat(plecyWidthA.toFixed(1)), qty: 1, category: "Plecy" });
   parts.push({ name: `Plecy narożne ${Math.round(height)}x${Math.round(legB)} (Ramię B)`, length: parseFloat(plecyLength.toFixed(1)), width: parseFloat(plecyWidthB.toFixed(1)), qty: 1, category: "Plecy" });
@@ -707,41 +710,21 @@ function getCornerCorpusParts(mod, config) {
   // miejscu, tak samo jak przy wieńcu.
   const cornerShelves = (mod.elements || []).filter(el => el.typ === 'poziom-narozny');
   if (cornerShelves.length > 0) {
-    const shelfName = `Półka narożna ${Math.round(wieniecA)}x${Math.round(wieniecB)} (naroże do wycięcia + wycięcie ${battenW - backThick}x${Math.round(th - backThick)} na listwę, przód cofnięty o 5 mm - patrz Wykrój narożny)`;
+    const shelfName = `Półka narożna ${Math.round(wieniecA)}x${Math.round(wieniecB)} (naroże do wycięcia + wycięcie ${battenW}x${Math.round(th)} na listwę, przód cofnięty o 5 mm - patrz Wykrój narożny)`;
     parts.push({ name: shelfName, length: parseFloat(wieniecA.toFixed(1)), width: parseFloat(wieniecB.toFixed(1)), qty: cornerShelves.length, category: "Korpus" });
   }
 
   return parts;
 }
 
-// Otwory łączeń (wkręt + kołek, 37 mm od przodu/tyłu i kołek 32 mm dalej -
-// jak w getCorpusHoles zwykłego modułu) w wieńcu narożnym, w układzie
-// formatki (x wzdłuż ramienia A, y wzdłuż ramienia B, 0,0 = tylny róg): przy
-// bokach ramion A i B oraz dwa kołki pod listwę narożną. Półka ich nie ma
-// (opiera się na podpórkach), ma wycięcie na listwę.
+// Otwory w wieńcu narożnym w układzie formatki (0,0 = tylny róg, cofnięty o
+// plecy): tak jak w zwykłej szafce łączenia z bokami są wiercone w BOKU (patrz
+// getCornerShelfHoles: joints), więc w wieńcu zostają tylko dwa kołki pod
+// listwę narożną (stoi końcami na wieńcu). Półka nie ma żadnych - opiera się
+// na podpórkach i ma wycięcie na listwę.
 export function getCornerWieniecHoles(mod, config = state.project) {
   const th = parseFloat(config.materials?.boardThickness) || 18;
-  const backThick = parseFloat(config.materials?.backThickness) || 3;
-  const legA = parseFloat(mod.dimensions.width) || 860;
-  const legB = parseFloat(mod.dimensions.legB) || 860;
-  const { depthA, depthB } = getCornerDepths(mod);
-  const edgeInset = th / 2;
-  const holes = [];
-
-  // Bok ramienia A: krawędź x = legA - th, oś wzdłuż y (0..depthA).
-  [backThick + 37, depthA - 37].forEach((y, i) => {
-    holes.push({ x: legA - th - edgeInset, y, type: 'screw', side: 'A' });
-    holes.push({ x: legA - th - edgeInset, y: i === 0 ? y + 32 : y - 32, type: 'dowel', side: 'A' });
-  });
-  // Bok ramienia B: krawędź y = legB - th, oś wzdłuż x (0..depthB).
-  [backThick + 37, depthB - 37].forEach((x, i) => {
-    holes.push({ x, y: legB - th - edgeInset, type: 'screw', side: 'B' });
-    holes.push({ x: i === 0 ? x + 32 : x - 32, y: legB - th - edgeInset, type: 'dowel', side: 'B' });
-  });
-  // Listwa narożna (100 x th) stoi końcami na wieńcu - dwa kołki pod nią.
-  [20, 80].forEach(x => holes.push({ x, y: th / 2, type: 'dowel', side: 'batten' }));
-  // Układ formatki zaczyna się w tylnym rogu wieńca, cofniętym o plecy.
-  return holes.map(h => ({ ...h, x: h.x - backThick, y: h.y - backThick }));
+  return [20, 80].map(x => ({ x, y: th / 2, type: 'dowel', side: 'batten' }));
 }
 
 // Wymiary formatek wieńca i półki narożnej w układzie rysunku (0,0 = tylny
@@ -758,7 +741,7 @@ export function getCornerPartsGeometry(mod, config = state.project) {
   return {
     th, backThick, legA, legB, depthA, depthB, shelfCount,
     wieniec: { blankA: legA - th - backThick, blankB: legB - th - backThick, depthA: depthA - backThick, depthB: depthB - backThick },
-    polka: { blankA: legA - th - backThick, blankB: legB - th - backThick, depthA: depthA - backThick - 5, depthB: depthB - backThick - 5, notch: { w: 100 - backThick, h: th - backThick } },
+    polka: { blankA: legA - th - backThick, blankB: legB - th - backThick, depthA: depthA - backThick - 5, depthB: depthB - backThick - 5, notch: { w: 100, h: th } },
   };
 }
 
