@@ -3,6 +3,7 @@ import { state } from "../core/state.js";
 import { calculateDrawerHoles, getDrawerComponents } from "../core/drawerMath.js";
 import { drawerSystems } from "../core/drawerSystems.js";
 import { calculateHinges } from "../core/hingeMath.js";
+import { totalEdgeBandingMeters } from "./edgeBanding.js";
 import { recalculateAllLayouts, getTraverseConfig, getWorldFootprint, getCornerDepths } from "../core/layout.js";
 
 export function calculateParts() {
@@ -131,7 +132,10 @@ function getGlobalHingesForModule(targetMod, config) {
   return mountingData;
 }
 
-export function calculateAllProjectParts() {
+// Wszystkie formatki projektu BEZ agregacji - każda z nazwą szafki (moduleName).
+// Potrzebne do etykiet i rozkroju, gdzie liczy się, do której szafki należy
+// dana sztuka; calculateAllProjectParts() niżej scala je w listę zbiorczą.
+export function collectProjectParts() {
   recalculateAllLayouts();
 
   const config = state.project;
@@ -232,6 +236,11 @@ export function calculateAllProjectParts() {
     });
   });
 
+  return allParts;
+}
+
+export function calculateAllProjectParts() {
+  const allParts = collectProjectParts();
   const aggregated = {};
   allParts.forEach(part => {
      const key = `${part.category}_${part.name}_${part.length}_${part.width}`;
@@ -380,6 +389,14 @@ export function calculateProjectHardware() {
       });
     });
   });
+
+  // Okleina krawędziowa: wszystkie formatki dookoła (poza plecami HDF) - patrz
+  // engine/edgeBanding.js. Ilość w metrach bieżących, bez zapasu.
+  const edgeMeters = totalEdgeBandingMeters(calculateAllProjectParts());
+  if (edgeMeters > 0) {
+    const edgeKey = `Okleina krawędziowa (mb, wszystkie formatki dookoła)`;
+    hardwareList[edgeKey] = { name: edgeKey, qty: Math.ceil(edgeMeters * 10) / 10, unit: 'mb' };
+  }
 
   return Object.values(hardwareList);
 }

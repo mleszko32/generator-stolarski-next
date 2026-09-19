@@ -3,6 +3,7 @@ import { generateSidePanelSVG } from "../render/viewer2d.js";
 import { state, getActiveModule, addModule, deleteModule, duplicateModule, addSidePanel, deleteSidePanel, addCornerModule } from "../core/state.js";
 import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel, openCornerBlankPrintView } from "./properties.js";
+import { openCutPlanModal } from "./cutPlanModal.js";
 import { escapeHtml } from "../utils/dom.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
@@ -545,6 +546,9 @@ export function updateSidebar() {
         </button>
         <button id="btn-export-hardware" class="btn btn-warning btn-block btn-sm">
           🛒 Wydrukuj / PDF (Lista Zakupów)
+        </button>
+        <button id="btn-cutplan" class="btn btn-success btn-block btn-sm">
+          🪚 Rozkrój i etykiety
         </button>
         <button id="btn-kosztorys" class="btn btn-gold btn-block btn-sm">
           💰 Kosztorys Projektu
@@ -1159,6 +1163,13 @@ export function updateSidebar() {
       
       const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
       window.open(URL.createObjectURL(blob), '_blank');
+    });
+  }
+
+  const cutPlanBtn = document.getElementById('btn-cutplan');
+  if (cutPlanBtn) {
+    cutPlanBtn.addEventListener('click', () => {
+      openCutPlanModal();
     });
   }
 
