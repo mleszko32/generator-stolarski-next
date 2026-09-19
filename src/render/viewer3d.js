@@ -1403,9 +1403,12 @@ function renderCornerCabinet(mod, isActive, th) {
   shelfShape.lineTo(battenW, -th);
   shelfShape.lineTo(battenW, 0);
   shelfShape.lineTo(wieniecA, 0);
-  shelfShape.lineTo(wieniecA, -depthA);
-  shelfShape.lineTo(depthB, -depthA);
-  shelfShape.lineTo(depthB, -wieniecB);
+  // Przód półki cofnięty o 5 mm względem wieńca - tak samo jak zwykła półka
+  // ruchoma (engine/cabinet.js: getInteriorParts, innerPartDepth - 5).
+  const shelfSetback = 5;
+  shelfShape.lineTo(wieniecA, -(depthA - shelfSetback));
+  shelfShape.lineTo(depthB - shelfSetback, -(depthA - shelfSetback));
+  shelfShape.lineTo(depthB - shelfSetback, -wieniecB);
   shelfShape.lineTo(0, -wieniecB);
   shelfShape.closePath();
   (mod.elements || []).forEach(el => {

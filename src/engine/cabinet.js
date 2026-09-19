@@ -705,7 +705,7 @@ function getCornerCorpusParts(mod, config) {
   // miejscu, tak samo jak przy wieńcu.
   const cornerShelves = (mod.elements || []).filter(el => el.typ === 'poziom-narozny');
   if (cornerShelves.length > 0) {
-    const shelfName = `Półka narożna ${Math.round(wieniecA)}x${Math.round(wieniecB)} (naroże do wycięcia + wycięcie ${battenW}x${Math.round(th)} na listwę - patrz rysunek 3D)`;
+    const shelfName = `Półka narożna ${Math.round(wieniecA)}x${Math.round(wieniecB)} (naroże do wycięcia + wycięcie ${battenW}x${Math.round(th)} na listwę, przód cofnięty o 5 mm - patrz Wykrój narożny)`;
     parts.push({ name: shelfName, length: parseFloat(wieniecA.toFixed(1)), width: parseFloat(wieniecB.toFixed(1)), qty: cornerShelves.length, category: "Korpus" });
   }
 
@@ -726,19 +726,20 @@ export function getCornerShelfHoles(mod, config = state.project) {
   const battenW = 100;
   const pinR = 2.5;
 
-  // yOffset: początek osi Y elementu względem dołu korpusu (listwa stoi
-  // między wieńcami, więc jej dół to th).
-  const build = (name, sideDepth, xs, h, yOffset) => {
+  // bottom: wysokość dolnej krawędzi elementu nad dołem korpusu (listwa stoi
+  // między wieńcami, więc th). Wysokości otworów są zawsze liczone od dołu
+  // KORPUSU, dzięki czemu otwory listwy zgrywają się z otworami boków.
+  const build = (name, sideDepth, xs, h, bottom) => {
     const holes = [];
     shelves.forEach(sh => {
-      const yBase = (parseFloat(sh.y) || 0) - yOffset - pinR;
+      const yBase = (parseFloat(sh.y) || 0) - pinR;
       xs.forEach(x => {
         [-32, 0, 32].forEach(dy => {
           holes.push({ x, y: yBase + dy, isCenter: dy === 0 });
         });
       });
     });
-    return { name, depth: sideDepth, height: h, holes };
+    return { name, depth: sideDepth, height: h, bottom, holes };
   };
 
   const sideA = depthA - backThick;

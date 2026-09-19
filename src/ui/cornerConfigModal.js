@@ -198,7 +198,7 @@ export function openCornerConfigModal(mod) {
   function renderShelfHoles() {
     const hasShelves = (mod.elements || []).some(el => el.typ === 'poziom-narozny');
     holesEl.innerHTML = hasShelves
-      ? `<div style="font-size:11px; color:#64748b; margin-bottom:4px;">Nawierty pod podpórki (System 32) na bokach - pomarańczowy = środek, opis = wysokość od dołu:</div>${generateCornerSidesHolesSVG(getCornerShelfHoles(mod))}`
+      ? `<div style="font-size:11px; color:#64748b; margin-bottom:4px;">Wykrój półki (wycięcie na listwę, przód cofnięty o 5 mm):</div>${generateCornerBlankSVG(parseFloat(mod.dimensions.width) || 0, parseFloat(mod.dimensions.legB) || 0, getCornerDepths(mod).depthA - 5, getCornerDepths(mod).depthB - 5, parseFloat(state.project.materials?.boardThickness) || 18, { w: 100, h: parseFloat(state.project.materials?.boardThickness) || 18 })}<div style="font-size:11px; color:#64748b; margin:10px 0 4px;">Nawierty pod podpórki (System 32) na bokach - pomarańczowy = środek, opis = wysokość od dołu:</div>${generateCornerSidesHolesSVG(getCornerShelfHoles(mod))}`
       : '';
   }
   renderShelvesList();

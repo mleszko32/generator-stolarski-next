@@ -894,9 +894,10 @@ export function generateCornerSidesHolesSVG(sides) {
   let ox = pad;
   sides.forEach(s => {
     const top = pad + 20;
-    const yOf = (y) => top + s.height - y;
+    const bottom = s.bottom || 0;
+    const yOf = (y) => top + maxH - y;
     svg += `<text x="${ox + s.depth / 2}" y="${pad}" font-size="18" font-weight="bold" fill="#1e293b" text-anchor="middle">${escapeHtml(s.name)} (${Math.round(s.height)}×${Math.round(s.depth)})</text>`;
-    svg += `<rect x="${ox}" y="${top}" width="${s.depth}" height="${s.height}" fill="#fef3c7" stroke="#334155" stroke-width="2" />`;
+    svg += `<rect x="${ox}" y="${yOf(bottom + s.height)}" width="${s.depth}" height="${s.height}" fill="#fef3c7" stroke="#334155" stroke-width="2" />`;
     s.holes.forEach(h => {
       svg += `<circle cx="${ox + h.x}" cy="${yOf(h.y)}" r="2.5" fill="${h.isCenter ? '#ea580c' : '#fcd34d'}" stroke="#78350f" stroke-width="0.5" />`;
       if (h.isCenter) {
@@ -931,7 +932,7 @@ export function generateCornerSidesHolesSVG(sides) {
 // pokazana tu jako DODATKOWY, cieńszy obrys wewnątrz + boki narysowane na
 // swoim realnym miejscu, żeby było widać skąd bierze się różnica, bez
 // zmiany głównych wymiarów.
-export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18) {
+export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18, notch = null) {
   const blankA = legA - th;
   const blankB = legB - th;
   // Rozmiary w SVG są w "mm" viewBoxa, skalowanym przez CSS do szerokości
@@ -964,11 +965,15 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18) {
   const cutW = legA - depthB; // szerokość odcinanego rogu (wyznaczona przez głębokość ramienia B)
   const cutH = legB - depthA; // wysokość odcinanego rogu (wyznaczona przez głębokość ramienia A)
 
-  const pts = [
-    [0, 0], [legA, 0], [legA, depthA], [depthB, depthA], [depthB, legB], [0, legB],
-  ].map(([x, y]) => `${ox + x},${oy + y}`).join(' ');
+  // notch = {w, h}: wycięcie w tylnym rogu (0,0) na listwę narożną - tylko
+  // półka (wieniec nie ma go, bo listwa stoi MIĘDZY wieńcami).
+  const outline = (a, b) => (notch
+    ? [[0, notch.h], [notch.w, notch.h], [notch.w, 0], [a, 0], [a, depthA], [depthB, depthA], [depthB, b], [0, b]]
+    : [[0, 0], [a, 0], [a, depthA], [depthB, depthA], [depthB, b], [0, b]]
+  ).map(([x, y]) => `${ox + x},${oy + y}`).join(' ');
+  const pts = outline(legA, legB);
 
-  let svg = `<svg viewBox="0 0 ${vbW} ${vbH}" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif">`;
+  let svg =`<svg viewBox="0 0 ${vbW} ${vbH}" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif">`;
 
   // Pełny prostokątny blank (przerywany) - to jest to, co realnie zamawia
   // się/tnie z płyty jako pierwszy krok (patrz Lista formatek: legA×legB).
@@ -990,6 +995,10 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18) {
 
   // Realny obrys L po docięciu - wypełniony, na wierzchu.
   svg += `<polygon points="${pts}" fill="#fef3c7" stroke="#334155" stroke-width="${strokeThick * 1.3}" />`;
+  if (notch) {
+    svg += `<rect x="${ox}" y="${oy}" width="${notch.w}" height="${notch.h}" fill="#fee2e2" stroke="#dc2626" stroke-width="${strokeThick}" stroke-dasharray="${strokeThick * 2.5},${strokeThick * 2}" />`;
+    svg += `<text x="${ox + notch.w + fsTiny * 0.6}" y="${oy + notch.h + fsTiny * 3.4}" font-size="${fsTiny}" fill="#b91c1c" font-weight="bold">wycięcie na listwę ${Math.round(notch.w)}×${Math.round(notch.h)} mm</text>`;
+  }
 
   // Boki (płyty boczne, ui/właściwe formatki "Bok (L/P)" w Liście formatek) -
   // narysowane na swoim realnym miejscu (dalsza krawędź każdego ramienia),
@@ -1012,11 +1021,9 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18) {
   // DODATKOWY kontur na wierzchu głównego obrysu, nie zamiast niego, żeby
   // główne wymiary (Ramię/Głęb./Wycięcie) zostały 1:1 z konfiguratorem.
   if (blankA > depthB && blankB > depthA) {
-    const blankPts = [
-      [0, 0], [blankA, 0], [blankA, depthA], [depthB, depthA], [depthB, blankB], [0, blankB],
-    ].map(([x, y]) => `${ox + x},${oy + y}`).join(' ');
+    const blankPts = outline(blankA, blankB);
     svg += `<polygon points="${blankPts}" fill="none" stroke="#7c3aed" stroke-width="${strokeThin * 1.5}" stroke-dasharray="${strokeThin * 3},${strokeThin * 2}" />`;
-    svg += `<text x="${ox + blankA - fsTiny * 0.6}" y="${oy + fsTiny * 1.4}" font-size="${fsTiny}" fill="#7c3aed" font-weight="bold" text-anchor="end">Formatka wieńca: ${Math.round(blankA)}×${Math.round(blankB)} mm (-${Math.round(th)} mm bok)</text>`;
+    svg += `<text x="${ox + blankA - fsTiny * 0.6}" y="${oy + fsTiny * 1.4}" font-size="${fsTiny}" fill="#7c3aed" font-weight="bold" text-anchor="end">${notch ? 'Formatka półki' : 'Formatka wieńca'}:${Math.round(blankA)}×${Math.round(blankB)} mm (-${Math.round(th)} mm bok)</text>`;
   }
 
   // Wymiary - proste kolorowe linie TUŻ PRZY odpowiadającym im fragmencie
