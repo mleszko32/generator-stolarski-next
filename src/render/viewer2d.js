@@ -907,6 +907,10 @@ export function generateCornerSidesHolesSVG(sides) {
     svg += `<text x="${ox + s.depth / 2}" y="${pad + 10}" font-size="16" font-weight="bold" fill="#1e3a8a" text-anchor="middle">${escapeHtml(s.name.toUpperCase())}</text>`;
     svg += `<text x="${ox + s.depth / 2}" y="${pad + 26}" font-size="11" fill="#64748b" text-anchor="middle">${Math.round(s.height)} × ${Math.round(s.depth)} mm</text>`;
     svg += `<rect x="${ox}" y="${yOf(bottom + s.height)}" width="${s.depth}" height="${s.height}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+    // Podpis na środku formatki (listwa wąska - pionowo).
+    const scx = ox + s.depth / 2, scy = yOf(bottom + s.height / 2);
+    const narrow = s.depth < 200;
+    svg += `<text x="${scx}" y="${scy}" font-size="${narrow ? 22 : 34}" fill="#0f172a" font-weight="bold" text-anchor="middle"${narrow ? ` transform="rotate(-90 ${scx} ${scy})"` : ''}>${escapeHtml(s.name.toUpperCase())}</text>`;
     svg += `<text x="${ox}" y="${yOf(bottom + s.height) - 6}" font-size="10" fill="#94a3b8" font-weight="bold">PRZÓD</text>`;
     svg += `<text x="${ox + s.depth}" y="${yOf(bottom + s.height) - 6}" font-size="10" fill="#94a3b8" font-weight="bold" text-anchor="end">TYŁ</text>`;
 
@@ -954,6 +958,11 @@ export function generateCornerPartSVG({ blankA, blankB, depthA, depthB, notch = 
     svg += `<rect x="${ox}" y="${oy}" width="${notch.w}" height="${notch.h}" fill="#fee2e2" stroke="${RED}" stroke-width="1" stroke-dasharray="4,3" />`;
     svg += `<text x="${ox + notch.w + 8}" y="${oy + notch.h + 14}" font-size="12" font-weight="bold" fill="${RED}">wycięcie na listwę ${Math.round(notch.w)}×${Math.round(notch.h)} mm</text>`;
   }
+
+  // Podpis na środku (jak "RZUT SZAFKI Z GÓRY" w rzucie) - co to za formatka.
+  const lcx = ox + blankA / 2, lcy = oy + depthA / 2;
+  svg += `<text x="${lcx}" y="${lcy}" font-size="44" fill="#0f172a" font-weight="bold" text-anchor="middle">${escapeHtml(title)}</text>`;
+  svg += `<text x="${lcx}" y="${lcy + 34}" font-size="22" fill="#334155" text-anchor="middle">${escapeHtml(subtitle.split(' · ')[0])}</text>`;
 
   // PRZÓD = krawędzie wycięcia w rogu, TYŁ = ściany.
   svg += `<text x="${ox + (depthB + blankA) / 2}" y="${oy + depthA + 16}" font-size="11" fill="#94a3b8" font-weight="bold" text-anchor="middle" letter-spacing="1">PRZÓD</text>`;
