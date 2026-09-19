@@ -631,7 +631,8 @@ export function openTechnicalDrawing() {
                           <label style="color:#0284c7;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-drawer', this)"> Szuflady</label>
                           <div style="width: 2px; height: 20px; background: #cbd5e1; margin: 0 5px;"></div>
                           <button class="btn-front" onclick="toggleFront('detail-front', this)">🚪 Fronty Zewn.</button>
-                          <button class="btn-front" onclick="toggleFront('detail-front-inner', this)">📥 Fronty Wewn.</button>
+                          <button class="btn-front" onclick="fitToContent()" title="Wyśrodkuj i przybliż rysunek (także dwuklik na rysunku)">Dopasuj widok</button>
+                            <button class="btn-front" onclick="toggleFront('detail-front-inner', this)">📥 Fronty Wewn.</button>
                       </div>
                   </div>
                   ${tabsHtml}
@@ -714,13 +715,54 @@ export function openTechnicalDrawing() {
                       document.getElementById('svg-viewport').innerHTML = svg;
                       bindSvgPanZoom();
                       showDetail('detail-left');
+                      fitToContent();
+                      document.getElementById('side-panel-svg').addEventListener('dblclick', fitToContent);
                       document.querySelectorAll('.module-tab').forEach(t => {
                           t.classList.toggle('active', t === btn);
                       });
                   }
 
+                  // Dopasowanie widoku do WIDOCZNEJ zawartości rysunku (getBBox pomija
+                  // elementy z display:none, np. niewłączone widoki frontów) - dzięki
+                  // temu po otwarciu rysunek jest wyśrodkowany i przybliżony maksymalnie
+                  // do okna, zamiast małej figury na dużym, pustym polu.
+                  function fitToContent() {
+                      const svg = document.getElementById('side-panel-svg');
+                      if (!svg) return;
+                      // Suma ramek widocznych elementów-liści (ukryte mają zerowy prostokąt),
+                      // z pominięciem długiej linii podłogi (.floor-line) - ona rozciąga się
+                      // na cały wirtualny obszar rysunku i zawyżałaby ramkę kilkukrotnie.
+                      // Liczymy w pikselach ekranu i przeliczamy z powrotem na układ SVG.
+                      let sx0 = Infinity, sy0 = Infinity, sx1 = -Infinity, sy1 = -Infinity;
+                      svg.querySelectorAll('rect, line, circle, text, path, polygon, polyline').forEach(function (el) {
+                          if (el.classList.contains('floor-line') || el.closest('defs')) return;
+                          const r = el.getBoundingClientRect();
+                          if (!r.width && !r.height) return;
+                          sx0 = Math.min(sx0, r.left); sy0 = Math.min(sy0, r.top);
+                          sx1 = Math.max(sx1, r.right); sy1 = Math.max(sy1, r.bottom);
+                      });
+                      if (!isFinite(sx0)) return;
+                      const inv = svg.getScreenCTM().inverse();
+                      const p0 = new DOMPoint(sx0, sy0).matrixTransform(inv);
+                      const p1 = new DOMPoint(sx1, sy1).matrixTransform(inv);
+                      const b = { x: Math.min(p0.x, p1.x), y: Math.min(p0.y, p1.y), width: Math.abs(p1.x - p0.x), height: Math.abs(p1.y - p0.y) };
+                      if (!b.width || !b.height) return;
+                      const m = Math.max(b.width, b.height) * 0.04;
+                      svg.setAttribute('viewBox', (b.x - m) + ' ' + (b.y - m) + ' ' + (b.width + 2 * m) + ' ' + (b.height + 2 * m));
+                  }
+
+                  // Włączenie/wyłączenie widoku frontów zmienia widoczną zawartość - dopasuj ponownie.
+                  const toggleFrontRaw = toggleFront;
+                  toggleFront = function (id, btn) { toggleFrontRaw(id, btn); fitToContent(); };
+
                   document.body.style.userSelect = 'none';
-                  window.onload = () => { showDetail('detail-left'); bindSvgPanZoom(); };
+                  window.onload = () => {
+                      showDetail('detail-left');
+                      bindSvgPanZoom();
+                      fitToContent();
+                      const svgEl = document.getElementById('side-panel-svg');
+                      if (svgEl) svgEl.addEventListener('dblclick', fitToContent);
+                  };
               </script>
           </body>
           </html>`;
