@@ -418,6 +418,31 @@ export function initPropertiesPanel() {
           label: `Szuflada ${idx + 1}${front.subtype === 'szuflada-wewnetrzna' ? ' (wewn.)' : ''}`,
       }));
 
+  // Drzwi szafki (pojedyncze i pary L/P) do wyboru strony zawiasów w sekcji Front.
+  const doorFrontsList = (activeModule.elements || [])
+      .filter(el => el.typ === 'front' && el.subtype && el.subtype.includes('drzwi'))
+      .sort((a, b) => (parseFloat(a.y) || 0) - (parseFloat(b.y) || 0) || (parseFloat(a.x) || 0) - (parseFloat(b.x) || 0))
+      .map((front, idx) => ({
+          front,
+          label: `Drzwi ${idx + 1} · ${Math.round(front.w || 0)}×${Math.round(front.h || 0)} mm`,
+      }));
+  const doorSideHtml = doorFrontsList.length === 0
+      ? '<div style="font-size: 11px; color: #94a3b8;">Ta szafka nie ma jeszcze drzwi.</div>'
+      : `<div style="display:flex; gap:6px; margin-bottom:8px;">
+           <button type="button" class="btn btn-sm btn-door-all" data-side="left" style="flex:1;">Wszystkie lewe</button>
+           <button type="button" class="btn btn-sm btn-door-all" data-side="right" style="flex:1;">Wszystkie prawe</button>
+         </div>` + doorFrontsList.map(({ front, label }) => {
+          if (front.subtype === 'drzwi-lp') {
+              return `<div class="property-group" style="margin-top: 8px;"><label>${escapeHtml(label)}</label><div style="font-size: 12px; color: #64748b;">Para L/P: lewe skrzydło ma zawiasy z lewej, prawe z prawej.</div></div>`;
+          }
+          const isRight = front.openingSide === 'right';
+          return `<div class="property-group" style="margin-top: 8px;"><label>${escapeHtml(label)} - zawiasy:</label>
+              <select class="input-door-side" data-front-id="${front.id}">
+                <option value="left" ${!isRight ? 'selected' : ''}>Z lewej (drzwi lewe)</option>
+                <option value="right" ${isRight ? 'selected' : ''}>Z prawej (drzwi prawe)</option>
+              </select></div>`;
+      }).join('');
+
   // Grupowanie modułów — dotąd edytowalne tylko z menu kontekstowego 3D
   // (render/viewer3d.js), teraz też tutaj (patrz plan przeniesienia okienek 3D
   // do panelu bocznego). "Można połączyć w grupę" tylko gdy zaznaczenie ma
@@ -503,6 +528,9 @@ export function initPropertiesPanel() {
         <div class="property-group"><label>Luz góra (mm):</label><input type="number" id="input-front-top" value="${fc.top ?? 2}" step="0.5" /></div>
         <div class="property-group"><label>Luz dół (mm):</label><input type="number" id="input-front-bottom" value="${fc.bottom ?? 2}" step="0.5" /></div>
       </div>
+
+      <h3 style="color: #059669;">Strona zawiasów drzwi</h3>
+      ${doorSideHtml}
     `)}
 
     ${tabContent("szuflady", `
@@ -969,6 +997,25 @@ function setupEventListeners() {
       const side = btn.dataset.side;
       getSelectedMods().forEach(mod => {
         if (mod.construction?.traverses?.[side]) delete mod.construction.traverses[side].width;
+      });
+      updateAll();
+      initPropertiesPanel();
+    });
+  });
+
+  document.querySelectorAll('.input-door-side').forEach(sel => {
+    sel.addEventListener('change', (e) => {
+      const front = findFront(sel.dataset.frontId);
+      if (front) front.openingSide = e.target.value === 'right' ? 'right' : 'left';
+      updateAll();
+      initPropertiesPanel();
+    });
+  });
+  document.querySelectorAll('.btn-door-all').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const side = btn.dataset.side === 'right' ? 'right' : 'left';
+      (getActiveModule()?.elements || []).forEach(el => {
+        if (el.typ === 'front' && el.subtype === 'drzwi') el.openingSide = side;
       });
       updateAll();
       initPropertiesPanel();

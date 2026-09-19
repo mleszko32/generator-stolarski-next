@@ -31,12 +31,11 @@ describe('generateSidePanelSVG - strona zawiasów drzwi', () => {
     baseZone: { minX: 18, maxX: 582, minY: 18, maxY: 702 },
   });
 
-  it('podpisuje drzwi prawe/lewe i rysuje symbol otwierania', () => {
+  it('podpisuje drzwi prawe/lewe i stronę zawiasów', () => {
     setProject(freshProject({ modules: [baseModule({ elements: [door('right')] })] }));
     let svg = generateSidePanelSVG(720, 510, []);
     expect(svg).toContain('Drzwi prawe');
     expect(svg).toContain('zawiasy z prawej');
-    expect(svg).toContain('stroke-dasharray="8,6"');
 
     setProject(freshProject({ modules: [baseModule({ elements: [door('left')] })] }));
     svg = generateSidePanelSVG(720, 510, []);

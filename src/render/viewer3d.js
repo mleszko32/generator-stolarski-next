@@ -1199,25 +1199,6 @@ const mats = {
 };
 const holeMat = new THREE.MeshBasicMaterial({ color: 0xdc2626 }); 
 
-// Symbol otwierania drzwi na licu frontu: dwie linie zbiegające się w środku
-// krawędzi zawiasów i rozchodzące do rogów krawędzi klamki - dzięki temu w 3D
-// widać, czy drzwi są lewe (zawiasy z lewej) czy prawe. Współrzędne jak w addBox
-// (x,y = lewy dolny róg frontu, z = lico).
-function addDoorOpeningSymbol(x, y, z, w, h, side, parentGroup) {
-  const hx = side === 'left' ? x : x + w;
-  const fx = side === 'left' ? x + w : x;
-  const my = y + h / 2;
-  const pts = [
-    new THREE.Vector3(hx, my, z), new THREE.Vector3(fx, y + h, z),
-    new THREE.Vector3(hx, my, z), new THREE.Vector3(fx, y, z),
-  ];
-  const geo = new THREE.BufferGeometry().setFromPoints(pts);
-  const line = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x15803d }));
-  line.userData = { doorSymbol: true };
-  line.raycast = () => {};
-  parentGroup.add(line);
-}
-
 function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, parentGroup, rotationY = 0) {
   const geo = new THREE.BoxGeometry(w, h, d);
   let matObj = isXrayMode ? mats.xray : mats.solid;
@@ -1763,10 +1744,6 @@ export function update3D() {
                   }
                   
                   addBox(el.w, el.h, isInternal ? innerFrontThick : 18, posX + el.x, posY + el.y, zForFront, 'front', isActive, udElement, innerGroup);
-                  if (el.subtype.includes('drzwi')) {
-                      const doorSide = el.subtype === 'drzwi-lp' ? (el.id.includes('-L-') ? 'left' : 'right') : (el.openingSide || 'left');
-                      addDoorOpeningSymbol(posX + el.x, posY + el.y, zForFront + 18.5, el.w, el.h, doorSide, innerGroup);
-                  }
 
                   if (el.subtype.includes('szuflada')) {
                       if (isXrayMode) {
