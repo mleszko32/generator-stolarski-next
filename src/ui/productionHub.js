@@ -157,9 +157,23 @@ const RENDERERS = {
   kosztorys: renderKosztorys,
 };
 
+// Zakładki trybów w górnym pasku (ui/layout.js): Projekt / Produkcja / Wycena.
+// Okno raportów odpowiada trybom Produkcja i Wycena (sekcja Kosztorys).
+function setModeTab(mode) {
+  document.querySelectorAll('.mode-tab').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+}
+
+let escHandler = null;
+
+export function closeProductionHub() {
+  document.getElementById('production-hub')?.remove();
+  if (escHandler) { document.removeEventListener('keydown', escHandler); escHandler = null; }
+  setModeTab('projekt');
+}
+
 export function openProductionHub(section = 'formatki') {
-  const existing = document.getElementById('production-hub');
-  if (existing) existing.remove();
+  document.getElementById('production-hub')?.remove();
+  if (escHandler) document.removeEventListener('keydown', escHandler);
 
   const overlay = document.createElement('div');
   overlay.id = 'production-hub';
@@ -179,11 +193,14 @@ export function openProductionHub(section = 'formatki') {
   const contentEl = overlay.querySelector('#hub-content');
   function show(id) {
     overlay.querySelectorAll('.hub-nav-item').forEach(b => b.classList.toggle('active', b.dataset.section === id));
+    setModeTab(id === 'kosztorys' ? 'wycena' : 'produkcja');
     contentEl.scrollTop = 0;
     RENDERERS[id](contentEl);
   }
   overlay.querySelectorAll('.hub-nav-item').forEach(b => b.addEventListener('click', () => show(b.dataset.section)));
-  overlay.querySelector('#hub-close').addEventListener('click', () => overlay.remove());
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#hub-close').addEventListener('click', closeProductionHub);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeProductionHub(); });
+  escHandler = (e) => { if (e.key === 'Escape' && !document.querySelector('.hub-overlay ~ div[style*="z-index: 10000"]')) closeProductionHub(); };
+  document.addEventListener('keydown', escHandler);
   show(section);
 }

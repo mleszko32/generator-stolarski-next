@@ -841,10 +841,9 @@ export function updateSidebar() {
   if (state.project.modules.length > 0) {
     html += `
       <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 15px;">
-        <button id="btn-production" class="btn btn-primary btn-block">
+        <button id="btn-production" class="btn btn-block btn-sm">
           <i class="ti ti-building-factory-2" aria-hidden="true"></i> Produkcja i raporty
         </button>
-        <div style="font-size: 11px; color: var(--text-secondary); text-align: center;">Formatki, rozkrój, etykiety, rysunki 2D, okucia, kosztorys</div>
       </div>
     `;
     if (!activeMod) {

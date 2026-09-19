@@ -349,3 +349,13 @@ body {
 .pacc-body { display: none; padding: 0 12px 12px; }
 .pacc.open .pacc-body { display: block; }
 .pacc-body > h3:first-child { margin-top: 4px; }
+
+/* Zakładki trybów pracy w górnym pasku (Projekt / Produkcja / Wycena) */
+.mode-tabs { display: flex; gap: 4px; background: rgba(255, 255, 255, 0.08); padding: 3px; border-radius: 8px; }
+.mode-tab {
+  padding: 6px 16px; border: none; border-radius: 6px; background: transparent;
+  color: #cbd5e1; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.mode-tab:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.mode-tab.active { background: #fff; color: var(--text-primary); }
+.top-nav .btn-primary i, .top-nav .btn i { font-size: 15px; }

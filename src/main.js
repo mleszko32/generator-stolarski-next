@@ -5,6 +5,7 @@ import { initLayout } from "./ui/layout.js";
 import { initPropertiesPanel } from "./ui/properties.js";
 import { updateSidebar } from "./ui/sidebar.js";
 import { init3DViewer, update3D, updateRoom } from "./render/viewer3d.js";
+import { openProductionHub, closeProductionHub } from "./ui/productionHub.js";
 import { escapeHtml } from "./utils/dom.js";
 import { state, ensureRoomDefaults, ensurePricingDefaults, ensureSidePanelsDefaults, getActiveModule } from "./core/state.js";
 import { openRoomSettingsModal } from "./ui/roomPanel.js";
@@ -18,11 +19,18 @@ import { undo, redo, onHistoryChange, resetHistory } from "./core/history.js";
 
 console.log("Generator Stolarski Next uruchomiony");
 
+const navIcon = (name, text) => `<i class="ti ti-${name}" aria-hidden="true"></i> ${text}`;
+
 ensureRoomDefaults(state.project);
 ensurePricingDefaults(state.project);
 ensureSidePanelsDefaults(state.project);
 migrateLegacyRoom(state.project);
 initLayout();
+document.querySelectorAll('.mode-tab').forEach(b => b.addEventListener('click', () => {
+  const mode = b.dataset.mode;
+  if (mode === 'projekt') closeProductionHub();
+  else openProductionHub(mode === 'wycena' ? 'kosztorys' : 'formatki');
+}));
 initPropertiesPanel();
 updateSidebar();
 init3DViewer();
@@ -101,7 +109,7 @@ async function runAutosave() {
   const result = await saveProjectSilently();
   if (!autosaveStatusEl || result !== 'saved') return;
   const t = new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
-  autosaveStatusEl.innerText = `💾 Autozapis ${t}`;
+  autosaveStatusEl.innerText = `Autozapis ${t}`;
 }
 
 function startAutosave() {
@@ -133,7 +141,7 @@ const cloudButtons = [btnSave, btnLoad].filter(Boolean);
 function reflectAuth(user) {
   const signedIn = !!user;
   if (authStatus) authStatus.innerText = signedIn ? `✓ ${user.email}` : 'niezalogowany';
-  if (btnAuth) btnAuth.innerText = signedIn ? '🚪 Wyloguj' : '🔑 Zaloguj (Google)';
+  if (btnAuth) btnAuth.innerHTML = signedIn ? navIcon('logout', 'Wyloguj') : navIcon('login', 'Zaloguj (Google)');
   cloudButtons.forEach(b => {
     b.disabled = !signedIn;
     b.style.opacity = signedIn ? '1' : '0.5';
@@ -155,18 +163,18 @@ onAuthChange(reflectAuth); // odpala się od razu ze stanem początkowym (null l
 
 if (btnSave) {
   btnSave.addEventListener('click', async () => {
-    btnSave.innerText = "⏳ Zapisywanie...";
+    btnSave.innerHTML = navIcon('loader-2', 'Zapisywanie...');
     await saveProjectToCloud(); 
-    btnSave.innerText = "☁️ Zapisz projekt";
+    btnSave.innerHTML = navIcon('device-floppy', 'Zapisz projekt');
   });
 }
 
 if (btnLoad) {
   btnLoad.addEventListener('click', async () => {
-    btnLoad.innerText = "⏳ Szukam...";
+    btnLoad.innerHTML = navIcon('loader-2', 'Szukam...');
     
     const projects = await getSavedProjectsList();
-    btnLoad.innerText = "📥 Wczytaj projekt";
+    btnLoad.innerHTML = navIcon('folder-open', 'Wczytaj projekt');
 
     if (projects.length === 0) {
       alert("Brak zapisanych projektów w chmurze.");
@@ -219,7 +227,7 @@ if (btnLoad) {
       // AKCJA: Wczytywanie projektu
       btn.onclick = async () => {
         modalOverlay.remove();
-        btnLoad.innerText = "⏳ Wczytywanie...";
+        btnLoad.innerHTML = navIcon('loader-2', 'Wczytywanie...');
         
         const success = await loadProjectFromCloud(projName);
         if (success) {
@@ -231,7 +239,7 @@ if (btnLoad) {
           updateSidebar();       
           update3D();            
         }
-        btnLoad.innerText = "📥 Wczytaj projekt";
+        btnLoad.innerHTML = navIcon('folder-open', 'Wczytaj projekt');
       };
 
       // NOWOŚĆ: Przycisk usuwania
