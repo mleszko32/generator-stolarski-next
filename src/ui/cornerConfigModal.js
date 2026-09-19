@@ -59,6 +59,7 @@ export function openCornerConfigModal(mod) {
       <h3 style="font-size:13px; color:#1e3a8a; margin:0 0 4px 0;">Fronty w rogu — zakładka</h3>
       <div class="property-group" style="max-width:420px;"><label>Rodzaj frontów narożnika:</label><select id="input-corner-front-mode"><option value="separate" ${mod.cornerFrontMode !== 'bifold' ? 'selected' : ''}>Dwa oddzielne fronty (każdy na własnych zawiasach)</option><option value="bifold" ${mod.cornerFrontMode === 'bifold' ? 'selected' : ''}>Front łamany (dwa skrzydła, zawias 60°)</option></select></div>
       <div id="corner-front-mode-hint" style="font-size:11px; color:#64748b; margin-bottom:6px;"></div>
+      <div id="corner-bifold-options" class="property-group" style="max-width:340px; display:${mod.cornerFrontMode === 'bifold' ? 'block' : 'none'};"><label>Luz w miejscu łamania (mm):</label><input type="number" step="0.5" id="input-corner-bifold-gap" value="${mod.cornerBifold?.breakGap ?? 2}" /></div>
       <div class="property-group" style="max-width:340px;"><label id="corner-front-primary-label">Który front zamyka się jako pierwszy (sięga do rogu):</label><select id="input-corner-front-primary"><option value="A" ${(!mod.cornerFrontOverlap || mod.cornerFrontOverlap.primaryArm !== 'B') ? 'selected' : ''}>Ramię A</option><option value="B" ${(mod.cornerFrontOverlap && mod.cornerFrontOverlap.primaryArm === 'B') ? 'selected' : ''}>Ramię B</option></select></div>
     </div>
 
@@ -281,7 +282,8 @@ export function openCornerConfigModal(mod) {
   const frontPrimaryLabelEl = modal.querySelector('#corner-front-primary-label');
   function renderFrontModeHint() {
     if (mod.cornerFrontMode === 'bifold') {
-      frontModeHintEl.textContent = `Front łamany: dwa skrzydła (po jednym na ramię) połączone zawiasem uzupełniającym CLIP top 60° (Blum 79T8500) - otwierają się razem. Skrzydło przy korpusie wisi na zawiasie 155°/170°, drugie tylko na zawiasie 60° (bez własnych zawiasów przy korpusie). Skrzydło przy korpusie sięga niemal do rogu (luz ${cornerFrontGap} mm), drugie jest skrócone o grubość płyty.`;
+      const cR = parseFloat((mod.front?.clearance ?? state.project.front?.clearance ?? {}).right ?? (mod.front?.clearance ?? state.project.front?.clearance ?? {}).sides ?? 1.5) || 1.5;
+      frontModeHintEl.textContent = `Front łamany: dwa skrzydła (po jednym na ramię) połączone zawiasem uzupełniającym CLIP top 60° (Blum 79T8500) - otwierają się razem. Skrzydło przy korpusie wisi na zawiasie 155°/170°, drugie tylko na zawiasie 60°. Wnęka = długość ramienia - głębokość drugiego ramienia - grubość płyty. Skrzydło przy korpusie = wnęka - ${cR} mm (luz od korpusu) - luz łamania; drugie skrzydło = wnęka - ${cR} mm - grubość frontu (chowa się za pierwszym).`;
       frontPrimaryLabelEl.textContent = 'Które skrzydło wisi na korpusie (sięga do rogu):';
     } else {
       frontModeHintEl.textContent = `Dwa oddzielne fronty nie mogą sięgać do samego naroża naraz (zderzyłyby się przy otwieraniu pod kątem 90°) - jeden zamyka się jako pierwszy i sięga niemal do rogu (luz ${cornerFrontGap} mm), drugi jako drugi i chowa się za nim (dodatkowo skrócony o grubość płyty).`;
@@ -292,8 +294,20 @@ export function openCornerConfigModal(mod) {
   frontModeEl.addEventListener('change', e => {
     mod.cornerFrontMode = e.target.value === 'bifold' ? 'bifold' : 'separate';
     renderFrontModeHint();
+    modal.querySelector('#corner-bifold-options').style.display = mod.cornerFrontMode === 'bifold' ? 'block' : 'none';
     update3D();
     updateSidebar();
+    armAEditor.render();
+    armBEditor.render();
+  });
+  modal.querySelector('#input-corner-bifold-gap').addEventListener('input', e => {
+    const v = parseFloat(e.target.value);
+    if (!Number.isFinite(v)) return;
+    mod.cornerBifold = { breakGap: v };
+    update3D();
+    updateSidebar();
+    armAEditor.render();
+    armBEditor.render();
   });
 
   const frontPrimaryEl = modal.querySelector('#input-corner-front-primary');

@@ -427,7 +427,26 @@ function applyCornerFrontOverlap(mod) {
 
     const rightEdge = getCornerArmRect(mod, arm).maxX + overRight;
     const isPrimary = arm === primaryArm;
-    const newX = isPrimary ? gap : gap + th;
+    let newX = isPrimary ? gap : gap + th;
+    let bifoldRight = null;
+    if (mod.cornerFrontMode === 'bifold') {
+      // Front łamany (wzory z katalogu/instrukcji montażu): wnęka = odległość od
+      // zewnętrznej krawędzi boku do wewnętrznego narożnika minus grubość boku
+      // (frontu) prostopadłego, czyli (długość ramienia - głębokość drugiego
+      // ramienia) - th. cRight = nasz luz od krawędzi korpusu (domyślnie 1.5 mm,
+      // we wzorze katalogowym 2 mm).
+      //   skrzydło przy korpusie: wnęka - cRight - luz łamania (domyślnie 2 mm)
+      //   drugie skrzydło:        wnęka - cRight - th (chowa się za pierwszym)
+      // Odległości liczone od zewnętrznej krawędzi (cut - cRight) do środka.
+      const { depthA, depthB } = getCornerDepths(mod);
+      const leg = arm === 'A' ? (parseFloat(mod.dimensions.width) || 860) : (parseFloat(mod.dimensions.legB) || 860);
+      const cut = leg - (arm === 'A' ? depthB : depthA);
+      const breakGap = parseFloat(mod.cornerBifold?.breakGap ?? 2);
+      const hollow = cut - th;
+      const width = isPrimary ? hollow - cRight - breakGap : hollow - cRight - th;
+      bifoldRight = cut - cRight;
+      newX = bifoldRight - Math.max(10, width);
+    }
     fronts.forEach(el => {
       el.x = newX;
       // Front bez ręcznego forceW - szerokość liczona automatycznie (sięga
@@ -436,7 +455,7 @@ function applyCornerFrontOverlap(mod) {
       // musi zostać fizycznym minimum (luz przy zakładce), więc ją zawsze
       // ustawiamy.
       const hasForceW = el.forceW !== undefined && el.forceW !== null && !isNaN(el.forceW);
-      if (!hasForceW) el.w = Math.max(10, rightEdge - newX);
+      if (!hasForceW) el.w = Math.max(10, (bifoldRight ?? rightEdge) - newX);
     });
   });
 }
