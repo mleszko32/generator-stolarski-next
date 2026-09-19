@@ -3,7 +3,7 @@ import "./styles/global.css";
 import { initLayout } from "./ui/layout.js"; 
 import { initPropertiesPanel } from "./ui/properties.js";
 import { updateSidebar } from "./ui/sidebar.js";
-import { init3DViewer, update3D } from "./render/viewer3d.js";
+import { init3DViewer, update3D, updateRoom } from "./render/viewer3d.js";
 import { escapeHtml } from "./utils/dom.js";
 import { state, ensureRoomDefaults, ensurePricingDefaults, ensureSidePanelsDefaults, getActiveModule } from "./core/state.js";
 import { openRoomSettingsModal } from "./ui/roomPanel.js";
@@ -35,6 +35,7 @@ const btnRedo = document.getElementById('btn-redo');
 // moduły, inne id) — tak jak po wczytaniu projektu z chmury odświeżamy
 // wszystkie trzy panele, a nie tylko ten, w którym coś kliknięto.
 function refreshAfterHistoryJump() {
+  updateRoom(); // migawka może mieć inne wymiary pokoju niż to, co jest zbudowane w 3D
   initPropertiesPanel();
   updateSidebar();
   update3D();
@@ -221,6 +222,10 @@ if (btnLoad) {
         
         const success = await loadProjectFromCloud(projName);
         if (success) {
+          // Ściany/podłoga pokoju nie przebudowują się w update3D() (patrz
+          // viewer3d.js: updateRoom) - bez tego po wczytaniu projektu 3D dalej
+          // pokazywał poprzedni pokój, mimo że state.project.room był już wczytany.
+          updateRoom();
           initPropertiesPanel(); 
           updateSidebar();       
           update3D();            
