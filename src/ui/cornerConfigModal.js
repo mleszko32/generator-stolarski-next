@@ -282,6 +282,14 @@ export function openCornerConfigModal(mod) {
   // Fronty w rogu - który front zamyka się jako pierwszy (core/layout.js:
   // applyCornerFrontOverlap, wołane automatycznie z recalculateLayout dla
   // każdego modułu narożnego).
+  // Zmiana trybu/luzów frontu łamanego ma przeliczyć szerokości ze wzoru -
+  // ręcznie wpisane szerokości (forceW, kwadraciki w rysunkach ramion, ikona ↺)
+  // trzymałyby stare liczby i wyglądało, jakby nic się nie zmieniło.
+  const clearManualFrontWidths = () => {
+    (mod.elements || []).forEach(el => {
+      if (el.typ === 'front' && el.cornerArm) delete el.forceW;
+    });
+  };
   const frontModeEl = modal.querySelector('#input-corner-front-mode');
   const frontModeHintEl = modal.querySelector('#corner-front-mode-hint');
   const frontPrimaryLabelEl = modal.querySelector('#corner-front-primary-label');
@@ -301,6 +309,7 @@ export function openCornerConfigModal(mod) {
   renderFrontModeHint();
   frontModeEl.addEventListener('change', e => {
     mod.cornerFrontMode = e.target.value === 'bifold' ? 'bifold' : 'separate';
+    clearManualFrontWidths();
     renderFrontModeHint();
     modal.querySelector('#corner-bifold-options').style.display = mod.cornerFrontMode === 'bifold' ? 'block' : 'none';
     update3D();
@@ -312,6 +321,7 @@ export function openCornerConfigModal(mod) {
     const v = parseFloat(e.target.value);
     if (!Number.isFinite(v)) return;
     mod.front = { ...(mod.front || {}), clearance: { ...(mod.front?.clearance || {}), right: v } };
+    clearManualFrontWidths();
     renderFrontModeHint();
     update3D();
     updateSidebar();
@@ -322,6 +332,7 @@ export function openCornerConfigModal(mod) {
     const v = parseFloat(e.target.value);
     if (!Number.isFinite(v)) return;
     mod.cornerBifold = { breakGap: v };
+    clearManualFrontWidths();
     update3D();
     updateSidebar();
     armAEditor.render();
