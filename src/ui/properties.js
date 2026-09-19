@@ -131,7 +131,7 @@ function renderSidePanelProperties(rightSidebar, panel) {
     </div>
 
     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
-    <button type="button" id="btn-side-delete" class="btn btn-danger btn-block btn-sm">🗑️ Usuń bok dokładany</button>
+    <button type="button" id="btn-side-delete" class="btn btn-danger btn-block btn-sm"><i class="ti ti-trash" aria-hidden="true"></i> Usuń bok dokładany</button>
   `;
 
   const bindText = (id, apply) => {
@@ -250,11 +250,11 @@ function renderCornerModuleProperties(rightSidebar, mod) {
       <input type="text" id="input-corner-name" value="${escapeHtml(mod.name)}" style="font-weight: bold; color: #1e293b;" />
     </div>
 
-    <div class="property-group" style="font-size: 12px; color: #475569; margin-bottom: 10px;">
+    <div style="font-size: 12px; color: #475569; margin: 12px 0 10px; line-height: 1.6;">
       Ramię A: <b>${legA}</b> mm · Ramię B: <b>${legB}</b> mm · Głębokość A/B: <b>${depthA}/${depthB}</b> mm · Wysokość: <b>${height}</b> mm
     </div>
-    <button type="button" id="btn-corner-configure" class="btn btn-block" style="background:#2563eb; color:#fff; margin-bottom: 8px;">⚙️ Konfiguruj szafkę narożną</button>
-    <button type="button" id="btn-corner-blank-print" class="btn btn-block btn-sm" style="margin-bottom: 15px;">📄 Wykrój narożny (jak wyciąć wieniec/półkę)</button>
+    <button type="button" id="btn-corner-configure" class="btn btn-block" style="background:#2563eb; color:#fff; margin-bottom: 8px;"><i class="ti ti-settings" aria-hidden="true"></i> Konfiguruj szafkę narożną</button>
+    <button type="button" id="btn-corner-blank-print" class="btn btn-block btn-sm" style="margin-bottom: 15px;"><i class="ti ti-file-text" aria-hidden="true"></i> Wykrój narożny (jak wyciąć wieniec/półkę)</button>
 
     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
 
@@ -275,7 +275,7 @@ function renderCornerModuleProperties(rightSidebar, mod) {
     <div style="font-size: 10px; color: #94a3b8; margin-top: 4px;">Ramię A biegnie wzdłuż lokalnej osi X, ramię B wzdłuż lokalnej osi Z (przed obrotem).</div>
 
     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
-    <button type="button" id="btn-corner-delete" class="btn btn-danger btn-block btn-sm">🗑️ Usuń szafkę narożną</button>
+    <button type="button" id="btn-corner-delete" class="btn btn-danger btn-block btn-sm"><i class="ti ti-trash" aria-hidden="true"></i> Usuń szafkę narożną</button>
   `;
 
   const bindText = (id, apply) => {
@@ -332,7 +332,7 @@ export function initPropertiesPanel() {
   if (!activeModule) {
     rightSidebar.innerHTML = `
       <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #94a3b8; text-align: center; padding: 20px;">
-        <span style="font-size: 40px; margin-bottom: 10px;">⚙️</span>
+        <span style="font-size: 40px; margin-bottom: 10px;"><i class="ti ti-settings" aria-hidden="true"></i></span>
         <h3 style="margin: 0; color: #64748b; text-transform: none; letter-spacing: normal; border-bottom: none; font-size: 15px;">Brak aktywnej szafki</h3>
       </div>
     `;
@@ -380,8 +380,8 @@ export function initPropertiesPanel() {
           if (front) {
               const bottomHinge = hinges[0];
               const topHinge = hinges[hinges.length - 1];
-              if (bottomHinge.isAdjusted) actualBottomText = `<div style="color: #c2410c; font-size: 10px; margin-top: 4px; padding: 4px 6px; background: #ffedd5; border-left: 3px solid #ea580c; border-radius: 2px;">⚠️ Zmieniono na: <b>${bottomHinge.relY} mm</b> (Kolizja)</div>`;
-              if (topHinge.isAdjusted) actualTopText = `<div style="color: #c2410c; font-size: 10px; margin-top: 4px; padding: 4px 6px; background: #ffedd5; border-left: 3px solid #ea580c; border-radius: 2px;">⚠️ Zmieniono na: <b>${Math.round(front.h - topHinge.relY)} mm</b> (Kolizja)</div>`;
+              if (bottomHinge.isAdjusted) actualBottomText = `<div style="color: #c2410c; font-size: 10px; margin-top: 4px; padding: 4px 6px; background: #ffedd5; border-left: 3px solid #ea580c; border-radius: 2px;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Zmieniono na: <b>${bottomHinge.relY} mm</b> (Kolizja)</div>`;
+              if (topHinge.isAdjusted) actualTopText = `<div style="color: #c2410c; font-size: 10px; margin-top: 4px; padding: 4px 6px; background: #ffedd5; border-left: 3px solid #ea580c; border-radius: 2px;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Zmieniono na: <b>${Math.round(front.h - topHinge.relY)} mm</b> (Kolizja)</div>`;
           }
       }
   } catch(e) {}
@@ -487,8 +487,8 @@ export function initPropertiesPanel() {
       ${(canCombineIntoGroup || activeModule.groupId) ? `
         <h3 style="color: #0284c7;">Grupowanie</h3>
         <div class="property-group" style="display: flex; flex-direction: column; gap: 6px;">
-          ${canCombineIntoGroup ? `<button type="button" id="btn-group-combine" class="btn btn-sm" style="background: #e0f2fe; color: #0284c7; border: 1px solid #7dd3fc; font-weight: bold; cursor: pointer; padding: 8px; border-radius: 4px;">🔗 Połącz zaznaczone w grupę</button>` : ''}
-          ${activeModule.groupId ? `<button type="button" id="btn-group-split" class="btn btn-sm" style="background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; font-weight: bold; cursor: pointer; padding: 8px; border-radius: 4px;">✂️ Rozbij grupę</button>` : ''}
+          ${canCombineIntoGroup ? `<button type="button" id="btn-group-combine" class="btn btn-sm" style="background: #e0f2fe; color: #0284c7; border: 1px solid #7dd3fc; font-weight: bold; cursor: pointer; padding: 8px; border-radius: 4px;"><i class="ti ti-link" aria-hidden="true"></i> Połącz zaznaczone w grupę</button>` : ''}
+          ${activeModule.groupId ? `<button type="button" id="btn-group-split" class="btn btn-sm" style="background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; font-weight: bold; cursor: pointer; padding: 8px; border-radius: 4px;"><i class="ti ti-scissors" aria-hidden="true"></i> Rozbij grupę</button>` : ''}
         </div>
       ` : ''}
     `)}
@@ -520,7 +520,7 @@ export function initPropertiesPanel() {
           const bz = front.baseZone || {};
           return `
           <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px; margin-bottom: 10px;">
-            <div style="font-weight: bold; font-size: 12px; color: #b45309; margin-bottom: 8px;">📦 ${escapeHtml(label)}</div>
+            <div style="font-weight: bold; font-size: 12px; color: #b45309; margin-bottom: 8px;"><i class="ti ti-box" aria-hidden="true"></i> ${escapeHtml(label)}</div>
             <div class="property-group" style="margin-bottom: 8px;">
               <label style="font-size: 11px;">Wymuszony wariant boku:</label>
               <select class="input-drawer-force-variant" data-front-id="${front.id}">
@@ -577,9 +577,9 @@ export function initPropertiesPanel() {
                 </div>
               </div>
             ` : `
-              <button type="button" class="btn-add-inner-drawer" data-front-id="${front.id}" style="width: 100%; padding: 6px; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; margin-top: 4px;">➕ Dodaj szufladę wewnętrzną nad tą</button>
+              <button type="button" class="btn-add-inner-drawer" data-front-id="${front.id}" style="width: 100%; padding: 6px; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; margin-top: 4px;"><i class="ti ti-plus" aria-hidden="true"></i> Dodaj szufladę wewnętrzną nad tą</button>
             `}
-            <button type="button" class="btn-delete-front" data-front-id="${front.id}" style="width: 100%; padding: 6px; background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; margin-top: 6px;">🗑️ Usuń tę szufladę</button>
+            <button type="button" class="btn-delete-front" data-front-id="${front.id}" style="width: 100%; padding: 6px; background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; margin-top: 6px;"><i class="ti ti-trash" aria-hidden="true"></i> Usuń tę szufladę</button>
           </div>
         `;
       }).join('')}
@@ -724,7 +724,7 @@ export function initPropertiesPanel() {
       ` : doorHingeGroups.map(group => `
         <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 6px; padding: 10px; margin-bottom: 10px;">
           <div style="font-weight: bold; font-size: 12px; color: #6d28d9; margin-bottom: 8px;">
-            🚪 ${escapeHtml(group.label)}
+            <i class="ti ti-door" aria-hidden="true"></i> ${escapeHtml(group.label)}
             <span style="font-weight: normal; color: #94a3b8;">(wys. ${Math.round(group.front.h)}mm, start ${Math.round(group.front.y)}mm od dołu szafki)</span>
           </div>
           ${group.hinges.map((h, i) => {
@@ -736,7 +736,7 @@ export function initPropertiesPanel() {
                 <span style="font-size: 10px; color: #94a3b8; flex-shrink: 0;">mm</span>
                 ${overridden
                     ? `<button type="button" class="btn-hinge-reset" data-front-id="${group.front.id}" data-hinge-index="${i}" title="Wróć do automatycznej pozycji" style="border: none; background: #ede9fe; color: #6d28d9; border-radius: 4px; width: 24px; height: 24px; cursor: pointer; font-weight: bold; flex-shrink: 0;">↺</button>`
-                    : (h.isAdjusted ? `<span title="Automatycznie odsunięty, żeby ominąć półkę/przeszkodę" style="flex-shrink: 0;">⚠️</span>` : '<span style="width: 24px; flex-shrink: 0;"></span>')
+                    : (h.isAdjusted ? `<span title="Automatycznie odsunięty, żeby ominąć półkę/przeszkodę" style="flex-shrink: 0;"><i class="ti ti-alert-triangle" aria-hidden="true"></i></span>` : '<span style="width: 24px; flex-shrink: 0;"></span>')
                 }
               </div>
             `;

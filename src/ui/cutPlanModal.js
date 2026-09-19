@@ -127,7 +127,7 @@ function unplacedHtml(plan) {
   const list = plan.groups.flatMap(g => g.result.unplaced);
   if (list.length === 0) return '';
   return `<div style="background:#fee2e2; border:1px solid #fca5a5; color:#991b1b; padding:8px 10px; border-radius:6px; font-size:12px; margin-top:8px;">
-    ⚠️ ${list.length} formatek nie mieści się na arkuszu ${plan.settings.sheetW}×${plan.settings.sheetH} mm (z obrzeżem): ${list.slice(0, 8).map(p => `${escapeHtml(p.id)} (${Math.round(p.length)}×${Math.round(p.width)})`).join(', ')}${list.length > 8 ? '…' : ''}
+    <i class="ti ti-alert-triangle" aria-hidden="true"></i> ${list.length} formatek nie mieści się na arkuszu ${plan.settings.sheetW}×${plan.settings.sheetH} mm (z obrzeżem): ${list.slice(0, 8).map(p => `${escapeHtml(p.id)} (${Math.round(p.length)}×${Math.round(p.width)})`).join(', ')}${list.length > 8 ? '…' : ''}
   </div>`;
 }
 
@@ -226,7 +226,7 @@ export function openCutPlanModal() {
 export function mountCutPlan(modal, onClose = null) {
   const s = getSettings();
   modal.innerHTML = `
-    <h2 style="margin:0 0 4px; color:#1e293b; font-size:16px;">🪚 Rozkrój i etykiety</h2>
+    <h2 style="margin:0 0 4px; color:#1e293b; font-size:16px;"><i class="ti ti-cut" aria-hidden="true"></i> Rozkrój i etykiety</h2>
     <div style="font-size:11px; color:#64748b; margin-bottom:12px;">Układ formatek na arkuszach (cięcia na wylot, do wykonania na pilarce), zużycie okleiny (wszystkie formatki dookoła, poza plecami HDF) i etykiety z kodem QR.</div>
     <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:10px;">
       <div class="property-group" style="flex:1; min-width:120px;"><label>Arkusz - długość (mm):</label><input type="number" id="cp-sheetW" value="${s.sheetW}" /></div>
@@ -237,8 +237,8 @@ export function mountCutPlan(modal, onClose = null) {
     </div>
     <div id="cp-results"></div>
     <div style="display:flex; gap:8px; margin-top:14px; justify-content:flex-end; flex-wrap:wrap;">
-      <button type="button" id="cp-print-plan" class="btn btn-sm">🖨️ Drukuj rozkrój</button>
-      <button type="button" id="cp-print-labels" class="btn btn-sm">🏷️ Drukuj etykiety</button>
+      <button type="button" id="cp-print-plan" class="btn btn-sm"><i class="ti ti-printer" aria-hidden="true"></i> Drukuj rozkrój</button>
+      <button type="button" id="cp-print-labels" class="btn btn-sm"><i class="ti ti-tag" aria-hidden="true"></i> Drukuj etykiety</button>
       ${onClose ? '<button type="button" id="cp-close" class="btn btn-primary btn-sm">Zamknij</button>' : ''}
     </div>
   `;

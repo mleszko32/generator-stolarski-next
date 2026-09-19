@@ -216,7 +216,7 @@ if (btnLoad) {
       row.style.gap = '6px';
 
       const btn = document.createElement('button');
-      btn.innerHTML = `📁 <b>${escapeHtml(projName)}</b>`;
+      btn.innerHTML = `<i class="ti ti-folder" aria-hidden="true"></i> <b>${escapeHtml(projName)}</b>`;
       Object.assign(btn.style, {
         flexGrow: '1', padding: '12px', backgroundColor: '#f8fafc', border: '1px solid #cbd5e1',
         borderRadius: '6px', cursor: 'pointer', textAlign: 'left', color: '#334155', fontSize: '14px'
@@ -244,7 +244,7 @@ if (btnLoad) {
 
       // NOWOŚĆ: Przycisk usuwania
       const delBtn = document.createElement('button');
-      delBtn.innerHTML = '🗑️';
+      delBtn.innerHTML = '<i class="ti ti-trash" aria-hidden="true"></i>';
       delBtn.title = 'Usuń projekt bezpowrotnie';
       Object.assign(delBtn.style, {
         padding: '12px', backgroundColor: '#fee2e2', border: '1px solid #fca5a5',

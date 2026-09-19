@@ -25,7 +25,7 @@ export function openRoomSettingsModal() {
   });
 
   modal.innerHTML = `
-    <h2 style="margin:0 0 4px 0; color:#1e293b; font-size:16px;">🏠 Wymiary pomieszczenia</h2>
+    <h2 style="margin:0 0 4px 0; color:#1e293b; font-size:16px;"><i class="ti ti-home" aria-hidden="true"></i> Wymiary pomieszczenia</h2>
     <div style="font-size:11px; color:#64748b; margin-bottom:16px;">Prostokątny pokój — narożnik tylno-lewy to punkt (0,0).</div>
     <div class="property-group" style="margin-bottom:12px;">
       <label>Szerokość (mm):</label>

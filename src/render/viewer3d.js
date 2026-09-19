@@ -725,36 +725,36 @@ export function init3DViewer() {
   uiOverlay.style.gap = '10px';
   
   const toggleBtn = document.createElement('button');
-  toggleBtn.innerText = '🔄 Przezroczysty (Szkic)';
+  toggleBtn.innerHTML = '<i class="ti ti-refresh" aria-hidden="true"></i> Przezroczysty (Szkic)';
   toggleBtn.className = 'btn view-btn active';
   
   toggleBtn.onclick = () => {
       isXrayMode = !isXrayMode;
-      toggleBtn.innerText = isXrayMode ? '🔄 Przezroczysty (Szkic)' : '🔄 Realistyczny (Bryły)';
+      toggleBtn.innerHTML = isXrayMode ? '<i class="ti ti-refresh" aria-hidden="true"></i> Przezroczysty (Szkic)' : '<i class="ti ti-refresh" aria-hidden="true"></i> Realistyczny (Bryły)';
       toggleBtn.classList.toggle('active', isXrayMode);
       update3D();
   };
   
   const toggleFrontsBtn = document.createElement('button');
-  toggleFrontsBtn.innerText = '🚪 Ukryj fronty zewn.';
+  toggleFrontsBtn.innerHTML = '<i class="ti ti-door" aria-hidden="true"></i> Ukryj fronty zewn.';
   toggleFrontsBtn.className = 'btn view-btn';
   
   toggleFrontsBtn.onclick = () => {
       isFrontsVisible = !isFrontsVisible;
-      toggleFrontsBtn.innerText = isFrontsVisible ? '🚪 Ukryj fronty zewn.' : '🚪 Pokaż fronty zewn.';
+      toggleFrontsBtn.innerHTML = isFrontsVisible ? '<i class="ti ti-door" aria-hidden="true"></i> Ukryj fronty zewn.' : '<i class="ti ti-door" aria-hidden="true"></i> Pokaż fronty zewn.';
       toggleFrontsBtn.classList.toggle('active', !isFrontsVisible);
       update3D();
       renderInteriorEditorIfVisible();
   };
 
   const toggleInteriorBtn = document.createElement('button');
-  toggleInteriorBtn.innerText = '🗂️ Wnętrze 2D';
+  toggleInteriorBtn.innerHTML = '<i class="ti ti-layout-list" aria-hidden="true"></i> Wnętrze 2D';
   toggleInteriorBtn.title = 'Klikalny edytor wnęk — dziel/obsadzaj fronty bez trafiania w 3D';
   toggleInteriorBtn.className = 'btn view-btn';
   toggleInteriorBtn.onclick = () => {
       toggleInteriorEditor();
       const showingInterior = document.getElementById('editor-interior-container')?.style.display !== 'none';
-      toggleInteriorBtn.innerText = showingInterior ? '🧊 Podgląd 3D' : '🗂️ Wnętrze 2D';
+      toggleInteriorBtn.innerHTML = showingInterior ? '<i class="ti ti-cube" aria-hidden="true"></i> Podgląd 3D' : '<i class="ti ti-layout-list" aria-hidden="true"></i> Wnętrze 2D';
       toggleInteriorBtn.classList.toggle('active', showingInterior);
       if (!showingInterior && container) {
           // #editor-3d-container był ukryty (display:none) — jego clientWidth/Height mogły
@@ -767,7 +767,7 @@ export function init3DViewer() {
   };
 
   const toggleMeasureBtn = document.createElement('button');
-  toggleMeasureBtn.innerText = '📏 Miarka';
+  toggleMeasureBtn.innerHTML = '<i class="ti ti-ruler-measure" aria-hidden="true"></i> Miarka';
   toggleMeasureBtn.title = 'Kliknij dwa punkty na scenie, żeby zmierzyć odległość między nimi';
   toggleMeasureBtn.className = 'btn view-btn';
   toggleMeasureBtn.onclick = () => toggleMeasureMode();
@@ -820,9 +820,9 @@ function enterMeasureMode() {
   clearMeasureVisuals();
   ensureHoverMarker();
   ensureMeasureBanner();
-  setMeasureBannerText('📏 Kliknij pierwszy punkt do zmierzenia...');
+  setMeasureBannerText('Kliknij pierwszy punkt do zmierzenia...');
   if (measureMode.btn) {
-      measureMode.btn.innerText = '📏 Wyłącz miarkę';
+      measureMode.btn.innerHTML = '<i class="ti ti-ruler-measure" aria-hidden="true"></i> Wyłącz miarkę';
       measureMode.btn.classList.add('active');
   }
 }
@@ -835,7 +835,7 @@ function exitMeasureMode() {
   if (measureHoverMarker) measureHoverMarker.visible = false;
   if (measureMode.banner) { measureMode.banner.remove(); measureMode.banner = null; }
   if (measureMode.btn) {
-      measureMode.btn.innerText = '📏 Miarka';
+      measureMode.btn.innerHTML = '<i class="ti ti-ruler-measure" aria-hidden="true"></i> Miarka';
       measureMode.btn.classList.remove('active');
   }
 }
@@ -986,12 +986,12 @@ function handleMeasureClick() {
       clearMeasureVisuals();
       measureMode.pointA = point;
       addMeasurePoint(point);
-      setMeasureBannerText('📏 Kliknij drugi punkt...');
+      setMeasureBannerText('Kliknij drugi punkt...');
   } else {
       addMeasurePoint(point);
       addMeasureLine(measureMode.pointA, point);
       const distMm = Math.round(measureMode.pointA.distanceTo(point));
-      setMeasureBannerText(`📏 Odległość: ${distMm} mm — kliknij, żeby zmierzyć od nowa`);
+      setMeasureBannerText(`Odległość: ${distMm} mm — kliknij, żeby zmierzyć od nowa`);
       measureMode.pointA = null;
   }
 }
@@ -1010,7 +1010,7 @@ export function enterAlignMode(mod, el) {
   });
   
   banner.innerHTML = `
-      <span>🧲 Kliknij na scenie wieniec lub półkę innej szafki, do której chcesz wyrównać...</span>
+      <span><i class="ti ti-magnet" aria-hidden="true"></i> Kliknij na scenie wieniec lub półkę innej szafki, do której chcesz wyrównać...</span>
       <button style="background:white; color:#0ea5e9; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold;">Anuluj</button>
   `;
 

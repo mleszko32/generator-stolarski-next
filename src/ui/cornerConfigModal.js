@@ -44,7 +44,7 @@ export function openCornerConfigModal(mod) {
   });
 
   modal.innerHTML = `
-    <h2 style="margin:0 0 4px 0; color:#1e293b; font-size:16px;">📐 Konfigurator szafki narożnej: <span style="color:#2563eb;">${escapeHtml(mod.name)}</span></h2>
+    <h2 style="margin:0 0 4px 0; color:#1e293b; font-size:16px;"><i class="ti ti-ruler-2" aria-hidden="true"></i> Konfigurator szafki narożnej: <span style="color:#2563eb;">${escapeHtml(mod.name)}</span></h2>
     <div style="font-size:11px; color:#64748b; margin-bottom:14px;">Kąt prosty 90°, dwa ramiona. Kliknij wnękę w ramieniu, żeby ją podzielić albo obsadzić frontem - tak samo jak w edytorze wnętrza zwykłej szafki.</div>
 
     <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:12px; margin-bottom:14px;">
@@ -180,7 +180,7 @@ export function openCornerConfigModal(mod) {
         <span style="font-size:11px; color:#475569; min-width:70px;">Wysokość od dołu:</span>
         <input type="number" step="1" value="${Math.round(parseFloat(shelf.y) || 0)}" style="width:90px;" />
         <span style="font-size:11px; color:#94a3b8;">mm</span>
-        <button type="button" class="btn btn-danger btn-sm" style="padding:2px 8px;">🗑️</button>
+        <button type="button" class="btn btn-danger btn-sm" style="padding:2px 8px;"><i class="ti ti-trash" aria-hidden="true"></i></button>
       `;
       const input = row.querySelector('input');
       const delBtn = row.querySelector('button');

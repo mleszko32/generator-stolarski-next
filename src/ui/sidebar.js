@@ -22,7 +22,7 @@ function showLoading(msg) {
         });
         document.body.appendChild(l);
     }
-    l.innerHTML = `<div>🪄 ${msg}</div><div style="font-size:14px; margin-top:15px; color:#94a3b8;">Sztuczna Inteligencja rozrysowuje wnęki i półki. Cierpliwości...</div>`;
+    l.innerHTML = `<div><i class="ti ti-wand" aria-hidden="true"></i> ${msg}</div><div style="font-size:14px; margin-top:15px; color:#94a3b8;">Sztuczna Inteligencja rozrysowuje wnęki i półki. Cierpliwości...</div>`;
     l.style.display = 'flex';
 }
 
@@ -99,7 +99,7 @@ function openCsvEditorModal(partsList) {
             <td style="padding: 6px;"><input type="number" value="${p.width}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
             <td style="padding: 6px;"><input type="number" value="${p.qty}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
             <td style="padding: 6px;"><input type="text" value="${escapeHtml(p.modules.join(' + '))}" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px; font-size:11px; color:#64748b;"></td>
-            <td style="padding: 6px; text-align:center;"><button class="btn-del-row" style="background:#ef4444; color:white; border:none; border-radius:3px; cursor:pointer; padding:4px 8px;">❌</button></td>
+            <td style="padding: 6px; text-align:center;"><button class="btn-del-row" style="background:#ef4444; color:white; border:none; border-radius:3px; cursor:pointer; padding:4px 8px;"><i class="ti ti-x" aria-hidden="true"></i></button></td>
           </tr>
         `;
     });
@@ -111,10 +111,10 @@ function openCsvEditorModal(partsList) {
     Object.assign(footer.style, { display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' });
     
     footer.innerHTML = `
-        <button id="csv-btn-add" style="background:#3b82f6; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">➕ Dodaj pusty wiersz</button>
+        <button id="csv-btn-add" style="background:#3b82f6; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold;"><i class="ti ti-plus" aria-hidden="true"></i> Dodaj pusty wiersz</button>
         <div style="display: flex; gap: 10px; align-items: center;">
             <button id="csv-btn-cancel" style="background:#94a3b8; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">Anuluj</button>
-            <button id="csv-btn-save" style="background:#10b981; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold; box-shadow:0 2px 4px rgba(0,0,0,0.1);">💾 Pobierz plik CSV</button>
+            <button id="csv-btn-save" style="background:#10b981; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; font-weight:bold; box-shadow:0 2px 4px rgba(0,0,0,0.1);"><i class="ti ti-device-floppy" aria-hidden="true"></i> Pobierz plik CSV</button>
         </div>
     `;
 
@@ -185,7 +185,7 @@ function openCsvEditorModal(partsList) {
             <td style="padding: 6px;"><input type="number" value="0" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
             <td style="padding: 6px;"><input type="number" value="1" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px;"></td>
             <td style="padding: 6px;"><input type="text" value="Ręcznie dodane" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:3px; font-size:11px; color:#64748b;"></td>
-            <td style="padding: 6px; text-align:center;"><button class="btn-del-row" style="background:#ef4444; color:white; border:none; border-radius:3px; cursor:pointer; padding:4px 8px;">❌</button></td>
+            <td style="padding: 6px; text-align:center;"><button class="btn-del-row" style="background:#ef4444; color:white; border:none; border-radius:3px; cursor:pointer; padding:4px 8px;"><i class="ti ti-x" aria-hidden="true"></i></button></td>
         `;
         tbody.appendChild(tr);
         attachRowEvents();
@@ -280,7 +280,7 @@ function openKosztorysModal() {
     modal.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:flex-start; padding:20px 22px 16px 22px; border-bottom:1px solid #e2e8f0;">
             <div>
-                <h2 style="margin:0 0 2px 0; font-size:18px; color:#1e293b;">💰 Kosztorys projektu</h2>
+                <h2 style="margin:0 0 2px 0; font-size:18px; color:#1e293b;"><i class="ti ti-calculator" aria-hidden="true"></i> Kosztorys projektu</h2>
                 <p style="margin:0; color:#64748b; font-size:12.5px;">${escapeHtml(state.project.name)} · ceny edytowalne, liczone na żywo</p>
             </div>
             <button id="kosztorys-close" style="border:none; background:#f8fafc; color:#64748b; width:28px; height:28px; border-radius:6px; font-size:14px; cursor:pointer; flex-shrink:0;">✕</button>
@@ -793,7 +793,7 @@ export function updateSidebar() {
   html += `
       <div style="margin-bottom: 15px;">
           <button id="btn-import-ai" class="btn btn-block">
-              🪄 Zbuduj projekt ze zdjęcia (AI)
+              <i class="ti ti-wand" aria-hidden="true"></i> Zbuduj projekt ze zdjęcia (AI)
           </button>
           <input type="file" id="input-ai-image" accept="image/png, image/jpeg" style="display: none;" />
       </div>
@@ -809,7 +809,7 @@ export function updateSidebar() {
     
     html += `
       <div id="btn-show-all" style="padding: 10px; margin-bottom: 15px; background-color: ${bgAll}; color: ${colorAll}; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; border: 1px solid ${borderAll}; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.2s;">
-        👁️ Odznacz wszystko
+        <i class="ti ti-eye-off" aria-hidden="true"></i> Odznacz wszystko
       </div>
     `;
 
@@ -825,10 +825,10 @@ export function updateSidebar() {
       const color = isActive ? '#ffffff' : '#1e293b';
       const border = isActive ? '#2563eb' : (isSelected ? '#93c5fd' : '#cbd5e1');
 
-      let icon = '🗄️';
-      if (m.type === 'upper_cabinet') icon = '☁️';
-      if (m.type === 'tall_cabinet') icon = '🚪';
-      if (m.type === 'corner_cabinet') icon = '📐';
+      let icon = '<i class="ti ti-layout-bottombar" aria-hidden="true"></i>';
+      if (m.type === 'upper_cabinet') icon = '<i class="ti ti-cloud" aria-hidden="true"></i>';
+      if (m.type === 'tall_cabinet') icon = '<i class="ti ti-layout-sidebar" aria-hidden="true"></i>';
+      if (m.type === 'corner_cabinet') icon = '<i class="ti ti-corner-up-right" aria-hidden="true"></i>';
 
       const groupIcon = m.groupId ? `<span title="Zgrupowana z innymi szafkami" style="color: ${isActive ? '#bae6fd' : '#ef4444'}; font-size:12px; margin-left:6px;">🔗</span>` : '';
 
@@ -838,8 +838,8 @@ export function updateSidebar() {
             ${icon} ${escapeHtml(m.name)} ${groupIcon} <span style="font-weight: normal; font-size: 11px; opacity: 0.8; margin-left: 2px;">(${m.dimensions.width}x${m.dimensions.height})</span>
           </div>
           <div style="display: flex; gap: 4px;">
-            <button class="btn-mod-action btn-mod-dup" data-id="${m.id}" title="Kopiuj szafkę" style="background: none; border: none; cursor: pointer; padding: 2px 4px; font-size: 14px; opacity: ${isActive ? 1 : 0.6}; transition: opacity 0.2s;">📋</button>
-            <button class="btn-mod-action btn-mod-del" data-id="${m.id}" title="Usuń szafkę" style="background: none; border: none; cursor: pointer; padding: 2px 4px; font-size: 14px; opacity: ${isActive ? 1 : 0.6}; transition: opacity 0.2s;">🗑️</button>
+            <button class="btn-mod-action btn-mod-dup" data-id="${m.id}" title="Kopiuj szafkę" style="background: none; border: none; cursor: pointer; padding: 2px 4px; font-size: 14px; opacity: ${isActive ? 1 : 0.6}; transition: opacity 0.2s;"><i class="ti ti-copy" aria-hidden="true"></i></button>
+            <button class="btn-mod-action btn-mod-del" data-id="${m.id}" title="Usuń szafkę" style="background: none; border: none; cursor: pointer; padding: 2px 4px; font-size: 14px; opacity: ${isActive ? 1 : 0.6}; transition: opacity 0.2s;"><i class="ti ti-trash" aria-hidden="true"></i></button>
           </div>
         </div>
       `;
@@ -848,12 +848,12 @@ export function updateSidebar() {
 
   html += `
       <div style="display: flex; gap: 4px; margin-top: 8px;">
-        <button id="btn-add-base" class="btn btn-sm" style="flex: 1;" title="Szafka dolna">➕ Dolna</button>
-        <button id="btn-add-upper" class="btn btn-sm" style="flex: 1;" title="Szafka wisząca">➕ Wisząca</button>
-        <button id="btn-add-tall" class="btn btn-sm" style="flex: 1;" title="Słupek">➕ Słupek</button>
+        <button id="btn-add-base" class="btn btn-sm" style="flex: 1;" title="Szafka dolna"><i class="ti ti-plus" aria-hidden="true"></i> Dolna</button>
+        <button id="btn-add-upper" class="btn btn-sm" style="flex: 1;" title="Szafka wisząca"><i class="ti ti-plus" aria-hidden="true"></i> Wisząca</button>
+        <button id="btn-add-tall" class="btn btn-sm" style="flex: 1;" title="Słupek"><i class="ti ti-plus" aria-hidden="true"></i> Słupek</button>
       </div>
-      <button id="btn-add-corner" class="btn btn-neutral btn-block btn-sm" style="margin-top: 6px;" title="Szafka narożna z frontem łamanym (front prosty + skośny)">➕ Narożna</button>
-      <button id="btn-add-side-panel" class="btn btn-teal btn-block btn-sm" style="margin-top: 6px;" title="Dekoracyjny panel niezależny od modułów, np. na cały słup szafek">➕ Bok dokładany</button>
+      <button id="btn-add-corner" class="btn btn-neutral btn-block btn-sm" style="margin-top: 6px;" title="Szafka narożna z frontem łamanym (front prosty + skośny)"><i class="ti ti-plus" aria-hidden="true"></i> Narożna</button>
+      <button id="btn-add-side-panel" class="btn btn-teal btn-block btn-sm" style="margin-top: 6px;" title="Dekoracyjny panel niezależny od modułów, np. na cały słup szafek"><i class="ti ti-plus" aria-hidden="true"></i> Bok dokładany</button>
     </div>
     <hr style="margin: 15px 0; border: 0; border-top: 1px dashed #cbd5e1;">
   `;
@@ -862,7 +862,7 @@ export function updateSidebar() {
   // projektu (nie właściwość modułu jak blenda), więc osobna lista niezależna
   // od "Lista Szafek" wyżej.
   if (state.project.sidePanels.length > 0) {
-    html += `<details open style="margin-bottom: 15px;"><summary style="font-weight: bold; cursor: pointer; outline: none; color: #0f766e;">🧱 Boki dokładane</summary><div style="margin-top: 8px;">`;
+    html += `<details open style="margin-bottom: 15px;"><summary style="font-weight: bold; cursor: pointer; outline: none; color: #0f766e;"><i class="ti ti-layout-board" aria-hidden="true"></i> Boki dokładane</summary><div style="margin-top: 8px;">`;
     state.project.sidePanels.forEach(p => {
       const isActive = p.id === state.activeSidePanelId;
       const bg = isActive ? '#0f766e' : '#f0fdfa';
@@ -871,9 +871,9 @@ export function updateSidebar() {
       html += `
         <div class="side-panel-item" data-id="${p.id}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; margin-bottom: 6px; background-color: ${bg}; color: ${color}; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; border: 1px solid ${border}; transition: all 0.2s; user-select: none;">
           <div style="flex-grow: 1; pointer-events: none;">
-            🧱 ${escapeHtml(p.name || 'Bok dokładany')} <span style="font-weight: normal; font-size: 11px; opacity: 0.8; margin-left: 2px;">(${p.dimensions.height}×${p.dimensions.depth})</span>
+            <i class="ti ti-layout-board" aria-hidden="true"></i> ${escapeHtml(p.name || 'Bok dokładany')} <span style="font-weight: normal; font-size: 11px; opacity: 0.8; margin-left: 2px;">(${p.dimensions.height}×${p.dimensions.depth})</span>
           </div>
-          <button class="btn-side-panel-del" data-id="${p.id}" title="Usuń bok dokładany" style="background: none; border: none; cursor: pointer; padding: 2px 4px; font-size: 14px; opacity: ${isActive ? 1 : 0.6}; transition: opacity 0.2s;">🗑️</button>
+          <button class="btn-side-panel-del" data-id="${p.id}" title="Usuń bok dokładany" style="background: none; border: none; cursor: pointer; padding: 2px 4px; font-size: 14px; opacity: ${isActive ? 1 : 0.6}; transition: opacity 0.2s;"><i class="ti ti-trash" aria-hidden="true"></i></button>
         </div>
       `;
     });
@@ -957,7 +957,7 @@ export function updateSidebar() {
 
   if (state.project.modules.length > 0) {
     html += `<details style="background: #fffbeb; padding: 10px; border-radius: 6px; border: 1px solid #fcd34d;">`;
-    html += `<summary style="font-weight: bold; cursor: pointer; outline: none; color: #92400e;">🛒 Lista zakupów (Okucia)</summary>`;
+    html += `<summary style="font-weight: bold; cursor: pointer; outline: none; color: #92400e;"><i class="ti ti-shopping-cart" aria-hidden="true"></i> Lista zakupów (Okucia)</summary>`;
     html += `<ul class="parts-list" style="margin-top: 10px; padding-left: 20px;">`;
     
     if (projectHardware.length === 0) {
