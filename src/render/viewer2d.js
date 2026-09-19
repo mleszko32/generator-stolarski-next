@@ -1,7 +1,7 @@
 // src/render/viewer2d.js
 import { state } from '../core/state.js';
 import { escapeHtml } from '../utils/dom.js';
-import { getCornerPartsGeometry, getCornerWieniecHoles, getCornerShelfHoles } from '../engine/cabinet.js';
+import { getCornerPartsGeometry, getCornerWieniecHoles, getCornerShelfHoles, getCornerDoorHinges } from '../engine/cabinet.js';
 
 const formatVal = (val) => Number(Number(val).toFixed(1));
 
@@ -934,6 +934,15 @@ export function generateCornerSidesHolesSVG(sides) {
       svg += `<circle cx="${ox + j.x}" cy="${yOf(j.y)}" r="${j.type === 'dowel' ? 4 : 1.5}" fill="${PURPLE}" />`;
     });
 
+    // Otwory pod płytki zawiasów (zielone, jak w rysunku boku zwykłej szafki):
+    // dwa co 32 mm wokół wysokości zawiasu, opis wysokości obok.
+    (s.hingePlates || []).forEach(hp => {
+      [-16, 16].forEach(dy => {
+        svg += `<circle cx="${ox + hp.x}" cy="${yOf(hp.y + dy)}" r="2.5" fill="#16a34a" />`;
+      });
+      svg += `<text x="${ox + hp.x + 12}" y="${yOf(hp.y) + 4}" font-family="sans-serif">${getDimText(hp.y - bottom, s.height, '#16a34a')}</text>`;
+    });
+
     const rightX = ox + s.depth;
     const maxX = Math.max(...(s.holes.length ? s.holes.map(h => h.x) : [0]));
     s.holes.forEach(h => {
@@ -1040,6 +1049,39 @@ export function generateCornerPartSVG({ blankA, blankB, depthA, depthB, notch = 
 // Komplet rysunków formatek szafki narożnej pod rzutem z góry: wieniec (z
 // otworami łączeń), półka (z wycięciem na listwę, tylko gdy są półki) oraz
 // boki i listwa (łączenia + podpórki półek). Zwraca HTML z nagłówkami.
+// Rysunek frontu narożnika z otworami pod puszki zawiasów (fi 35, 22,5 mm od
+// krawędzi zawiasów) - układ jak w rysunku frontów zwykłej szafki.
+// door = element z getCornerDoorHinges: { front, arm, side, atBok, bifoldSecondary, hinges }.
+export function generateCornerFrontSVG(door, doorName) {
+  const f = door.front;
+  const w = parseFloat(f.w) || 0, h = parseFloat(f.h) || 0;
+  const M = 150;
+  const ox = M, oy = M;
+  const GREEN = '#16a34a', NAVY = '#1e3a8a';
+  const isLeft = door.side === 'left';
+  const sub = door.bifoldSecondary
+    ? 'skrzydło łączone zawiasem 60° (Blum 79T8500), bez zawiasów przy korpusie'
+    : `zawiasy ${isLeft ? 'od strony narożnika' : 'od strony boku korpusu'}`;
+  let svg = `<svg viewBox="0 0 ${w + M * 2} ${h + M * 2}" xmlns="http://www.w3.org/2000/svg" style="background:#f8fafc" font-family="'Segoe UI', sans-serif">`;
+  svg += `<text x="${ox + w / 2}" y="34" font-size="20" font-weight="bold" fill="${NAVY}" text-anchor="middle">${escapeHtml(doorName)} (WIDOK OD PRZODU)</text>`;
+  svg += `<text x="${ox + w / 2}" y="56" font-size="14" fill="#64748b" text-anchor="middle">${Math.round(w)} × ${Math.round(h)} mm · ${escapeHtml(sub)}</text>`;
+  svg += `<rect x="${ox}" y="${oy}" width="${w}" height="${h}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+  svg += `<rect x="${isLeft ? ox : ox + w - 6}" y="${oy}" width="6" height="${h}" fill="#dc2626" opacity="0.7" />`;
+  svg += `<text x="${ox + w / 2}" y="${oy + h / 2}" font-size="36" font-weight="bold" fill="#0f172a" text-anchor="middle">${escapeHtml(doorName.split(' — ')[0].toUpperCase())}</text>`;
+  door.hinges.forEach(hg => {
+    const cx = isLeft ? ox + hg.cupXOffset : ox + w - hg.cupXOffset;
+    const cy = oy + h - hg.relY;
+    const c = hg.isAdjusted ? '#ea580c' : GREEN;
+    svg += `<circle cx="${cx}" cy="${cy}" r="17.5" fill="#fcfdfd" stroke="${c}" stroke-width="1.5" />`;
+    svg += `<circle cx="${cx}" cy="${cy}" r="2.5" fill="${c}" />`;
+    const tx = isLeft ? cx + 26 : cx - 26;
+    svg += `<text x="${tx}" y="${cy + 4}" text-anchor="${isLeft ? 'start' : 'end'}" font-family="sans-serif">${getDimText(hg.relY, h, c)}</text>`;
+  });
+  svg += `<text x="${isLeft ? ox + 12 : ox + w - 12}" y="${oy - 8}" font-size="11" font-weight="bold" fill="#dc2626" text-anchor="${isLeft ? 'start' : 'end'}">ZAWIASY</text>`;
+  svg += `</svg>`;
+  return svg;
+}
+
 export function generateCornerPartsDrawings(mod) {
   const g = getCornerPartsGeometry(mod);
   const h2 = (t) => `<h3 style="font-size:14px; color:#1e3a8a; margin:18px 0 6px;">${t}</h3>`;
@@ -1057,6 +1099,14 @@ export function generateCornerPartsDrawings(mod) {
   }
   html += h2('Boki i listwa narożna');
   html += generateCornerSidesHolesSVG(getCornerShelfHoles(mod));
+  const doors = getCornerDoorHinges(mod);
+  if (doors.length > 0) {
+    html += h2('Fronty z zawiasami');
+    doors.sort((a, b) => a.arm.localeCompare(b.arm) || (a.front.y || 0) - (b.front.y || 0)).forEach((d, i) => {
+      const name = `Front ramię ${d.arm}${doors.filter(x => x.arm === d.arm).length > 1 ? ' ' + (i + 1) : ''} — drzwi ${d.side === 'left' ? 'lewe' : 'prawe'}`;
+      html += generateCornerFrontSVG(d, name);
+    });
+  }
   return html;
 }
 

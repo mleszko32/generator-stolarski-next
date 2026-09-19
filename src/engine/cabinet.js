@@ -4,7 +4,7 @@ import { calculateDrawerHoles, getDrawerComponents } from "../core/drawerMath.js
 import { drawerSystems } from "../core/drawerSystems.js";
 import { calculateHinges } from "../core/hingeMath.js";
 import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "./edgeBanding.js";
-import { recalculateAllLayouts, getTraverseConfig, getWorldFootprint, getCornerDepths } from "../core/layout.js";
+import { recalculateLayout, recalculateAllLayouts, getTraverseConfig, getWorldFootprint, getCornerDepths } from "../core/layout.js";
 
 export function calculateParts() {
   // Fronty muszą mieć aktualne el.x/y/w/h zanim policzymy z nich formatki.
@@ -756,6 +756,44 @@ function getCornerCorpusParts(mod, config) {
   return parts;
 }
 
+// Strona zawiasów drzwi szafki narożnej w układzie LOKALNYM frontu (x rośnie od
+// narożnika w stronę zewnętrznego boku ramienia): 'left' = krawędź przy narożniku,
+// 'right' = krawędź zewnętrzna (przy boku korpusu). W trybie frontu łamanego
+// skrzydło przy korpusie wisi na zewnętrznej krawędzi (na boku), drugie skrzydło
+// ma zawiasy 60° od strony narożnika (do pierwszego skrzydła).
+export function getCornerDoorHingeSide(mod, front) {
+  if (mod.cornerFrontMode === 'bifold' && front.cornerArm) {
+    const primary = mod.cornerFrontOverlap?.primaryArm || 'A';
+    return front.cornerArm === primary ? 'right' : 'left';
+  }
+  if (front.subtype === 'drzwi-lp') return front.id.includes('-L-') ? 'left' : 'right';
+  return front.openingSide || (front.cornerArm === 'B' ? 'right' : 'left');
+}
+
+// Zawiasy wszystkich drzwi szafki narożnej (pozycje pod puszki i płytki).
+// Zakłada aktualny layout (el.x/y/w/h) - wołający robi recalculateLayout. Zawias
+// przykręcany do boku korpusu (atBok) tylko gdy leży na zewnętrznej krawędzi.
+export function getCornerDoorHinges(mod) {
+  recalculateLayout(mod);
+  const board = parseFloat(state.project.materials?.boardThickness) || 18;
+  const els = mod.elements || [];
+  const cornerShelves = els.filter(el => el.typ === 'poziom-narozny');
+  return els
+    .filter(el => el.typ === 'front' && el.cornerArm && (el.subtype || '').includes('drzwi'))
+    .map(front => {
+      const side = getCornerDoorHingeSide(mod, front);
+      const obstacles = els
+        .filter(o => (o.typ === 'poziom' || o.subtype === 'szuflada-wewnetrzna') && o.cornerArm === front.cornerArm)
+        .concat(cornerShelves);
+      const bifoldSecondary = mod.cornerFrontMode === 'bifold' && side === 'left';
+      return {
+        front, arm: front.cornerArm, side, atBok: side === 'right',
+        bifoldSecondary,
+        hinges: calculateHinges(front, board, obstacles, side),
+      };
+    });
+}
+
 // Otwory w wieńcu narożnym w układzie formatki (0,0 = tylny róg, cofnięty o
 // plecy): tak jak w zwykłej szafce łączenia z bokami są wiercone w BOKU (patrz
 // getCornerShelfHoles: joints), więc w wieńcu zostają tylko dwa kołki pod
@@ -821,18 +859,25 @@ export function getCornerShelfHoles(mod, config = state.project) {
         joints.push({ x: sideDepth - 37, y, type: 'screw' }, { x: sideDepth - 37 - 32, y, type: 'dowel' });
       });
     }
-    return { name, depth: sideDepth, height: h, bottom, holes, joints };
+    return { name, depth: sideDepth, height: h, bottom, holes, joints, hingePlates: [] };
   };
 
   const sideA = depthA - backThick;
   const sideB = depthB - backThick;
-  return [
+  const sides = [
     build('Bok ramienia A', sideA, [37, sideA - 37], height, 0, true),
     build('Bok ramienia B', sideB, [37, sideB - 37], height, 0, true),
     // Półka ma wycięcie na listwę, więc opiera się też na podpórkach w
     // listwie (dwa pionowe rzędy 20 mm od jej krawędzi).
     build('Listwa narożna', battenW, [20, battenW - 20], height - th * 2, th),
   ];
+  // Płytki zawiasów drzwi wiszących na zewnętrznej krawędzi ramienia: dwa otwory
+  // (co 32 mm wokół wysokości zawiasu y, 37 mm od przodu boku), na boku tego ramienia.
+  getCornerDoorHinges(mod).filter(d => d.atBok).forEach(d => {
+    const side = sides[d.arm === 'A' ? 0 : 1];
+    d.hinges.forEach(h => side.hingePlates.push({ x: 37, y: h.y }));
+  });
+  return sides;
 }
 
 function getInteriorParts(mod, config) {

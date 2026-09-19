@@ -8,6 +8,7 @@ import { state, DEFAULT_ROOM } from '../core/state.js';
 import { getDrawerComponents, calculateDrawerHoles } from '../core/drawerMath.js';
 import { drawerSystems } from '../core/drawerSystems.js';
 import { calculateHinges } from '../core/hingeMath.js';
+import { getCornerDoorHinges } from '../engine/cabinet.js';
 import { recalculateLayout, getTraverseConfig, getWorldFootprint, clampModuleToRoom, getModuleBox, getCornerDepths } from '../core/layout.js';
 import { buildZoneTree, moveSplit } from '../core/zoneTree.js';
 import { scheduleCheckpoint } from '../core/history.js';
@@ -1437,6 +1438,8 @@ function renderCornerCabinet(mod, isActive, th) {
   const frontZA = isInsetFront ? depthA - th : depthA + 2; // czoło ramienia A (Z)
   const frontZB = isInsetFront ? depthB - th : depthB + 2; // czoło ramienia B (X)
 
+  const cornerDoorHinges = new Map(getCornerDoorHinges(mod).map(d => [d.front.id, d]));
+
   (mod.elements || []).forEach(front => {
       if (front.typ !== 'front') return;
       const fw = parseFloat(front.w) || 0;
@@ -1455,6 +1458,30 @@ function renderCornerCabinet(mod, isActive, th) {
           // Ramię B biegnie wzdłuż +Z, front na jego czole: lokalny front.x
           // (0..widthB) mapuje się na Z = depthA + front.x.
           addBox(th, fh, fw, frontZB, posY + fy, depthA + fx, 'front', isActive, udFront, innerGroup);
+      }
+
+      // Zawiasy drzwi narożnika (widoczne w trybie przezroczystym, jak w zwykłych
+      // szafkach): puszka fi 35 w tylnej stronie frontu, a przy zawiasie na
+      // zewnętrznej krawędzi - dwa otwory płytki w boku korpusu.
+      const dh = cornerDoorHinges.get(front.id);
+      if (dh) {
+          dh.hinges.forEach(h => {
+              const cupOff = dh.side === 'left' ? h.cupXOffset : fw - h.cupXOffset;
+              const cy = posY + fy + h.relY;
+              if (front.cornerArm === 'A') {
+                  addHole(17.5, 13, depthB + fx + cupOff, cy, frontZA + 6.5, 'z', innerGroup);
+                  if (dh.atBok) {
+                      addHole(2.5, th, legA - th / 2, cy - 16, depthA - 37, 'x', innerGroup);
+                      addHole(2.5, th, legA - th / 2, cy + 16, depthA - 37, 'x', innerGroup);
+                  }
+              } else {
+                  addHole(17.5, 13, frontZB + 6.5, cy, depthA + fx + cupOff, 'x', innerGroup);
+                  if (dh.atBok) {
+                      addHole(2.5, th, depthB - 37, cy - 16, legB - th / 2, 'z', innerGroup);
+                      addHole(2.5, th, depthB - 37, cy + 16, legB - th / 2, 'z', innerGroup);
+                  }
+              }
+          });
       }
   });
 
