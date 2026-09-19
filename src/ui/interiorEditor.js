@@ -48,6 +48,23 @@ const FRONT_LABELS = {
   szuflada: "Szuflada",
   "szuflada-wewnetrzna": "Szuflada wewn.",
 };
+// Strona zawiasów drzwi ('left' = zawiasy z lewej). Para L/P ma ją w id.
+function hingeSideOf(front) {
+  if (front.subtype === "drzwi-lp") return front.id.includes("-L-") ? "left" : "right";
+  if (front.subtype === "drzwi") return front.openingSide === "right" ? "right" : "left";
+  return null;
+}
+
+// Etykieta frontu z informacją o stronie zawiasów (dla pojedynczych drzwi i
+// drzwi z pary L/P) - wcześniej wszystkie drzwi były podpisane tak samo.
+function frontLabelText(front) {
+  const base = FRONT_LABELS[front.subtype] || front.subtype;
+  const side = hingeSideOf(front);
+  if (!side) return base;
+  if (front.subtype === "drzwi-lp") return `Drzwi ${side === "left" ? "lewe" : "prawe"}`;
+  return `Drzwi ${side === "left" ? "lewe" : "prawe"} · zawiasy ${side === "left" ? "z lewej" : "z prawej"}`;
+}
+
 const FRONT_COLORS = {
   drzwi: { fill: "#eff6ff", border: "#2563eb" },
   "drzwi-lp": { fill: "#eff6ff", border: "#2563eb" },
@@ -501,7 +518,19 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     el.dataset.leaf = "1";
 
     if (!isMultiFront) {
-      const labelText = (FRONT_LABELS[node.fronts[0].subtype] || node.fronts[0].subtype) + (hidden ? " (ukryty)" : "");
+      const labelText = frontLabelText(node.fronts[0]) + (hidden ? " (ukryty)" : "");
+      const hingeSide = hingeSideOf(node.fronts[0]);
+      if (hingeSide && !hidden) {
+        // Czerwony pasek na krawędzi zawiasów - od razu widać, po której stronie są.
+        const bar = document.createElement("div");
+        bar.title = hingeSide === "left" ? "Zawiasy z lewej" : "Zawiasy z prawej";
+        Object.assign(bar.style, {
+          position: "absolute", top: "0", bottom: "0", width: "5px",
+          [hingeSide === "left" ? "left" : "right"]: "0",
+          background: "#dc2626", pointerEvents: "none",
+        });
+        el.appendChild(bar);
+      }
       if (badgeStyle) {
         const badge = document.createElement("div");
         badge.innerText = labelText;
@@ -519,7 +548,8 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
         });
         el.appendChild(badge);
       } else {
-        el.innerText = labelText;
+        // appendChild zamiast innerText - innerText skasowałby dodany wyżej pasek zawiasów.
+        el.appendChild(document.createTextNode(labelText));
       }
     } else if (hidden) {
       const label = FRONT_LABELS[node.fronts[0].subtype] || node.fronts[0].subtype;
@@ -575,7 +605,16 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
           color: colors.border,
           pointerEvents: "none",
         });
-        box.innerText = FRONT_LABELS[front.subtype] || front.subtype;
+        const boxSide = hingeSideOf(front);
+        if (boxSide) {
+          const bar = document.createElement("div");
+          Object.assign(bar.style, {
+            position: "absolute", top: "0", bottom: "0", width: "4px",
+            [boxSide === "left" ? "left" : "right"]: "0", background: "#dc2626",
+          });
+          box.appendChild(bar);
+        }
+        box.appendChild(document.createTextNode(frontLabelText(front)));
         stage.appendChild(box);
       });
     }

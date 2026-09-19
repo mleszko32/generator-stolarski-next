@@ -23,3 +23,24 @@ describe('generateSidePanelSVG - otwory pod podpórki półki', () => {
     expect(cys).not.toContain(369);
   });
 });
+
+describe('generateSidePanelSVG - strona zawiasów drzwi', () => {
+  const door = (openingSide) => ({
+    id: 'front-1', typ: 'front', subtype: 'drzwi', openingSide,
+    x: 1.5, y: 2, w: 597, h: 715,
+    baseZone: { minX: 18, maxX: 582, minY: 18, maxY: 702 },
+  });
+
+  it('podpisuje drzwi prawe/lewe i rysuje symbol otwierania', () => {
+    setProject(freshProject({ modules: [baseModule({ elements: [door('right')] })] }));
+    let svg = generateSidePanelSVG(720, 510, []);
+    expect(svg).toContain('Drzwi prawe');
+    expect(svg).toContain('zawiasy z prawej');
+    expect(svg).toContain('stroke-dasharray="8,6"');
+
+    setProject(freshProject({ modules: [baseModule({ elements: [door('left')] })] }));
+    svg = generateSidePanelSVG(720, 510, []);
+    expect(svg).toContain('Drzwi lewe');
+    expect(svg).toContain('zawiasy z lewej');
+  });
+});

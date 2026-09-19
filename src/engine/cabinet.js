@@ -122,7 +122,7 @@ function getGlobalHingesForModule(targetMod, config) {
                   });
 
                   if (translatedHinges.some(h => h.isLocal) || sourceMod.id === targetMod.id) {
-                      let partName = front.subtype === 'drzwi-lp' ? `Drzwi ${side === 'left' ? 'Lewe' : 'Prawe'}` : 'Drzwi';
+                      let partName = `Drzwi ${side === 'left' ? 'Lewe' : 'Prawe'}`;
                       mountingData.push({ type: 'door', name: partName, side: side, frontId: front.id, hinges: translatedHinges });
                   }
               });
@@ -898,7 +898,10 @@ function getFrontsAndDrawers(mod, config) {
     let partName = "Front";
     if (front.subtype === 'szuflada') { partName = `Front szuflady`; } 
     else if (front.subtype === 'szuflada-wewnetrzna') { partName = `Front szuflady wewn.`; } 
-    else if (front.subtype === 'drzwi') { partName = `Drzwi`; } 
+    else if (front.subtype === 'drzwi') {
+      // Strona zawiasów: lewe/prawe to różne formatki (inne rozmieszczenie otworów pod zawiasy).
+      partName = `Drzwi ${(front.openingSide || 'left') === 'right' ? 'Prawe' : 'Lewe'}`;
+    } 
     else if (front.subtype === 'drzwi-lp') {
       const side = front.id.includes('-L-') ? 'Lewe' : 'Prawe';
       partName = `Drzwi ${side}`;

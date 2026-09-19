@@ -27,6 +27,24 @@ function getDimText(localY, panelH, color, addRc = false) {
            `<tspan fill="#94a3b8" font-size="9" font-weight="normal">(${formatVal(secondary)} ${isBottomCloser ? 'GÓRA' : 'DÓŁ'})</tspan>`;
 }
 
+// Strona zawiasów drzwi: 'left' = zawiasy z lewej. Drzwi L/P (para) mają stronę
+// zakodowaną w id (-L-/-P-), pojedyncze w front.openingSide.
+function doorHingeSide(front) {
+  if (front.subtype === 'drzwi-lp') return front.id.includes('-L-') ? 'left' : 'right';
+  return front.openingSide || 'left';
+}
+
+// Standardowy symbol otwierania drzwi na rysunku frontu: dwie linie kreskowane
+// zbiegają się w środku krawędzi ZAWIASÓW, a rozchodzą do rogów krawędzi
+// przeciwnej (klamki).
+function doorOpeningSymbol(x, y, w, h, side, color) {
+  const hx = side === 'left' ? x : x + w;
+  const fx = side === 'left' ? x + w : x;
+  const my = y + h / 2;
+  return `<line x1="${hx}" y1="${my}" x2="${fx}" y2="${y}" stroke="${color}" stroke-width="1.2" stroke-dasharray="8,6" />` +
+         `<line x1="${hx}" y1="${my}" x2="${fx}" y2="${y + h}" stroke="${color}" stroke-width="1.2" stroke-dasharray="8,6" />`;
+}
+
 export function generateSidePanelSVG(height, depth, mountingData = []) {
   const mod = state.project.modules.find(m => m.id === state.activeModuleId) || state.project.modules[0];
   if (!mod) return '<svg></svg>';
@@ -765,9 +783,12 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
 
       svg += `<rect x="${fSvgX}" y="${elSvgY}" width="${fWidth}" height="${front.h}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5" ${strokeDash} />`;
 
-      let labelText = isDrawer ? `Szuflada` : `Drzwi`;
+      const hingeSide = isDoor ? doorHingeSide(front) : null;
+      let labelText = isDrawer ? `Szuflada` : `Drzwi ${hingeSide === 'right' ? 'prawe' : 'lewe'}`;
+      if (isDoor) svg += doorOpeningSymbol(fSvgX, elSvgY, fWidth, front.h, hingeSide, isForeign ? '#cbd5e1' : '#15803d');
       if (isForeign) labelText += ` (z: ${escapeHtml(front.sourceModName)})`;
       svg += `<text x="${fSvgX + fWidth/2}" y="${elSvgY + front.h/2}" font-size="12" fill="${isForeign ? '#94a3b8' : '#1e293b'}" font-weight="bold" text-anchor="middle">${labelText}</text>`;
+      if (isDoor) svg += `<text x="${fSvgX + fWidth/2}" y="${elSvgY + front.h/2 + 16}" font-size="10" fill="${isForeign ? '#94a3b8' : '#15803d'}" text-anchor="middle">zawiasy z ${hingeSide === 'right' ? 'prawej' : 'lewej'}</text>`;
 
       if (isDoor && mountingData) {
         svg += `<g class="layer-holes-hinge">`;
