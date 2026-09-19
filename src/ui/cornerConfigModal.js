@@ -23,6 +23,11 @@ import { getCornerDepths } from "../core/layout.js";
 import { state } from "../core/state.js";
 
 export function openCornerConfigModal(mod) {
+  // Efektywny luz frontu od krawędzi korpusu - ta sama reguła co w
+  // core/layout.js: applyCornerFrontOverlap (moduł narożny nie ma zakładki
+  // "Front", więc tu jest jedyne miejsce, gdzie da się go zobaczyć/zmienić).
+  const fcNow = { ...(state.project.front?.clearance || {}), ...(mod.front?.clearance || {}) };
+  const cornerClearanceNow = parseFloat(fcNow.right ?? fcNow.sides ?? 1.5) || 0;
   const cornerFrontGap = parseFloat(mod.front?.gap ?? state.project.front?.gap) || 3;
   const overlay = document.createElement('div');
   Object.assign(overlay.style, {
@@ -59,7 +64,7 @@ export function openCornerConfigModal(mod) {
       <h3 style="font-size:13px; color:#1e3a8a; margin:0 0 4px 0;">Fronty w rogu — zakładka</h3>
       <div class="property-group" style="max-width:420px;"><label>Rodzaj frontów narożnika:</label><select id="input-corner-front-mode"><option value="separate" ${mod.cornerFrontMode !== 'bifold' ? 'selected' : ''}>Dwa oddzielne fronty (każdy na własnych zawiasach)</option><option value="bifold" ${mod.cornerFrontMode === 'bifold' ? 'selected' : ''}>Front łamany (dwa skrzydła, zawias 60°)</option></select></div>
       <div id="corner-front-mode-hint" style="font-size:11px; color:#64748b; margin-bottom:6px;"></div>
-      <div id="corner-bifold-options" class="property-group" style="max-width:340px; display:${mod.cornerFrontMode === 'bifold' ? 'block' : 'none'};"><label>Luz w miejscu łamania (mm):</label><input type="number" step="0.5" id="input-corner-bifold-gap" value="${mod.cornerBifold?.breakGap ?? 2}" /></div>
+      <div id="corner-bifold-options" class="property-group" style="max-width:340px; display:${mod.cornerFrontMode === 'bifold' ? 'block' : 'none'};"><label>Luz w miejscu łamania (mm):</label><input type="number" step="0.5" id="input-corner-bifold-gap" value="${mod.cornerBifold?.breakGap ?? 2}" /><label style="margin-top:8px;">Luz od korpusu (mm):</label><input type="number" step="0.5" id="input-corner-front-clearance" value="${cornerClearanceNow}" /></div>
       <div class="property-group" style="max-width:340px;"><label id="corner-front-primary-label">Który front zamyka się jako pierwszy (sięga do rogu):</label><select id="input-corner-front-primary"><option value="A" ${(!mod.cornerFrontOverlap || mod.cornerFrontOverlap.primaryArm !== 'B') ? 'selected' : ''}>Ramię A</option><option value="B" ${(mod.cornerFrontOverlap && mod.cornerFrontOverlap.primaryArm === 'B') ? 'selected' : ''}>Ramię B</option></select></div>
     </div>
 
@@ -282,7 +287,10 @@ export function openCornerConfigModal(mod) {
   const frontPrimaryLabelEl = modal.querySelector('#corner-front-primary-label');
   function renderFrontModeHint() {
     if (mod.cornerFrontMode === 'bifold') {
-      const cR = parseFloat((mod.front?.clearance ?? state.project.front?.clearance ?? {}).right ?? (mod.front?.clearance ?? state.project.front?.clearance ?? {}).sides ?? 1.5) || 1.5;
+      // Ten sam merge i ta sama reguła co applyCornerFrontOverlap (core/layout.js) -
+      // wcześniej wartość 0 była tu podmieniana na 1.5 i opis kłamał.
+      const fcHint = { ...(state.project.front?.clearance || {}), ...(mod.front?.clearance || {}) };
+      const cR = parseFloat(fcHint.right ?? fcHint.sides ?? 1.5) || 0;
       frontModeHintEl.textContent = `Front łamany: dwa skrzydła (po jednym na ramię) połączone zawiasem uzupełniającym CLIP top 60° (Blum 79T8500) - otwierają się razem. Skrzydło przy korpusie wisi na zawiasie 155°/170°, drugie tylko na zawiasie 60°. Oba skrzydła liczone tak samo: długość ramienia - głębokość drugiego ramienia - grubość frontu - luz łamania - ${cR} mm (luz od korpusu).`;
       frontPrimaryLabelEl.textContent = 'Które skrzydło wisi na korpusie (sięga do rogu):';
     } else {
@@ -295,6 +303,16 @@ export function openCornerConfigModal(mod) {
     mod.cornerFrontMode = e.target.value === 'bifold' ? 'bifold' : 'separate';
     renderFrontModeHint();
     modal.querySelector('#corner-bifold-options').style.display = mod.cornerFrontMode === 'bifold' ? 'block' : 'none';
+    update3D();
+    updateSidebar();
+    armAEditor.render();
+    armBEditor.render();
+  });
+  modal.querySelector('#input-corner-front-clearance').addEventListener('input', e => {
+    const v = parseFloat(e.target.value);
+    if (!Number.isFinite(v)) return;
+    mod.front = { ...(mod.front || {}), clearance: { ...(mod.front?.clearance || {}), right: v } };
+    renderFrontModeHint();
     update3D();
     updateSidebar();
     armAEditor.render();
