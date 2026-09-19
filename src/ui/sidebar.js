@@ -447,7 +447,7 @@ export function updateSidebar() {
 
   html += `
       <div style="margin-bottom: 15px;">
-          <button id="btn-import-ai" class="btn btn-block" style="background: linear-gradient(135deg, #9333ea, #6366f1);">
+          <button id="btn-import-ai" class="btn btn-block">
               🪄 Zbuduj projekt ze zdjęcia (AI)
           </button>
           <input type="file" id="input-ai-image" accept="image/png, image/jpeg" style="display: none;" />
@@ -503,9 +503,9 @@ export function updateSidebar() {
 
   html += `
       <div style="display: flex; gap: 4px; margin-top: 8px;">
-        <button id="btn-add-base" class="btn btn-success btn-sm" style="flex: 1;" title="Szafka dolna">➕ Dolna</button>
-        <button id="btn-add-upper" class="btn btn-primary btn-sm" style="flex: 1;" title="Szafka wisząca">➕ Wisząca</button>
-        <button id="btn-add-tall" class="btn btn-purple btn-sm" style="flex: 1;" title="Słupek">➕ Słupek</button>
+        <button id="btn-add-base" class="btn btn-sm" style="flex: 1;" title="Szafka dolna">➕ Dolna</button>
+        <button id="btn-add-upper" class="btn btn-sm" style="flex: 1;" title="Szafka wisząca">➕ Wisząca</button>
+        <button id="btn-add-tall" class="btn btn-sm" style="flex: 1;" title="Słupek">➕ Słupek</button>
       </div>
       <button id="btn-add-corner" class="btn btn-neutral btn-block btn-sm" style="margin-top: 6px;" title="Szafka narożna z frontem łamanym (front prosty + skośny)">➕ Narożna</button>
       <button id="btn-add-side-panel" class="btn btn-teal btn-block btn-sm" style="margin-top: 6px;" title="Dekoracyjny panel niezależny od modułów, np. na cały słup szafek">➕ Bok dokładany</button>

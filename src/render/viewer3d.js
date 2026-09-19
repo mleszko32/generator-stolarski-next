@@ -726,31 +726,23 @@ export function init3DViewer() {
   
   const toggleBtn = document.createElement('button');
   toggleBtn.innerText = '🔄 Przezroczysty (Szkic)';
-  Object.assign(toggleBtn.style, {
-      padding: '10px 16px', background: '#3b82f6', color: '#fff', border: 'none',
-      borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px',
-      boxShadow: '0 4px 6px rgba(0,0,0,0.1)', transition: 'background 0.2s'
-  });
+  toggleBtn.className = 'btn view-btn active';
   
   toggleBtn.onclick = () => {
       isXrayMode = !isXrayMode;
       toggleBtn.innerText = isXrayMode ? '🔄 Przezroczysty (Szkic)' : '🔄 Realistyczny (Bryły)';
-      toggleBtn.style.background = isXrayMode ? '#3b82f6' : '#10b981';
+      toggleBtn.classList.toggle('active', isXrayMode);
       update3D();
   };
   
   const toggleFrontsBtn = document.createElement('button');
   toggleFrontsBtn.innerText = '🚪 Ukryj fronty zewn.';
-  Object.assign(toggleFrontsBtn.style, {
-      padding: '10px 16px', background: '#8b5cf6', color: '#fff', border: 'none',
-      borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px',
-      boxShadow: '0 4px 6px rgba(0,0,0,0.1)', transition: 'background 0.2s'
-  });
+  toggleFrontsBtn.className = 'btn view-btn';
   
   toggleFrontsBtn.onclick = () => {
       isFrontsVisible = !isFrontsVisible;
       toggleFrontsBtn.innerText = isFrontsVisible ? '🚪 Ukryj fronty zewn.' : '🚪 Pokaż fronty zewn.';
-      toggleFrontsBtn.style.background = isFrontsVisible ? '#8b5cf6' : '#64748b';
+      toggleFrontsBtn.classList.toggle('active', !isFrontsVisible);
       update3D();
       renderInteriorEditorIfVisible();
   };
@@ -758,16 +750,12 @@ export function init3DViewer() {
   const toggleInteriorBtn = document.createElement('button');
   toggleInteriorBtn.innerText = '🗂️ Wnętrze 2D';
   toggleInteriorBtn.title = 'Klikalny edytor wnęk — dziel/obsadzaj fronty bez trafiania w 3D';
-  Object.assign(toggleInteriorBtn.style, {
-      padding: '10px 16px', background: '#0f766e', color: '#fff', border: 'none',
-      borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px',
-      boxShadow: '0 4px 6px rgba(0,0,0,0.1)', transition: 'background 0.2s'
-  });
+  toggleInteriorBtn.className = 'btn view-btn';
   toggleInteriorBtn.onclick = () => {
       toggleInteriorEditor();
       const showingInterior = document.getElementById('editor-interior-container')?.style.display !== 'none';
       toggleInteriorBtn.innerText = showingInterior ? '🧊 Podgląd 3D' : '🗂️ Wnętrze 2D';
-      toggleInteriorBtn.style.background = showingInterior ? '#475569' : '#0f766e';
+      toggleInteriorBtn.classList.toggle('active', showingInterior);
       if (!showingInterior && container) {
           // #editor-3d-container był ukryty (display:none) — jego clientWidth/Height mogły
           // w tym czasie wynosić 0 i "zatrzasnąć się" w renderze/kamerze (patrz resize listener
@@ -781,11 +769,7 @@ export function init3DViewer() {
   const toggleMeasureBtn = document.createElement('button');
   toggleMeasureBtn.innerText = '📏 Miarka';
   toggleMeasureBtn.title = 'Kliknij dwa punkty na scenie, żeby zmierzyć odległość między nimi';
-  Object.assign(toggleMeasureBtn.style, {
-      padding: '10px 16px', background: '#f59e0b', color: '#fff', border: 'none',
-      borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px',
-      boxShadow: '0 4px 6px rgba(0,0,0,0.1)', transition: 'background 0.2s'
-  });
+  toggleMeasureBtn.className = 'btn view-btn';
   toggleMeasureBtn.onclick = () => toggleMeasureMode();
   measureMode.btn = toggleMeasureBtn;
 
@@ -839,7 +823,7 @@ function enterMeasureMode() {
   setMeasureBannerText('📏 Kliknij pierwszy punkt do zmierzenia...');
   if (measureMode.btn) {
       measureMode.btn.innerText = '📏 Wyłącz miarkę';
-      measureMode.btn.style.background = '#b45309';
+      measureMode.btn.classList.add('active');
   }
 }
 
@@ -852,7 +836,7 @@ function exitMeasureMode() {
   if (measureMode.banner) { measureMode.banner.remove(); measureMode.banner = null; }
   if (measureMode.btn) {
       measureMode.btn.innerText = '📏 Miarka';
-      measureMode.btn.style.background = '#f59e0b';
+      measureMode.btn.classList.remove('active');
   }
 }
 
