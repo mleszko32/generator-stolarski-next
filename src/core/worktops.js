@@ -91,6 +91,14 @@ function buildRuns(wall, s, panels = []) {
   return runs.filter(r => r.items.some(it => !it.panel));
 }
 
+// Prostokąt blatu w rzucie z góry (układ świata, mm) dla rzędu/kawałka { wallId, u0, u1, depth }.
+export function rectOf(p, room) {
+  if (p.wallId === 'tyl') return { x0: p.u0, x1: p.u1, z0: 0, z1: p.depth };
+  if (p.wallId === 'przednia') return { x0: room.width - p.u1, x1: room.width - p.u0, z0: room.depth - p.depth, z1: room.depth };
+  if (p.wallId === 'prawa') return { x0: room.width - p.depth, x1: room.width, z0: p.u0, z1: p.u1 };
+  return { x0: 0, x1: p.depth, z0: room.depth - p.u1, z1: room.depth - p.u0 };
+}
+
 // Wynik: { settings, pieces, plan } - pieces to kawałki po podziale na płyty (parts),
 // runs to bazowe blaty (przed podziałem), plan = plan cięcia.
 export function computeWorktops(project = state.project) {
@@ -114,37 +122,7 @@ export function computeWorktops(project = state.project) {
     });
   });
 
-  // narożniki: dwa rzędy dochodzą do tego samego rogu pokoju. Rząd "dochodzi" do rogu,
-  // gdy dotyka ściany narożnej albo kończy się nie dalej niż głębokość blatu od niej
-  // (drugi rząd zwykle zaczyna się dopiero za szafką stojącą w rogu).
-  const corners = [];
-  const dist = (r, e) => (e === 'low' ? r.u0 : r.wallLength - r.u1);
-  const reaches = (r, e) => dist(r, e) <= r.depth + s.gapTolerance;
-  const touches = (r, e) => dist(r, e) <= 0.5;
-  CORNERS.forEach(([w1, e1, w2, e2]) => {
-    const r1 = (runsByWall[w1] || []).find(r => reaches(r, e1));
-    const r2 = (runsByWall[w2] || []).find(r => reaches(r, e2));
-    if (!r1 || !r2) return;
-    const t1 = touches(r1, e1), t2 = touches(r2, e2);
-    if (!t1 && !t2) return;
-    const key = `${w1}-${w2}`;
-    const len1 = r1.u1 - r1.u0, len2 = r2.u1 - r2.u0;
-    const forced = s.corners[key]?.through;
-    let throughFirst;
-    if (t1 !== t2) throughFirst = t1;               // do ściany może iść tylko ten, który ją dotyka
-    else if (forced) throughFirst = forced === w1;
-    else throughFirst = len1 >= len2;
-    const through = throughFirst ? r1 : r2;
-    const other = throughFirst ? r2 : r1;
-    const otherEnd = throughFirst ? e2 : e1;
-    // drugi blat kończy się na krawędzi pierwszego (kątowe złącze 90°)
-    if (otherEnd === 'low') other.u0 = through.depth; else other.u1 = other.wallLength - through.depth;
-    through.joins.push({ corner: key, role: 'przez', with: other.wallLabel });
-    other.joins.push({ corner: key, role: 'skrócony', with: through.wallLabel });
-    corners.push({ key, walls: [w1, w2], through: through.wallId });
-  });
-
-  // nadpisania użytkownika + podział na kawałki mieszczące się w płycie
+  // nadpisania użytkownika (długość/początek/głębokość/grubość, pominięcie)
   const runs = [];
   Object.values(runsByWall).flat().forEach(r => {
     const ov = s.overrides[r.key] || {};
@@ -153,10 +131,73 @@ export function computeWorktops(project = state.project) {
     if (ov.length !== undefined && ov.length !== '') r.u1 = r.u0 + parseFloat(ov.length);
     if (ov.depth !== undefined && ov.depth !== '') r.depth = parseFloat(ov.depth);
     if (ov.thickness !== undefined && ov.thickness !== '') r.thickness = parseFloat(ov.thickness);
-    r.length = Math.max(0, r.u1 - r.u0);
-    if (r.length <= 0) return;
+    if (r.u1 - r.u0 <= 0) return;
     runs.push(r);
   });
+
+  // złącza: dwa blaty na prostopadłych ścianach, które na siebie zachodzą lub się
+  // stykają w planie. Jeden ("przez") zostaje cały, drugi jest skrócony do jego
+  // krawędzi (kątowe złącze 90°, w warsztacie "na łyżwę"). Wybór: s.corners[klucz].through
+  // = id ściany, której blat idzie przez; domyślnie blat dochodzący do ściany
+  // drugiego, a gdy oba lub żaden - dłuższy. Bez tego blaty nachodziłyby na siebie.
+  const corners = [];
+  const seen = new Set();
+  const horizontal = runs.filter(r => r.wallId === 'tyl' || r.wallId === 'przednia');
+  const vertical = runs.filter(r => r.wallId === 'lewa' || r.wallId === 'prawa');
+  const tol = Math.max(s.gapTolerance, 0.5);
+  const sepOf = (r) => rectOf(r, room);
+  horizontal.forEach(a => vertical.forEach(b => {
+    const ra = sepOf(a), rb = sepOf(b);
+    const ox = Math.min(ra.x1, rb.x1) - Math.max(ra.x0, rb.x0);
+    const oz = Math.min(ra.z1, rb.z1) - Math.max(ra.z0, rb.z0);
+    if (ox < -tol || oz < -tol) return;              // za daleko, żeby się łączyć
+    if (ox <= 0.5 && oz <= 0.5) return;               // tylko styk narożnikami
+    const key = `${a.wallId}-${b.wallId}`;
+    const aTouches = b.wallId === 'lewa' ? ra.x0 <= 0.5 : ra.x1 >= room.width - 0.5;
+    const bTouches = a.wallId === 'tyl' ? rb.z0 <= 0.5 : rb.z1 >= room.depth - 0.5;
+    const forced = s.corners[key]?.through;
+    let throughFirst;
+    if (forced === a.wallId) throughFirst = true;
+    else if (forced === b.wallId) throughFirst = false;
+    else if (aTouches !== bTouches) throughFirst = aTouches;
+    else throughFirst = (a.u1 - a.u0) >= (b.u1 - b.u0);
+    const through = throughFirst ? a : b;
+    const other = throughFirst ? b : a;
+    const rt = rectOf(through, room);
+    // przytnij drugi blat do krawędzi pierwszego (tylko gdy zachodzą na siebie)
+    const ro = rectOf(other, room);
+    const cx0 = Math.max(rt.x0, ro.x0), cx1 = Math.min(rt.x1, ro.x1);
+    const cz0 = Math.max(rt.z0, ro.z0), cz1 = Math.min(rt.z1, ro.z1);
+    const toU = other.wallId === 'tyl' ? (x0, x1) => [x0, x1]
+      : other.wallId === 'przednia' ? (x0, x1) => [room.width - x1, room.width - x0]
+      : other.wallId === 'prawa' ? (z0, z1) => [z0, z1]
+      : (z0, z1) => [room.depth - z1, room.depth - z0];
+    const horiz = other.wallId === 'tyl' || other.wallId === 'przednia';
+    if (cx1 - cx0 > 0.5 && cz1 - cz0 > 0.5) {
+      const [c0, c1] = horiz ? toU(cx0, cx1) : toU(cz0, cz1);
+      if (c0 <= other.u0 + 0.5 && c1 < other.u1) other.u0 = c1;
+      else if (c1 >= other.u1 - 0.5 && c0 > other.u0) other.u1 = c0;
+    }
+    through.joins.push({ corner: key, role: 'przez', with: other.wallLabel });
+    other.joins.push({ corner: key, role: 'skrócony', with: through.wallLabel });
+    if (!seen.has(key)) {
+      seen.add(key);
+      const rn = rectOf(other, room);
+      // szew: krawędź drugiego blatu zwrócona do pierwszego
+      let seam;
+      if (horiz) {
+        const near = (e) => Math.abs(e - Math.min(Math.max(e, rt.x0), rt.x1));
+        const x = near(rn.x0) <= near(rn.x1) ? rn.x0 : rn.x1;
+        seam = { x0: x, x1: x, z0: rn.z0, z1: rn.z1 };
+      } else {
+        const near = (e) => Math.abs(e - Math.min(Math.max(e, rt.z0), rt.z1));
+        const z = near(rn.z0) <= near(rn.z1) ? rn.z0 : rn.z1;
+        seam = { x0: rn.x0, x1: rn.x1, z0: z, z1: z };
+      }
+      corners.push({ key, walls: [a.wallId, b.wallId], through: through.wallId, seam });
+    }
+  }));
+  runs.forEach(r => { r.length = Math.max(0, r.u1 - r.u0); });
 
   const pieces = [];
   runs.forEach(r => {
@@ -244,11 +285,7 @@ export function worktopBoxes(project = state.project) {
   const { settings, pieces, room } = computeWorktops(project);
   if (!settings.enabled) return [];
   return pieces.map(p => {
-    let x0, x1, z0, z1;
-    if (p.wallId === 'tyl') { x0 = p.u0; x1 = p.u1; z0 = 0; z1 = p.depth; }
-    else if (p.wallId === 'przednia') { x0 = room.width - p.u1; x1 = room.width - p.u0; z1 = room.depth; z0 = room.depth - p.depth; }
-    else if (p.wallId === 'prawa') { z0 = p.u0; z1 = p.u1; x1 = room.width; x0 = room.width - p.depth; }
-    else { z0 = room.depth - p.u1; z1 = room.depth - p.u0; x0 = 0; x1 = p.depth; }
+    const { x0, x1, z0, z1 } = rectOf(p, room);
     return { x0, x1, y0: p.y, y1: p.y + p.thickness, z0, z1, piece: p };
   });
 }

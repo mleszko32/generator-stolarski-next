@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { state } from './state.js';
-import { computeWorktops, splitLength, planStock, getWorktopParts, worktopBoxes, WORKTOP_DEFAULTS } from './worktops.js';
+import { computeWorktops, rectOf, splitLength, planStock, getWorktopParts, worktopBoxes, WORKTOP_DEFAULTS } from './worktops.js';
 import { freshProject, baseModule, setProject } from '../test/fixtures.js';
 
 const room = { width: 4000, depth: 3000, height: 2600 };
@@ -127,5 +127,35 @@ describe('blaty - boki dokładane', () => {
     project([base('a', 0, 0)]);
     state.project.sidePanels = [side(2000)];
     expect(computeWorktops().pieces).toHaveLength(1);
+  });
+});
+
+describe('blaty - układ U bez nakładania', () => {
+  const left = (id, z) => base(id, 0, z, 270);
+  const right = (id, z) => base(id, 3487, z, 90);
+  const cabs = () => [
+    base('a', 0, 0), base('b', 600, 0), base('c', 1200, 0), base('d', 1800, 0), base('e', 2400, 0), base('f', 3000, 0),
+    left('l0', 0), left('l1', 600), left('l2', 1200), right('r0', 0), right('r1', 600), right('r2', 1200),
+  ];
+  const overlap = (p, q, room) => {
+    const a = rectOf(p, room), b = rectOf(q, room);
+    return Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) > 0.5 && Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0) > 0.5;
+  };
+
+  it('żadne dwa blaty nie nachodzą na siebie w rzucie z góry', () => {
+    project(cabs());
+    const { pieces, room: r } = computeWorktops();
+    for (let i = 0; i < pieces.length; i++) for (let j = i + 1; j < pieces.length; j++) expect(overlap(pieces[i], pieces[j], r)).toBe(false);
+    expect(pieces.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('wybór "przez" odwraca, który blat jest skrócony, i zwraca szew', () => {
+    project(cabs(), { corners: { 'tyl-lewa': { through: 'lewa' } } });
+    const { pieces, corners } = computeWorktops();
+    const c = corners.find(x => x.key === 'tyl-lewa');
+    expect(c.through).toBe('lewa');
+    expect(c.seam).toBeTruthy();
+    const tyl = pieces.find(p => p.wallId === 'tyl');
+    expect(tyl.u0).toBe(600);
   });
 });

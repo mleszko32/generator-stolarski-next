@@ -8,12 +8,12 @@ import { escapeHtml } from "../utils/dom.js";
 import { state, getActiveModule } from "../core/state.js";
 import { collectProjectParts, calculateAllProjectParts, calculateProjectHardware } from "../engine/cabinet.js";
 import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "../engine/edgeBanding.js";
-import { getCornerDepths } from "../core/layout.js";
+import { getCornerDepths, getWorldFootprint } from "../core/layout.js";
 import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel } from "./properties.js";
 import { mountCutPlan } from "./cutPlanModal.js";
 import { generateAllWallSVGs } from "../render/wallElevations.js";
-import { computeWorktops, getWorktopSettings } from "../core/worktops.js";
+import { computeWorktops, getWorktopSettings, rectOf } from "../core/worktops.js";
 import { openCsvExport, printHardwareList, openTechnicalDrawing, openKosztorysModal, updateSidebar } from "./sidebar.js";
 
 const SECTIONS = [
@@ -145,6 +145,37 @@ const WT_FIELDS = [
   ['minPiece', 'Min. kawałek przy dzieleniu (mm)', 10],
 ];
 
+// Schemat blatów w rzucie z góry: szafki (szary), blaty (kolor), szwy złączeń.
+// Kliknięcie szwu przełącza, który blat idzie przez (pełny), a który jest skrócony.
+function worktopSchemeSVG(p, wt) {
+  const { room, pieces, corners } = wt;
+  const W = room.width, D = room.depth, pad = 260;
+  const fs = Math.max(W, D) / 55;
+  const colors = { tyl: '#d6b48a', przednia: '#c9d6a3', lewa: '#a9c7d9', prawa: '#d9a9c2' };
+  let svg = `<svg viewBox="${-pad} ${-pad} ${W + pad * 2} ${D + pad * 2}" style="width:100%;max-width:640px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px">`;
+  svg += `<rect x="0" y="0" width="${W}" height="${D}" fill="#fff" stroke="#334155" stroke-width="${fs * 0.3}"/>`;
+  (p.modules || []).forEach(m => {
+    const fp = getWorldFootprint(m);
+    svg += `<rect x="${parseFloat(m.position?.x) || 0}" y="${parseFloat(m.position?.z) || 0}" width="${fp.worldW}" height="${fp.worldD}" fill="#e2e8f0" stroke="#94a3b8" stroke-width="${fs * 0.15}"/>`;
+  });
+  (p.sidePanels || []).forEach(sp => {
+    const fp = getWorldFootprint(sp);
+    svg += `<rect x="${parseFloat(sp.position?.x) || 0}" y="${parseFloat(sp.position?.z) || 0}" width="${fp.worldW}" height="${fp.worldD}" fill="#94a3b8"/>`;
+  });
+  pieces.forEach(pc => {
+    const r = rectOf(pc, room);
+    svg += `<rect x="${r.x0}" y="${r.z0}" width="${r.x1 - r.x0}" height="${r.z1 - r.z0}" fill="${colors[pc.wallId]}" fill-opacity="0.55" stroke="#7c5a34" stroke-width="${fs * 0.15}"/>`;
+    svg += `<text x="${(r.x0 + r.x1) / 2}" y="${(r.z0 + r.z1) / 2}" font-size="${fs}" text-anchor="middle" fill="#1e293b">${Math.round(pc.length)}</text>`;
+  });
+  corners.forEach(c => {
+    const sm = c.seam;
+    svg += `<g class="wt-seam" data-key="${c.key}" data-through="${c.through}" data-walls="${c.walls.join(',')}" style="cursor:pointer"><line x1="${sm.x0}" y1="${sm.z0}" x2="${sm.x1}" y2="${sm.z1}" stroke="#dc2626" stroke-width="${fs * 0.5}"/><line x1="${sm.x0}" y1="${sm.z0}" x2="${sm.x1}" y2="${sm.z1}" stroke="transparent" stroke-width="${fs * 3}"/><circle cx="${(sm.x0 + sm.x1) / 2}" cy="${(sm.z0 + sm.z1) / 2}" r="${fs * 1.3}" fill="#dc2626"/><text x="${(sm.x0 + sm.x1) / 2}" y="${(sm.z0 + sm.z1) / 2 + fs * 0.4}" font-size="${fs * 1.2}" fill="#fff" text-anchor="middle">⇄</text></g>`;
+  });
+  svg += `<text x="${W / 2}" y="${-pad / 2}" font-size="${fs}" text-anchor="middle" fill="#64748b">ściana tylna</text>`;
+  svg += '</svg>';
+  return svg;
+}
+
 function renderBlaty(el) {
   const p = state.project;
   const s = getWorktopSettings(p);
@@ -170,6 +201,7 @@ function renderBlaty(el) {
   const cornerRows = corners.map(c => `<label class="hub-sub">Narożnik ${escapeHtml(c.walls.join(' / '))}: do ściany idzie blat
     <select class="wt-through" data-key="${c.key}">${c.walls.map(w => `<option value="${w}" ${c.through === w ? 'selected' : ''}>${w}</option>`).join('')}</select></label>`).join('<br>');
   const stockRows = plan.stocks.map(st => `<tr><td>${st.size} mm</td><td>${st.depth} × ${st.thickness}</td><td>${st.items.map(i => Math.round(i.length)).join(' + ')}</td><td class="num">${Math.round(st.waste)} mm</td></tr>`).join('');
+  const scheme = pieces.length ? `<h4>Schemat (widok z góry)</h4><p class="hub-sub">Czerwony punkt to miejsce łączenia blatów. Kliknij go, żeby wybrać, który blat idzie przez (pełny), a który jest skrócony do jego krawędzi.</p>${worktopSchemeSVG(p, { room: computeWorktops(p).room, pieces, corners })}` : '';
   el.innerHTML = `
     <div class="hub-bar"><div><h3>Blaty</h3>
       <div class="hub-sub">Blat leży od ściany na 0 i ma stałą głębokość, więc nawis wynika z położenia szafek pod spodem. Blaty układane są nad ciągłymi rzędami szafek dolnych; w narożniku jeden blat idzie do ściany, drugi jest skrócony o jego głębokość (złącze kątowe „na łyżwę”, wykonywane frezem w warsztacie).</div></div></div>
@@ -179,6 +211,7 @@ function renderBlaty(el) {
       <label class="hub-sub">Łączenie w narożniku<br><select id="wt-joint"><option value="lyzwa" ${s.joint === 'lyzwa' ? 'selected' : ''}>Na łyżwę</option><option value="styk" ${s.joint === 'styk' ? 'selected' : ''}>Na styk</option></select></label>
     </div>
     ${offRows ? `<div style="margin-bottom:12px">${offRows}</div>` : ''}
+    ${scheme}
     ${cornerRows ? `<div style="margin-bottom:12px">${cornerRows}</div>` : ''}
     ${pieces.length ? `<table class="hub-table"><thead><tr><th>Ściana</th><th>Wymiar (dł. × gł. × gr.)</th><th>Narożnik</th><th>Długość</th><th>Głębokość</th><th>Grubość</th><th></th></tr></thead><tbody>${rows}</tbody></table>
     <h4>Plan cięcia płyt ${s.stockLength} / ${s.halfLength} mm</h4>
@@ -187,6 +220,10 @@ function renderBlaty(el) {
   el.querySelector('#wt-enabled').addEventListener('change', e => { save({ enabled: e.target.checked }); updateSidebar(); });
   el.querySelectorAll('.wt-f').forEach(i => i.addEventListener('change', () => { const v = parseFloat(i.value); if (v >= 0) save({ [i.dataset.k]: v }); updateSidebar(); }));
   el.querySelector('#wt-joint').addEventListener('change', e => save({ joint: e.target.value }));
+  el.querySelectorAll('.wt-seam').forEach(g => g.addEventListener('click', () => {
+    const [w1, w2] = g.dataset.walls.split(',');
+    save({ corners: { ...s.corners, [g.dataset.key]: { through: g.dataset.through === w1 ? w2 : w1 } } });
+  }));
   el.querySelectorAll('.wt-through').forEach(i => i.addEventListener('change', () => save({ corners: { ...s.corners, [i.dataset.key]: { through: i.value } } })));
   const setOv = (key, patch) => save({ overrides: { ...s.overrides, [key]: { ...(s.overrides[key] || {}), ...patch } } });
   el.querySelectorAll('.wt-ov').forEach(i => i.addEventListener('change', () => setOv(i.dataset.key, { [i.dataset.f]: i.value === '' ? '' : parseFloat(i.value) })));
