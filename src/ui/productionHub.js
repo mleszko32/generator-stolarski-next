@@ -12,12 +12,14 @@ import { getCornerDepths } from "../core/layout.js";
 import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel } from "./properties.js";
 import { mountCutPlan } from "./cutPlanModal.js";
+import { generateAllWallSVGs } from "../render/wallElevations.js";
 import { openCsvExport, printHardwareList, openTechnicalDrawing, openKosztorysModal, updateSidebar } from "./sidebar.js";
 
 const SECTIONS = [
   { id: 'formatki', label: 'Formatki', icon: 'ti-list-details' },
   { id: 'rozkroj', label: 'Rozkrój i etykiety', icon: 'ti-cut' },
   { id: 'rysunki', label: 'Rysunki 2D', icon: 'ti-ruler-2' },
+  { id: 'sciany', label: 'Rzuty ścian', icon: 'ti-wall' },
   { id: 'okucia', label: 'Okucia i okleina', icon: 'ti-shopping-cart' },
   { id: 'kosztorys', label: 'Kosztorys', icon: 'ti-calculator' },
 ];
@@ -158,6 +160,41 @@ function renderRysunki(el) {
   }));
 }
 
+let showEmptyWalls = false;
+
+// Rzuty ścian pomieszczenia: każda ściana widziana od środka, z szafkami,
+// łańcuchem szerokości, poziomami i wymiarami pionowymi (render/wallElevations.js).
+function renderSciany(el) {
+  const all = generateAllWallSVGs(state.project);
+  const shown = all.filter(w => showEmptyWalls || w.wall.items.length > 0);
+  el.innerHTML = `
+    <div class="hub-bar">
+      <div><h3>Rzuty ścian</h3><div class="hub-sub">Widok każdej ściany od środka pokoju: szafki z frontami, szerokości i odstępy w rzędzie pod podłogą, poziomy wysokości oraz wymiary pionowe. Szafka narożna jest pokazana na obu ścianach, przy których stoi.</div></div>
+      <div class="hub-actions">
+        <label class="hub-sub"><input type="checkbox" id="hub-empty-walls" ${showEmptyWalls ? 'checked' : ''} /> pokaż ściany bez szafek</label>
+        <button type="button" id="hub-walls-print" class="btn btn-sm" ${shown.length ? '' : 'disabled'}>Drukuj rzuty ścian</button>
+      </div>
+    </div>
+    ${shown.length === 0 ? '<p class="hub-empty">Żadna szafka nie stoi jeszcze przy ścianie (sprawdź położenie i obrót szafek).</p>' : shown.map(w => `<div class="hub-wall">${w.svg}</div>`).join('')}`;
+  el.querySelector('#hub-empty-walls').addEventListener('change', e => { showEmptyWalls = e.target.checked; renderSciany(el); });
+  el.querySelector('#hub-walls-print').addEventListener('click', () => {
+    const pages = shown.map(w => `<div class="page">${w.svg}</div>`).join('');
+    const html = `<!DOCTYPE html><html lang="pl"><head><meta charset="UTF-8"><title>Rzuty ścian</title>
+      <style>
+        @page { size: A3 landscape; margin: 10mm; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 20px; }
+        .bar { margin-bottom: 14px; } .bar button { padding: 10px 20px; background: #059669; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .page { page-break-after: always; margin-bottom: 24px; }
+        .page:last-child { page-break-after: auto; }
+        .page svg { width: 100%; height: auto; max-height: 260mm; }
+        @media print { .bar { display: none; } body { padding: 0; } .page { margin: 0; } }
+      </style></head><body>
+      <div class="bar"><button onclick="window.print()">Drukuj / Zapisz jako PDF</button></div>
+      ${pages}</body></html>`;
+    window.open(URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' })), '_blank');
+  });
+}
+
 function renderOkucia(el) {
   const hw = calculateProjectHardware();
   const edge = totalEdgeBandingMeters(collectProjectParts());
@@ -194,6 +231,7 @@ const RENDERERS = {
   formatki: renderFormatki,
   rozkroj: renderRozkroj,
   rysunki: renderRysunki,
+  sciany: renderSciany,
   okucia: renderOkucia,
   kosztorys: renderKosztorys,
 };

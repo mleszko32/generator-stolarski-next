@@ -360,3 +360,4 @@ body {
 .mode-tab.active { background: #fff; color: var(--text-primary); }
 .top-nav .btn-primary i, .top-nav .btn i { font-size: 15px; }
 .hub-table tr.hub-row-active td { background: #eff6ff; }
+.hub-wall { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px; padding: 8px; background: #fff; overflow-x: auto; }
