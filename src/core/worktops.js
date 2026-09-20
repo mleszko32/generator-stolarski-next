@@ -132,6 +132,7 @@ export function computeWorktops(project = state.project) {
     if (ov.depth !== undefined && ov.depth !== '') r.depth = parseFloat(ov.depth);
     if (ov.thickness !== undefined && ov.thickness !== '') r.thickness = parseFloat(ov.thickness);
     if (r.u1 - r.u0 <= 0) return;
+    r.base = { u0: r.u0, u1: r.u1 };   // położenie przed złączami (do przesuwania)
     runs.push(r);
   });
 
@@ -178,8 +179,9 @@ export function computeWorktops(project = state.project) {
       if (c0 <= other.u0 + 0.5 && c1 < other.u1) other.u0 = c1;
       else if (c1 >= other.u1 - 0.5 && c0 > other.u0) other.u1 = c0;
     }
-    through.joins.push({ corner: key, role: 'przez', with: other.wallLabel });
-    other.joins.push({ corner: key, role: 'skrócony', with: through.wallLabel });
+    const joint = s.corners[key]?.joint || s.joint;
+    through.joins.push({ corner: key, role: 'przez', with: other.wallLabel, joint });
+    other.joins.push({ corner: key, role: 'skrócony', with: through.wallLabel, joint });
     if (!seen.has(key)) {
       seen.add(key);
       const rn = rectOf(other, room);
@@ -194,7 +196,7 @@ export function computeWorktops(project = state.project) {
         const z = near(rn.z0) <= near(rn.z1) ? rn.z0 : rn.z1;
         seam = { x0: rn.x0, x1: rn.x1, z0: z, z1: z };
       }
-      corners.push({ key, walls: [a.wallId, b.wallId], through: through.wallId, seam });
+      corners.push({ key, walls: [a.wallId, b.wallId], through: through.wallId, joint, seam });
     }
   }));
   runs.forEach(r => { r.length = Math.max(0, r.u1 - r.u0); });
@@ -207,7 +209,7 @@ export function computeWorktops(project = state.project) {
       pieces.push({
         key: r.key, part: i + 1, parts: chunks.length, wallId: r.wallId, wallLabel: r.wallLabel,
         u0: cursor, u1: cursor + len, length: len, depth: r.depth, thickness: r.thickness, y: r.y,
-        joins: r.joins, seam: chunks.length > 1,
+        joins: r.joins, seam: chunks.length > 1, base: r.base,
       });
       cursor += len;
     });
@@ -266,7 +268,7 @@ export function getWorktopParts(project = state.project) {
   if (!settings.enabled) return [];
   return pieces.map(p => {
     const join = p.joins.length
-      ? ` - ${settings.joint === 'lyzwa' ? 'łyżwa' : 'na styk'} ${p.joins.map(j => `${j.role} (ściana ${j.with})`).join(', ')}`
+      ? ` - ${p.joins.map(j => `${j.joint === 'lyzwa' ? 'łyżwa' : 'na styk'} ${j.role} (ściana ${j.with})`).join(', ')}`
       : '';
     const seam = p.seam ? ` (kawałek ${p.part}/${p.parts})` : '';
     return {

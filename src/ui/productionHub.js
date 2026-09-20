@@ -164,12 +164,12 @@ function worktopSchemeSVG(p, wt) {
   });
   pieces.forEach(pc => {
     const r = rectOf(pc, room);
-    svg += `<rect x="${r.x0}" y="${r.z0}" width="${r.x1 - r.x0}" height="${r.z1 - r.z0}" fill="${colors[pc.wallId]}" fill-opacity="0.55" stroke="#7c5a34" stroke-width="${fs * 0.15}"/>`;
+    svg += `<rect class="wt-drag" data-key="${pc.key}" data-wall="${pc.wallId}" data-base0="${pc.base.u0}" data-base1="${pc.base.u1}" style="cursor:grab" x="${r.x0}" y="${r.z0}" width="${r.x1 - r.x0}" height="${r.z1 - r.z0}" fill="${colors[pc.wallId]}" fill-opacity="0.55" stroke="#7c5a34" stroke-width="${fs * 0.15}"/>`;
     svg += `<text x="${(r.x0 + r.x1) / 2}" y="${(r.z0 + r.z1) / 2}" font-size="${fs}" text-anchor="middle" fill="#1e293b">${Math.round(pc.length)}</text>`;
   });
   corners.forEach(c => {
     const sm = c.seam;
-    svg += `<g class="wt-seam" data-key="${c.key}" data-through="${c.through}" data-walls="${c.walls.join(',')}" style="cursor:pointer"><line x1="${sm.x0}" y1="${sm.z0}" x2="${sm.x1}" y2="${sm.z1}" stroke="#dc2626" stroke-width="${fs * 0.5}"/><line x1="${sm.x0}" y1="${sm.z0}" x2="${sm.x1}" y2="${sm.z1}" stroke="transparent" stroke-width="${fs * 3}"/><circle cx="${(sm.x0 + sm.x1) / 2}" cy="${(sm.z0 + sm.z1) / 2}" r="${fs * 1.3}" fill="#dc2626"/><text x="${(sm.x0 + sm.x1) / 2}" y="${(sm.z0 + sm.z1) / 2 + fs * 0.4}" font-size="${fs * 1.2}" fill="#fff" text-anchor="middle">⇄</text></g>`;
+    svg += `<g class="wt-seam" data-key="${c.key}" data-through="${c.through}" data-walls="${c.walls.join(',')}" style="cursor:pointer"><line x1="${sm.x0}" y1="${sm.z0}" x2="${sm.x1}" y2="${sm.z1}" stroke="#dc2626" stroke-width="${fs * 0.5}"/><line x1="${sm.x0}" y1="${sm.z0}" x2="${sm.x1}" y2="${sm.z1}" stroke="transparent" stroke-width="${fs * 3}"/><circle cx="${(sm.x0 + sm.x1) / 2}" cy="${(sm.z0 + sm.z1) / 2}" r="${fs * 1.3}" fill="#dc2626"/><text x="${(sm.x0 + sm.x1) / 2}" y="${(sm.z0 + sm.z1) / 2 + fs * 0.4}" font-size="${fs * 1.2}" fill="#fff" text-anchor="middle">⇄</text><text x="${(sm.x0 + sm.x1) / 2 + fs * 2}" y="${(sm.z0 + sm.z1) / 2 - fs * 1.6}" font-size="${fs * 0.9}" fill="#991b1b">${c.joint === 'lyzwa' ? 'łyżwa' : 'styk'}</text></g>`;
   });
   svg += `<text x="${W / 2}" y="${-pad / 2}" font-size="${fs}" text-anchor="middle" fill="#64748b">ściana tylna</text>`;
   svg += '</svg>';
@@ -191,6 +191,7 @@ function renderBlaty(el) {
       <td>${escapeHtml(pc.wallLabel)}${pc.seam ? ` (${pc.part}/${pc.parts})` : ''}</td>
       <td>${Math.round(pc.length)} × ${Math.round(pc.depth)} × ${pc.thickness}</td>
       <td>${pc.joins.map(j => escapeHtml(j.role)).join(', ') || '—'}</td>
+      <td>${first ? `<input type="number" class="wt-ov" data-key="${pc.key}" data-f="start" value="${num(o.start)}" placeholder="${Math.round(pc.base ? pc.base.u0 : pc.u0)}" style="width:80px">` : ''}</td>
       <td>${first ? `<input type="number" class="wt-ov" data-key="${pc.key}" data-f="length" value="${num(o.length)}" placeholder="auto" style="width:80px">` : ''}</td>
       <td>${first ? `<input type="number" class="wt-ov" data-key="${pc.key}" data-f="depth" value="${num(o.depth)}" placeholder="${s.depth}" style="width:70px">` : ''}</td>
       <td>${first ? `<input type="number" class="wt-ov" data-key="${pc.key}" data-f="thickness" value="${num(o.thickness)}" placeholder="${s.thickness}" style="width:60px">` : ''}</td>
@@ -198,8 +199,8 @@ function renderBlaty(el) {
     </tr>`;
   }).join('');
   const offRows = Object.entries(ov).filter(([, o]) => o.disabled).map(([k]) => `<label class="hub-sub"><input type="checkbox" class="wt-on" data-key="${k}"> przywróć pominięty blat ${escapeHtml(k)}</label>`).join('<br>');
-  const cornerRows = corners.map(c => `<label class="hub-sub">Narożnik ${escapeHtml(c.walls.join(' / '))}: do ściany idzie blat
-    <select class="wt-through" data-key="${c.key}">${c.walls.map(w => `<option value="${w}" ${c.through === w ? 'selected' : ''}>${w}</option>`).join('')}</select></label>`).join('<br>');
+  const wallName = { tyl: 'tylna', przednia: 'przednia', lewa: 'lewa', prawa: 'prawa' };
+  const cornerRows = corners.map(c => `<div class="hub-sub" style="margin-bottom:4px">Narożnik ${wallName[c.walls[0]]} / ${wallName[c.walls[1]]}: przez idzie blat <select class="wt-through" data-key="${c.key}">${c.walls.map(w => `<option value="${w}" ${c.through === w ? 'selected' : ''}>${wallName[w]}</option>`).join('')}</select> łączenie <select class="wt-cjoint" data-key="${c.key}"><option value="lyzwa" ${c.joint === 'lyzwa' ? 'selected' : ''}>na łyżwę</option><option value="styk" ${c.joint === 'styk' ? 'selected' : ''}>na styk</option></select></div>`).join('');
   const stockRows = plan.stocks.map(st => `<tr><td>${st.size} mm</td><td>${st.depth} × ${st.thickness}</td><td>${st.items.map(i => Math.round(i.length)).join(' + ')}</td><td class="num">${Math.round(st.waste)} mm</td></tr>`).join('');
   const scheme = pieces.length ? `<h4>Schemat (widok z góry)</h4><p class="hub-sub">Czerwony punkt to miejsce łączenia blatów. Kliknij go, żeby wybrać, który blat idzie przez (pełny), a który jest skrócony do jego krawędzi.</p>${worktopSchemeSVG(p, { room: computeWorktops(p).room, pieces, corners })}` : '';
   el.innerHTML = `
@@ -208,23 +209,46 @@ function renderBlaty(el) {
     <label class="hub-sub"><input type="checkbox" id="wt-enabled" ${s.enabled ? 'checked' : ''}/> Dodaj blaty do projektu (3D, formatki, kosztorys)</label>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;margin:12px 0">
       ${WT_FIELDS.map(([k, l, st]) => `<label class="hub-sub">${l}<br><input type="number" class="wt-f" data-k="${k}" value="${s[k]}" step="${st}" style="width:100%"></label>`).join('')}
-      <label class="hub-sub">Łączenie w narożniku<br><select id="wt-joint"><option value="lyzwa" ${s.joint === 'lyzwa' ? 'selected' : ''}>Na łyżwę</option><option value="styk" ${s.joint === 'styk' ? 'selected' : ''}>Na styk</option></select></label>
+      <label class="hub-sub">Łączenie w narożnikach (domyślne)<br><select id="wt-joint"><option value="lyzwa" ${s.joint === 'lyzwa' ? 'selected' : ''}>Na łyżwę</option><option value="styk" ${s.joint === 'styk' ? 'selected' : ''}>Na styk</option></select></label>
     </div>
     ${offRows ? `<div style="margin-bottom:12px">${offRows}</div>` : ''}
     ${scheme}
     ${cornerRows ? `<div style="margin-bottom:12px">${cornerRows}</div>` : ''}
-    ${pieces.length ? `<table class="hub-table"><thead><tr><th>Ściana</th><th>Wymiar (dł. × gł. × gr.)</th><th>Narożnik</th><th>Długość</th><th>Głębokość</th><th>Grubość</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    ${pieces.length ? `<table class="hub-table"><thead><tr><th>Ściana</th><th>Wymiar (dł. × gł. × gr.)</th><th>Narożnik</th><th>Początek</th><th>Długość</th><th>Głębokość</th><th>Grubość</th><th></th></tr></thead><tbody>${rows}</tbody></table>
     <h4>Plan cięcia płyt ${s.stockLength} / ${s.halfLength} mm</h4>
     <p class="hub-sub">Płyty pełne: <b>${plan.fullCount}</b>, połówki: <b>${plan.halfCount}</b>, odpad łącznie: ${Math.round(plan.wasteMm)} mm${plan.oversize.length ? ' — <b>uwaga: kawałek dłuższy niż płyta</b>' : ''}</p>
     <table class="hub-table"><thead><tr><th>Płyta</th><th>Głęb. × gr.</th><th>Kawałki (mm)</th><th class="num">Odpad</th></tr></thead><tbody>${stockRows}</tbody></table>` : '<p class="hub-empty">Brak rzędów szafek dolnych przy ścianach (sprawdź położenie i obrót szafek) albo blaty wyłączone.</p>'}`;
   el.querySelector('#wt-enabled').addEventListener('change', e => { save({ enabled: e.target.checked }); updateSidebar(); });
   el.querySelectorAll('.wt-f').forEach(i => i.addEventListener('change', () => { const v = parseFloat(i.value); if (v >= 0) save({ [i.dataset.k]: v }); updateSidebar(); }));
   el.querySelector('#wt-joint').addEventListener('change', e => save({ joint: e.target.value }));
+  // przesuwanie blatu wzdłuż ściany przeciąganiem na schemacie (co 10 mm)
+  const svgEl = el.querySelector('svg');
+  const SIGN = { tyl: ['x', 1], przednia: ['x', -1], prawa: ['z', 1], lewa: ['z', -1] };
+  el.querySelectorAll('.wt-drag').forEach(rc => rc.addEventListener('pointerdown', ev => {
+    ev.preventDefault();
+    const [axis, sign] = SIGN[rc.dataset.wall];
+    const toWorld = (e) => { const pt = svgEl.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; return pt.matrixTransform(svgEl.getScreenCTM().inverse()); };
+    const p0 = toWorld(ev);
+    let du = 0;
+    rc.setPointerCapture(ev.pointerId);
+    rc.onpointermove = e => {
+      const p = toWorld(e);
+      du = Math.round(sign * (axis === 'x' ? p.x - p0.x : p.y - p0.y) / 10) * 10;
+      rc.setAttribute('transform', axis === 'x' ? `translate(${sign * du} 0)` : `translate(0 ${sign * du})`);
+    };
+    rc.onpointerup = () => {
+      rc.onpointermove = rc.onpointerup = null;
+      if (!du) { rc.removeAttribute('transform'); return; }
+      const b0 = parseFloat(rc.dataset.base0), b1 = parseFloat(rc.dataset.base1);
+      setOv(rc.dataset.key, { start: b0 + du, length: b1 - b0 });
+    };
+  }));
   el.querySelectorAll('.wt-seam').forEach(g => g.addEventListener('click', () => {
     const [w1, w2] = g.dataset.walls.split(',');
-    save({ corners: { ...s.corners, [g.dataset.key]: { through: g.dataset.through === w1 ? w2 : w1 } } });
+    save({ corners: { ...s.corners, [g.dataset.key]: { ...(s.corners[g.dataset.key] || {}), through: g.dataset.through === w1 ? w2 : w1 } } });
   }));
-  el.querySelectorAll('.wt-through').forEach(i => i.addEventListener('change', () => save({ corners: { ...s.corners, [i.dataset.key]: { through: i.value } } })));
+  el.querySelectorAll('.wt-through').forEach(i => i.addEventListener('change', () => save({ corners: { ...s.corners, [i.dataset.key]: { ...(s.corners[i.dataset.key] || {}), through: i.value } } })));
+  el.querySelectorAll('.wt-cjoint').forEach(i => i.addEventListener('change', () => save({ corners: { ...s.corners, [i.dataset.key]: { ...(s.corners[i.dataset.key] || {}), joint: i.value } } })));
   const setOv = (key, patch) => save({ overrides: { ...s.overrides, [key]: { ...(s.overrides[key] || {}), ...patch } } });
   el.querySelectorAll('.wt-ov').forEach(i => i.addEventListener('change', () => setOv(i.dataset.key, { [i.dataset.f]: i.value === '' ? '' : parseFloat(i.value) })));
   el.querySelectorAll('.wt-on').forEach(i => i.addEventListener('change', () => setOv(i.dataset.key, { disabled: false })));
