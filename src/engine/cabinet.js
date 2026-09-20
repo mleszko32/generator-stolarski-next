@@ -1,5 +1,5 @@
 // src/engine/cabinet.js
-import { state } from "../core/state.js";
+import { state, migratePricingExtras } from "../core/state.js";
 import { calculateDrawerHoles, getDrawerComponents } from "../core/drawerMath.js";
 import { drawerSystems } from "../core/drawerSystems.js";
 import { calculateHinges } from "../core/hingeMath.js";
@@ -421,7 +421,7 @@ export function calculateProjectHardware() {
 const MATERIAL_CATEGORY_ORDER = ['Korpus', 'Front', 'Szuflada', 'Plecy', 'Blat'];
 
 export function calculateProjectCost() {
-  const pricing = state.project.pricing || { materials: {}, marginPercent: 0, hardware: {} };
+  const pricing = migratePricingExtras({ materials: {}, marginPercent: 0, hardware: {}, ...(state.project.pricing || {}) });
   const parts = calculateAllProjectParts();
   const hardware = calculateProjectHardware();
 
@@ -451,19 +451,38 @@ export function calculateProjectCost() {
 
   const materialsSubtotal = materials.reduce((sum, m) => sum + m.cost, 0);
   const hardwareSubtotal = hardwareLines.reduce((sum, l) => sum + l.cost, 0);
-  const subtotal = materialsSubtotal + hardwareSubtotal;
+  const laborCost = pricing.labor.hours * pricing.labor.rate;
+  const assemblyCost = pricing.assembly.hours * pricing.assembly.rate;
+  const transportCost = pricing.transport;
+  // suma kosztów = materiały + okucia + robocizna + montaż + transport;
+  // marża liczona od sumy kosztów, rabat od ceny po marży, VAT od ceny po rabacie
+  const subtotal = materialsSubtotal + hardwareSubtotal + laborCost + assemblyCost + transportCost;
   const marginPercent = parseFloat(pricing.marginPercent) || 0;
   const marginAmount = subtotal * (marginPercent / 100);
+  const priceBeforeDiscount = subtotal + marginAmount;
+  const discountAmount = priceBeforeDiscount * (pricing.discountPercent / 100);
+  const net = priceBeforeDiscount - discountAmount;
+  const vatAmount = net * (pricing.vatPercent / 100);
 
   return {
     materials,
     hardware: hardwareLines,
     materialsSubtotal,
     hardwareSubtotal,
+    laborCost,
+    assemblyCost,
+    transportCost,
     subtotal,
     marginPercent,
     marginAmount,
-    total: subtotal + marginAmount
+    priceBeforeDiscount,
+    discountPercent: pricing.discountPercent,
+    discountAmount,
+    net,
+    vatPercent: pricing.vatPercent,
+    vatAmount,
+    gross: net + vatAmount,
+    total: net
   };
 }
 

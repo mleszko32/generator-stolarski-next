@@ -37,6 +37,25 @@ export function ensureRoomDefaults(project) {
 // jedna wspólna cena za "płytę" nie miała sensu (zgłoszona uwaga).
 export const PRICING_MATERIAL_CATEGORIES = ['Korpus', 'Front', 'Szuflada', 'Plecy'];
 
+export const DEFAULT_VAT_PERCENT = 23;
+
+// Robocizna, montaż, transport, rabat i VAT - pola dodane po pierwszej wersji
+// kosztorysu, więc starsze projekty (i chmura) ich nie mają. Brak pola = 0,
+// z wyjątkiem VAT (domyślnie 23%); jawne 0 w VAT zostaje zerem.
+function nonNeg(v, fallback = 0) {
+  const n = parseFloat(v);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+export function migratePricingExtras(p) {
+  const hr = (o) => ({ hours: nonNeg(o && o.hours), rate: nonNeg(o && o.rate) });
+  p.labor = hr(p.labor);
+  p.assembly = hr(p.assembly);
+  p.transport = nonNeg(p.transport);
+  p.discountPercent = Math.min(100, nonNeg(p.discountPercent));
+  p.vatPercent = nonNeg(p.vatPercent, DEFAULT_VAT_PERCENT);
+  return p;
+}
+
 export function ensurePricingDefaults(project) {
   if (!project.pricing || typeof project.pricing !== 'object') {
     project.pricing = { materials: {}, marginPercent: 0, hardware: {} };
@@ -59,6 +78,7 @@ export function ensurePricingDefaults(project) {
   });
   p.marginPercent = parseFloat(p.marginPercent) || 0;
   if (!p.hardware || typeof p.hardware !== 'object') p.hardware = {};
+  migratePricingExtras(p);
 
   return p;
 }
@@ -86,7 +106,7 @@ export const state = {
     construction: { joinType: "boki_przelotowe", topType: "pelny", traverseWidth: 100 },
     front: { active: true, distribution: "1:1:1", drawerSystem: "merivobox", gap: 3, clearance: { sides: 1.5, top: 5, bottom: 0 } },
     room: { ...DEFAULT_ROOM },
-    pricing: { materials: { Korpus: 0, Front: 0, Szuflada: 0, Plecy: 0 }, marginPercent: 0, hardware: {} },
+    pricing: { materials: { Korpus: 0, Front: 0, Szuflada: 0, Plecy: 0 }, marginPercent: 0, hardware: {}, labor: { hours: 0, rate: 0 }, assembly: { hours: 0, rate: 0 }, transport: 0, discountPercent: 0, vatPercent: DEFAULT_VAT_PERCENT },
     modules: [],
     sidePanels: []
   }

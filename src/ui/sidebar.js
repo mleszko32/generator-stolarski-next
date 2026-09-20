@@ -313,21 +313,48 @@ function openKosztorysModal() {
                 </table>
             </section>
 
+            <section>
+                <h3 style="margin:0 0 8px 0; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#64748b;">Robocizna, montaż, transport</h3>
+                <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
+                    <tr><td style="padding:6px 8px 6px 0;">Robocizna (warsztat)</td><td style="text-align:right;"><input type="number" id="kosztorys-labor-hours" value="${pricing.labor.hours}" step="any" min="0" style="width:64px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px; font-size:12.5px;">&nbsp;h</td><td style="text-align:right;"><input type="number" id="kosztorys-labor-rate" value="${pricing.labor.rate}" step="any" min="0" style="width:70px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px; font-size:12.5px;">&nbsp;zł/h</td><td id="kosztorys-labor-cost" style="text-align:right; font-weight:600;">—</td></tr>
+                    <tr><td style="padding:6px 8px 6px 0;">Montaż</td><td style="text-align:right;"><input type="number" id="kosztorys-assembly-hours" value="${pricing.assembly.hours}" step="any" min="0" style="width:64px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px; font-size:12.5px;">&nbsp;h</td><td style="text-align:right;"><input type="number" id="kosztorys-assembly-rate" value="${pricing.assembly.rate}" step="any" min="0" style="width:70px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px; font-size:12.5px;">&nbsp;zł/h</td><td id="kosztorys-assembly-cost" style="text-align:right; font-weight:600;">—</td></tr>
+                    <tr><td style="padding:6px 8px 6px 0;">Transport</td><td></td><td style="text-align:right;"><input type="number" id="kosztorys-transport" value="${pricing.transport}" step="any" min="0" style="width:70px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px; font-size:12.5px;">&nbsp;zł</td><td></td></tr>
+                </table>
+            </section>
+
             <div style="display:flex; align-items:center; justify-content:space-between; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:10px 14px;">
                 <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:#92400e;">
-                    Marża / narzut na robociznę
+                    Marża
                     <input type="number" id="kosztorys-margin" value="${pricing.marginPercent}" step="1" min="0" style="width:56px; text-align:right; border:1px solid #fcd34d; border-radius:5px; padding:4px 6px; font-size:12.5px; color:#92400e; font-weight:700;">%
                 </label>
-                <span style="font-size:11px; color:#92400e; opacity:.8;">liczona od sumy materiału + okuć</span>
+                <span style="font-size:11px; color:#92400e; opacity:.8;">liczona od sumy kosztów</span>
+            </div>
+            <div style="display:flex; gap:24px; font-size:12.5px; font-weight:600; color:#334155;">
+                <label>Rabat <input type="number" id="kosztorys-discount" value="${pricing.discountPercent}" step="any" min="0" max="100" style="width:56px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px;">%</label>
+                <label>VAT <input type="number" id="kosztorys-vat" value="${pricing.vatPercent}" step="any" min="0" style="width:56px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px;">%</label>
             </div>
 
         </div>
         <div style="border-top:1px solid #e2e8f0; padding:16px 22px 20px 22px; display:flex; flex-direction:column; gap:6px; background:#f8fafc;">
             <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Materiały</span><span id="kosztorys-foot-plyty" style="color:#1e293b;">—</span></div>
             <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Okucia</span><span id="kosztorys-foot-okucia" style="color:#1e293b;">—</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Robocizna</span><span id="kosztorys-foot-labor" style="color:#1e293b;">—</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Montaż</span><span id="kosztorys-foot-assembly" style="color:#1e293b;">—</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Transport</span><span id="kosztorys-foot-transport" style="color:#1e293b;">—</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span><b>Suma kosztów</b></span><span id="kosztorys-foot-subtotal" style="color:#1e293b;">—</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Robocizna</span><span id="kosztorys-foot-labor" style="color:#1e293b;">—</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Montaż</span><span id="kosztorys-foot-assembly" style="color:#1e293b;">—</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Transport</span><span id="kosztorys-foot-transport" style="color:#1e293b;">—</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span><b>Suma kosztów</b></span><span id="kosztorys-foot-subtotal" style="color:#1e293b;">—</span></div>
             <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Marża (<span id="kosztorys-foot-marginpct">0</span>%)</span><span id="kosztorys-foot-margin" style="color:#1e293b;">—</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Rabat (<span id="kosztorys-foot-discpct">0</span>%)</span><span id="kosztorys-foot-discount" style="color:#1e293b;">—</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span><b>Cena netto</b></span><span id="kosztorys-foot-net" style="color:#1e293b;">—</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>VAT (<span id="kosztorys-foot-vatpct">23</span>%)</span><span id="kosztorys-foot-vat" style="color:#1e293b;">—</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Rabat (<span id="kosztorys-foot-discpct">0</span>%)</span><span id="kosztorys-foot-discount" style="color:#1e293b;">—</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span><b>Cena netto</b></span><span id="kosztorys-foot-net" style="color:#1e293b;">—</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>VAT (<span id="kosztorys-foot-vatpct">23</span>%)</span><span id="kosztorys-foot-vat" style="color:#1e293b;">—</span></div>
             <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:6px; padding-top:10px; border-top:1px dashed #cbd5e1;">
-                <span style="font-weight:700; font-size:13px;">Razem szacunkowo</span>
+                <span style="font-weight:700; font-size:13px;">Cena brutto</span>
                 <span id="kosztorys-foot-total" style="font-weight:800; font-size:22px; color:#059669;">—</span>
             </div>
             <p style="font-size:10.5px; color:#64748b; margin:8px 0 0 0;">Ceny zapisują się razem z projektem (przycisk "Zapisz projekt"). Ilości pobrane z listy formatek i listy okuć.</p>
@@ -361,6 +388,13 @@ function openKosztorysModal() {
         });
         pricing.marginPercent = parseFloat(modal.querySelector('#kosztorys-margin').value) || 0;
 
+        const num = (id) => Math.max(0, parseFloat(modal.querySelector(id).value) || 0);
+        pricing.labor = { hours: num('#kosztorys-labor-hours'), rate: num('#kosztorys-labor-rate') };
+        pricing.assembly = { hours: num('#kosztorys-assembly-hours'), rate: num('#kosztorys-assembly-rate') };
+        pricing.transport = num('#kosztorys-transport');
+        pricing.discountPercent = Math.min(100, num('#kosztorys-discount'));
+        pricing.vatPercent = num('#kosztorys-vat');
+
         const cost = calculateProjectCost();
 
         modal.querySelectorAll('.kosztorys-mat-area').forEach(cell => {
@@ -383,7 +417,19 @@ function openKosztorysModal() {
         modal.querySelector('#kosztorys-foot-okucia').textContent = formatPLN(cost.hardwareSubtotal);
         modal.querySelector('#kosztorys-foot-margin').textContent = formatPLN(cost.marginAmount);
         modal.querySelector('#kosztorys-foot-marginpct').textContent = cost.marginPercent;
-        modal.querySelector('#kosztorys-foot-total').textContent = formatPLN(cost.total);
+        const set = (id, v) => { modal.querySelector(id).textContent = v; };
+        set('#kosztorys-labor-cost', formatPLN(cost.laborCost));
+        set('#kosztorys-assembly-cost', formatPLN(cost.assemblyCost));
+        set('#kosztorys-foot-labor', formatPLN(cost.laborCost));
+        set('#kosztorys-foot-assembly', formatPLN(cost.assemblyCost));
+        set('#kosztorys-foot-transport', formatPLN(cost.transportCost));
+        set('#kosztorys-foot-subtotal', formatPLN(cost.subtotal));
+        set('#kosztorys-foot-discpct', cost.discountPercent);
+        set('#kosztorys-foot-discount', '−' + formatPLN(cost.discountAmount));
+        set('#kosztorys-foot-net', formatPLN(cost.net));
+        set('#kosztorys-foot-vatpct', cost.vatPercent);
+        set('#kosztorys-foot-vat', formatPLN(cost.vatAmount));
+        set('#kosztorys-foot-total', formatPLN(cost.gross));
     }
 
     function renderMaterialRows() {
@@ -429,6 +475,7 @@ function openKosztorysModal() {
     recalc();
 
     modal.querySelector('#kosztorys-margin').addEventListener('input', recalc);
+    ['labor-hours','labor-rate','assembly-hours','assembly-rate','transport','discount','vat'].forEach(k => modal.querySelector('#kosztorys-' + k).addEventListener('input', recalc));
     modal.querySelector('#kosztorys-close').addEventListener('click', () => document.body.removeChild(overlay));
     overlay.addEventListener('click', (e) => { if (e.target === overlay) document.body.removeChild(overlay); });
 }
