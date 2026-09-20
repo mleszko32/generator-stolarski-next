@@ -112,3 +112,20 @@ describe('blaty - narożnik na łyżwę i dzielenie', () => {
     expect([b.x0, b.x1, b.z0, b.z1, b.y0, b.y1]).toEqual([0, 1200, 0, 600, 820, 858]);
   });
 });
+
+describe('blaty - boki dokładane', () => {
+  const side = (x) => ({ id: 's' + x, position: { x, y: 0, z: 0 }, rotation: 0, dimensions: { width: 18, height: 2600, depth: 600 } });
+
+  it('blat przykrywa bok dokładany przy końcu rzędu', () => {
+    project([base('a', 18, 0), base('b', 618, 0)]);
+    state.project.sidePanels = [side(0), side(1218)];
+    const p = computeWorktops().pieces[0];
+    expect([p.u0, p.u1]).toEqual([0, 1236]);
+  });
+
+  it('sam bok bez szafki nie dostaje blatu', () => {
+    project([base('a', 0, 0)]);
+    state.project.sidePanels = [side(2000)];
+    expect(computeWorktops().pieces).toHaveLength(1);
+  });
+});

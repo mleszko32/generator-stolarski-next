@@ -11,6 +11,7 @@
 // 4100/2050 mm (cięcie liniowe).
 import { state } from "./state.js";
 import { computeWallLayouts } from "./walls.js";
+import { getWorldFootprint } from "./layout.js";
 
 export const WORKTOP_DEFAULTS = {
   enabled: false,
@@ -51,9 +52,29 @@ const CORNERS = [
 
 const WALL_LABEL = { tyl: 'tylna', prawa: 'prawa', przednia: 'przednia', lewa: 'lewa' };
 
-function buildRuns(wall, s) {
+// Boki dokładane (state.project.sidePanels) stojące przy ścianie: blat ma je przykrywać
+// razem z szafkami. Zwraca przedziały { u0, u1 } w układzie u danej ściany.
+function sidePanelIntervals(project, room, wallId, tol) {
+  const out = [];
+  (project.sidePanels || []).forEach(p => {
+    const { worldW, worldD } = getWorldFootprint(p);
+    const x = parseFloat(p.position?.x) || 0, z = parseFloat(p.position?.z) || 0;
+    const y0 = parseFloat(p.position?.y) || 0;
+    if (y0 >= HANG_MIN) return;
+    let at, u;
+    if (wallId === 'tyl') { at = z; u = [x, x + worldW]; }
+    else if (wallId === 'przednia') { at = room.depth - (z + worldD); u = [room.width - (x + worldW), room.width - x]; }
+    else if (wallId === 'prawa') { at = room.width - (x + worldW); u = [z, z + worldD]; }
+    else { at = x; u = [room.depth - (z + worldD), room.depth - z]; }
+    if (at <= tol) out.push({ u0: u[0], u1: u[1] });
+  });
+  return out;
+}
+
+function buildRuns(wall, s, panels = []) {
   const items = wall.items
     .filter(it => BASE_TYPES.includes(it.mod.type) && it.y0 < HANG_MIN && it.mod.worktop !== false)
+    .concat(panels.map(p => ({ ...p, panel: true, y1: 0, items: [] })))
     .sort((a, b) => a.u0 - b.u0);
   const runs = [];
   items.forEach(it => {
@@ -66,7 +87,8 @@ function buildRuns(wall, s) {
       runs.push({ u0: it.u0, u1: it.u1, y1: it.y1, items: [it] });
     }
   });
-  return runs;
+  // sam bok dokładany bez szafki nie dostaje blatu
+  return runs.filter(r => r.items.some(it => !it.panel));
 }
 
 // Wynik: { settings, pieces, plan } - pieces to kawałki po podziale na płyty (parts),
@@ -78,7 +100,7 @@ export function computeWorktops(project = state.project) {
 
   walls.forEach(w => {
     const L = w.length;
-    runsByWall[w.id] = buildRuns(w, s).map((r, index) => {
+    runsByWall[w.id] = buildRuns(w, s, sidePanelIntervals(project, room, w.id, s.gapTolerance)).map((r, index) => {
       let u0 = r.u0 - s.sideStart, u1 = r.u1 + s.sideEnd;
       // blat idzie od ściany na 0: koniec rzędu bliski ścianie dochodzi do ściany
       if (r.u0 <= s.gapTolerance) u0 = 0;
