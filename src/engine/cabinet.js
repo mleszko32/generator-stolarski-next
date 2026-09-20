@@ -4,6 +4,7 @@ import { calculateDrawerHoles, getDrawerComponents } from "../core/drawerMath.js
 import { drawerSystems } from "../core/drawerSystems.js";
 import { calculateHinges } from "../core/hingeMath.js";
 import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "./edgeBanding.js";
+import { getWorktopParts } from "../core/worktops.js";
 import { recalculateLayout, recalculateAllLayouts, getTraverseConfig, getWorldFootprint, getCornerDepths } from "../core/layout.js";
 
 export function calculateParts() {
@@ -236,6 +237,10 @@ export function collectProjectParts() {
     });
   });
 
+  // Blaty (core/worktops.js) - kategoria "Blat": w liście formatek i kosztorysie,
+  // ale poza rozkrojem płyt i okleiną (cięte osobno z płyt 4100/2050).
+  allParts.push(...getWorktopParts(config));
+
   return allParts;
 }
 
@@ -413,7 +418,7 @@ export function calculateProjectHardware() {
 // stałego zestawu pozycji do wycenienia. Tylko kategorie faktycznie obecne
 // w projekcie trafiają do wyniku (np. projekt bez szuflad nie pokaże
 // pustego wiersza "Szuflada").
-const MATERIAL_CATEGORY_ORDER = ['Korpus', 'Front', 'Szuflada', 'Plecy'];
+const MATERIAL_CATEGORY_ORDER = ['Korpus', 'Front', 'Szuflada', 'Plecy', 'Blat'];
 
 export function calculateProjectCost() {
   const pricing = state.project.pricing || { materials: {}, marginPercent: 0, hardware: {} };

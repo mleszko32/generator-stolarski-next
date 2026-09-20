@@ -7,6 +7,7 @@
 // (cokół, korpus, odstęp do sufitu). Dane liczy core/walls.js.
 import { escapeHtml } from '../utils/dom.js';
 import { computeWallLayouts } from '../core/walls.js';
+import { computeWorktops } from '../core/worktops.js';
 
 const NAVY = '#1e3a8a';
 const ORANGE = '#d97706';
@@ -111,6 +112,12 @@ export function generateWallSVG(wall, room, meta = {}) {
     svg += `<text x="${X((it.u0 + it.u1) / 2)}" y="${Y(it.y1) + fs * 1.5}" font-size="${fs * 1.05}" font-weight="bold" fill="#0f172a" text-anchor="middle">${moduleCode(it)}</text>`;
     const label = moduleLabel(it);
     if (label) svg += `<text x="${X((it.u0 + it.u1) / 2)}" y="${Y(it.y1) + fs * 2.7}" font-size="${fs * 0.8}" fill="#475569" text-anchor="middle">${fit(label)}</text>`;
+  });
+
+  // blaty (core/worktops.js): przekrój blatu nad szafkami, z opisem długości
+  (meta.worktops || []).filter(t => t.wallId === wall.id).forEach(t => {
+    svg += `<rect x="${X(t.u0)}" y="${Y(t.y + t.thickness)}" width="${t.length}" height="${t.thickness}" fill="#d6b48a" stroke="#7c5a34" stroke-width="${fs * 0.12}" />`;
+    svg += `<text x="${X((t.u0 + t.u1) / 2)}" y="${Y(t.y + t.thickness) - fs * 0.5}" font-size="${fs * 0.85}" fill="#7c5a34" text-anchor="middle">blat ${Math.round(t.length)} × ${Math.round(t.depth)} × ${t.thickness}</text>`;
   });
 
   // poziomy wysokości (linie pomocnicze po lewej) - góry szafek i spód korpusów
@@ -231,6 +238,7 @@ export function generateWallSVG(wall, room, meta = {}) {
 
 export function generateAllWallSVGs(project) {
   const { room, walls, plan } = computeWallLayouts(project);
-  const meta = { plan, projectName: project.name, date: new Date().toLocaleDateString('pl-PL') };
+  const wt = computeWorktops(project);
+  const meta = { worktops: wt.settings.enabled ? wt.pieces : [], plan, projectName: project.name, date: new Date().toLocaleDateString('pl-PL') };
   return walls.map(w => ({ wall: w, room, svg: generateWallSVG(w, room, meta) }));
 }

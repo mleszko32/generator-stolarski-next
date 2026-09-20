@@ -23,7 +23,7 @@ function getSettings() {
 // Rozwija formatki na pojedyncze sztuki z numerem (P001...) - ten sam numer
 // jest na schemacie rozkroju i na etykiecie.
 function buildPieces() {
-  const raw = collectProjectParts().slice().sort((a, b) => {
+  const raw = collectProjectParts().filter(p => p.category !== 'Blat').slice().sort((a, b) => {
     const ca = CATEGORY_ORDER.indexOf(a.category), cb = CATEGORY_ORDER.indexOf(b.category);
     return (ca === -1 ? 99 : ca) - (cb === -1 ? 99 : cb)
       || String(a.moduleName).localeCompare(String(b.moduleName), 'pl')

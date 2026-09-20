@@ -5,7 +5,7 @@
 // (kategoria "Plecy") - płyty pilśniowej nie okleja się. Formatka L (wieniec/
 // półka narożna) ma ten sam obwód co jej prostokąt opisany, bo wcięcie w rogu
 // nie zmienia obwodu, więc wystarczy length/width.
-export const EDGE_BANDING_EXCLUDED_CATEGORIES = ['Plecy'];
+export const EDGE_BANDING_EXCLUDED_CATEGORIES = ['Plecy', 'Blat'];
 // Zapas okleiny doliczany do zamówienia (odpad na końcach, docinanie).
 export const EDGE_BANDING_RESERVE = 0.10;
 

@@ -15,6 +15,7 @@ import { scheduleCheckpoint } from '../core/history.js';
 import { toggleInteriorEditor, renderInteriorEditorIfVisible } from '../ui/interiorEditor.js';
 
 import { updateSidebar } from '../ui/sidebar.js';
+import { worktopBoxes } from '../core/worktops.js';
 import { initPropertiesPanel } from '../ui/properties.js';
 
 let alignMode = { active: false, sourceMod: null, sourceEl: null, banner: null };
@@ -1198,6 +1199,7 @@ const mats = {
       plinth: new THREE.MeshStandardMaterial({ color: 0x1c1917, transparent: true, opacity: 0.7, depthWrite: true })
   }
 };
+const worktopMat = new THREE.MeshStandardMaterial({ color: 0x8a6a4a, roughness: 0.55, metalness: 0.0 });
 const holeMat = new THREE.MeshBasicMaterial({ color: 0xdc2626 }); 
 
 function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, parentGroup, rotationY = 0) {
@@ -2017,6 +2019,14 @@ export function update3D() {
   // po uwzględnieniu obrotu (getWorldFootprint działa na tym obiekcie bez
   // zmian, bo ma ten sam kształt dimensions/rotation co moduł).
   if (isFrontsVisible) {
+      worktopBoxes(state.project).forEach(b => {
+          const w = b.x1 - b.x0, d = b.z1 - b.z0, h = b.y1 - b.y0;
+          const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), isXrayMode ? mats.xray.shelf : worktopMat);
+          mesh.position.set(b.x0 + w / 2, b.y0 + h / 2, b.z0 + d / 2);
+          mesh.castShadow = !isXrayMode; mesh.receiveShadow = !isXrayMode;
+          mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), new THREE.LineBasicMaterial({ color: 0x1f2937 })));
+          cabinetGroup.add(mesh);
+      });
       (state.project.sidePanels || []).forEach(panel => {
           const isActiveSide = panel.id === state.activeSidePanelId;
           const { worldW, worldD } = getWorldFootprint(panel);
