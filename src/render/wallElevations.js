@@ -50,9 +50,28 @@ export function generateWallSVG(wall, room, meta = {}) {
   const Hroom = room.height;
   const fs = Math.max(22, Math.round(L * 0.0125));
   const tick = fs * 0.35;
-  const mLeft = fs * 9, mRight = fs * 13, mTop = fs * 11;
   const rowGap = fs * 2.2;
-  const mBottom = fs * 3 + rowGap * 2 + fs * 2 + fs * 5;
+
+  // Szafki dzielimy na dolne (stoją przy podłodze) i górne (wiszące, spód korpusu
+  // powyżej 600 mm) - każda grupa ma OSOBNY łańcuch wymiarów: dolne pod podłogą,
+  // górne nad ścianą. Wewnątrz grupy szafki, które nachodzą na siebie w poziomie,
+  // trafiają do kolejnych rzędów, żeby wymiary się nie nakładały.
+  const HANG_MIN = 600;
+  const splitRows = (list) => {
+    const rows = [];
+    list.slice().sort((a, b) => a.u0 - b.u0).forEach(it => {
+      let r = rows.find(row => row[row.length - 1].u1 <= it.u0 + 0.5);
+      if (!r) { r = []; rows.push(r); }
+      r.push(it);
+    });
+    return rows;
+  };
+  const floorRows = splitRows(wall.items.filter(it => it.y0 < HANG_MIN));
+  const hangRows = splitRows(wall.items.filter(it => it.y0 >= HANG_MIN));
+
+  const mLeft = fs * 9, mRight = fs * 13;
+  const mTop = fs * 15 + (hangRows.length ? fs * 2.6 + rowGap * (hangRows.length - 1) : 0);
+  const mBottom = fs * 3 + rowGap * (Math.max(1, floorRows.length) + 1) + fs * 2 + fs * 5;
   const vbW = L + mLeft + mRight;
   const vbH = Hroom + mTop + mBottom;
   const ox = mLeft;
@@ -102,9 +121,7 @@ export function generateWallSVG(wall, room, meta = {}) {
     svg += `<text x="${X(0) - fs * 2.5}" y="${Y(h) + fs * 0.35}" font-size="${fs * 0.9}" fill="${NAVY}" text-anchor="end">+${h}</text>`;
   });
 
-  // rzędy wymiarów poziomych pod podłogą
-  const yRow1 = Y(0) + fs * 2.4;
-  const yRow2 = yRow1 + rowGap;
+  // wymiary poziome
   const dimH = (u0, u1, y, label, color) => {
     let s = `<line x1="${X(u0)}" y1="${y}" x2="${X(u1)}" y2="${y}" stroke="${color}" stroke-width="${fs * 0.1}" />`;
     s += `<line x1="${X(u0)}" y1="${y - tick}" x2="${X(u0)}" y2="${y + tick}" stroke="${color}" stroke-width="${fs * 0.1}" />`;
@@ -114,16 +131,71 @@ export function generateWallSVG(wall, room, meta = {}) {
     return s;
   };
 
-  // łańcuch: odstęp / szafka / odstęp ... do długości ściany
-  let cursor = 0;
-  wall.items.forEach(it => {
-    const u0 = Math.max(0, it.u0), u1 = Math.min(L, it.u1);
-    if (u0 - cursor > 0.5) svg += dimH(cursor, u0, yRow1, `${Math.round(u0 - cursor)}`, ORANGE);
-    svg += dimH(u0, u1, yRow1, `${Math.round(u1 - u0)}`, NAVY);
-    cursor = Math.max(cursor, u1);
+  // Łańcuch jednego rzędu: odstęp od ściany / szafka / odstęp / szafka ... / odstęp do
+  // ściany. Odstępy (pomarańczowe) między szafkami, żeby było widać wolne miejsce.
+  const chain = (row, y) => {
+    let out = '';
+    let cursor = 0;
+    row.forEach(it => {
+      const u0 = Math.max(0, it.u0), u1 = Math.min(L, it.u1);
+      if (u0 - cursor > 0.5) out += dimH(cursor, u0, y, `${Math.round(u0 - cursor)}`, ORANGE);
+      out += dimH(u0, u1, y, `${Math.round(u1 - u0)}`, NAVY);
+      cursor = Math.max(cursor, u1);
+    });
+    if (L - cursor > 0.5 && row.length > 0) out += dimH(cursor, L, y, `${Math.round(L - cursor)}`, ORANGE);
+    return out;
+  };
+  const rowLabel = (text, y) => `<text x="${X(0) - fs * 0.6}" y="${y + fs * 0.3}" font-size="${fs * 0.8}" fill="${GRAY}" text-anchor="end">${text}</text>`;
+
+  // dolne: pod podłogą, od najbliższego podłodze rzędu w dół
+  const yFloor0 = Y(0) + fs * 2.4;
+  floorRows.forEach((row, i) => {
+    const y = yFloor0 + i * rowGap;
+    svg += chain(row, y) + rowLabel('dolne', y);
   });
-  if (L - cursor > 0.5 && wall.items.length > 0) svg += dimH(cursor, L, yRow1, `${Math.round(L - cursor)}`, ORANGE);
-  svg += dimH(0, L, yRow2, `${Math.round(L)} mm`, '#0f172a');
+  const yOverall = yFloor0 + Math.max(1, floorRows.length) * rowGap;
+  svg += dimH(0, L, yOverall, `${Math.round(L)} mm`, '#0f172a');
+
+  // górne: nad ścianą (nad sufitem), od najbliższego ściany rzędu w górę
+  hangRows.forEach((row, i) => {
+    const y = Y(Hroom) - fs * 2.4 - i * rowGap;
+    svg += chain(row, y) + rowLabel('górne', y);
+  });
+
+  // pionowo: przestrzeń między górą szafki dolnej a spodem górnej (np. blat -> szafki
+  // wiszące), w miejscu, gdzie obie się pokrywają w poziomie
+  wall.items.forEach(up => {
+    if (up.y0 < HANG_MIN) return;
+    wall.items.forEach(low => {
+      if (low === up || low.y0 >= HANG_MIN) return;
+      const ov0 = Math.max(up.u0, low.u0), ov1 = Math.min(up.u1, low.u1);
+      if (ov1 - ov0 < fs * 2 || up.y0 - low.y1 < 1) return;
+      const x = X(ov0 + Math.min(fs * 3, (ov1 - ov0) / 2));
+      svg += `<line x1="${x}" y1="${Y(low.y1)}" x2="${x}" y2="${Y(up.y0)}" stroke="${ORANGE}" stroke-width="${fs * 0.1}" />`;
+      svg += `<line x1="${x - tick}" y1="${Y(low.y1)}" x2="${x + tick}" y2="${Y(low.y1)}" stroke="${ORANGE}" stroke-width="${fs * 0.1}" />`;
+      svg += `<line x1="${x - tick}" y1="${Y(up.y0)}" x2="${x + tick}" y2="${Y(up.y0)}" stroke="${ORANGE}" stroke-width="${fs * 0.1}" />`;
+      svg += `<text x="${x + fs * 0.7}" y="${(Y(low.y1) + Y(up.y0)) / 2 + fs * 0.35}" font-size="${fs * 0.95}" font-weight="bold" fill="${ORANGE}">${Math.round(up.y0 - low.y1)}</text>`;
+    });
+  });
+
+  // Wysokość korpusu: po jednym wymiarze na każdą wysokość (para spód/góra),
+  // przy prawej krawędzi ostatniej takiej szafki - tylko gdy obok jest miejsce.
+  {
+    const groups = new Map();
+    wall.items.forEach(it => {
+      const k = Math.round(it.y0) + '|' + Math.round(it.y1);
+      if (!groups.has(k) || it.u1 > groups.get(k).u1) groups.set(k, it);
+    });
+    groups.forEach(it => {
+      const blocked = wall.items.some(o => o !== it && o.u0 < it.u1 + fs * 5 && o.u1 > it.u1 && o.y0 < it.y1 && o.y1 > it.y0);
+      if (blocked || it.u1 + fs * 5 > L) return;
+      const x = X(it.u1) + fs * 1.6;
+      svg += `<line x1="${x}" y1="${Y(it.y0)}" x2="${x}" y2="${Y(it.y1)}" stroke="${NAVY}" stroke-width="${fs * 0.1}" />`;
+      svg += `<line x1="${x - tick}" y1="${Y(it.y0)}" x2="${x + tick}" y2="${Y(it.y0)}" stroke="${NAVY}" stroke-width="${fs * 0.1}" />`;
+      svg += `<line x1="${x - tick}" y1="${Y(it.y1)}" x2="${x + tick}" y2="${Y(it.y1)}" stroke="${NAVY}" stroke-width="${fs * 0.1}" />`;
+      svg += `<text x="${x + fs * 0.7}" y="${(Y(it.y0) + Y(it.y1)) / 2 + fs * 0.35}" font-size="${fs * 0.95}" font-weight="bold" fill="${NAVY}">${Math.round(it.y1 - it.y0)}</text>`;
+    });
+  }
 
   // wymiary pionowe przy prawej krawędzi: cokół / korpus najwyższej szafki / do sufitu
   if (wall.items.length > 0) {
