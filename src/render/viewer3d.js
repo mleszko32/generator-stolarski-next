@@ -281,10 +281,10 @@ export function init3DViewer() {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0xf1f5f9);
 
-  camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 10, 100000);
+  camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 100000);
   camera.position.set(2500, 1500, 3500); // nadpisane zaraz po utworzeniu controls przez reframeCameraToRoom()
 
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, logarithmicDepthBuffer: true }); // log. bufor głębi: bliska płaszczyzna 1 mm bez migotania krawędzi przy zbliżeniach
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(container.clientWidth, container.clientHeight);
   renderer.shadowMap.enabled = true;
@@ -302,6 +302,12 @@ export function init3DViewer() {
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
+  // Zbliżanie do detali (łączenia, okucia): zoom w kierunku kursora, prawie do styku
+  // i szybsze kółko - wcześniej kamera zatrzymywała się daleko, a bliska płaszczyzna
+  // 10 mm ucinała szczegóły.
+  controls.zoomToCursor = true;
+  controls.zoomSpeed = 1.6;
+  controls.minDistance = 20;
 
   // Miękkie oświetlenie otoczenia (IBL) z gotowej "pokojowej" sceny three.js —
   // bez tego płyty korpusu (MeshStandardMaterial) odbijają światło tylko z
