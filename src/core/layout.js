@@ -132,7 +132,7 @@ export function restModuleOnNeighbors(mod) {
     if (!(overlapY <= overlapX && overlapY <= overlapZ)) return;
 
     const dir = boxM.y0 + boxM.y1 >= boxO.y0 + boxO.y1 ? 1 : -1;
-    mod.position.y = Math.round((parseFloat(mod.position.y) || 0) + dir * overlapY);
+    mod.position.y = Math.round(((parseFloat(mod.position.y) || 0) + dir * overlapY) * 100) / 100;
     boxM.y0 += dir * overlapY;
     boxM.y1 += dir * overlapY;
   });

@@ -27,6 +27,7 @@
 // wrapperami wokół niej, więc zachowanie dla istniejących wywołań (main.js,
 // ui/properties.js, ui/sidebar.js, render/viewer3d.js) jest identyczne jak
 // przed wprowadzeniem fabryki.
+import { fmtMm } from "../utils/math.js";
 import { getActiveModule } from "../core/state.js";
 import {
   buildZoneTree,
@@ -324,7 +325,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
   }
 
   function appendDimNumber(container, valueMm, parentSplit, side, onCommit, editInfo = null) {
-    const rounded = Math.round(valueMm);
+    const rounded = fmtMm(valueMm);
     if (!parentSplit) {
       if (!editInfo) {
         const span = document.createElement("span");
@@ -361,7 +362,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
         });
         input.addEventListener("blur", () => {
           const mm = parseFloat(input.value);
-          if (Number.isFinite(mm) && mm > 0 && Math.round(mm) !== rounded) onCommit(mm);
+          if (Number.isFinite(mm) && mm > 0 && Math.abs(mm - valueMm) > 0.05) onCommit(mm);
           else if (input.parentNode) input.parentNode.replaceChild(forcedSpan, input);
         });
         container.replaceChild(input, forcedSpan);
@@ -409,7 +410,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       });
       input.addEventListener("blur", () => {
         const mm = parseFloat(input.value);
-        if (Number.isFinite(mm) && mm > 0 && Math.round(mm) !== rounded) onCommit(mm);
+        if (Number.isFinite(mm) && mm > 0 && Math.abs(mm - valueMm) > 0.05) onCommit(mm);
         else if (input.parentNode) input.parentNode.replaceChild(numSpan, input);
       });
       container.replaceChild(input, numSpan);

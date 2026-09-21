@@ -103,7 +103,7 @@ export function autoDistributeShelves(internalHeight, boardThick, shelfCount) {
   if (shelfCount <= 0) return shelves;
 
   const totalClearance = internalHeight - (shelfCount * boardThick);
-  const standardGap = Math.round(totalClearance / (shelfCount + 1));
+  const standardGap = Math.round(totalClearance / (shelfCount + 1) * 10) / 10;
   
   let currentY = standardGap; 
 

@@ -8,7 +8,7 @@ import { getTraverseConfig, clampModuleToRoom, restModuleOnNeighbors, getCornerD
 import { drawerSystems, DRAWER_VARIANT_ORDER, DRAWER_VARIANT_LABELS } from "../core/drawerSystems.js";
 import { getDrawerVariant } from "../core/drawerMath.js";
 import { escapeHtml } from "../utils/dom.js";
-import { evalDimensionExpr } from "../utils/math.js";
+import { evalDimensionExpr, fmtMm } from "../utils/math.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
 import { openCornerConfigModal } from "./cornerConfigModal.js";
@@ -212,11 +212,11 @@ export function openCornerBlankPrintView(mod) {
       </div>
       <div class="header">
         <h1>Wykrój narożny: ${escapeHtml(mod.name)}</h1>
-        <p>Wspólny wykrój (ten sam prostokątny blank ${Math.round(legA)}×${Math.round(legB)} mm z odciętym rogiem) dla:</p>
+        <p>Wspólny wykrój (ten sam prostokątny blank ${fmtMm(legA)}×${fmtMm(legB)} mm z odciętym rogiem) dla:</p>
         <ul>
           <li>Wieniec narożny (dolny) — 1 szt.</li>
           <li>Wieniec narożny (górny) — 1 szt.</li>
-          ${shelfCount > 0 ? `<li>Półka narożna — ${shelfCount} szt. (dodatkowo wycięcie 100×${Math.round(th)} mm w tylnym rogu na listwę narożną)</li>` : ''}
+          ${shelfCount > 0 ? `<li>Półka narożna — ${shelfCount} szt. (dodatkowo wycięcie 100×${fmtMm(th)} mm w tylnym rogu na listwę narożną)</li>` : ''}
         </ul>
       </div>
       ${svgContent}
@@ -381,7 +381,7 @@ export function initPropertiesPanel() {
               const bottomHinge = hinges[0];
               const topHinge = hinges[hinges.length - 1];
               if (bottomHinge.isAdjusted) actualBottomText = `<div style="color: #c2410c; font-size: 10px; margin-top: 4px; padding: 4px 6px; background: #ffedd5; border-left: 3px solid #ea580c; border-radius: 2px;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Zmieniono na: <b>${bottomHinge.relY} mm</b> (Kolizja)</div>`;
-              if (topHinge.isAdjusted) actualTopText = `<div style="color: #c2410c; font-size: 10px; margin-top: 4px; padding: 4px 6px; background: #ffedd5; border-left: 3px solid #ea580c; border-radius: 2px;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Zmieniono na: <b>${Math.round(front.h - topHinge.relY)} mm</b> (Kolizja)</div>`;
+              if (topHinge.isAdjusted) actualTopText = `<div style="color: #c2410c; font-size: 10px; margin-top: 4px; padding: 4px 6px; background: #ffedd5; border-left: 3px solid #ea580c; border-radius: 2px;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Zmieniono na: <b>${fmtMm(front.h - topHinge.relY)} mm</b> (Kolizja)</div>`;
           }
       }
   } catch(e) {}
@@ -424,7 +424,7 @@ export function initPropertiesPanel() {
       .sort((a, b) => (parseFloat(a.y) || 0) - (parseFloat(b.y) || 0) || (parseFloat(a.x) || 0) - (parseFloat(b.x) || 0))
       .map((front, idx) => ({
           front,
-          label: `Drzwi ${idx + 1} · ${Math.round(front.w || 0)}×${Math.round(front.h || 0)} mm`,
+          label: `Drzwi ${idx + 1} · ${fmtMm(front.w || 0)}×${fmtMm(front.h || 0)} mm`,
       }));
   const doorSideHtml = doorFrontsList.length === 0
       ? '<div style="font-size: 11px; color: #94a3b8;">Ta szafka nie ma jeszcze drzwi.</div>'
@@ -643,7 +643,7 @@ export function initPropertiesPanel() {
                 <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
                   <input type="checkbox" class="input-traverse-active" data-side="${side}" ${active ? 'checked' : ''} title="Czy ten trawers ma w ogóle istnieć" style="width: 14px; height: 14px; cursor: pointer; flex-shrink: 0;" />
                   <span style="width: 52px; flex-shrink: 0; font-size: 11px; font-weight: bold;">${TRAVERSE_LABELS[side]}:</span>
-                  <input type="number" class="input-traverse-width-override" data-side="${side}" value="${displayWidth}" step="1" ${active ? '' : 'disabled'} style="flex: 1; min-width: 0;${widthOverridden ? ' border-color:#3b82f6; background:#eff6ff;' : ''}" />
+                  <input type="number" class="input-traverse-width-override" data-side="${side}" value="${displayWidth}" step="0.5" ${active ? '' : 'disabled'} style="flex: 1; min-width: 0;${widthOverridden ? ' border-color:#3b82f6; background:#eff6ff;' : ''}" />
                   <span style="font-size: 10px; color: #94a3b8; flex-shrink: 0;">mm</span>
                   ${widthOverridden
                       ? `<button type="button" class="btn-traverse-reset" data-side="${side}" title="Wróć do wspólnej szerokości" style="border: none; background: #eff6ff; color: #1d4ed8; border-radius: 4px; width: 24px; height: 24px; cursor: pointer; font-weight: bold; flex-shrink: 0;">↺</button>`
@@ -687,7 +687,7 @@ export function initPropertiesPanel() {
               return `
               <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 6px;">
                 <span style="width: 76px; flex-shrink: 0; font-size: 11px; color: #9a3412; font-weight: bold;">${label}:</span>
-                <input type="number" class="input-leg-height-override" data-leg-index="${i}" value="${shownVal}" step="1" style="flex: 1; min-width: 0;${overridden ? ' border-color:#f97316; background:#ffedd5;' : ' border-color:#fed7aa;'}" />
+                <input type="number" class="input-leg-height-override" data-leg-index="${i}" value="${shownVal}" step="0.5" style="flex: 1; min-width: 0;${overridden ? ' border-color:#f97316; background:#ffedd5;' : ' border-color:#fed7aa;'}" />
                 <span style="font-size: 10px; color: #9a3412; flex-shrink: 0;">mm</span>
                 ${overridden
                     ? `<button type="button" class="btn-leg-reset" data-leg-index="${i}" title="Wróć do wspólnej wysokości" style="border: none; background: #ffedd5; color: #9a3412; border-radius: 4px; width: 24px; height: 24px; cursor: pointer; font-weight: bold; flex-shrink: 0;">↺</button>`
@@ -748,10 +748,10 @@ export function initPropertiesPanel() {
     ${tabContent("zawiasy", `
       <div style="background: #ecfdf5; padding: 10px; border: 1px dashed #6ee7b7; border-radius: 4px;">
         <h3 style="color: #047857;">Wymiary Osi Zawiasów (Lokalne)</h3>
-        <div class="property-group" style="margin-bottom: ${actualTopText ? '12px' : '8px'};"><label style="font-size: 11px;">Od góry do środka puszki (mm):</label><input type="number" id="input-hinge-top" value="${fh.topOffset}" step="1" />${actualTopText}</div>
-        <div class="property-group" style="margin-bottom: ${actualBottomText ? '12px' : '8px'};"><label style="font-size: 11px;">Od dołu do środka puszki (mm):</label><input type="number" id="input-hinge-bottom" value="${fh.bottomOffset}" step="1" />${actualBottomText}</div>
-        <div class="property-group"><label style="font-size: 11px;">Bezpieczny margines od półki (mm):</label><input type="number" id="input-hinge-margin" value="${fh.margin}" step="1" /></div>
-        <div class="property-group" style="margin-top: 8px; margin-bottom: 0;"><label style="font-size: 11px; font-weight: bold; color: #065f46;">Wymuś ilość zawiasów (0 = Auto):</label><input type="number" id="input-hinge-count" value="${fh.forceCount || 0}" step="1" style="border-color: #34d399; background-color: #d1fae5;" /></div>
+        <div class="property-group" style="margin-bottom: ${actualTopText ? '12px' : '8px'};"><label style="font-size: 11px;">Od góry do środka puszki (mm):</label><input type="number" id="input-hinge-top" value="${fh.topOffset}" step="0.5" />${actualTopText}</div>
+        <div class="property-group" style="margin-bottom: ${actualBottomText ? '12px' : '8px'};"><label style="font-size: 11px;">Od dołu do środka puszki (mm):</label><input type="number" id="input-hinge-bottom" value="${fh.bottomOffset}" step="0.5" />${actualBottomText}</div>
+        <div class="property-group"><label style="font-size: 11px;">Bezpieczny margines od półki (mm):</label><input type="number" id="input-hinge-margin" value="${fh.margin}" step="0.5" /></div>
+        <div class="property-group" style="margin-top: 8px; margin-bottom: 0;"><label style="font-size: 11px; font-weight: bold; color: #065f46;">Wymuś ilość zawiasów (0 = Auto):</label><input type="number" id="input-hinge-count" value="${fh.forceCount || 0}" step="0.5" style="border-color: #34d399; background-color: #d1fae5;" /></div>
       </div>
 
       <h3 style="color: #7c3aed;">Zawiasy — pozycje ręczne</h3>
@@ -761,14 +761,14 @@ export function initPropertiesPanel() {
         <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 6px; padding: 10px; margin-bottom: 10px;">
           <div style="font-weight: bold; font-size: 12px; color: #6d28d9; margin-bottom: 8px;">
             <i class="ti ti-door" aria-hidden="true"></i> ${escapeHtml(group.label)}
-            <span style="font-weight: normal; color: #94a3b8;">(wys. ${Math.round(group.front.h)}mm, start ${Math.round(group.front.y)}mm od dołu szafki)</span>
+            <span style="font-weight: normal; color: #94a3b8;">(wys. ${fmtMm(group.front.h)}mm, start ${fmtMm(group.front.y)}mm od dołu szafki)</span>
           </div>
           ${group.hinges.map((h, i) => {
               const overridden = group.front.hingeOverrides && group.front.hingeOverrides[i] !== undefined && group.front.hingeOverrides[i] !== null;
               return `
               <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 6px;">
                 <span style="width: 52px; flex-shrink: 0; font-size: 11px; color: #6d28d9; font-weight: bold;">Zawias ${i + 1}:</span>
-                <input type="number" class="input-hinge-override" data-front-id="${group.front.id}" data-hinge-index="${i}" value="${h.y}" step="1" style="flex: 1; min-width: 0;${overridden ? ' border-color:#a855f7; background:#f3e8ff;' : ''}" />
+                <input type="number" class="input-hinge-override" data-front-id="${group.front.id}" data-hinge-index="${i}" value="${h.y}" step="0.5" style="flex: 1; min-width: 0;${overridden ? ' border-color:#a855f7; background:#f3e8ff;' : ''}" />
                 <span style="font-size: 10px; color: #94a3b8; flex-shrink: 0;">mm</span>
                 ${overridden
                     ? `<button type="button" class="btn-hinge-reset" data-front-id="${group.front.id}" data-hinge-index="${i}" title="Wróć do automatycznej pozycji" style="border: none; background: #ede9fe; color: #6d28d9; border-radius: 4px; width: 24px; height: 24px; cursor: pointer; font-weight: bold; flex-shrink: 0;">↺</button>`

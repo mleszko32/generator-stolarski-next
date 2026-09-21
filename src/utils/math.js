@@ -76,3 +76,13 @@ export function evalDimensionExpr(input) {
     return NaN;
   }
 }
+
+// Wymiar w mm do pokazania człowiekowi: do 0,1 mm, bez zbędnego ".0" (600 → "600",
+// 600.5 → "600.5"). Zaokrąglanie do pełnych mm ukrywało połówki milimetra.
+export function fmtMm(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? String(Number(n.toFixed(1))) : '';
+}
+
+// Zaokrąglenie wartości liczbowej do 0,1 mm (obliczenia, nie tekst).
+export const round1 = (v) => Math.round(v * 10) / 10;

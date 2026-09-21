@@ -1,9 +1,10 @@
 // src/core/hingeMath.js
 import { state } from './state.js';
+import { round1 } from '../utils/math.js';
 
 export function calculateHinges(front, boardThick, obstacles, side) {
-  const h = Math.round(front.h); 
-  const y = Math.round(front.y); 
+  const h = round1(front.h); 
+  const y = round1(front.y); 
   
   const mod = state.project.modules.find(m => m.elements && m.elements.some(e => e.id === front.id));
   
@@ -35,7 +36,7 @@ export function calculateHinges(front, boardThick, obstacles, side) {
   if (count === 2) {
     cupRelPositions = [bottomDist, h - topDist];
   } else {
-    const step = Math.round((h - topDist - bottomDist) / (count - 1));
+    const step = round1((h - topDist - bottomDist) / (count - 1));
     for (let i = 0; i < count; i++) {
       if (i === 0) {
          cupRelPositions.push(bottomDist);
@@ -57,8 +58,8 @@ export function calculateHinges(front, boardThick, obstacles, side) {
     if (manualY !== undefined && manualY !== null && manualY !== '') {
       const manualAbsY = Number(manualY);
       return {
-        y: Math.round(manualAbsY),
-        relY: Math.round(manualAbsY - y),
+        y: round1(manualAbsY),
+        relY: round1(manualAbsY - y),
         side: side,
         cupXOffset: 22.5,
         isAdjusted: false,
@@ -127,11 +128,11 @@ export function calculateHinges(front, boardThick, obstacles, side) {
     }
 
     return {
-      y: Math.round(absY),             
-      relY: Math.round(currentRelY),   
+      y: round1(absY),             
+      relY: round1(currentRelY),   
       side: side,
       cupXOffset: 22.5,
-      isAdjusted: Math.round(currentRelY) !== Math.round(relY)
+      isAdjusted: round1(currentRelY) !== round1(relY)
     };
   });
 

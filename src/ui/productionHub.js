@@ -5,6 +5,7 @@
 // okleina, Kosztorys), zawartość po prawej. Akcje (wydruki, CSV, kosztorys)
 // to te same funkcje co dotąd (ui/sidebar.js), tylko w jednym miejscu.
 import { escapeHtml } from "../utils/dom.js";
+import { fmtMm } from "../utils/math.js";
 import { state, getActiveModule } from "../core/state.js";
 import { collectProjectParts, calculateAllProjectParts, calculateProjectHardware } from "../engine/cabinet.js";
 import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "../engine/edgeBanding.js";
@@ -189,7 +190,7 @@ function renderBlaty(el) {
     const first = pc.part === 1;
     return `<tr>
       <td>${escapeHtml(pc.wallLabel)}${pc.seam ? ` (${pc.part}/${pc.parts})` : ''}</td>
-      <td>${Math.round(pc.length)} × ${Math.round(pc.depth)} × ${pc.thickness}</td>
+      <td>${fmtMm(pc.length)} × ${fmtMm(pc.depth)} × ${pc.thickness}</td>
       <td>${pc.joins.map(j => escapeHtml(j.role)).join(', ') || '—'}</td>
       <td>${first ? `<input type="number" class="wt-ov" data-key="${pc.key}" data-f="start" value="${num(o.start)}" placeholder="${Math.round(pc.base ? pc.base.u0 : pc.u0)}" style="width:80px">` : ''}</td>
       <td>${first ? `<input type="number" class="wt-ov" data-key="${pc.key}" data-f="length" value="${num(o.length)}" placeholder="auto" style="width:80px">` : ''}</td>

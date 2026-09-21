@@ -6,6 +6,7 @@
 // pomocnicze z opisem po lewej) oraz wymiary pionowe przy prawej krawędzi
 // (cokół, korpus, odstęp do sufitu). Dane liczy core/walls.js.
 import { escapeHtml } from '../utils/dom.js';
+import { fmtMm } from '../utils/math.js';
 import { computeWallLayouts } from '../core/walls.js';
 import { computeWorktops } from '../core/worktops.js';
 
@@ -18,7 +19,7 @@ const TYPE_PREFIX = { base_cabinet: 'D', upper_cabinet: 'W', tall_cabinet: 'S', 
 // Kod szafki na rzucie: typ + szerokość (D600 = dolna 600, W800 = wisząca 800,
 // S = słupek, N = narożna - dla narożnej szerokość ramienia na tej ścianie).
 function moduleCode(item) {
-  return `${TYPE_PREFIX[item.mod.type] || 'M'}${Math.round(item.u1 - item.u0)}`;
+  return `${TYPE_PREFIX[item.mod.type] || 'M'}${fmtMm(item.u1 - item.u0)}`;
 }
 
 function moduleLabel(item) {
@@ -86,7 +87,7 @@ export function generateWallSVG(wall, room, meta = {}) {
   if (meta.plan) svg += planInset(wall.id, room, meta.plan, ox + L - fs * 13, fs * 1.2, fs * 13, fs);
 
   // tytuł
-  svg += `<text x="${ox}" y="${fs * 1.6}" font-size="${fs * 1.3}" font-weight="bold" fill="#0f172a">${escapeHtml(wall.label.toUpperCase())} <tspan font-weight="normal" font-size="${fs}" fill="${GRAY}">(widok od środka pokoju) · ${Math.round(L)} × ${Math.round(Hroom)} mm</tspan></text>`;
+  svg += `<text x="${ox}" y="${fs * 1.6}" font-size="${fs * 1.3}" font-weight="bold" fill="#0f172a">${escapeHtml(wall.label.toUpperCase())} <tspan font-weight="normal" font-size="${fs}" fill="${GRAY}">(widok od środka pokoju) · ${fmtMm(L)} × ${fmtMm(Hroom)} mm</tspan></text>`;
 
   // ściana
   svg += `<rect x="${X(0)}" y="${Y(Hroom)}" width="${L}" height="${Hroom}" fill="#f8fafc" stroke="#94a3b8" stroke-width="${fs * 0.12}" />`;
@@ -117,7 +118,7 @@ export function generateWallSVG(wall, room, meta = {}) {
   // blaty (core/worktops.js): przekrój blatu nad szafkami, z opisem długości
   (meta.worktops || []).filter(t => t.wallId === wall.id).forEach(t => {
     svg += `<rect x="${X(t.u0)}" y="${Y(t.y + t.thickness)}" width="${t.length}" height="${t.thickness}" fill="#d6b48a" stroke="#7c5a34" stroke-width="${fs * 0.12}" />`;
-    svg += `<text x="${X((t.u0 + t.u1) / 2)}" y="${Y(t.y + t.thickness) - fs * 0.5}" font-size="${fs * 0.85}" fill="#7c5a34" text-anchor="middle">blat ${Math.round(t.length)} × ${Math.round(t.depth)} × ${t.thickness}</text>`;
+    svg += `<text x="${X((t.u0 + t.u1) / 2)}" y="${Y(t.y + t.thickness) - fs * 0.5}" font-size="${fs * 0.85}" fill="#7c5a34" text-anchor="middle">blat ${fmtMm(t.length)} × ${fmtMm(t.depth)} × ${t.thickness}</text>`;
   });
 
   // poziomy wysokości (linie pomocnicze po lewej) - góry szafek i spód korpusów
@@ -145,11 +146,11 @@ export function generateWallSVG(wall, room, meta = {}) {
     let cursor = 0;
     row.forEach(it => {
       const u0 = Math.max(0, it.u0), u1 = Math.min(L, it.u1);
-      if (u0 - cursor > 0.5) out += dimH(cursor, u0, y, `${Math.round(u0 - cursor)}`, ORANGE);
-      out += dimH(u0, u1, y, `${Math.round(u1 - u0)}`, NAVY);
+      if (u0 - cursor > 0.5) out += dimH(cursor, u0, y, `${fmtMm(u0 - cursor)}`, ORANGE);
+      out += dimH(u0, u1, y, `${fmtMm(u1 - u0)}`, NAVY);
       cursor = Math.max(cursor, u1);
     });
-    if (L - cursor > 0.5 && row.length > 0) out += dimH(cursor, L, y, `${Math.round(L - cursor)}`, ORANGE);
+    if (L - cursor > 0.5 && row.length > 0) out += dimH(cursor, L, y, `${fmtMm(L - cursor)}`, ORANGE);
     return out;
   };
   const rowLabel = (text, y) => `<text x="${X(0) - fs * 0.6}" y="${y + fs * 0.3}" font-size="${fs * 0.8}" fill="${GRAY}" text-anchor="end">${text}</text>`;
@@ -161,7 +162,7 @@ export function generateWallSVG(wall, room, meta = {}) {
     svg += chain(row, y) + rowLabel('dolne', y);
   });
   const yOverall = yFloor0 + Math.max(1, floorRows.length) * rowGap;
-  svg += dimH(0, L, yOverall, `${Math.round(L)} mm`, '#0f172a');
+  svg += dimH(0, L, yOverall, `${fmtMm(L)} mm`, '#0f172a');
 
   // górne: nad ścianą (nad sufitem), od najbliższego ściany rzędu w górę
   hangRows.forEach((row, i) => {
@@ -181,7 +182,7 @@ export function generateWallSVG(wall, room, meta = {}) {
       svg += `<line x1="${x}" y1="${Y(low.y1)}" x2="${x}" y2="${Y(up.y0)}" stroke="${ORANGE}" stroke-width="${fs * 0.1}" />`;
       svg += `<line x1="${x - tick}" y1="${Y(low.y1)}" x2="${x + tick}" y2="${Y(low.y1)}" stroke="${ORANGE}" stroke-width="${fs * 0.1}" />`;
       svg += `<line x1="${x - tick}" y1="${Y(up.y0)}" x2="${x + tick}" y2="${Y(up.y0)}" stroke="${ORANGE}" stroke-width="${fs * 0.1}" />`;
-      svg += `<text x="${x + fs * 0.7}" y="${(Y(low.y1) + Y(up.y0)) / 2 + fs * 0.35}" font-size="${fs * 0.95}" font-weight="bold" fill="${ORANGE}">${Math.round(up.y0 - low.y1)}</text>`;
+      svg += `<text x="${x + fs * 0.7}" y="${(Y(low.y1) + Y(up.y0)) / 2 + fs * 0.35}" font-size="${fs * 0.95}" font-weight="bold" fill="${ORANGE}">${fmtMm(up.y0 - low.y1)}</text>`;
     });
   });
 
@@ -200,7 +201,7 @@ export function generateWallSVG(wall, room, meta = {}) {
       svg += `<line x1="${x}" y1="${Y(it.y0)}" x2="${x}" y2="${Y(it.y1)}" stroke="${NAVY}" stroke-width="${fs * 0.1}" />`;
       svg += `<line x1="${x - tick}" y1="${Y(it.y0)}" x2="${x + tick}" y2="${Y(it.y0)}" stroke="${NAVY}" stroke-width="${fs * 0.1}" />`;
       svg += `<line x1="${x - tick}" y1="${Y(it.y1)}" x2="${x + tick}" y2="${Y(it.y1)}" stroke="${NAVY}" stroke-width="${fs * 0.1}" />`;
-      svg += `<text x="${x + fs * 0.7}" y="${(Y(it.y0) + Y(it.y1)) / 2 + fs * 0.35}" font-size="${fs * 0.95}" font-weight="bold" fill="${NAVY}">${Math.round(it.y1 - it.y0)}</text>`;
+      svg += `<text x="${x + fs * 0.7}" y="${(Y(it.y0) + Y(it.y1)) / 2 + fs * 0.35}" font-size="${fs * 0.95}" font-weight="bold" fill="${NAVY}">${fmtMm(it.y1 - it.y0)}</text>`;
     });
   }
 
@@ -216,10 +217,10 @@ export function generateWallSVG(wall, room, meta = {}) {
       s += `<text x="${x + fs * 0.7}" y="${(Y(h0) + Y(h1)) / 2 + fs * 0.35}" font-size="${fs * 0.95}" font-weight="bold" fill="${color}">${label}</text>`;
       return s;
     };
-    if (tallest.y0 > tallest.floorY) svg += dimV(tallest.floorY, tallest.y0, `${Math.round(tallest.y0 - tallest.floorY)}`, GRAY);
-    svg += dimV(tallest.y0, tallest.y1, `${Math.round(tallest.y1 - tallest.y0)}`, NAVY);
-    if (Hroom - tallest.y1 > 0.5) svg += dimV(tallest.y1, Hroom, `${Math.round(Hroom - tallest.y1)}`, ORANGE);
-    svg += dimV(0, Hroom, `${Math.round(Hroom)}`, '#0f172a', fs * 5.2);
+    if (tallest.y0 > tallest.floorY) svg += dimV(tallest.floorY, tallest.y0, `${fmtMm(tallest.y0 - tallest.floorY)}`, GRAY);
+    svg += dimV(tallest.y0, tallest.y1, `${fmtMm(tallest.y1 - tallest.y0)}`, NAVY);
+    if (Hroom - tallest.y1 > 0.5) svg += dimV(tallest.y1, Hroom, `${fmtMm(Hroom - tallest.y1)}`, ORANGE);
+    svg += dimV(0, Hroom, `${fmtMm(Hroom)}`, '#0f172a', fs * 5.2);
   }
 
   // kartusz (tabelka rysunkowa) na dole

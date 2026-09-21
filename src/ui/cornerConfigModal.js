@@ -12,7 +12,7 @@
 // update3D() (który i tak woła recalculateAllLayouts) + odświeżenie obu
 // edytorów wnętrza poniżej, żeby zobaczyć nowy układ.
 import { escapeHtml } from "../utils/dom.js";
-import { evalDimensionExpr } from "../utils/math.js";
+import { evalDimensionExpr, fmtMm } from "../utils/math.js";
 import { update3D } from "../render/viewer3d.js";
 import { updateSidebar } from "./sidebar.js";
 import { initPropertiesPanel } from "./properties.js";
@@ -150,7 +150,7 @@ export function openCornerConfigModal(mod) {
     blankPreviewEl.innerHTML = generateCornerBlankSVG(legA, legB, depthA, depthB, th, null, {
       title: 'RZUT SZAFKI Z GÓRY', plain: true,
     });
-    cutoutInfoEl.textContent = `Wynikowo: Ramię A = ${Math.round(legA)} mm, Ramię B = ${Math.round(legB)} mm`;
+    cutoutInfoEl.textContent = `Wynikowo: Ramię A = ${fmtMm(legA)} mm, Ramię B = ${fmtMm(legB)} mm`;
   }
 
   renderBlankPreview();
@@ -178,7 +178,7 @@ export function openCornerConfigModal(mod) {
       Object.assign(row.style, { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' });
       row.innerHTML = `
         <span style="font-size:11px; color:#475569; min-width:70px;">Wysokość od dołu:</span>
-        <input type="number" step="1" value="${Math.round(parseFloat(shelf.y) || 0)}" style="width:90px;" />
+        <input type="number" step="0.5" value="${fmtMm(parseFloat(shelf.y) || 0)}" style="width:90px;" />
         <span style="font-size:11px; color:#94a3b8;">mm</span>
         <button type="button" class="btn btn-danger btn-sm" style="padding:2px 8px;"><i class="ti ti-trash" aria-hidden="true"></i></button>
       `;

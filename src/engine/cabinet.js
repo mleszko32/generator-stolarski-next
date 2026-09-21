@@ -4,6 +4,7 @@ import { calculateDrawerHoles, getDrawerComponents } from "../core/drawerMath.js
 import { drawerSystems } from "../core/drawerSystems.js";
 import { calculateHinges } from "../core/hingeMath.js";
 import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "./edgeBanding.js";
+import { fmtMm } from "../utils/math.js";
 import { getWorktopParts } from "../core/worktops.js";
 import { recalculateLayout, recalculateAllLayouts, getTraverseConfig, getWorldFootprint, getCornerDepths } from "../core/layout.js";
 
@@ -716,7 +717,7 @@ function getCornerCorpusParts(mod, config) {
   // depth - backThick) - wymiar Ramię/Głębokość liczy się z plecami.
   const wieniecA = legA - th - backThick;
   const wieniecB = legB - th - backThick;
-  const wieniecName = `Wieniec narożny ${Math.round(wieniecA)}x${Math.round(wieniecB)} (naroże do wycięcia - patrz rysunek 3D)`;
+  const wieniecName = `Wieniec narożny ${fmtMm(wieniecA)}x${fmtMm(wieniecB)} (naroże do wycięcia - patrz rysunek 3D)`;
   parts.push({ name: wieniecName, length: parseFloat(wieniecA.toFixed(1)), width: parseFloat(wieniecB.toFixed(1)), qty: 2, category: "Korpus" });
 
   // Listwa narożna pionowa (render/viewer3d.js: renderCornerCabinet) - płaska
@@ -759,8 +760,8 @@ function getCornerCorpusParts(mod, config) {
     ? legB - th - backThick - 2 + grooveDepth - clearance
     : legB - th - backThick - 4;
 
-  parts.push({ name: `Plecy narożne ${Math.round(height)}x${Math.round(legA)} (Ramię A)`, length: parseFloat(plecyLength.toFixed(1)), width: parseFloat(plecyWidthA.toFixed(1)), qty: 1, category: "Plecy" });
-  parts.push({ name: `Plecy narożne ${Math.round(height)}x${Math.round(legB)} (Ramię B)`, length: parseFloat(plecyLength.toFixed(1)), width: parseFloat(plecyWidthB.toFixed(1)), qty: 1, category: "Plecy" });
+  parts.push({ name: `Plecy narożne ${fmtMm(height)}x${fmtMm(legA)} (Ramię A)`, length: parseFloat(plecyLength.toFixed(1)), width: parseFloat(plecyWidthA.toFixed(1)), qty: 1, category: "Plecy" });
+  parts.push({ name: `Plecy narożne ${fmtMm(height)}x${fmtMm(legB)} (Ramię B)`, length: parseFloat(plecyLength.toFixed(1)), width: parseFloat(plecyWidthB.toFixed(1)), qty: 1, category: "Plecy" });
 
   // Półki narożne (typ:'poziom-narozny', ui/cornerConfigModal.js) - w realnej
   // stolarce półka w szafce narożnej jest w KSZTAŁCIE L (jak wieniec wyżej),
@@ -773,7 +774,7 @@ function getCornerCorpusParts(mod, config) {
   // miejscu, tak samo jak przy wieńcu.
   const cornerShelves = (mod.elements || []).filter(el => el.typ === 'poziom-narozny');
   if (cornerShelves.length > 0) {
-    const shelfName = `Półka narożna ${Math.round(wieniecA)}x${Math.round(wieniecB)} (naroże do wycięcia + wycięcie ${battenW}x${Math.round(th)} na listwę, przód cofnięty o 5 mm - patrz Wykrój narożny)`;
+    const shelfName = `Półka narożna ${fmtMm(wieniecA)}x${fmtMm(wieniecB)} (naroże do wycięcia + wycięcie ${battenW}x${Math.round(th)} na listwę, przód cofnięty o 5 mm - patrz Wykrój narożny)`;
     parts.push({ name: shelfName, length: parseFloat(wieniecA.toFixed(1)), width: parseFloat(wieniecB.toFixed(1)), qty: cornerShelves.length, category: "Korpus" });
   }
 
@@ -939,7 +940,7 @@ function getInteriorParts(mod, config) {
       // i tak trafiała poprawnie do kolumny "Wymiar", więc dopisujemy ją też
       // w nazwie w nawiasie - zawsze, niezależnie czy półka jest na całą
       // szerokość czy nie, żeby format był przewidywalny na liście formatek.
-      const realW = Math.round(el.w || 0);
+      const realW = fmtMm(el.w || 0);
       parts.push({ name: `P${width} (${realW})`, length: parseFloat((el.w || 0).toFixed(1)), width: innerPartDepthForEl(el) - 5, qty: 1, category: "Korpus" });
     }
   });

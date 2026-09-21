@@ -143,7 +143,7 @@ function pushOverlappingModules(draggedIds) {
 
       if (overlapY <= overlapX && overlapY <= overlapZ) {
         const dir = (boxM.y0 + boxM.y1) >= (boxO.y0 + boxO.y1) ? 1 : -1;
-        m.position.y = Math.round((parseFloat(m.position.y) || 0) + dir * overlapY);
+        m.position.y = Math.round(((parseFloat(m.position.y) || 0) + dir * overlapY) * 100) / 100;
         boxM.y0 += dir * overlapY;
         boxM.y1 += dir * overlapY;
         syncModuleMesh(m);
@@ -507,8 +507,8 @@ export function init3DViewer() {
           snapX = Math.max(0, Math.min(room.width - worldW, snapX));
           snapZ = Math.max(0, Math.min(room.depth - worldD, snapZ));
 
-          dragSidePanel.position.x = Math.round(snapX);
-          dragSidePanel.position.z = Math.round(snapZ);
+          dragSidePanel.position.x = Math.round(snapX * 100) / 100;
+          dragSidePanel.position.z = Math.round(snapZ * 100) / 100;
 
           const H = parseFloat(dragSidePanel.dimensions.height) || 0;
           const y = parseFloat(dragSidePanel.position.y) || 0;
@@ -639,9 +639,9 @@ export function init3DViewer() {
                   if (!m) return;
                   const mOrig = dragSelectionOrigins.get(id);
                   if (mOrig) {
-                      m.position.x = Math.round(mOrig.x + deltaX);
-                      m.position.y = Math.round(mOrig.y + deltaY);
-                      m.position.z = Math.round(mOrig.z + deltaZ);
+                      m.position.x = Math.round((mOrig.x + deltaX) * 100) / 100;
+                      m.position.y = Math.round((mOrig.y + deltaY) * 100) / 100;
+                      m.position.z = Math.round((mOrig.z + deltaZ) * 100) / 100;
 
                       const tTarget = cabinetGroup.children.find(g => g.userData.moduleId === id);
                       if (tTarget) {
@@ -992,7 +992,7 @@ function handleMeasureClick() {
   } else {
       addMeasurePoint(point);
       addMeasureLine(measureMode.pointA, point);
-      const distMm = Math.round(measureMode.pointA.distanceTo(point));
+      const distMm = Math.round(measureMode.pointA.distanceTo(point) * 10) / 10;
       setMeasureBannerText(`Odległość: ${distMm} mm — kliknij, żeby zmierzyć od nowa`);
       measureMode.pointA = null;
   }
