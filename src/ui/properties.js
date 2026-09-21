@@ -483,6 +483,14 @@ export function initPropertiesPanel() {
         <label>Nazwa szafki:</label>
         <input type="text" id="input-mod-name" value="${escapeHtml(activeModule.name)}" style="font-weight: 600;" />
       </div>
+      ${activeModule.type !== 'corner_cabinet' ? `<div class="property-group">
+        <label>Rodzaj szafki:</label>
+        <select id="input-mod-type">
+          <option value="base_cabinet" ${activeModule.type === 'base_cabinet' ? 'selected' : ''}>Dolna (stoi na podłodze)</option>
+          <option value="upper_cabinet" ${activeModule.type === 'upper_cabinet' ? 'selected' : ''}>Wisząca</option>
+          <option value="tall_cabinet" ${activeModule.type === 'tall_cabinet' ? 'selected' : ''}>Słupek</option>
+        </select>
+      </div>` : ''}
     </div>
 
     ${tabContent("wymiary", `
@@ -813,6 +821,29 @@ function setupEventListeners() {
 
   // POPRAWKA: W trakcie wpisywania odświeża się tylko widok 3D, panel nie znika!
   const debouncedUpdateAll = () => { clearTimeout(typingTimer); typingTimer = setTimeout(() => { updateAll(); }, 50); };
+
+  // Zmiana rodzaju szafki (dolna / wisząca / słupek): lista i rzuty ścian, blaty i
+  // etykiety idą po mod.type. Na dolną lub słupek szafka schodzi na podłogę (zostaje
+  // przy ustawionych nóżkach - można je wyłączyć), na wiszącą idzie na 1450 mm bez nóżek.
+  const modTypeInput = document.getElementById('input-mod-type');
+  if (modTypeInput) modTypeInput.addEventListener('change', (e) => {
+      const t = e.target.value;
+      getSelectedMods().forEach(mod => {
+          if (mod.type === 'corner_cabinet') return;
+          mod.type = t;
+          // domyślna nazwa (np. "Szafka wisząca 3") idzie za rodzajem; własnej nazwy nie ruszamy
+          const NAMES = { base_cabinet: 'Szafka dolna', upper_cabinet: 'Szafka wisząca', tall_cabinet: 'Słupek' };
+          Object.values(NAMES).forEach(n => { if (typeof mod.name === 'string' && mod.name.startsWith(n + ' ')) mod.name = NAMES[t] + mod.name.slice(n.length); });
+          if (!mod.legs) mod.legs = { active: false, height: 100, plinth: false, plinthOffset: 40 };
+          if (t === 'upper_cabinet') {
+              mod.legs.active = false;
+              if ((parseFloat(mod.position.y) || 0) < 600) mod.position.y = 1450;
+          } else if ((parseFloat(mod.position.y) || 0) >= 600) {
+              mod.position.y = 0;
+          }
+      });
+      initPropertiesPanel(); updateAll();
+  });
 
   const nameInput = document.getElementById('input-mod-name');
   if (nameInput) {
