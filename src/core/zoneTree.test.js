@@ -10,6 +10,8 @@ import {
   moveSplit,
   addEvenShelves,
   rescaleSubtree,
+  axisAncestorChain,
+  resizeAlongAxis,
 } from "./zoneTree.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
 import { recalculateLayout } from "./layout.js";
@@ -540,5 +542,105 @@ describe("moveSplit", () => {
       const newLeftWidth = tree.a.rect.maxX - tree.a.rect.minX;
       expect(newLeftWidth).toBeCloseTo(leftWidth);
     });
+  });
+});
+
+// Zgłoszony błąd (drugi etap): mając np. 4 wnęki, z których dwie ŚRODKOWE są
+// zablokowane, a skrajne (góra/dół) nie - wpisanie nowego wymiaru w JEDNEJ
+// skrajnej wnęce zmieniało NAJBLIŻSZĄ (zablokowaną!) sąsiadkę zamiast dotrzeć
+// do drugiej, odblokowanej wnęki po przeciwnej stronie. moveSplit() zawsze
+// resize'ował tylko bezpośredniego sąsiada danego dzielnika, z pominięciem
+// tego, czy jest zablokowany - lock chronił tylko przed kaskadą zmiany "z
+// góry" (zmiana wymiaru całej szafki, patrz opis wyżej), nie przed edycją
+// sąsiedniej wnęki. resizeAlongAxis (użyte teraz w ui/interiorEditor.js do
+// wpisywania dokładnego wymiaru wnęki) ma "przejść przez" zablokowane wnęki.
+describe("resizeAlongAxis - edycja wymiaru przechodzi przez zablokowane sąsiednie wnęki", () => {
+  function setup4() {
+    const mod = baseModule({ elements: [] });
+    setProject(freshProject({ modules: [mod] }));
+    const root = buildZoneTree(mod);
+    addEvenShelves(mod, root, 3); // 4 równe wnęki: dół -> góra
+    return mod;
+  }
+  // Drzewo po addEvenShelves(mod, root, 3): root.a = dół (z1), root.b.a = z2,
+  // root.b.b.a = z3, root.b.b.b = góra (z4) - patrz rescaleSubtree/moveSplit
+  // wyżej dla tego samego kształtu drzewa.
+  function zones(tree) {
+    return [tree.a, tree.b.a, tree.b.b.a, tree.b.b.b]; // [z1..z4], dół -> góra
+  }
+  function heights(zs) {
+    return zs.map((n) => n.rect.maxY - n.rect.minY);
+  }
+
+  it("axisAncestorChain: łańcuch dzielników osi 'h' od korzenia do wnęki, ze stroną po drodze", () => {
+    const mod = setup4();
+    const tree = buildZoneTree(mod);
+    const [, , , z4] = zones(tree);
+    const chain = axisAncestorChain(tree, z4, true);
+    expect(chain.map((c) => c.side)).toEqual(["b", "b", "b"]); // z4 jest zawsze stroną 'b' (góra) na każdym poziomie
+    expect(chain[chain.length - 1].node).toBe(tree.b.b); // najbliższy rodzic ostatni
+  });
+
+  it("edycja GÓRNEJ odblokowanej wnęki: dwie zablokowane środkowe bez zmian, dolna odblokowana wchłania różnicę", () => {
+    const mod = setup4();
+    const tree = buildZoneTree(mod);
+    const [z1, z2, z3, z4] = zones(tree);
+    tree.b.divider.lockA = true; // zablokuj z2
+    tree.b.b.divider.lockA = true; // zablokuj z3
+    const [h1, h2, h3, h4] = heights([z1, z2, z3, z4]);
+
+    resizeAlongAxis(mod, tree, z4, true, h4 + 50, h4);
+
+    const [nz1, nz2, nz3, nz4] = zones(buildZoneTree(mod));
+    expect(nz4.rect.maxY - nz4.rect.minY).toBeCloseTo(h4 + 50);
+    expect(nz3.rect.maxY - nz3.rect.minY).toBeCloseTo(h3);
+    expect(nz2.rect.maxY - nz2.rect.minY).toBeCloseTo(h2);
+    expect(nz1.rect.maxY - nz1.rect.minY).toBeCloseTo(h1 - 50);
+  });
+
+  it("edycja DOLNEJ odblokowanej wnęki: te same dwie zablokowane środkowe bez zmian, górna wchłania różnicę", () => {
+    const mod = setup4();
+    const tree = buildZoneTree(mod);
+    const [z1, z2, z3, z4] = zones(tree);
+    tree.b.divider.lockA = true;
+    tree.b.b.divider.lockA = true;
+    const [h1, h2, h3, h4] = heights([z1, z2, z3, z4]);
+
+    resizeAlongAxis(mod, tree, z1, true, h1 + 42.5, h1);
+
+    const [nz1, nz2, nz3, nz4] = zones(buildZoneTree(mod));
+    expect(nz1.rect.maxY - nz1.rect.minY).toBeCloseTo(h1 + 42.5);
+    expect(nz2.rect.maxY - nz2.rect.minY).toBeCloseTo(h2);
+    expect(nz3.rect.maxY - nz3.rect.minY).toBeCloseTo(h3);
+    expect(nz4.rect.maxY - nz4.rect.minY).toBeCloseTo(h4 - 42.5);
+  });
+
+  it("bez żadnej blokady zachowuje się jak dawniej - zmienia bezpośredniego sąsiada", () => {
+    const mod = setup4();
+    const tree = buildZoneTree(mod);
+    const [, , z3, z4] = zones(tree);
+    const [h3, h4] = heights([z3, z4]);
+
+    resizeAlongAxis(mod, tree, z4, true, h4 + 30, h4);
+
+    const [, , nz3, nz4] = zones(buildZoneTree(mod));
+    expect(nz4.rect.maxY - nz4.rect.minY).toBeCloseTo(h4 + 30);
+    expect(nz3.rect.maxY - nz3.rect.minY).toBeCloseTo(h3 - 30);
+  });
+
+  it("gdy wszystko po drodze jest zablokowane, spada do starego zachowania (najbliższy dzielnik)", () => {
+    const mod = setup4();
+    const tree = buildZoneTree(mod);
+    tree.divider.lockA = true; // zablokuj z1 (dół)
+    tree.b.divider.lockA = true; // zablokuj z2
+    tree.b.b.divider.lockA = true; // zablokuj z3
+    const [, , z3, z4] = zones(tree);
+    const [h3, h4] = heights([z3, z4]);
+
+    resizeAlongAxis(mod, tree, z4, true, h4 + 20, h4);
+
+    const [, , nz3, nz4] = zones(buildZoneTree(mod));
+    expect(nz4.rect.maxY - nz4.rect.minY).toBeCloseTo(h4 + 20);
+    expect(nz3.rect.maxY - nz3.rect.minY).toBeCloseTo(h3 - 20); // nie ma dokąd oddać zmiany
   });
 });

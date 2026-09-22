@@ -487,3 +487,66 @@ export function moveSplit(mod, node, newPos) {
     node.divider.x = clamped;
   }
 }
+
+// Ścieżka dzielników OSI `wantH` (poziomych - dla wysokości, jeśli wantH=true;
+// pionowych - dla szerokości, jeśli wantH=false) od korzenia drzewa do węzła
+// `target` (liść ALBO węzeł 'split' z frontem obejmującym całe poddrzewo -
+// patrz komentarz na górze pliku), z informacją, po której stronie (a/b)
+// dzielnika leży target. Dzielniki przeciwnej osi są pomijane - nie mają
+// wpływu na ten wymiar (ten sam warunek co "isPrimary" w rescaleSubtree).
+// Pierwszy element to dzielnik najbliżej korzenia, ostatni - bezpośredni
+// rodzic węzła target.
+export function axisAncestorChain(root, target, wantH) {
+  const path = [];
+  const wantAxis = wantH ? "h" : "v";
+  function walk(node) {
+    if (node === target) return true;
+    if (node.type !== "split") return false;
+    const foundInA = walk(node.a);
+    const foundInB = !foundInA && walk(node.b);
+    if (foundInA || foundInB) {
+      if (node.axis === wantAxis) path.unshift({ node, side: foundInA ? "a" : "b" });
+      return true;
+    }
+    return false;
+  }
+  walk(root);
+  return path;
+}
+
+// Zmienia wymiar `target` (liścia albo węzła 'split' z frontem) na `newSize`,
+// PRZECHODZĄC PRZEZ zablokowane sąsiednie wnęki (core/zoneTree.js:
+// divider.lockA/lockB, kłódka w edytorze wnętrza) zamiast je poruszać.
+//
+// Bez tego: wpisanie wymiaru wnęki zawsze przesuwało tylko NAJBLIŻSZY
+// dzielnik, resize'ując bezpośredniego sąsiada, nawet jeśli był zablokowany
+// (zgłoszony błąd - kłódka na sąsiedniej wnęce nie chroniła jej przed
+// zmianą wywołaną edycją innej wnęki w tym samym rzędzie). Zamiast tego
+// szukamy - idąc od najbliższego dzielnika w stronę korzenia - pierwszego,
+// którego DRUGA strona (ta, która musiałaby się zmienić) NIE jest
+// zablokowana, i przesuwamy WŁAŚNIE TEN dzielnik o tyle samo, o ile ma się
+// zmienić target. rescaleSubtree() zejdzie od niego w dół i - dzięki temu,
+// że honoruje blokady na każdym zagnieżdżonym poziomie z osobna - sam
+// zostawi każdą zablokowaną wnękę po drodze bez zmian, a całą różnicę
+// odda dopiero znalezionej, odblokowanej wnęce na końcu łańcucha.
+// Gdy WSZYSTKO po drodze aż do korzenia jest zablokowane, spada do starego
+// zachowania (najbliższy dzielnik) - nie ma gdzie oddać zmiany.
+export function resizeAlongAxis(mod, root, target, wantH, newSize, currentSize) {
+  const chain = axisAncestorChain(root, target, wantH);
+  if (chain.length === 0) return false;
+  const delta = newSize - currentSize;
+  if (Math.abs(delta) < 0.01) return false;
+
+  let pivot = null;
+  for (let i = chain.length - 1; i >= 0; i--) {
+    const { node, side } = chain[i];
+    const otherLocked = side === "a" ? !!node.divider.lockB : !!node.divider.lockA;
+    if (!otherLocked) { pivot = chain[i]; break; }
+  }
+  if (!pivot) pivot = chain[chain.length - 1]; // wszystko zablokowane po drodze - najbliższy dzielnik, jak dawniej
+
+  const axisKey = wantH ? "y" : "x";
+  const newPos = pivot.node.divider[axisKey] + (pivot.side === "a" ? delta : -delta);
+  moveSplit(mod, pivot.node, newPos);
+  return true;
+}

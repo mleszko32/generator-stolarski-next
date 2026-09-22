@@ -38,6 +38,7 @@ import {
   assignFront,
   moveSplit,
   addEvenShelves,
+  resizeAlongAxis,
 } from "../core/zoneTree.js";
 import { update3D, enterAlignMode, areFrontsVisible } from "../render/viewer3d.js";
 import { updateSidebar } from "./sidebar.js";
@@ -83,6 +84,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
   let selectedNode = null; // węzeł drzewa aktualnie pod pływającym paskiem
   let toolbarMode = null; // null | 'empty' | 'occupied' | 'divider'
   let toolbarEl = null; // pływający pasek TEJ instancji (nie document.getElementById - patrz komentarz na górze pliku)
+  let currentTree = null; // korzeń ostatnio zbudowanego drzewa (render()) - potrzebny appendDimLine, żeby znaleźć łańcuch dzielników do resizeAlongAxis
 
   function isVisible() {
     const el = getContainer();
@@ -115,6 +117,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     }
 
     const tree = buildZoneTree(mod, { cornerArm });
+    currentTree = tree;
 
     // Obrys "z kontekstem" (boki/wieńce) do narysowania jako tło (shell,
     // niżej) - dla zwykłego modułu to CAŁA bryła (0..width, 0..height), żeby
@@ -313,12 +316,14 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
         // idzie wprost na front.forceW/forceH, nie na pozycję dzielnika
         // (którego tu nie ma).
         editFront[isH ? "forceW" : "forceH"] = mm;
-      } else if (isH) {
-        const newX = side === "a" ? node.rect.minX + mm : node.rect.maxX - mm - parentSplit.divider.w;
-        moveSplit(mod, parentSplit, newX);
       } else {
-        const newY = side === "a" ? node.rect.minY + mm : node.rect.maxY - mm - parentSplit.divider.h;
-        moveSplit(mod, parentSplit, newY);
+        // resizeAlongAxis (core/zoneTree.js) zamiast bezpośredniego moveSplit -
+        // gdy najbliższy sąsiad jest zablokowany (kłódka), zmiana przechodzi
+        // przez niego (zostaje bez zmian) do pierwszej odblokowanej wnęki dalej
+        // w tym samym rzędzie/kolumnie, zamiast po prostu resize'ować sąsiada.
+        // isH=true tutaj oznacza wymiar SZEROKOŚCI, czyli rządzą nim dzielniki
+        // PIONOWE (oś 'v') - stąd wantH=!isH.
+        resizeAlongAxis(mod, currentTree, node, !isH, mm, valueMm);
       }
       refreshAfterEdit();
     }, editFront ? { front: editFront, axis: isH ? "forceW" : "forceH" } : null);
