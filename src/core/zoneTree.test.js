@@ -9,6 +9,7 @@ import {
   assignFront,
   moveSplit,
   addEvenShelves,
+  rescaleSubtree,
 } from "./zoneTree.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
 import { recalculateLayout } from "./layout.js";
@@ -497,6 +498,47 @@ describe("moveSplit", () => {
       const tree = buildZoneTree(mod);
       const newMiddleHeight = tree.b.a.rect.maxY - tree.b.a.rect.minY;
       expect(newMiddleHeight).not.toBeCloseTo(middleHeight, 0);
+    });
+
+    // Zgłoszony błąd: zablokowana przestrzeń między półkami wracała do starego
+    // (proporcjonalnego) rozmiaru przy zmianie SZEROKOŚCI/WYSOKOŚCI całej szafki z
+    // panelu właściwości - ten kod wcześniej przeliczał piony/poziomy wprost po
+    // współrzędnych, z pominięciem zoneTree.js i jego blokad. ui/properties.js
+    // (input width/height) woła teraz dokładnie to, co te dwa testy odtwarzają.
+    it("zmiana wysokości szafki z panelu właściwości respektuje zablokowaną przestrzeń", () => {
+      const mod = setup();
+      let root = buildZoneTree(mod);
+      addEvenShelves(mod, root, 2); // dół (a), środek (b.a), góra (b.b)
+      root = buildZoneTree(mod);
+      const middleHeight = root.b.a.rect.maxY - root.b.a.rect.minY;
+      root.b.divider.lockA = true; // zablokuj środkową przestrzeń
+
+      const th = 18;
+      mod.dimensions.height = 900; // 720 -> 900, jak wpisanie w polu "Wysokość korpusu"
+      const newInner = 900 - th - th;
+      rescaleSubtree(root, "y", INNER.minY, INNER.maxY, th, th + newInner);
+
+      const tree = buildZoneTree(mod);
+      const newMiddleHeight = tree.b.a.rect.maxY - tree.b.a.rect.minY;
+      expect(newMiddleHeight).toBeCloseTo(middleHeight);
+    });
+
+    it("zmiana szerokości szafki z panelu właściwości respektuje zablokowaną przestrzeń", () => {
+      const mod = setup();
+      let root = buildZoneTree(mod);
+      splitZoneVertical(mod, root); // lewa (a), prawa (b)
+      root = buildZoneTree(mod);
+      const leftWidth = root.a.rect.maxX - root.a.rect.minX;
+      root.divider.lockA = true; // zablokuj lewą kolumnę
+
+      const th = 18;
+      mod.dimensions.width = 900; // 600 -> 900, jak wpisanie w polu "Szerokość"
+      const newInner = 900 - th - th;
+      rescaleSubtree(root, "x", INNER.minX, INNER.maxX, th, th + newInner);
+
+      const tree = buildZoneTree(mod);
+      const newLeftWidth = tree.a.rect.maxX - tree.a.rect.minX;
+      expect(newLeftWidth).toBeCloseTo(leftWidth);
     });
   });
 });

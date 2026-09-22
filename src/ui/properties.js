@@ -11,6 +11,7 @@ import { escapeHtml } from "../utils/dom.js";
 import { evalDimensionExpr, fmtMm } from "../utils/math.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
+import { buildZoneTree, rescaleSubtree } from "../core/zoneTree.js";
 import { openCornerConfigModal } from "./cornerConfigModal.js";
 import { generateCornerBlankSVG, generateCornerPartsDrawings } from "../render/viewer2d.js";
 
@@ -1250,13 +1251,15 @@ function setupEventListeners() {
               const innerOldX = oldWidth - 2 * th;
               const innerNewX = val - 2 * th;
               if (innerOldX > 0 && innerNewX > 0 && mod.elements) {
+                  // Drzewo wnęk PRZED zmianą szerokości (core/zoneTree.js) - rescaleSubtree
+                  // przelicza piony/poziomy z poszanowaniem zablokowanych wymiarów (kłódka w
+                  // edytorze wnętrza). Wcześniej ten kod przeliczał wszystko proporcjonalnie
+                  // wprost po współrzędnych, ignorując blokadę - zgłoszony błąd: zablokowana
+                  // przestrzeń między półkami zmieniała się przy zmianie innego wymiaru.
+                  const tree = buildZoneTree(mod);
+                  rescaleSubtree(tree, 'x', th, th + innerOldX, th, th + innerNewX);
                   mod.elements.forEach(el => {
-                      if (el.typ === 'poziom') {
-                          el.x = th + ((el.x - th) / innerOldX * innerNewX);
-                          el.w = (el.w / innerOldX) * innerNewX;
-                      } else if (el.typ === 'pion') {
-                          el.x = th + ((el.x - th) / innerOldX * innerNewX);
-                      } else if (el.typ === 'front' && el.baseZone && !el.baseZone.boundLeft) {
+                      if (el.typ === 'front' && el.baseZone && !el.baseZone.boundLeft) {
                           el.baseZone.minX = th + (((parseFloat(el.baseZone.minX) - th) / innerOldX) * innerNewX);
                           el.baseZone.maxX = th + (((parseFloat(el.baseZone.maxX) - th) / innerOldX) * innerNewX);
                       }
@@ -1277,13 +1280,12 @@ function setupEventListeners() {
               const innerOldY = oldHeight - th - topZoneH;
               const innerNewY = val - th - topZoneH;
               if (innerOldY > 0 && innerNewY > 0 && mod.elements) {
+                  // Jak przy szerokości wyżej - rescaleSubtree z core/zoneTree.js respektuje
+                  // zablokowane wymiary zamiast przeliczać wszystko proporcjonalnie na ślepo.
+                  const tree = buildZoneTree(mod);
+                  rescaleSubtree(tree, 'y', th, th + innerOldY, th, th + innerNewY);
                   mod.elements.forEach(el => {
-                      if (el.typ === 'poziom') {
-                          el.y = th + ((el.y - th) / innerOldY * innerNewY);
-                      } else if (el.typ === 'pion') {
-                          el.y = th + ((el.y - th) / innerOldY * innerNewY);
-                          el.h = (el.h / innerOldY) * innerNewY;
-                      } else if (el.typ === 'front' && el.baseZone && !el.baseZone.boundBottom) {
+                      if (el.typ === 'front' && el.baseZone && !el.baseZone.boundBottom) {
                           el.baseZone.minY = th + (((parseFloat(el.baseZone.minY) - th) / innerOldY) * innerNewY);
                           el.baseZone.maxY = th + (((parseFloat(el.baseZone.maxY) - th) / innerOldY) * innerNewY);
                       }

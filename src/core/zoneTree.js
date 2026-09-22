@@ -414,7 +414,7 @@ export function assignFront(mod, node, subtype, opts = {}) {
 // gdzie to i tak wychodzi na to samo) - liczymy WŁASNY, faktyczny stary/nowy
 // zakres każdej strony z osobna, bo przy blokadzie te zakresy przestają być
 // jedną wspólną transformacją afiniczną.
-function rescaleSubtree(node, axis, oldMin, oldMax, newMin, newMax) {
+export function rescaleSubtree(node, axis, oldMin, oldMax, newMin, newMax) {
   const oldSpan = oldMax - oldMin;
   if (oldSpan <= 0 || node.type !== "split") return;
   const scale = (newMax - newMin) / oldSpan;
