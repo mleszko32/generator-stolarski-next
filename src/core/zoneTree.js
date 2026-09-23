@@ -514,39 +514,100 @@ export function axisAncestorChain(root, target, wantH) {
   return path;
 }
 
-// Zmienia wymiar `target` (liścia albo węzła 'split' z frontem) na `newSize`,
-// PRZECHODZĄC PRZEZ zablokowane sąsiednie wnęki (core/zoneTree.js:
-// divider.lockA/lockB, kłódka w edytorze wnętrza) zamiast je poruszać.
+// Płaska lista liści wzdłuż osi `wantAxis` ('h'/'v'), w kolejności rosnącej
+// współrzędnej (dół->góra dla wysokości, lewo->prawo dla szerokości), każdy z
+// `governDivider` = {node, side} dzielnika, który go BEZPOŚREDNIO ogranicza
+// (ten sam, co ostatni element axisAncestorChain dla tego liścia). Dzielniki
+// przeciwnej osi są przezroczyste - obie ich strony mają ten sam zakres tej
+// osi (patrz rescaleSubtree "not primary"), więc bierzemy 'a' jako
+// reprezentanta zamiast schodzić w obie (byłby duplikat).
+// buildZoneTree() zawsze buduje "w lewo" (partition() bierze najniższą/
+// najbardziej wysuniętą kandydatkę jako dzielnik: strona 'a' to POJEDYNCZA
+// wnęka, 'b' to reszta z kolejnym podziałem w środku) - dzięki temu KAŻDY
+// dzielnik osi wantAxis odpowiada dokładnie JEDNEJ granicy między dwoma
+// sąsiednimi liśćmi na tej liście (poza ostatnim liściem, który jest stroną
+// 'b' - jego granica z poprzednikiem to ten sam dzielnik co poprzednika).
+function flattenAxisLeaves(node, wantAxis, side, governDivider, into) {
+  if (node.type === "leaf") { into.push({ leaf: node, governDivider }); return; }
+  if (node.axis === wantAxis) {
+    flattenAxisLeaves(node.a, wantAxis, "a", { node, side: "a" }, into);
+    flattenAxisLeaves(node.b, wantAxis, "b", { node, side: "b" }, into);
+  } else {
+    flattenAxisLeaves(node.a, wantAxis, side, governDivider, into);
+  }
+}
+
+function isEntryLocked(entry) {
+  if (!entry.governDivider) return false;
+  const { node, side } = entry.governDivider;
+  return side === "a" ? !!node.divider.lockA : !!node.divider.lockB;
+}
+
+// Zmienia wymiar liścia `target` na `newSize`, PRZECHODZĄC PRZEZ zablokowane
+// sąsiednie wnęki (core/zoneTree.js: divider.lockA/lockB, kłódka w edytorze
+// wnętrza) zamiast je poruszać.
 //
 // Bez tego: wpisanie wymiaru wnęki zawsze przesuwało tylko NAJBLIŻSZY
 // dzielnik, resize'ując bezpośredniego sąsiada, nawet jeśli był zablokowany
-// (zgłoszony błąd - kłódka na sąsiedniej wnęce nie chroniła jej przed
-// zmianą wywołaną edycją innej wnęki w tym samym rzędzie). Zamiast tego
-// szukamy - idąc od najbliższego dzielnika w stronę korzenia - pierwszego,
-// którego DRUGA strona (ta, która musiałaby się zmienić) NIE jest
-// zablokowana, i przesuwamy WŁAŚNIE TEN dzielnik o tyle samo, o ile ma się
-// zmienić target. rescaleSubtree() zejdzie od niego w dół i - dzięki temu,
-// że honoruje blokady na każdym zagnieżdżonym poziomie z osobna - sam
-// zostawi każdą zablokowaną wnękę po drodze bez zmian, a całą różnicę
-// odda dopiero znalezionej, odblokowanej wnęce na końcu łańcucha.
-// Gdy WSZYSTKO po drodze aż do korzenia jest zablokowane, spada do starego
-// zachowania (najbliższy dzielnik) - nie ma gdzie oddać zmiany.
+// (zgłoszony błąd - kłódka na sąsiedniej wnęce nie chroniła jej przed zmianą
+// wywołaną edycją innej wnęki w tym samym rzędzie).
+//
+// WAŻNE - pierwsza wersja tej funkcji (oparta na axisAncestorChain +
+// rescaleSubtree/moveSplit) miała ten sam błąd w innej postaci: szukała
+// "pierwszego NIEzablokowanego PRZODKA", ale sprawdzała blokadę tylko NA
+// POZIOMIE CAŁEJ GAŁĘZI drzewa (np. "czy CAŁA reszta szafki nad tą wnęką jest
+// zablokowana"), nie każdej wnęki z osobna - a taki "zbiorczy" lock nigdy nie
+// jest ustawiany (kłódka w UI zawsze dotyczy jednej, konkretnej wnęki). Efekt:
+// gdy najbliższy sąsiad był NAPRAWDĘ odblokowany, ale głębiej w tej samej
+// gałęzi były jeszcze inne, zablokowane wnęki, rescaleSubtree i tak dzielił tę
+// gałąź PROPORCJONALNIE między nie (bo żadna pojedyncza kłódka na tym
+// poziomie nie była ustawiona) - różnica trafiała częściowo do złego sąsiada,
+// a resztę "przepychała" aż do zupełnie innej, odległej wnęki.
+//
+// Poprawnie: spłaszczamy całe drzewo do listy liści w kolejności (patrz
+// flattenAxisLeaves) i idziemy od razu obok target, PO KOLEI, sprawdzając
+// blokadę KAŻDEGO liścia z osobna, aż trafimy na pierwszy odblokowany - on
+// wchłania całą różnicę. Każdy dzielnik między target a nim przesuwa się o
+// dokładnie `delta` (te wnęki po drodze zachowują swój rozmiar, tylko
+// zmieniają pozycję) - żadnego proporcjonalnego dzielenia. Gdy WSZYSTKO po
+// drodze jest zablokowane, spada do starego zachowania (najbliższy sąsiad) -
+// nie ma gdzie oddać zmiany.
 export function resizeAlongAxis(mod, root, target, wantH, newSize, currentSize) {
-  const chain = axisAncestorChain(root, target, wantH);
-  if (chain.length === 0) return false;
   const delta = newSize - currentSize;
   if (Math.abs(delta) < 0.01) return false;
 
-  let pivot = null;
-  for (let i = chain.length - 1; i >= 0; i--) {
-    const { node, side } = chain[i];
-    const otherLocked = side === "a" ? !!node.divider.lockB : !!node.divider.lockA;
-    if (!otherLocked) { pivot = chain[i]; break; }
-  }
-  if (!pivot) pivot = chain[chain.length - 1]; // wszystko zablokowane po drodze - najbliższy dzielnik, jak dawniej
+  const entries = [];
+  flattenAxisLeaves(root, wantH ? "h" : "v", "a", null, entries);
+  const idx = entries.findIndex((e) => e.leaf === target);
+  if (idx === -1) return false;
+  const immediate = entries[idx].governDivider;
+  if (!immediate) return false; // target to cały korpus - brak dzielnika do przesunięcia
+
+  const dir = immediate.side === "a" ? 1 : -1;
+  let j = idx + dir;
+  while (j >= 0 && j < entries.length && isEntryLocked(entries[j])) j += dir;
+  if (j < 0 || j >= entries.length) j = idx + dir; // nic po drodze odblokowanego - najbliższy sąsiad, jak dawniej
+  if (j < 0 || j >= entries.length) return false; // krawędź szafki, dosłownie nie ma sąsiada (1 wnęka)
 
   const axisKey = wantH ? "y" : "x";
-  const newPos = pivot.node.divider[axisKey] + (pivot.side === "a" ? delta : -delta);
-  moveSplit(mod, pivot.node, newPos);
+  // Zabezpieczenie: rozmiar wnęki, która oddaje różnicę, nie może spaść
+  // poniżej MIN_GAP. Bez tego zbyt duża wpisana wartość (większa niż mieści
+  // się w tej jednej wnęce) przesunęłaby jej dzielnik NA/ZA sąsiednią półkę -
+  // buildZoneTree() przy następnym przeliczeniu bierze zawsze najniższą
+  // (najbardziej wysuniętą) belkę jako korzeń drzewa, więc taki "przeskok"
+  // przestawia kolejność dzielników i psuje całą resztę wnęk, nie tylko tę
+  // jedną (rekonstrukcja drzewa przestaje odpowiadać temu, co edytowaliśmy).
+  const absorberSize = entries[j].leaf.rect[wantH ? "maxY" : "maxX"] - entries[j].leaf.rect[wantH ? "minY" : "minX"];
+  const clampedDelta = delta > 0 ? Math.min(delta, absorberSize - MIN_GAP) : delta;
+  if (clampedDelta <= 0 && delta > 0) return false; // sąsiad już i tak na granicy MIN_GAP - nie da się oddać nic więcej
+
+  const lo = Math.min(idx, j), hi = Math.max(idx, j);
+  const moved = new Set();
+  for (let i = lo; i < hi; i++) {
+    const g = entries[i].governDivider;
+    if (!g || g.side !== "a" || moved.has(g.node)) continue;
+    moved.add(g.node);
+    g.node.divider[axisKey] += dir * clampedDelta;
+  }
   return true;
 }

@@ -644,3 +644,66 @@ describe("resizeAlongAxis - edycja wymiaru przechodzi przez zablokowane sąsiedn
     expect(nz3.rect.maxY - nz3.rect.minY).toBeCloseTo(h3 - 20); // nie ma dokąd oddać zmiany
   });
 });
+
+// Zgłoszony błąd (trzeci etap, na prawdziwym projekcie): 6 wnęk, zablokowane
+// wszystkie oprócz dwóch DOLNYCH (bezpośrednio sąsiadujących ze sobą). Pierwsza
+// (poprawiona) wersja resizeAlongAxis szukała "pierwszego niezablokowanego
+// PRZODKA" po CAŁYCH gałęziach drzewa, więc mimo że sąsiadka (druga wnęka)
+// była naprawdę odblokowana, różnica i tak trafiała częściowo do niej
+// proporcjonalnie, a resztę wypychała aż do zupełnie innej, odległej wnęki
+// (u góry) - łamiąc po drodze blokady kilku wnęk, które miały zostać bez
+// zmian. Odtwarza dokładnie warstwę zamków z realnego projektu (dwa ostatnie
+// poziomy zablokowane PO OBU stronach tego samego dzielnika na raz).
+describe("resizeAlongAxis - realny przypadek: 6 wnęk, zablokowane wszystkie oprócz dwóch dolnych", () => {
+  function setup6() {
+    // Wysoki słupek (jak w zgłoszeniu) - przy domyślnej wysokości 720 mm 6
+    // wnęk wychodzi po ~99 mm, za mało, żeby zmieścić realistyczną (40-50 mm)
+    // zmianę bez przekroczenia sąsiedniej wnęki.
+    const mod = baseModule({ elements: [], dimensions: { width: 550, height: 2082, depth: 473 } });
+    setProject(freshProject({ modules: [mod] }));
+    const root = buildZoneTree(mod);
+    addEvenShelves(mod, root, 5); // 6 wnęk: dół -> góra
+    return mod;
+  }
+  // root.a=z1(dół) .. root.b.b.b.b.b=z6(góra), jak w setup4, ale o dwa poziomy głębiej
+  function zones6(tree) {
+    return [tree.a, tree.b.a, tree.b.b.a, tree.b.b.b.a, tree.b.b.b.b.a, tree.b.b.b.b.b];
+  }
+  function heights(zs) { return zs.map((n) => n.rect.maxY - n.rect.minY); }
+
+  it("zmiana dolnej wnęki na konkretny wymiar zmienia TYLKO sąsiadkę - reszta (w tym podwójnie zablokowana góra) zostaje bez zmian", () => {
+    const mod = setup6();
+    const tree = buildZoneTree(mod);
+    const [z1, z2, z3, z4, z5, z6] = zones6(tree);
+    tree.b.b.divider.lockA = true; // zablokuj z3
+    tree.b.b.b.divider.lockA = true; // zablokuj z4
+    tree.b.b.b.b.divider.lockA = true; // zablokuj z5
+    tree.b.b.b.b.divider.lockB = true; // I zablokuj z6 - ten sam dzielnik, obie strony na raz (jak w realnym projekcie)
+    const [h1, h2, h3, h4, h5, h6] = heights([z1, z2, z3, z4, z5, z6]);
+    const newH1 = h1 + 40; // odpowiednik "zmień pierwszą wnękę na 360mm" ze zgłoszenia (326 -> 366)
+
+    resizeAlongAxis(mod, tree, z1, true, newH1, h1);
+
+    const [n1, n2, n3, n4, n5, n6] = zones6(buildZoneTree(mod));
+    expect(n1.rect.maxY - n1.rect.minY).toBeCloseTo(newH1);
+    expect(n2.rect.maxY - n2.rect.minY).toBeCloseTo(h2 - 40); // jedyna, która ma się zmienić
+    expect(n3.rect.maxY - n3.rect.minY).toBeCloseTo(h3);
+    expect(n4.rect.maxY - n4.rect.minY).toBeCloseTo(h4);
+    expect(n5.rect.maxY - n5.rect.minY).toBeCloseTo(h5);
+    expect(n6.rect.maxY - n6.rect.minY).toBeCloseTo(h6);
+  });
+
+  it("zmiana większa niż mieści sąsiadka zostaje docięta do MIN_GAP zamiast przeskoczyć na kolejną półkę", () => {
+    const mod = setup6();
+    const tree = buildZoneTree(mod);
+    const [z1, z2, z3] = zones6(tree);
+    const [h1, h2, h3] = heights([z1, z2, z3]);
+
+    resizeAlongAxis(mod, tree, z1, true, h1 + h2, h1); // żąda całej wysokości sąsiadki na raz - za dużo
+
+    const [n1, n2, n3] = zones6(buildZoneTree(mod));
+    expect(n2.rect.maxY - n2.rect.minY).toBeGreaterThanOrEqual(30 - 0.01); // MIN_GAP, nie ujemna/zerowa
+    expect(n1.rect.maxY - n1.rect.minY).toBeCloseTo(h1 + h2 - 30);
+    expect(n3.rect.maxY - n3.rect.minY).toBeCloseTo(h3); // dalsze wnęki nietknięte, kolejność się nie posypała
+  });
+});
