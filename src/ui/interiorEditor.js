@@ -85,6 +85,15 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
   let toolbarMode = null; // null | 'empty' | 'occupied' | 'divider'
   let toolbarEl = null; // pływający pasek TEJ instancji (nie document.getElementById - patrz komentarz na górze pliku)
   let currentTree = null; // korzeń ostatnio zbudowanego drzewa (render()) - potrzebny appendDimLine, żeby znaleźć łańcuch dzielników do resizeAlongAxis
+  let viewportRef = null; // stały (nieskalowany) kontener zdarzeń pan/zoom TEJ instancji - tu (nie do `stage`) trafia pływający pasek, żeby nie skalował się z przybliżeniem
+  // Widok (przesunięcie/zoom) - TRWA między kolejnymi render() tego samego
+  // modułu (np. po dodaniu półki), żeby edycja nie zerowała przybliżenia.
+  // {x:0,y:0,scale:1} = dokładnie to samo dopasowanie do okna co dawniej
+  // (scale/originX/originTop liczone niżej w render()) - pan/zoom to
+  // DODATKOWA transformacja NA WIERZCHU tego dopasowania, nie zamiast niego.
+  let view = { x: 0, y: 0, scale: 1 };
+  let lastModId = null; // zmiana aktywnego modułu = reset widoku (patrz render())
+  let worldEl = null; // ostatnio narysowany <div> ze skalowaną treścią - potrzebny applyViewTransform() wołanemu z dala od render() (drag/scroll)
 
   function isVisible() {
     const el = getContainer();
@@ -116,6 +125,16 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       return;
     }
 
+    // Inny moduł niż ostatnio narysowany (np. kliknięcie innej szafki na
+    // liście) - zerujemy pan/zoom, bo poprzednie przesunięcie/przybliżenie
+    // prawie na pewno nie ma sensu dla zupełnie innej bryły. Edycja TEGO
+    // SAMEGO modułu (dodanie półki itd. -> refreshAfterEdit -> render())
+    // NIE zeruje widoku - `view` żyje w zamknięciu instancji, przetrwa.
+    if (mod.id !== lastModId) {
+      view = { x: 0, y: 0, scale: 1 };
+      lastModId = mod.id;
+    }
+
     const tree = buildZoneTree(mod, { cornerArm });
     currentTree = tree;
 
@@ -143,14 +162,20 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     const toPxLen = (mm) => mm * scale;
     const px = { toPxX, toPxY, toPxLen };
 
-    const stage = document.createElement("div");
-    Object.assign(stage.style, { position: "absolute", inset: "0", fontFamily: "sans-serif", userSelect: "none" });
+    // viewport = stały, nieskalowany kontener na zdarzenia (pan/zoom, klik w
+    // tło) i na pływający pasek narzędzi. world = jego dziecko, wszystko, co
+    // widać na rysunku - dostaje transform translate(view.x,view.y)
+    // scale(view.scale) (patrz applyViewTransform), więc pan/zoom nie rusza
+    // ANI JEDNEJ linijki logiki rysowania niżej (renderNode i cała reszta
+    // liczy pozycje tak jak dawniej, w "dopasowanych do okna" px).
+    const viewport = document.createElement("div");
+    Object.assign(viewport.style, { position: "absolute", inset: "0", overflow: "hidden", fontFamily: "sans-serif", userSelect: "none", cursor: "grab" });
+    viewportRef = viewport;
 
-    const title = document.createElement("div");
-    const titleSuffix = cornerArm ? ` — ramię ${cornerArm}` : "";
-    title.innerHTML = `🗂️ Wnętrze: <b>${escapeHtml(mod.name)}${titleSuffix}</b> <span style="color:#94a3b8; font-weight:normal;">— klik w wnękę: podziel / obsadź · klik w dzielnik: przesuń / usuń</span>`;
-    Object.assign(title.style, { position: "absolute", top: "10px", left: "16px", fontSize: "13px", color: "#1e3a8a" });
-    stage.appendChild(title);
+    const world = document.createElement("div");
+    Object.assign(world.style, { position: "absolute", left: "0", top: "0", transformOrigin: "0 0" });
+    worldEl = world;
+    applyViewTransform();
 
     // obrys całej szafki/ramienia (boki/wieńce) dla kontekstu
     const shell = document.createElement("div");
@@ -164,16 +189,124 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       background: "#ffffff",
       boxSizing: "border-box",
     });
-    stage.appendChild(shell);
+    world.appendChild(shell);
 
-    renderNode(tree, stage, px, mod);
+    renderNode(tree, world, px, mod);
+    viewport.appendChild(world);
 
-    container.appendChild(stage);
+    // tytuł/podpowiedź - w viewport (NIE w world), żeby nie skalował się z
+    // przybliżeniem i został czytelny w rogu niezależnie od poziomu zoomu
+    const title = document.createElement("div");
+    const titleSuffix = cornerArm ? ` — ramię ${cornerArm}` : "";
+    title.innerHTML = `🗂️ Wnętrze: <b>${escapeHtml(mod.name)}${titleSuffix}</b> <span style="color:#94a3b8; font-weight:normal;">— klik w wnękę: podziel / obsadź · klik w dzielnik: przesuń / usuń · przeciągnij tło: przesuń · scroll: przybliż</span>`;
+    Object.assign(title.style, { position: "absolute", top: "10px", left: "16px", fontSize: "13px", color: "#1e3a8a", pointerEvents: "none" });
+    viewport.appendChild(title);
 
-    // klik poza wnęką/dzielnikiem = zamknij pływający pasek
-    stage.addEventListener("click", (e) => {
-      if (e.target === stage || e.target === shell) closeToolbar();
+    appendZoomControls(viewport);
+
+    container.appendChild(viewport);
+
+    // klik na tło (viewport/world/shell, nie na wnękę/dzielnik/pasek) =
+    // zamknij pływający pasek. Sam mousedown-drag do przesuwania widoku (niżej)
+    // już przy starcie zamyka pasek, więc nie trzeba tu odróżniać kliku od
+    // zakończenia przeciągnięcia - closeToolbar() wywołane dwa razy jest nieszkodliwe.
+    viewport.addEventListener("click", (e) => {
+      if (e.target === viewport || e.target === world || e.target === shell) closeToolbar();
     });
+
+    // Przeciąganie TŁA przesuwa widok (pan) - tylko gdy mousedown zaczyna się
+    // na tle (nie na wnęce/dzielniku/pasku, które mają własne handlery i same
+    // wołają stopPropagation tam, gdzie to ważne - tu i tak sprawdzamy target).
+    viewport.addEventListener("mousedown", (e) => {
+      if (e.target !== viewport && e.target !== world && e.target !== shell) return;
+      closeToolbar();
+      const start = { mx: e.clientX, my: e.clientY, vx: view.x, vy: view.y };
+      viewport.style.cursor = "grabbing";
+      const onMove = (ev) => {
+        view.x = start.vx + (ev.clientX - start.mx);
+        view.y = start.vy + (ev.clientY - start.my);
+        applyViewTransform();
+      };
+      const onUp = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        viewport.style.cursor = "grab";
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    });
+
+    // Kółko myszy = zoom "pod kursorem" (punkt pod kursorem zostaje w tym
+    // samym miejscu ekranu) - ten sam mechanizm co niedawno dodany
+    // zoomToCursor w podglądzie 3D (render/viewer3d.js).
+    viewport.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      closeToolbar();
+      const rect = viewport.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const oldScale = view.scale;
+      const newScale = Math.min(6, Math.max(0.15, oldScale * (e.deltaY > 0 ? 1 / 1.12 : 1.12)));
+      view.x = mx - ((mx - view.x) / oldScale) * newScale;
+      view.y = my - ((my - view.y) / oldScale) * newScale;
+      view.scale = newScale;
+      applyViewTransform();
+      updateZoomLabel();
+    }, { passive: false });
+
+    viewport.addEventListener("dblclick", (e) => {
+      if (e.target === viewport || e.target === world || e.target === shell) resetView();
+    });
+  }
+
+  function applyViewTransform() {
+    if (worldEl) worldEl.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+  }
+
+  function resetView() {
+    view = { x: 0, y: 0, scale: 1 };
+    render();
+  }
+
+  let zoomLabelEl = null;
+  function updateZoomLabel() {
+    if (zoomLabelEl) zoomLabelEl.innerText = Math.round(view.scale * 100) + "%";
+  }
+
+  // Kontrolki przybliżenia (+/-/dopasuj) w rogu viewportu - poza `world`, więc
+  // mają zawsze ten sam, normalny rozmiar niezależnie od poziomu zoomu.
+  function appendZoomControls(viewport) {
+    const wrap = document.createElement("div");
+    Object.assign(wrap.style, {
+      position: "absolute", right: "10px", bottom: "10px", zIndex: "150",
+      display: "flex", flexDirection: "column", gap: "5px", alignItems: "stretch",
+    });
+    const mkBtn = (label, title, onClick) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.innerText = label;
+      b.title = title;
+      Object.assign(b.style, {
+        width: "28px", height: "28px", border: "1px solid #cbd5e1", borderRadius: "6px",
+        background: "#fff", color: "#334155", fontWeight: "bold", fontSize: "14px", cursor: "pointer",
+      });
+      b.addEventListener("click", (e) => { e.stopPropagation(); onClick(); });
+      wrap.appendChild(b);
+      return b;
+    };
+    mkBtn("+", "Przybliż", () => { view.scale = Math.min(6, view.scale * 1.25); applyViewTransform(); updateZoomLabel(); });
+    mkBtn("–", "Oddal", () => { view.scale = Math.max(0.15, view.scale / 1.25); applyViewTransform(); updateZoomLabel(); });
+    mkBtn("⤢", "Dopasuj widok (albo podwójny klik na tle)", () => resetView());
+
+    zoomLabelEl = document.createElement("div");
+    zoomLabelEl.innerText = Math.round(view.scale * 100) + "%";
+    Object.assign(zoomLabelEl.style, {
+      textAlign: "center", fontSize: "10.5px", fontWeight: "bold", color: "#64748b",
+      background: "#fff", border: "1px solid #e2e8f0", borderRadius: "5px", padding: "2px 0",
+    });
+    wrap.appendChild(zoomLabelEl);
+
+    viewport.appendChild(wrap);
   }
 
   // Rysuje węzeł drzewa. Front (jeśli jest) może być przypisany do węzła
@@ -724,8 +857,14 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       maxWidth: "260px",
     });
 
+    // Pozycja liczona względem viewportRef (NIE stage/world) i tam też
+    // dopinany pasek (niżej) - world ma transform pan/zoom, więc pozycjonowanie
+    // czy dopięcie względem niego skalowałoby/przesuwało pasek razem z
+    // przybliżeniem. getBoundingClientRect() zawsze zwraca już przeliczone
+    // współrzędne na ekranie (po transformie), więc różnica względem
+    // NIEskalowanego viewportRef daje poprawną pozycję w zwykłych px.
     const rect = anchorEl.getBoundingClientRect();
-    const stageRect = stage.getBoundingClientRect();
+    const stageRect = viewportRef.getBoundingClientRect();
     toolbar.style.left = Math.max(4, rect.left - stageRect.left + rect.width / 2 - 90) + "px";
     toolbar.style.top = Math.max(30, rect.top - stageRect.top - 42) + "px";
 
@@ -853,7 +992,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     closeBtn.style.background = "transparent";
     closeBtn.style.marginLeft = "auto";
 
-    stage.appendChild(toolbar);
+    viewportRef.appendChild(toolbar);
   }
 
   function appendDrawerPicker(toolbar, mod, subtype, label) {
