@@ -41,7 +41,7 @@ import {
   resizeAlongAxis,
 } from "../core/zoneTree.js";
 import { update3D, enterAlignMode, areFrontsVisible } from "../render/viewer3d.js";
-import { updateSidebar } from "./sidebar.js";
+import { updateSidebar, openTechnicalDrawing } from "./sidebar.js";
 import { initPropertiesPanel } from "./properties.js";
 
 const FRONT_LABELS = {
@@ -297,6 +297,25 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     title.innerHTML = `🗂️ Wnętrze: <b>${titleName}${titleSuffix}</b> <span style="color:#94a3b8; font-weight:normal;">— klik w wnękę: podziel / obsadź · klik w dzielnik: przesuń / usuń · przeciągnij tło: przesuń · scroll: przybliż</span>`;
     Object.assign(title.style, { position: "absolute", top: "10px", left: "16px", fontSize: "13px", color: "#1e3a8a", pointerEvents: "none" });
     viewport.appendChild(title);
+
+    // Drukuj - ten sam rysunek techniczny z nawiertami co dziś w Produkcji >
+    // Rysunki 2D (osobne okno do wydruku, render/viewer2d.js), tylko dostępny
+    // od razu stąd, bez przełączania się. Ramię narożnika nie drukuje osobno
+    // (rysunek dotyczy całego modułu, nie pojedynczego ramienia).
+    if (!cornerArm) {
+      const printBtn = document.createElement("button");
+      printBtn.type = "button";
+      printBtn.innerHTML = `<i class="ti ti-printer" aria-hidden="true"></i> Drukuj`;
+      Object.assign(printBtn.style, {
+        position: "absolute", top: "8px", right: "10px", zIndex: "150",
+        display: "flex", alignItems: "center", gap: "6px",
+        border: "1px solid #cbd5e1", borderRadius: "6px", background: "#fff", color: "#334155",
+        fontSize: "12px", fontWeight: "bold", fontFamily: "sans-serif", padding: "6px 10px", cursor: "pointer",
+      });
+      printBtn.title = "Otwiera rysunek techniczny (boki, nawierty) do wydruku dla aktywnej szafki";
+      printBtn.addEventListener("click", (e) => { e.stopPropagation(); openTechnicalDrawing(); });
+      viewport.appendChild(printBtn);
+    }
 
     appendZoomControls(viewport);
 
