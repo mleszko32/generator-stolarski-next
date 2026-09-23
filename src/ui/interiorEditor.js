@@ -28,7 +28,7 @@
 // ui/properties.js, ui/sidebar.js, render/viewer3d.js) jest identyczne jak
 // przed wprowadzeniem fabryki.
 import { fmtMm } from "../utils/math.js";
-import { getActiveModule } from "../core/state.js";
+import { state, getActiveModule } from "../core/state.js";
 import {
   buildZoneTree,
   splitZoneHorizontal,
@@ -84,7 +84,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
   let selectedNode = null; // węzeł drzewa aktualnie pod pływającym paskiem
   let toolbarMode = null; // null | 'empty' | 'occupied' | 'divider'
   let toolbarEl = null; // pływający pasek TEJ instancji (nie document.getElementById - patrz komentarz na górze pliku)
-  let currentTree = null; // korzeń ostatnio zbudowanego drzewa (render()) - potrzebny appendDimLine, żeby znaleźć łańcuch dzielników do resizeAlongAxis
+  let treesByModId = {}; // korzenie ostatnio zbudowanych drzew (render()), po id modułu - potrzebne appendDimLine, żeby znaleźć łańcuch dzielników do resizeAlongAxis (grupa modułów ma po jednym drzewie na moduł, patrz render())
   let viewportRef = null; // stały (nieskalowany) kontener zdarzeń pan/zoom TEJ instancji - tu (nie do `stage`) trafia pływający pasek, żeby nie skalował się z przybliżeniem
   // Widok (przesunięcie/zoom) - TRWA między kolejnymi render() tego samego
   // modułu (np. po dodaniu półki), żeby edycja nie zerowała przybliżenia.
@@ -125,29 +125,77 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       return;
     }
 
-    // Inny moduł niż ostatnio narysowany (np. kliknięcie innej szafki na
-    // liście) - zerujemy pan/zoom, bo poprzednie przesunięcie/przybliżenie
-    // prawie na pewno nie ma sensu dla zupełnie innej bryły. Edycja TEGO
-    // SAMEGO modułu (dodanie półki itd. -> refreshAfterEdit -> render())
-    // NIE zeruje widoku - `view` żyje w zamknięciu instancji, przetrwa.
-    if (mod.id !== lastModId) {
+    // Grupa: moduły ze wspólnym groupId ("Połącz zaznaczone w grupę" w
+    // ui/properties.js) rysują się WSZYSTKIE naraz, każdy w pełni edytowalny,
+    // ułożone wg realnej pozycji w pokoju - ten sam widok co dziś w rysunku
+    // technicznym do druku (render/viewer2d.js: stackModules/getLocalRelX/
+    // getDy), tylko tu każdy człon grupy dostaje WŁASNE drzewo i własne
+    // wnęki do kliknięcia, nie tylko aktywny. Ramię narożnika nigdy się nie
+    // grupuje (własny, mały układ współrzędnych ramienia).
+    const groupMods = (!cornerArm && mod.groupId)
+      ? state.project.modules.filter((m) => m.groupId === mod.groupId)
+      : [mod];
+
+    // Zmiana aktywnego modułu ALBO grupy (np. inny człon tej samej grupy
+    // kliknięty na liście) - zerujemy pan/zoom, bo poprzednie przesunięcie/
+    // przybliżenie prawie na pewno nie ma sensu dla innego układu. Ten sam
+    // groupId liczy się jako "ta sama scena" (klik w innego członka tej
+    // samej grupy NIE resetuje widoku - to dalej ta sama rysowana całość).
+    // Edycja (dodanie półki itd. -> refreshAfterEdit -> render()) NIE zeruje
+    // widoku - `view` żyje w zamknięciu instancji, przetrwa.
+    const sceneKey = mod.groupId || mod.id;
+    if (sceneKey !== lastModId) {
       view = { x: 0, y: 0, scale: 1 };
-      lastModId = mod.id;
+      lastModId = sceneKey;
     }
 
-    const tree = buildZoneTree(mod, { cornerArm });
-    currentTree = tree;
+    // Przesunięcie każdego członka grupy WZGLĘDEM aktywnego modułu, w
+    // płaszczyźnie elewacji (przód szafki = widz): oś pozioma to x albo z
+    // zależnie od obrotu o 90°/270° (ten sam rzut co getLocalRelX w
+    // viewer2d.js), oś pionowa to wysokość nad podłogą + nóżki (getDy tamże).
+    const activeX = parseFloat(mod.position.x) || 0;
+    const activeZ = parseFloat(mod.position.z) || 0;
+    const activeY = parseFloat(mod.position.y) || 0;
+    const activeRot = ((parseFloat(mod.rotation) || 0) % 360 + 360) % 360;
+    const axisIsX = activeRot === 0 || activeRot === 180;
+    const rightSign = (activeRot === 0 || activeRot === 90) ? 1 : -1;
+    const relX = (m) => {
+      const p = axisIsX ? (parseFloat(m.position.x) || 0) : (parseFloat(m.position.z) || 0);
+      const a = axisIsX ? activeX : activeZ;
+      return rightSign * (p - a);
+    };
+    const relY = (m) => {
+      const legH = (m.legs && m.legs.active) ? (parseFloat(m.legs.height) || 0) : 0;
+      return (parseFloat(m.position.y) || 0) + legH - activeY;
+    };
 
-    // Obrys "z kontekstem" (boki/wieńce) do narysowania jako tło (shell,
-    // niżej) - dla zwykłego modułu to CAŁA bryła (0..width, 0..height), żeby
-    // grubość boków było widać jako margines wokół strefy wnęk (tree.rect,
-    // zaczynającej się od th). Ramię szafki narożnej nie ma dziś osobno
-    // policzonej "pełnej bryły" - tree.rect już JEST tym, co pokazujemy.
-    const outer = cornerArm
-      ? tree.rect
-      : { minX: 0, maxX: parseFloat(mod.dimensions.width) || 600, minY: 0, maxY: parseFloat(mod.dimensions.height) || 720 };
-    const W = outer.maxX - outer.minX;
-    const H = outer.maxY - outer.minY;
+    // Drzewo + obrys "z kontekstem" (boki/wieńce) KAŻDEGO członka grupy - dla
+    // zwykłego modułu to CAŁA bryła (0..width, 0..height), żeby grubość
+    // boków było widać jako margines wokół strefy wnęk (tree.rect, zaczynającej
+    // się od th). Ramię szafki narożnej nie ma dziś osobno policzonej "pełnej
+    // bryły" - tree.rect już JEST tym, co pokazujemy (grupa pomijana wtedy,
+    // items ma zawsze dokładnie jeden element).
+    treesByModId = {};
+    const items = groupMods.map((m) => {
+      const t = buildZoneTree(m, { cornerArm });
+      treesByModId[m.id] = t;
+      const outerRect = cornerArm
+        ? t.rect
+        : { minX: 0, maxX: parseFloat(m.dimensions.width) || 600, minY: 0, maxY: parseFloat(m.dimensions.height) || 720 };
+      return { mod: m, tree: t, outer: outerRect, offX: relX(m), offY: relY(m) };
+    });
+
+    // Wspólny bounding box CAŁEJ sceny (mm) - dopasowanie do okna liczone raz
+    // dla wszystkich członków grupy naraz, nie osobno dla każdego.
+    let sceneMinX = Infinity, sceneMaxX = -Infinity, sceneMinY = Infinity, sceneMaxY = -Infinity;
+    items.forEach((it) => {
+      sceneMinX = Math.min(sceneMinX, it.offX + it.outer.minX);
+      sceneMaxX = Math.max(sceneMaxX, it.offX + it.outer.maxX);
+      sceneMinY = Math.min(sceneMinY, it.offY + it.outer.minY);
+      sceneMaxY = Math.max(sceneMaxY, it.offY + it.outer.maxY);
+    });
+    const W = sceneMaxX - sceneMinX;
+    const H = sceneMaxY - sceneMinY;
     const pad = 40;
     const availW = Math.max(container.clientWidth - pad * 2, 100);
     const availH = Math.max(container.clientHeight - pad * 2, 100);
@@ -155,12 +203,11 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     const originX = (container.clientWidth - W * scale) / 2;
     const originTop = (container.clientHeight - H * scale) / 2;
 
-    // mm -> px: X wprost (przesunięte o outer.minX), Y odwrócone (dół strefy
-    // = duże piksele)
-    const toPxX = (mmX) => originX + (mmX - outer.minX) * scale;
-    const toPxY = (mmY) => originTop + (outer.maxY - mmY) * scale;
+    // mm -> px WSPÓLNE dla całej sceny: X wprost (przesunięte o sceneMinX), Y
+    // odwrócone (dół strefy = duże piksele).
+    const toSceneX = (mmX) => originX + (mmX - sceneMinX) * scale;
+    const toSceneY = (mmY) => originTop + (sceneMaxY - mmY) * scale;
     const toPxLen = (mm) => mm * scale;
-    const px = { toPxX, toPxY, toPxLen };
 
     // viewport = stały, nieskalowany kontener na zdarzenia (pan/zoom, klik w
     // tło) i na pływający pasek narzędzi. world = jego dziecko, wszystko, co
@@ -177,28 +224,57 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     worldEl = world;
     applyViewTransform();
 
-    // obrys całej szafki/ramienia (boki/wieńce) dla kontekstu
-    const shell = document.createElement("div");
-    Object.assign(shell.style, {
-      position: "absolute",
-      left: toPxX(outer.minX) + "px",
-      top: toPxY(outer.maxY) + "px",
-      width: toPxLen(W) + "px",
-      height: toPxLen(H) + "px",
-      border: "2px solid #334155",
-      background: "#ffffff",
-      boxSizing: "border-box",
-    });
-    world.appendChild(shell);
+    const isBackgroundTarget = (t) => t === viewport || t === world || t?.dataset?.ieShell === "1";
 
-    renderNode(tree, world, px, mod);
+    items.forEach((it) => {
+      // px lokalne dla TEGO członka grupy - te same wzory co dawniej, tylko
+      // z doliczonym offsetem (offX/offY) tego modułu w scenie.
+      const px = {
+        toPxX: (mmX) => toSceneX(it.offX + mmX),
+        toPxY: (mmY) => toSceneY(it.offY + mmY),
+        toPxLen,
+      };
+
+      const shellEl = document.createElement("div");
+      shellEl.dataset.ieShell = "1";
+      Object.assign(shellEl.style, {
+        position: "absolute",
+        left: px.toPxX(it.outer.minX) + "px",
+        top: px.toPxY(it.outer.maxY) + "px",
+        width: toPxLen(it.outer.maxX - it.outer.minX) + "px",
+        height: toPxLen(it.outer.maxY - it.outer.minY) + "px",
+        border: "2px solid #334155",
+        background: "#ffffff",
+        boxSizing: "border-box",
+      });
+      world.appendChild(shellEl);
+
+      // Nazwa modułu nad korpusem - tylko gdy pokazujemy więcej niż jeden
+      // naraz (dla pojedynczego modułu nazwa jest już w tytule nad rysunkiem).
+      if (items.length > 1) {
+        const lbl = document.createElement("div");
+        lbl.innerText = it.mod.name;
+        Object.assign(lbl.style, {
+          position: "absolute",
+          left: px.toPxX(it.outer.minX) + "px",
+          top: (px.toPxY(it.outer.maxY) - 18) + "px",
+          fontSize: "11px", fontWeight: "bold", color: "#1e293b", fontFamily: "sans-serif",
+          pointerEvents: "none",
+        });
+        world.appendChild(lbl);
+      }
+
+      renderNode(it.tree, world, px, it.mod);
+    });
+
     viewport.appendChild(world);
 
     // tytuł/podpowiedź - w viewport (NIE w world), żeby nie skalował się z
     // przybliżeniem i został czytelny w rogu niezależnie od poziomu zoomu
     const title = document.createElement("div");
     const titleSuffix = cornerArm ? ` — ramię ${cornerArm}` : "";
-    title.innerHTML = `🗂️ Wnętrze: <b>${escapeHtml(mod.name)}${titleSuffix}</b> <span style="color:#94a3b8; font-weight:normal;">— klik w wnękę: podziel / obsadź · klik w dzielnik: przesuń / usuń · przeciągnij tło: przesuń · scroll: przybliż</span>`;
+    const titleName = items.length > 1 ? `grupa (${items.length} szafki: ${items.map((it) => it.mod.name).join(", ")})` : escapeHtml(mod.name);
+    title.innerHTML = `🗂️ Wnętrze: <b>${titleName}${titleSuffix}</b> <span style="color:#94a3b8; font-weight:normal;">— klik w wnękę: podziel / obsadź · klik w dzielnik: przesuń / usuń · przeciągnij tło: przesuń · scroll: przybliż</span>`;
     Object.assign(title.style, { position: "absolute", top: "10px", left: "16px", fontSize: "13px", color: "#1e3a8a", pointerEvents: "none" });
     viewport.appendChild(title);
 
@@ -206,19 +282,20 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
 
     container.appendChild(viewport);
 
-    // klik na tło (viewport/world/shell, nie na wnękę/dzielnik/pasek) =
-    // zamknij pływający pasek. Sam mousedown-drag do przesuwania widoku (niżej)
-    // już przy starcie zamyka pasek, więc nie trzeba tu odróżniać kliku od
-    // zakończenia przeciągnięcia - closeToolbar() wywołane dwa razy jest nieszkodliwe.
+    // klik na tło (viewport/world/dowolny shell, nie na wnękę/dzielnik/pasek)
+    // = zamknij pływający pasek. Sam mousedown-drag do przesuwania widoku
+    // (niżej) już przy starcie zamyka pasek, więc nie trzeba tu odróżniać
+    // kliku od zakończenia przeciągnięcia - closeToolbar() wywołane dwa razy
+    // jest nieszkodliwe.
     viewport.addEventListener("click", (e) => {
-      if (e.target === viewport || e.target === world || e.target === shell) closeToolbar();
+      if (isBackgroundTarget(e.target)) closeToolbar();
     });
 
     // Przeciąganie TŁA przesuwa widok (pan) - tylko gdy mousedown zaczyna się
     // na tle (nie na wnęce/dzielniku/pasku, które mają własne handlery i same
     // wołają stopPropagation tam, gdzie to ważne - tu i tak sprawdzamy target).
     viewport.addEventListener("mousedown", (e) => {
-      if (e.target !== viewport && e.target !== world && e.target !== shell) return;
+      if (!isBackgroundTarget(e.target)) return;
       closeToolbar();
       const start = { mx: e.clientX, my: e.clientY, vx: view.x, vy: view.y };
       viewport.style.cursor = "grabbing";
@@ -255,7 +332,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     }, { passive: false });
 
     viewport.addEventListener("dblclick", (e) => {
-      if (e.target === viewport || e.target === world || e.target === shell) resetView();
+      if (isBackgroundTarget(e.target)) resetView();
     });
   }
 
@@ -456,7 +533,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
         // w tym samym rzędzie/kolumnie, zamiast po prostu resize'ować sąsiada.
         // isH=true tutaj oznacza wymiar SZEROKOŚCI, czyli rządzą nim dzielniki
         // PIONOWE (oś 'v') - stąd wantH=!isH.
-        resizeAlongAxis(mod, currentTree, node, !isH, mm, valueMm);
+        resizeAlongAxis(mod, treesByModId[mod.id], node, !isH, mm, valueMm);
       }
       refreshAfterEdit();
     }, editFront ? { front: editFront, axis: isH ? "forceW" : "forceH" } : null);
