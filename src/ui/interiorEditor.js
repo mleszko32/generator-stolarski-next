@@ -244,10 +244,30 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
         width: toPxLen(it.outer.maxX - it.outer.minX) + "px",
         height: toPxLen(it.outer.maxY - it.outer.minY) + "px",
         border: "2px solid #334155",
-        background: "#ffffff",
+        // "Przekrój płyty" na grubości boków/wieńców, jak na rysunku
+        // technicznym - biała strefa wnęk (inner, niżej) rysuje się NA
+        // WIERZCHU tego szrafowania, więc widać je tylko jako obwódkę.
+        // Ramię narożnika nie ma osobno policzonej "pełnej bryły" (outer ===
+        // tree.rect), więc tam nie ma czego szrafować - zostaje białe.
+        background: cornerArm ? "#ffffff" : "repeating-linear-gradient(45deg, #dbe2ea, #dbe2ea 4px, #eef2f6 4px, #eef2f6 8px)",
         boxSizing: "border-box",
       });
       world.appendChild(shellEl);
+
+      if (!cornerArm) {
+        const innerPanel = document.createElement("div");
+        Object.assign(innerPanel.style, {
+          position: "absolute",
+          left: px.toPxX(it.tree.rect.minX) + "px",
+          top: px.toPxY(it.tree.rect.maxY) + "px",
+          width: toPxLen(it.tree.rect.maxX - it.tree.rect.minX) + "px",
+          height: toPxLen(it.tree.rect.maxY - it.tree.rect.minY) + "px",
+          background: "#ffffff",
+          boxSizing: "border-box",
+          pointerEvents: "none",
+        });
+        world.appendChild(innerPanel);
+      }
 
       // Nazwa modułu nad korpusem - tylko gdy pokazujemy więcej niż jeden
       // naraz (dla pojedynczego modułu nazwa jest już w tytule nad rysunkiem).
@@ -500,17 +520,20 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     const windowEl = document.createElement("div");
     Object.assign(windowEl.style, {
       position: "absolute",
-      background: "rgba(255,255,255,0.95)",
+      background: "rgba(255,255,255,0.97)",
       border: `1px solid ${color}`,
-      borderRadius: "3px",
-      padding: "0 3px",
-      fontSize: "9px",
-      fontFamily: "sans-serif",
+      borderRadius: "4px",
+      padding: "1px 5px",
+      fontSize: "9.5px",
+      // monospace jak na rysunku technicznym - liczby wymiarowe równej
+      // szerokości, łatwiej je odczytać/porównać niż w kroju proporcjonalnym
+      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
       lineHeight: "13px",
       display: "flex",
       alignItems: "center",
-      gap: "1px",
+      gap: "2px",
       whiteSpace: "nowrap",
+      boxShadow: "0 1px 2px rgba(15,23,42,.10)",
     });
     if (isH) {
       Object.assign(windowEl.style, { left: "50%", bottom: "4px", transform: "translate(-50%, 50%)" });
@@ -633,12 +656,13 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       input.select();
     });
 
-    const lockBtn = document.createElement("span");
-    lockBtn.innerText = locked ? "🔒" : "🔓";
+    const lockBtn = document.createElement("i");
+    lockBtn.className = locked ? "ti ti-lock" : "ti ti-lock-open";
+    lockBtn.setAttribute("aria-hidden", "true");
     lockBtn.title = locked
       ? "Odblokuj ten wymiar (znów będzie się dostosowywał automatycznie)"
       : "Zablokuj ten wymiar (nie zmieni się, gdy dostosowują się inne wnęki)";
-    Object.assign(lockBtn.style, { cursor: "pointer", fontSize: "8px" });
+    Object.assign(lockBtn.style, { cursor: "pointer", fontSize: "10px" });
     lockBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (side === "a") parentSplit.divider.lockA = !locked; else parentSplit.divider.lockB = !locked;
@@ -679,7 +703,12 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       transition: "background .12s",
     });
     el.dataset.leaf = "1";
-    el.innerText = "+ pusta wnęka";
+    const plusIcon = document.createElement("i");
+    plusIcon.className = "ti ti-plus";
+    plusIcon.setAttribute("aria-hidden", "true");
+    plusIcon.style.marginRight = "4px";
+    el.appendChild(plusIcon);
+    el.appendChild(document.createTextNode("pusta wnęka"));
 
     el.addEventListener("mouseenter", () => { el.style.background = hoverBg; });
     el.addEventListener("mouseleave", () => { el.style.background = idleBg; });
@@ -860,8 +889,11 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
         cursor: "ew-resize",
       });
     }
-    handle.style.background = node.divider.isStructural ? "#a7f3d0" : "#cbd5e1";
-    handle.style.border = "1px solid #475569";
+    // Ta sama tekstura płyty co korpus (patrz shellEl w render()) - kolor
+    // ramki dalej rozróżnia konstrukcyjną (zielona, kołek+wkręt) od ruchomej
+    // (szara, na podpórkach), tylko sam materiał teraz wygląda tak samo.
+    handle.style.background = "repeating-linear-gradient(45deg, #dbe2ea, #dbe2ea 3px, #eef2f6 3px, #eef2f6 6px)";
+    handle.style.border = node.divider.isStructural ? "1.5px solid #16a34a" : "1px solid #475569";
     handle.style.boxSizing = "border-box";
     handle.style.zIndex = "2";
 
@@ -894,7 +926,11 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
           selectNode(node, handle, stage, px, mod, "divider");
         }
       };
-      handle._scale = px.toPxLen(1);
+      // toPxLen(1) to px "dopasowania do okna" BEZ przybliżenia - ekranowa
+      // odległość na piksel to jeszcze razy view.scale (transform na world,
+      // patrz applyViewTransform), inaczej przeciąganie dzielnika przy
+      // przybliżeniu było dwa razy za szybkie/wolne względem ruchu myszy.
+      handle._scale = px.toPxLen(1) * view.scale;
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
     });
