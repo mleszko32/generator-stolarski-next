@@ -260,7 +260,7 @@ function renderRysunki(el) {
   const mods = state.project.modules || [];
   const activeId = state.activeModuleId;
   el.innerHTML = `
-    <div class="hub-bar"><div><h3>Rysunki 2D</h3><div class="hub-sub">Rysunek wykonawczy z nawiertami (System 32, wkręty i kołki, zawiasy, podpórki). Wybierz szafkę, dla której chcesz otworzyć rysunek.</div></div></div>
+    <div class="hub-bar"><div><h3>Rysunki 2D</h3><div class="hub-sub">Rysunek wykonawczy z nawiertami (System 32, wkręty i kołki, zawiasy, podpórki). Wybierz szafkę, dla której chcesz otworzyć rysunek. W otwartym rysunku kliknij formatkę (bok, przegrodę, wieniec) i użyj „Drukuj formatkę (A4)” - arkusz z odwiertami w czytelnej skali, w razie potrzeby na kilku kartkach.</div></div></div>
     ${mods.length === 0 ? '<p class="hub-empty">Projekt nie ma jeszcze szafek.</p>' : `
     <table class="hub-table">
       <thead><tr><th>Szafka</th><th>Wymiary</th><th></th></tr></thead>

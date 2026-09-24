@@ -614,6 +614,17 @@ export function openTechnicalDrawing() {
         const groupModules = groupId
             ? state.project.modules.filter(m => m.groupId === groupId)
             : [];
+        // Metadane nagłówka wydruku formatki (A4) - okno wydruku czyta je z
+        // window.opener.__printMeta (świeże po przełączeniu modułu grupy), a gdy
+        // aplikacja jest niedostępna, z kopii wstrzykniętej do skryptu okna.
+        const buildPrintMeta = (m) => ({
+            project: state.project.name || '',
+            module: m.name || '',
+            th: parseFloat(state.project.materials?.boardThickness) || 18,
+            date: new Date().toLocaleDateString('pl-PL'),
+        });
+        window.__printMeta = buildPrintMeta(activeMod);
+
         window.__printSelectModule = (moduleId) => {
             state.activeModuleId = moduleId;
             update3D();
@@ -621,6 +632,7 @@ export function openTechnicalDrawing() {
             initPropertiesPanel();
             const m = state.project.modules.find(mm => mm.id === moduleId);
             if (!m) return null;
+            window.__printMeta = buildPrintMeta(m);
             const { parts: mParts, mountingData: mMountingData } = calculateParts();
             const mSidePanel = mParts.find(p => p.name.toLowerCase().includes('bok'));
             const mDrawHeight = mSidePanel ? mSidePanel.length : (parseFloat(m.dimensions.height) || 720);
@@ -634,6 +646,7 @@ export function openTechnicalDrawing() {
               </div>
         ` : '';
 
+        const printMetaJson = JSON.stringify(window.__printMeta).replace(/</g, '\\u003c');
         const htmlContent = `
           <!DOCTYPE html>
           <html lang="pl">
@@ -657,10 +670,33 @@ export function openTechnicalDrawing() {
                   .module-tab { padding: 6px 14px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 999px; font-weight: bold; color: #334155; cursor: pointer; font-size: 12px; transition: all 0.15s; }
                   .module-tab:hover { background: #e0f2fe; border-color: #3b82f6; }
                   .module-tab.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+                  select.print-scale { padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: bold; color: #334155; background: #fff; }
+                  .btn-print { padding: 6px 12px; background: #2563eb; border: 1px solid #2563eb; border-radius: 4px; font-weight: bold; color: #fff; cursor: pointer; }
+                  .btn-print:hover { background: #1d4ed8; }
+                  /* Wydruk pojedynczej formatki na A4 (printPart niżej): arkusze w mm,
+                     jedna formatka na stronie albo kilka arkuszy z zakładką. */
+                  #print-root { display: none; }
+                  .sheet { box-sizing: border-box; page-break-after: always; break-after: page; overflow: hidden; background: #fff; color: #0f172a; font-family: 'Segoe UI', Tahoma, Arial, sans-serif; }
+                  .sheet:last-child { page-break-after: auto; break-after: auto; }
+                  .sheet-portrait { width: 190mm; height: 275mm; }
+                  .sheet-landscape { width: 277mm; height: 188mm; }
+                  .sh-head { height: 16mm; margin-bottom: 1mm; border-bottom: 0.4mm solid #0f172a; }
+                  .sh-title { font-size: 6mm; font-weight: 800; line-height: 8.5mm; }
+                  .sh-sub { font-size: 3.1mm; color: #334155; line-height: 4mm; }
+                  .sheet svg { display: block; outline: 0.2mm solid #cbd5e1; outline-offset: -0.2mm; }
+                  .sh-foot { height: 12mm; margin-top: 1mm; display: flex; align-items: center; justify-content: space-between; gap: 4mm; font-size: 3mm; color: #334155; }
+                  .sh-foot .legend span { margin-right: 3.5mm; white-space: nowrap; }
+                  .sh-foot .dot { display: inline-block; width: 2.6mm; height: 2.6mm; border-radius: 50%; vertical-align: -0.5mm; margin-right: 1mm; }
+                  .sh-foot .scale { text-align: right; white-space: nowrap; }
+                  .sh-foot .scalebar { display: inline-block; height: 2.2mm; border: 0.3mm solid #0f172a; border-top: none; vertical-align: middle; margin-left: 2mm; }
                   @media print {
                       body { height: auto; overflow: visible; display: block; background: white; }
                       .header { display: none; }
                       .svg-container { display: block; overflow: visible; background: white; }
+                      body.printing-part { display: block; height: auto; overflow: visible; background: #fff; }
+                      body.printing-part .header, body.printing-part .svg-container { display: none !important; }
+                      body.printing-part #print-root { display: block; }
+                      #print-root, #print-root * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                   }
               </style>
           </head>
@@ -680,6 +716,14 @@ export function openTechnicalDrawing() {
                           <button class="btn-front" onclick="toggleFront('detail-front', this)">🚪 Fronty Zewn.</button>
                           <button class="btn-front" onclick="fitToContent()" title="Wyśrodkuj i przybliż rysunek (także dwuklik na rysunku)">Dopasuj widok</button>
                             <button class="btn-front" onclick="toggleFront('detail-front-inner', this)">📥 Fronty Wewn.</button>
+                          <div style="width: 2px; height: 20px; background: #cbd5e1; margin: 0 5px;"></div>
+                          <select class="print-scale" id="print-scale" title="Skala wydruku formatki na A4">
+                              <option value="auto">Skala: auto (czytelna)</option>
+                              <option value="1">1:1 (do przyłożenia do płyty, wiele arkuszy)</option>
+                              <option value="0.5">1:2</option>
+                              <option value="0.25">1:4</option>
+                          </select>
+                          <button class="btn-print" onclick="printPart()" title="Drukuje wybraną (kliknięta na korpusie) formatkę z odwiertami na kartkach A4">Drukuj formatkę (A4)</button>
                       </div>
                   </div>
                   ${tabsHtml}
@@ -687,6 +731,8 @@ export function openTechnicalDrawing() {
               <div class="svg-container" id="svg-viewport">
                   ${svgContent}
               </div>
+              <style id="print-page-style"></style>
+              <div id="print-root"></div>
               <script>
                   function toggleLayer(layerName, checkbox) {
                       const elements = document.querySelectorAll('.' + layerName);
@@ -801,6 +847,150 @@ export function openTechnicalDrawing() {
                   // Włączenie/wyłączenie widoku frontów zmienia widoczną zawartość - dopasuj ponownie.
                   const toggleFrontRaw = toggleFront;
                   toggleFront = function (id, btn) { toggleFrontRaw(id, btn); fitToContent(); };
+
+                  // ===== Wydruk pojedynczej formatki z odwiertami na kartkach A4 =====
+                  // Drukuje TĘ formatkę, którą aktualnie widać (ostatnio kliknięta na
+                  // korpusie: bok, przegroda, wieniec, półka). Rysunek jest w mm, więc
+                  // skala wydruku = mm papieru na mm formatki: przy 1:1 arkusz można
+                  // przyłożyć do płyty. Za duża na jedną kartkę formatka jest cięta na
+                  // arkusze (zakładka 8 mm) w skali nie mniejszej niż 1:4, żeby opisy
+                  // (wysokości otworów) zostały czytelne - stąd auto nie zmniejsza dalej.
+                  var currentDetailId = 'detail-left';
+                  var showDetailRaw = showDetail;
+                  showDetail = function (id) { showDetailRaw(id); if (id) currentDetailId = id; };
+
+                  var PRINT_META = ${printMetaJson};
+
+                  function escH(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+                  function fmtN(v) { var n = Math.round(parseFloat(v) * 10) / 10; return String(n); }
+                  function tileCount(total, size, step) { return total <= size + 0.5 ? 1 : Math.ceil((total - size) / step) + 1; }
+
+                  function printMeta() {
+                      try {
+                          if (window.opener && !window.opener.closed && window.opener.__printMeta) return window.opener.__printMeta;
+                      } catch (e) {}
+                      return PRINT_META;
+                  }
+
+                  function printPart() {
+                      var g = document.getElementById(currentDetailId);
+                      if (!g) { alert('Kliknij formatkę na rysunku korpusu, żeby wybrać, którą wydrukować.'); return; }
+                      var bb = g.getBBox();
+                      if (!bb.width || !bb.height) { alert('Brak rysunku tej formatki do wydruku.'); return; }
+                      var meta = printMeta();
+
+                      var titleEl = g.querySelector('text[font-size="16"]');
+                      var title = titleEl ? titleEl.textContent : 'Formatka';
+                      var pr = g.querySelector('rect');
+                      var dims = '';
+                      if (pr) {
+                          var pw = parseFloat(pr.getAttribute('width')), ph = parseFloat(pr.getAttribute('height'));
+                          dims = fmtN(Math.max(pw, ph)) + ' × ' + fmtN(Math.min(pw, ph)) + ' mm';
+                      }
+
+                      // Obszar rysunku na kartce po odjęciu nagłówka (17 mm) i stopki (13 mm), marginesy 10 mm.
+                      var orients = [
+                          { name: 'portrait', aw: 190, ah: 245 },
+                          { name: 'landscape', aw: 277, ah: 158 }
+                      ];
+                      var OVL = 8, MINREAD = 0.18, M = 14;
+                      var sel = document.getElementById('print-scale').value;
+
+                      // Plan wydruku (skala, orientacja) dla danego prostokąta rysunku.
+                      function planFor(bw, bh) {
+                          orients.forEach(function (x) { x.fit = Math.min(x.aw / bw, x.ah / bh); });
+                          var best = orients[0].fit >= orients[1].fit ? orients[0] : orients[1];
+                          if (sel === 'auto' && best.fit >= MINREAD) return { s: Math.min(best.fit, 1), o: best };
+                          var sc = sel === 'auto' ? MINREAD : parseFloat(sel);
+                          var pages = orients.map(function (x) {
+                              var ttw = x.aw / sc, tth = x.ah / sc;
+                              return tileCount(bw, ttw, ttw - OVL / sc) * tileCount(bh, tth, tth - OVL / sc);
+                          });
+                          return { s: sc, o: (pages[1] < pages[0]) ? orients[1] : (pages[0] < pages[1] ? orients[0] : best) };
+                      }
+
+                      var bb = g.getBBox();
+                      var plan = planFor(bb.width + 2 * M, bb.height + 2 * M);
+
+                      // Czytelność: opisy mają w SVG 9-12 jednostek (= mm w skali 1:1). Po
+                      // zmniejszeniu skali na papierze byłyby za drobne, więc powiększamy je
+                      // tak, żeby najmniejszy opis (9 jednostek) miał na kartce ok. 2,8 mm
+                      // wysokości. Powiększone opisy poszerzają rysunek, a to zmienia skalę,
+                      // więc dopasowujemy iteracyjnie (kilka przebiegów zbiega). Robimy to na
+                      // oryginalnych elementach (getBBox musi zobaczyć nowe, szersze opisy) i
+                      // po zbudowaniu arkuszy przywracamy oryginalne rozmiary.
+                      var TEXT_MM = 2.8;
+                      var touched = [];
+                      function restoreFonts() {
+                          touched.forEach(function (p) { p[0].setAttribute('font-size', p[1]); });
+                          touched = [];
+                      }
+                      function applyFontK(k) {
+                          g.querySelectorAll('text, tspan').forEach(function (t) {
+                              var fs0 = t.getAttribute('font-size');
+                              if (!fs0) return;
+                              touched.push([t, fs0]);
+                              t.setAttribute('font-size', String(parseFloat(fs0) * k));
+                          });
+                      }
+                      var textK = 1;
+                      for (var it = 0; it < 6; it++) {
+                          var kNew = Math.max(1, TEXT_MM / (9 * plan.s));
+                          if (Math.abs(kNew - textK) < 0.03) break;
+                          textK = kNew;
+                          restoreFonts();
+                          if (textK > 1.01) applyFontK(textK);
+                          bb = g.getBBox();
+                          plan = planFor(bb.width + 2 * M, bb.height + 2 * M);
+                      }
+                      var bx = bb.x - M, by = bb.y - M, bw = bb.width + 2 * M, bh = bb.height + 2 * M;
+                      var s = plan.s, o = plan.o;
+                      var tw = o.aw / s, th = o.ah / s;
+                      var stepx = tw - OVL / s, stepy = th - OVL / s;
+                      var nx = tileCount(bw, tw, stepx), ny = tileCount(bh, th, stepy);
+                      var total = nx * ny;
+                      if (total > 12 && !confirm('Ta formatka w tej skali zajmie ' + total + ' arkuszy A4. Drukować?')) { restoreFonts(); return; }
+
+                      var clone = g.cloneNode(true);
+                      clone.style.display = '';
+                      var inner = clone.outerHTML;
+                      restoreFonts();
+
+                      var ratio = Math.round((1 / s) * 10) / 10;
+                      var scaleTxt = '1:' + String(ratio).replace('.', ',');
+                      var barMm = 100 * s;
+                      var legend = '<span class="legend">'
+                          + '<span><i class="dot" style="background:#9333ea"></i>kołek Ø8 + wkręt Ø3</span>'
+                          + '<span><i class="dot" style="background:#ea580c"></i>podpórka półki Ø5</span>'
+                          + '<span><i class="dot" style="background:#0284c7"></i>prowadnica szuflady Ø5</span>'
+                          + '<span><i class="dot" style="background:#16a34a"></i>zawias Ø5</span></span>';
+
+                      var html = '', n = 0;
+                      for (var r = 0; r < ny; r++) {
+                          for (var c = 0; c < nx; c++) {
+                              n++;
+                              var vx = nx === 1 ? bx - (tw - bw) / 2 : bx + c * stepx;
+                              var vy = ny === 1 ? by - (th - bh) / 2 : by + r * stepy;
+                              var sheetNo = total > 1 ? (' · arkusz ' + n + '/' + total + ' (kol. ' + (c + 1) + ', wiersz ' + (r + 1) + ')') : '';
+                              html += '<div class="sheet sheet-' + o.name + '">'
+                                  + '<div class="sh-head"><div class="sh-title">' + escH(title) + (dims ? ' — ' + escH(dims) : '') + '</div>'
+                                  + '<div class="sh-sub">' + escH(meta.project) + ' · ' + escH(meta.module) + ' · gr. płyty ' + fmtN(meta.th) + ' mm · skala ' + scaleTxt + sheetNo + ' · ' + escH(meta.date) + '</div></div>'
+                                  + '<svg xmlns="http://www.w3.org/2000/svg" width="' + o.aw + 'mm" height="' + o.ah + 'mm" viewBox="' + vx + ' ' + vy + ' ' + tw + ' ' + th + '" style="font-family: Segoe UI, Tahoma, Arial, sans-serif;">' + inner + '</svg>'
+                                  + '<div class="sh-foot">' + legend
+                                  + '<span class="scale">drukuj w skali 100% (bez dopasowania do strony) · 100 mm =<span class="scalebar" style="width:' + barMm + 'mm"></span></span></div>'
+                                  + '</div>';
+                          }
+                      }
+
+                      document.getElementById('print-root').innerHTML = html;
+                      document.getElementById('print-page-style').textContent = '@page { size: A4 ' + o.name + '; margin: 10mm; }';
+                      document.body.classList.add('printing-part');
+                      window.onafterprint = function () {
+                          document.body.classList.remove('printing-part');
+                          document.getElementById('print-root').innerHTML = '';
+                      };
+                      setTimeout(function () { window.print(); }, 60);
+                  }
 
                   document.body.style.userSelect = 'none';
                   window.onload = () => {
