@@ -921,10 +921,12 @@ export function openTechnicalDrawing() {
                       // zmienia skalę, więc dopasowujemy iteracyjnie. Robimy to na oryginalnych
                       // elementach (getBBox musi zobaczyć zmiany), po zbudowaniu arkuszy
                       // przywracamy oryginał.
-                      var TEXT_MM = 2.6, TEXT_KMAX = 2.25;
+                      var TEXT_MM = 2.8, TEXT_KMAX = 2.6;
                       var touched = [];
                       function restoreFonts() {
-                          touched.forEach(function (p) { p[0].setAttribute(p[1], p[2]); });
+                          touched.forEach(function (p) {
+                              if (p[2] === null) p[0].removeAttribute(p[1]); else p[0].setAttribute(p[1], p[2]);
+                          });
                           touched = [];
                       }
                       function setAttrTracked(el, attr, val) {
@@ -932,22 +934,34 @@ export function openTechnicalDrawing() {
                           el.setAttribute(attr, String(val));
                       }
                       function applyBoost(k, sc) {
+                          if (titleEl) setAttrTracked(titleEl, 'display', 'none');
                           g.querySelectorAll('text, tspan').forEach(function (t) {
                               var fs0 = t.getAttribute('font-size');
                               if (fs0 && k > 1.01) setAttrTracked(t, 'font-size', parseFloat(fs0) * k);
+                              // Na wydruku jasnoszare opisy (druga krawędź w nawiasie) i półprzezroczyste
+                              // (skrajne otwory podpórek) wychodzą prawie niewidoczne - ciemniejszy kolor, pełna krycie.
+                              if ((t.getAttribute('fill') || '').toLowerCase() === '#94a3b8') setAttrTracked(t, 'fill', '#475569');
+                              if (t.getAttribute('opacity')) setAttrTracked(t, 'opacity', '1');
                           });
                           g.querySelectorAll('circle').forEach(function (c) {
                               var r0 = parseFloat(c.getAttribute('r'));
-                              var r1 = Math.max(r0, 0.55 / sc);
+                              var r1 = Math.max(r0, 0.7 / sc);
                               if (r1 > r0 + 0.01) setAttrTracked(c, 'r', r1);
                           });
                           g.querySelectorAll('line, rect, polygon, polyline, path').forEach(function (e) {
                               var w0 = parseFloat(e.getAttribute('stroke-width'));
                               if (!w0) return;
-                              var w1 = Math.max(w0, 0.2 / sc);
+                              var w1 = Math.max(w0, 0.25 / sc);
                               if (w1 > w0 + 0.001) setAttrTracked(e, 'stroke-width', w1);
                           });
                       }
+                      // Tytuł formatki jest już w nagłówku arkusza. W rysunku stoi wysoko nad
+                      // formatką (wg wysokości całego zestawu modułów) i zawyżał obszar rysunku,
+                      // przez co formatka wychodziła w mniejszej skali - ukrywamy go na czas
+                      // pomiaru i wydruku.
+                      if (titleEl) setAttrTracked(titleEl, 'display', 'none');
+                      bb = g.getBBox();
+                      plan = planFor(bb.width + 2 * M, bb.height + 2 * M);
                       var textK = 1;
                       for (var it = 0; it < 6; it++) {
                           var kNew = Math.min(TEXT_KMAX, Math.max(1, TEXT_MM / (9 * plan.s)));
