@@ -688,16 +688,6 @@ export function openTechnicalDrawing() {
                   .sh-foot .legend span { margin-right: 3.5mm; white-space: nowrap; }
                   .sh-foot .dot { display: inline-block; width: 2.6mm; height: 2.6mm; border-radius: 50%; vertical-align: -0.5mm; margin-right: 1mm; }
                   .sh-foot .scale { text-align: right; white-space: nowrap; }
-                  .sh-body { height: 245mm; display: flex; gap: 4mm; overflow: hidden; }
-                  .sh-body.stack { flex-direction: column; gap: 3mm; }
-                  .sh-draw svg { outline: none; }
-                  .sh-table { flex: 1; min-width: 0; font-size: 2.9mm; }
-                  .tb-h, .tb-r { display: grid; grid-template-columns: 9mm 17mm 17mm 30mm 1fr; align-items: center; height: 4.3mm; padding: 0 1mm; box-sizing: border-box; white-space: nowrap; }
-                  .tb-h { font-weight: 800; background: #e2e8f0; border-bottom: 0.3mm solid #0f172a; }
-                  .tb-r { border-bottom: 0.1mm solid #cbd5e1; }
-                  .tb-r:nth-child(even) { background: #f1f5f9; }
-                  .tb-r .dot { width: 2.2mm; height: 2.2mm; margin-right: 1mm; border-radius: 50%; display: inline-block; vertical-align: -0.3mm; }
-                  .sh-foot .scalebar { display: inline-block; height: 2.2mm; border: 0.3mm solid #0f172a; border-top: none; vertical-align: middle; margin-left: 2mm; }
                   @media print {
                       body { height: auto; overflow: visible; display: block; background: white; }
                       .header { display: none; }
@@ -727,7 +717,7 @@ export function openTechnicalDrawing() {
                             <button class="btn-front" onclick="toggleFront('detail-front-inner', this)">📥 Fronty Wewn.</button>
                           <div style="width: 2px; height: 20px; background: #cbd5e1; margin: 0 5px;"></div>
                           <select class="print-scale" id="print-scale" title="Skala wydruku formatki na A4">
-                              <option value="auto">1 kartka A4 + wykaz otworów</option>
+                              <option value="auto">1 kartka A4 (wymiary jak na rysunku)</option>
                               <option value="1">Kilka kartek: 1:1 (do przyłożenia do płyty)</option>
                               <option value="0.5">Kilka kartek: 1:2</option>
                               <option value="0.25">Kilka kartek: 1:4</option>
@@ -881,169 +871,6 @@ export function openTechnicalDrawing() {
                       return PRINT_META;
                   }
 
-                  // ===== Tryb "1 kartka A4": rysunek formatki + wykaz otworów =====
-                  // Duża formatka (np. bok 2 m) nie da się zmieścić na jednej kartce w skali,
-                  // w której opisy przy otworach byłyby czytelne. Zamiast zmniejszać opisy,
-                  // rysujemy formatkę w skali (otwory jako punkty z numerami wierszy), a
-                  // dokładne wymiary podajemy w tabeli czytelną czcionką (ok. 2,9 mm).
-                  // Otwory czytamy z rysunku (okręgi wewnątrz obrysu formatki), więc tabela
-                  // zawsze zgadza się z tym, co widać w oknie.
-                  function printSingleSheet(g, meta, title, dims) {
-                      var rectEl = g.querySelector('rect');
-                      if (!rectEl) return false;
-                      var rx = parseFloat(rectEl.getAttribute('x')), ry = parseFloat(rectEl.getAttribute('y'));
-                      var rw = parseFloat(rectEl.getAttribute('width')), rh = parseFloat(rectEl.getAttribute('height'));
-                      if (!(rw > 0 && rh > 0)) return false;
-
-                      var frontAt = 'left';
-                      var texts = g.querySelectorAll('text');
-                      for (var ti = 0; ti < texts.length; ti++) {
-                          if (texts[ti].textContent.trim() === 'PRZÓD') {
-                              var tx = parseFloat(texts[ti].getAttribute('x')), ty = parseFloat(texts[ti].getAttribute('y'));
-                              frontAt = ty < ry - 1 ? 'top' : (tx > rx + rw / 2 ? 'right' : 'left');
-                              break;
-                          }
-                      }
-                      var topView = frontAt === 'top';
-
-                      var holes = [];
-                      g.querySelectorAll('circle').forEach(function (c) {
-                          var cx = parseFloat(c.getAttribute('cx')), cy = parseFloat(c.getAttribute('cy')), r = parseFloat(c.getAttribute('r'));
-                          if (cx < rx - 0.5 || cx > rx + rw + 0.5 || cy < ry - 0.5 || cy > ry + rh + 0.5) return;
-                          var fill = (c.getAttribute('fill') || '').toLowerCase();
-                          var typ, col = fill;
-                          if (fill === '#9333ea') typ = r >= 3 ? 'kołek Ø8' : 'wkręt Ø3';
-                          else if (fill === '#ea580c') typ = 'podpórka Ø5';
-                          else if (fill === '#0284c7') typ = 'prowadnica Ø5';
-                          else if (fill === '#16a34a') typ = 'zawias Ø5';
-                          else { typ = 'otwór Ø' + fmtN(2 * r); col = '#334155'; }
-                          var prim, sec;
-                          if (topView) { prim = cx - rx; sec = cy - ry; }
-                          else { prim = (ry + rh) - cy; sec = frontAt === 'left' ? cx - rx : (rx + rw) - cx; }
-                          holes.push({ typ: typ, col: col, prim: Math.round(prim * 10) / 10, sec: sec, cx: cx, cy: cy, r: r });
-                      });
-                      if (!holes.length) return false;
-
-                      var map = {}, rows = [];
-                      holes.forEach(function (h) {
-                          var key = h.typ + '|' + h.prim;
-                          if (!map[key]) { map[key] = { typ: h.typ, col: h.col, prim: h.prim, sec: [] }; rows.push(map[key]); }
-                          var sv = fmtN(h.sec);
-                          if (map[key].sec.indexOf(sv) < 0) map[key].sec.push(sv);
-                      });
-                      rows.forEach(function (r) { r.sec.sort(function (a, b) { return parseFloat(a) - parseFloat(b); }); });
-                      rows.sort(function (a, b) {
-                          var d = topView ? a.prim - b.prim : b.prim - a.prim;
-                          return d || a.typ.localeCompare(b.typ);
-                      });
-                      rows.forEach(function (r, i) { r.nr = i + 1; });
-
-                      // --- rysunek (w mm papieru) ---
-                      var tall = !topView && rh >= 1.25 * rw;
-                      var zw, zh, s;
-                      var ox = 8, oy = 9;
-                      if (topView) { zw = 190; s = Math.min((zw - 16) / rw, 105 / rh, 1); zh = rh * s + 24; }
-                      else if (tall) { zw = 90; zh = 245; s = Math.min((zw - 26) / rw, (zh - 15) / rh, 1); }
-                      else { zw = 190; s = Math.min((zw - 26) / rw, 100 / rh, 1); zh = rh * s + 15; }
-                      var pw = rw * s, ph = rh * s;
-                      function f2(v) { return Math.round(v * 100) / 100; }
-
-                      var d = '<svg xmlns="http://www.w3.org/2000/svg" width="' + f2(zw) + 'mm" height="' + f2(zh) + 'mm" viewBox="0 0 ' + f2(zw) + ' ' + f2(zh) + '" style="font-family: Segoe UI, Tahoma, Arial, sans-serif;">';
-                      d += '<rect x="' + ox + '" y="' + oy + '" width="' + f2(pw) + '" height="' + f2(ph) + '" fill="#ffffff" stroke="#0f172a" stroke-width="0.3" />';
-                      var frontLeft = topView || frontAt === 'left';
-                      if (topView) {
-                          d += '<text x="' + f2(ox + pw / 2) + '" y="' + (oy - 2) + '" font-size="2.6" font-weight="700" fill="#64748b" text-anchor="middle">PRZÓD</text>';
-                          d += '<text x="' + f2(ox + pw - 1.5) + '" y="' + f2(oy + ph - 1.5) + '" font-size="2.6" font-weight="700" fill="#94a3b8" text-anchor="end">TYŁ</text>';
-                      } else {
-                          d += '<text x="' + ox + '" y="' + (oy - 2) + '" font-size="2.6" font-weight="700" fill="#64748b" text-anchor="start">' + (frontLeft ? 'PRZÓD' : 'TYŁ') + '</text>';
-                          d += '<text x="' + f2(ox + pw) + '" y="' + (oy - 2) + '" font-size="2.6" font-weight="700" fill="#64748b" text-anchor="end">' + (frontLeft ? 'TYŁ' : 'PRZÓD') + '</text>';
-                      }
-
-                      // pozycje etykiet wierszy (numery) - wiersze o tej samej pozycji dzielą etykietę
-                      var byPos = {}, posList = [];
-                      rows.forEach(function (r) {
-                          var k = String(r.prim);
-                          if (!byPos[k]) { byPos[k] = { prim: r.prim, nrs: [] }; posList.push(byPos[k]); }
-                          byPos[k].nrs.push(r.nr);
-                      });
-                      posList.forEach(function (p) { p.nat = topView ? ox + p.prim * s : oy + (rh - p.prim) * s; });
-                      posList.sort(function (a, b) { return a.nat - b.nat; });
-
-                      var guides = '', labels = '';
-                      if (topView) {
-                          var prevX = -99, prevLv = 1;
-                          posList.forEach(function (p) {
-                              var lv = (p.nat - prevX < 6.5) ? 1 - prevLv : 0;
-                              var ly = oy + ph + 6 + lv * 3.8;
-                              guides += '<line x1="' + f2(p.nat) + '" y1="' + oy + '" x2="' + f2(p.nat) + '" y2="' + f2(ly - 2) + '" stroke="#cbd5e1" stroke-width="0.12" />';
-                              labels += '<text x="' + f2(p.nat) + '" y="' + f2(ly + 0.9) + '" font-size="2.5" font-weight="700" fill="#0f172a" text-anchor="middle">' + p.nrs.join(',') + '</text>';
-                              prevX = p.nat; prevLv = lv;
-                          });
-                      } else {
-                          var prevY = -99, xr = ox + pw;
-                          posList.forEach(function (p) {
-                              var ly = Math.max(p.nat, prevY + 3.1);
-                              guides += '<line x1="' + ox + '" y1="' + f2(p.nat) + '" x2="' + f2(xr + 6) + '" y2="' + f2(p.nat) + '" stroke="#cbd5e1" stroke-width="0.12" />';
-                              guides += '<line x1="' + f2(xr + 6) + '" y1="' + f2(p.nat) + '" x2="' + f2(xr + 9) + '" y2="' + f2(ly) + '" stroke="#94a3b8" stroke-width="0.12" />';
-                              labels += '<text x="' + f2(xr + 10) + '" y="' + f2(ly + 0.9) + '" font-size="2.5" font-weight="700" fill="#0f172a">' + p.nrs.join(',') + '</text>';
-                              prevY = ly;
-                          });
-                      }
-                      d += guides;
-                      holes.forEach(function (h) {
-                          d += '<circle cx="' + f2(ox + (h.cx - rx) * s) + '" cy="' + f2(oy + (h.cy - ry) * s) + '" r="' + f2(Math.max(h.r * s, 0.55)) + '" fill="' + h.col + '" />';
-                      });
-                      d += labels + '</svg>';
-
-                      // --- tabela (wiersze jako div-y, żeby dało się dzielić na kartki) ---
-                      var heads = topView ? ['Nr', 'Od lewej', 'Od prawej', 'Otwór', 'Od przodu'] : ['Nr', 'Od dołu', 'Od góry', 'Otwór', 'Od przodu'];
-                      var headHtml = '<div class="tb-h"><span>' + heads.join('</span><span>') + '</span></div>';
-                      function rowHtml(r) {
-                          var c2 = topView ? rw - r.prim : rh - r.prim;
-                          return '<div class="tb-r"><b>' + r.nr + '</b><span>' + fmtN(r.prim) + '</span><span>' + fmtN(c2) + '</span>'
-                              + '<span><i class="dot" style="background:' + r.col + '"></i>' + escH(r.typ) + '</span><span>' + r.sec.join(' · ') + '</span></div>';
-                      }
-                      var ROW = 4.3, BODY = 245;
-                      var tableH1 = tall ? BODY : BODY - zh - 3;
-                      var cap1 = Math.max(0, Math.floor((tableH1 - ROW) / ROW));
-                      var capN = Math.floor((BODY - ROW) / ROW);
-
-                      var chunks = [], idx = 0;
-                      chunks.push(rows.slice(0, cap1)); idx = cap1;
-                      while (idx < rows.length) { chunks.push(rows.slice(idx, idx + capN)); idx += capN; }
-                      var total = chunks.length;
-
-                      var scaleTxt = '1:' + String(Math.round((1 / s) * 10) / 10).replace('.', ',');
-                      var legend = '<span class="legend">'
-                          + '<span><i class="dot" style="background:#9333ea"></i>kołek Ø8 / wkręt Ø3</span>'
-                          + '<span><i class="dot" style="background:#ea580c"></i>podpórka Ø5</span>'
-                          + '<span><i class="dot" style="background:#0284c7"></i>prowadnica Ø5</span>'
-                          + '<span><i class="dot" style="background:#16a34a"></i>zawias Ø5</span></span>';
-                      var foot = '<div class="sh-foot">' + legend + '<span class="scale">rysunek w skali ok. ' + scaleTxt + ' - wymiary otworów wg tabeli (mm)</span></div>';
-
-                      var html = '';
-                      chunks.forEach(function (chunk, ci) {
-                          var no = total > 1 ? (' · arkusz ' + (ci + 1) + '/' + total) : '';
-                          var head = '<div class="sh-head"><div class="sh-title">' + escH(title) + (dims ? ' — ' + escH(dims) : '') + (ci > 0 ? ' (wykaz otworów - ciąg dalszy)' : '') + '</div>'
-                              + '<div class="sh-sub">' + escH(meta.project) + ' · ' + escH(meta.module) + ' · gr. płyty ' + fmtN(meta.th) + ' mm' + no + ' · ' + escH(meta.date) + '</div></div>';
-                          var tableHtml = chunk.length ? '<div class="sh-table">' + headHtml + chunk.map(rowHtml).join('') + '</div>' : '';
-                          var body;
-                          if (ci === 0) body = '<div class="sh-body' + (tall ? '' : ' stack') + '"><div class="sh-draw">' + d + '</div>' + tableHtml + '</div>';
-                          else body = '<div class="sh-body stack">' + tableHtml + '</div>';
-                          html += '<div class="sheet sheet-portrait">' + head + body + foot + '</div>';
-                      });
-
-                      document.getElementById('print-root').innerHTML = html;
-                      document.getElementById('print-page-style').textContent = '@page { size: A4 portrait; margin: 10mm; }';
-                      document.body.classList.add('printing-part');
-                      window.onafterprint = function () {
-                          document.body.classList.remove('printing-part');
-                          document.getElementById('print-root').innerHTML = '';
-                      };
-                      setTimeout(function () { window.print(); }, 60);
-                      return true;
-                  }
-
                   function printPart() {
                       var g = document.getElementById(currentDetailId);
                       if (!g) { alert('Kliknij formatkę na rysunku korpusu, żeby wybrać, którą wydrukować.'); return; }
@@ -1060,8 +887,6 @@ export function openTechnicalDrawing() {
                           dims = fmtN(Math.max(pw, ph)) + ' × ' + fmtN(Math.min(pw, ph)) + ' mm';
                       }
 
-                      if (document.getElementById('print-scale').value === 'auto' && printSingleSheet(g, meta, title, dims)) return;
-
                       // Obszar rysunku na kartce po odjęciu nagłówka (17 mm) i stopki (13 mm), marginesy 10 mm.
                       var orients = [
                           { name: 'portrait', aw: 190, ah: 245 },
@@ -1074,7 +899,7 @@ export function openTechnicalDrawing() {
                       function planFor(bw, bh) {
                           orients.forEach(function (x) { x.fit = Math.min(x.aw / bw, x.ah / bh); });
                           var best = orients[0].fit >= orients[1].fit ? orients[0] : orients[1];
-                          if (sel === 'auto' && best.fit >= MINREAD) return { s: Math.min(best.fit, 1), o: best };
+                          if (sel === 'auto') return { s: Math.min(best.fit, 1), o: best };   // zawsze jedna kartka
                           var sc = sel === 'auto' ? MINREAD : parseFloat(sel);
                           var pages = orients.map(function (x) {
                               var ttw = x.aw / sc, tth = x.ah / sc;
@@ -1086,34 +911,50 @@ export function openTechnicalDrawing() {
                       var bb = g.getBBox();
                       var plan = planFor(bb.width + 2 * M, bb.height + 2 * M);
 
-                      // Czytelność: opisy mają w SVG 9-12 jednostek (= mm w skali 1:1). Po
-                      // zmniejszeniu skali na papierze byłyby za drobne, więc powiększamy je
-                      // tak, żeby najmniejszy opis (9 jednostek) miał na kartce ok. 2,8 mm
-                      // wysokości. Powiększone opisy poszerzają rysunek, a to zmienia skalę,
-                      // więc dopasowujemy iteracyjnie (kilka przebiegów zbiega). Robimy to na
-                      // oryginalnych elementach (getBBox musi zobaczyć nowe, szersze opisy) i
-                      // po zbudowaniu arkuszy przywracamy oryginalne rozmiary.
-                      var TEXT_MM = 2.8;
+                      // Czytelność przy zmniejszonej skali: opisy mają w SVG 9-12 jednostek (=
+                      // mm w skali 1:1), a otwory r=1,5-4 i cienkie linie pomocnicze 0,5 - na
+                      // kartce w skali np. 1:8 byłyby niewidoczne. Powiększamy więc opisy (tak,
+                      // by najmniejszy miał ok. 2,6 mm), kropki otworów (min. 0,55 mm promienia)
+                      // i cienkie linie (min. 0,2 mm). Powiększenie opisów jest ograniczone do
+                      // x2,25 - opisy sąsiednich otworów są w rysunku co 32 mm, więc większe
+                      // zaczęłyby na siebie nachodzić. Powiększone opisy poszerzają rysunek, a to
+                      // zmienia skalę, więc dopasowujemy iteracyjnie. Robimy to na oryginalnych
+                      // elementach (getBBox musi zobaczyć zmiany), po zbudowaniu arkuszy
+                      // przywracamy oryginał.
+                      var TEXT_MM = 2.6, TEXT_KMAX = 2.25;
                       var touched = [];
                       function restoreFonts() {
-                          touched.forEach(function (p) { p[0].setAttribute('font-size', p[1]); });
+                          touched.forEach(function (p) { p[0].setAttribute(p[1], p[2]); });
                           touched = [];
                       }
-                      function applyFontK(k) {
+                      function setAttrTracked(el, attr, val) {
+                          touched.push([el, attr, el.getAttribute(attr)]);
+                          el.setAttribute(attr, String(val));
+                      }
+                      function applyBoost(k, sc) {
                           g.querySelectorAll('text, tspan').forEach(function (t) {
                               var fs0 = t.getAttribute('font-size');
-                              if (!fs0) return;
-                              touched.push([t, fs0]);
-                              t.setAttribute('font-size', String(parseFloat(fs0) * k));
+                              if (fs0 && k > 1.01) setAttrTracked(t, 'font-size', parseFloat(fs0) * k);
+                          });
+                          g.querySelectorAll('circle').forEach(function (c) {
+                              var r0 = parseFloat(c.getAttribute('r'));
+                              var r1 = Math.max(r0, 0.55 / sc);
+                              if (r1 > r0 + 0.01) setAttrTracked(c, 'r', r1);
+                          });
+                          g.querySelectorAll('line, rect, polygon, polyline, path').forEach(function (e) {
+                              var w0 = parseFloat(e.getAttribute('stroke-width'));
+                              if (!w0) return;
+                              var w1 = Math.max(w0, 0.2 / sc);
+                              if (w1 > w0 + 0.001) setAttrTracked(e, 'stroke-width', w1);
                           });
                       }
                       var textK = 1;
                       for (var it = 0; it < 6; it++) {
-                          var kNew = Math.max(1, TEXT_MM / (9 * plan.s));
+                          var kNew = Math.min(TEXT_KMAX, Math.max(1, TEXT_MM / (9 * plan.s)));
                           if (Math.abs(kNew - textK) < 0.03) break;
                           textK = kNew;
                           restoreFonts();
-                          if (textK > 1.01) applyFontK(textK);
+                          applyBoost(textK, plan.s);
                           bb = g.getBBox();
                           plan = planFor(bb.width + 2 * M, bb.height + 2 * M);
                       }
