@@ -26,6 +26,12 @@ service cloud.firestore {
     // Zapisane projekty. Dokument = jeden projekt, id = nazwa projektu.
     match /projects/{projectId} {
       allow read, write: if isOwner();
+
+      // Historia wersji projektu (podkolekcje versions i versionData) - reguły
+      // dokumentu nadrzędnego NIE obejmują podkolekcji, trzeba je wskazać osobno.
+      match /{subcollection}/{docId} {
+        allow read, write: if isOwner();
+      }
     }
 
     // Wszystko poza tym jest zamknięte na głucho.

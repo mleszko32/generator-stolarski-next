@@ -16,6 +16,7 @@ import { clampModuleToRoom, migrateLegacyRoom } from "./core/layout.js";
 import { saveProjectToCloud, loadProjectFromCloud, getSavedProjectsList, deleteProjectFromCloud, showCustomDialog } from "./core/storage.js";
 import { onAuthChange, signInWithGoogle, signOutUser, getCurrentUser, saveProjectSilently } from "./core/storage.js";
 import { undo, redo, onHistoryChange, resetHistory } from "./core/history.js";
+import { openVersionHistory } from "./ui/versionHistory.js";
 
 console.log("Generator Stolarski Next uruchomiony");
 
@@ -131,12 +132,24 @@ if (btnRoom) btnRoom.addEventListener('click', () => openRoomSettingsModal());
 const btnSave = document.getElementById('btn-save-cloud');
 const btnLoad = document.getElementById('btn-load-cloud');
 
+// Odświeżenie widoku po wczytaniu projektu z chmury albo przywróceniu wersji z historii.
+// Ściany/podłoga pokoju nie przebudowują się w update3D() (patrz viewer3d.js:
+// updateRoom) - bez tego po wczytaniu projektu 3D dalej pokazywał poprzedni pokój,
+// mimo że state.project.room był już wczytany.
+function refreshAfterProjectLoad() {
+  updateRoom();
+  initPropertiesPanel();
+  updateSidebar();
+  update3D();
+}
+
 // --- LOGOWANIE (Google) ---
 // Chmura działa tylko dla zalogowanego właściciela. Przyciski zapisu/wczytania
 // są nieaktywne, dopóki nie ma sesji.
 const btnAuth = document.getElementById('btn-auth');
 const authStatus = document.getElementById('auth-status');
-const cloudButtons = [btnSave, btnLoad].filter(Boolean);
+const btnHistory = document.getElementById('btn-history');
+const cloudButtons = [btnSave, btnLoad, btnHistory].filter(Boolean);
 
 function reflectAuth(user) {
   const signedIn = !!user;
@@ -167,6 +180,10 @@ if (btnSave) {
     await saveProjectToCloud(); 
     btnSave.innerHTML = navIcon('device-floppy', 'Zapisz projekt');
   });
+}
+
+if (btnHistory) {
+  btnHistory.addEventListener('click', () => openVersionHistory(refreshAfterProjectLoad));
 }
 
 if (btnLoad) {
@@ -231,13 +248,7 @@ if (btnLoad) {
         
         const success = await loadProjectFromCloud(projName);
         if (success) {
-          // Ściany/podłoga pokoju nie przebudowują się w update3D() (patrz
-          // viewer3d.js: updateRoom) - bez tego po wczytaniu projektu 3D dalej
-          // pokazywał poprzedni pokój, mimo że state.project.room był już wczytany.
-          updateRoom();
-          initPropertiesPanel(); 
-          updateSidebar();       
-          update3D();            
+          refreshAfterProjectLoad();
         }
         btnLoad.innerHTML = navIcon('folder-open', 'Wczytaj projekt');
       };

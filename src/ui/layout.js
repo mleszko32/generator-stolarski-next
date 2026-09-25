@@ -19,6 +19,7 @@ export function initLayout() {
           <button id="btn-auth" class="btn btn-sm"><i class="ti ti-login" aria-hidden="true"></i> Zaloguj</button>
           <button id="btn-save-cloud" class="btn btn-primary btn-sm"><i class="ti ti-device-floppy" aria-hidden="true"></i> Zapisz projekt</button>
           <button id="btn-load-cloud" class="btn btn-sm"><i class="ti ti-folder-open" aria-hidden="true"></i> Wczytaj projekt</button>
+          <button id="btn-history" class="btn btn-sm" title="Historia wersji projektu"><i class="ti ti-history" aria-hidden="true"></i> Historia</button>
       </div>
     </div>
     

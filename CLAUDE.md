@@ -128,6 +128,12 @@ window event (dispatched by 3D drag) to re-render the properties panel.
 promise-based modal used instead of native `confirm` / `prompt`. The Firebase web config is
 committed inline (it is public by design).
 
+**Version history**: before overwriting a project in the cloud (manual save, autosave at most once per
+10 min, restore) `storage.js` archives its previous content into subcollections `projects/{id}/versions`
+(metadata, used for the list) and `projects/{id}/versionData` (full project JSON as a string), keeping the
+newest 60. UI: `ui/versionHistory.js` (button "Historia"). Needs the subcollection rule in `firestore.rules`.
+Tests mock Firestore in memory (`core/storage.test.js`).
+
 **Auth**: allowlist of Google accounts (all share the same `projects` collection). Google
 sign-in (`signInWithGoogle` / `signOutUser` / `onAuthChange` / `getCurrentUser`, wired in
 `main.js`, button in `layout.js`). Every cloud function bails via `requireOwner()` unless

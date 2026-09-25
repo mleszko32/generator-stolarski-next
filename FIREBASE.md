@@ -20,6 +20,10 @@ ustaw „Project support email" → Save.
 Firestore Database → zakładka **Rules** → wklej całą zawartość `firestore.rules`
 z repo → **Publish**.
 
+Reguły obejmują też podkolekcje `versions` i `versionData` w dokumencie projektu (historia wersji,
+przycisk „Historia" na górnym pasku). Po aktualizacji aplikacji do tej funkcji **opublikuj reguły ponownie**,
+inaczej historia nie będzie się zapisywać (aplikacja działa dalej, tylko bez wersji).
+
 Od tej chwili niezalogowany użytkownik (ani zalogowany innym kontem) nie odczyta
 ani nie zmieni żadnego projektu. Istniejące projekty w kolekcji `projects/`
 zostają na miejscu i stają się dostępne po zalogowaniu właściciela.

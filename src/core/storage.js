@@ -1,6 +1,6 @@
 // src/core/storage.js
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from "firebase/firestore";
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc, writeBatch } from "firebase/firestore";
 import {
   getAuth,
   GoogleAuthProvider,
@@ -177,6 +177,131 @@ function markSaved() {
   lastSavedSnapshot = JSON.stringify(state.project);
 }
 
+// --- HISTORIA WERSJI ---
+// Przed nadpisaniem projektu w chmurze archiwizujemy jego poprzednią treść.
+// Wersje leżą w podkolekcjach projects/{id}/versions (małe metadane - z nich
+// budowana jest lista) i projects/{id}/versionData (pełny JSON projektu jako
+// tekst - czytany dopiero przy przywracaniu). Podkolekcje wymagają osobnej
+// reguły w firestore.rules.
+const VERSION_MIN_GAP_MS = 10 * 60 * 1000; // autozapis archiwizuje najwyżej raz na 10 min
+const VERSIONS_KEEP = 60;                  // starsze wersje są usuwane
+let lastArchiveAt = 0;
+let lastArchivedCanon = null;
+let versionsDisabled = false; // po błędzie uprawnień nie ponawiamy w tej sesji
+
+// Firestore zwraca pola map w innej kolejności niż stan w pamięci - do
+// porównywania i zapisu sortujemy klucze, żeby ta sama treść dawała ten sam tekst.
+function canonJson(value) {
+  const sort = (v) => Array.isArray(v) ? v.map(sort)
+    : (v && typeof v === "object") ? Object.keys(v).sort().reduce((o, k) => { o[k] = sort(v[k]); return o; }, {})
+    : v;
+  return JSON.stringify(sort(value));
+}
+
+function resetVersionSession() {
+  lastArchiveAt = 0;
+  lastArchivedCanon = null;
+}
+
+async function archiveVersion(projectId, projectObj, label, { force = false } = {}) {
+  if (versionsDisabled || !projectObj) return false;
+  const copy = JSON.parse(JSON.stringify(projectObj));
+  delete copy.name;
+  const json = canonJson(copy);
+  if (json === lastArchivedCanon) return false;
+  if (!force && Date.now() - lastArchiveAt < VERSION_MIN_GAP_MS) return false;
+  try {
+    const createdAt = Date.now();
+    const id = String(createdAt).padStart(15, "0") + "-" + Math.random().toString(36).slice(2, 6);
+    const batch = writeBatch(db);
+    batch.set(doc(db, "projects", projectId, "versions", id), {
+      createdAt,
+      label,
+      author: (auth.currentUser && auth.currentUser.email) || "",
+      moduleCount: (copy.modules || []).length,
+      sizeKB: Math.max(1, Math.round(json.length / 1024)),
+    });
+    batch.set(doc(db, "projects", projectId, "versionData", id), { json });
+    await batch.commit();
+    lastArchiveAt = createdAt;
+    lastArchivedCanon = json;
+    pruneVersions(projectId).catch(() => {});
+    return true;
+  } catch (error) {
+    console.warn("Nie udało się zapisać wersji projektu:", error);
+    if (error && error.code === "permission-denied") versionsDisabled = true;
+    return false;
+  }
+}
+
+async function deleteVersionDocs(projectId, ids) {
+  for (let i = 0; i < ids.length; i += 200) {
+    const batch = writeBatch(db);
+    ids.slice(i, i + 200).forEach((id) => {
+      batch.delete(doc(db, "projects", projectId, "versions", id));
+      batch.delete(doc(db, "projects", projectId, "versionData", id));
+    });
+    await batch.commit();
+  }
+}
+
+async function pruneVersions(projectId) {
+  const snap = await getDocs(collection(db, "projects", projectId, "versions"));
+  const ids = snap.docs.map((d) => d.id).sort(); // id zaczyna się od czasu - rosnąco
+  const extra = ids.slice(0, Math.max(0, ids.length - VERSIONS_KEEP));
+  if (extra.length) await deleteVersionDocs(projectId, extra);
+}
+
+// Lista wersji projektu (najnowsze pierwsze). null = nie udało się pobrać.
+export async function listProjectVersions(projectId) {
+  if (!requireOwner()) return null;
+  try {
+    const snap = await getDocs(collection(db, "projects", projectId, "versions"));
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => b.createdAt - a.createdAt);
+  } catch (error) {
+    console.error("Błąd pobierania historii wersji:", error);
+    return null;
+  }
+}
+
+export async function deleteProjectVersion(projectId, versionId) {
+  if (!requireOwner()) return false;
+  try {
+    await deleteVersionDocs(projectId, [versionId]);
+    return true;
+  } catch (error) {
+    console.error("Błąd usuwania wersji:", error);
+    alert("❌ Nie udało się usunąć wersji:\n" + error.message);
+    return false;
+  }
+}
+
+// Przywraca wersję jako bieżący stan projektu. Bieżący stan (razem z
+// niezapisanymi zmianami) trafia najpierw do historii, więc przywrócenie da się cofnąć.
+export async function restoreProjectVersion(projectId, versionId) {
+  if (!requireOwner()) return false;
+  try {
+    const snap = await getDoc(doc(db, "projects", projectId, "versionData", versionId));
+    if (!snap.exists()) {
+      alert("⚠️ Nie znaleziono tej wersji (mogła zostać usunięta).");
+      return false;
+    }
+    const data = JSON.parse(snap.data().json);
+    await archiveVersion(projectId, state.project, "Przed przywróceniem wersji", { force: true });
+    applyProjectData(data, projectId);
+    const toSave = JSON.parse(JSON.stringify(state.project));
+    toSave.name = projectId;
+    await setDoc(doc(db, "projects", projectId), toSave);
+    state.project.name = projectId;
+    markSaved();
+    return true;
+  } catch (error) {
+    console.error("Błąd przywracania wersji:", error);
+    alert("❌ Nie udało się przywrócić wersji:\n" + (error.message || "Brak szczegółów."));
+    return false;
+  }
+}
+
 // ZAPISYWANIE
 export async function saveProjectToCloud(projectId = null) {
   if (!requireOwner()) return;
@@ -213,19 +338,46 @@ export async function saveProjectToCloud(projectId = null) {
 
     const projectRef = doc(db, "projects", targetId);
     const dataToSave = JSON.parse(JSON.stringify(state.project));
-    dataToSave.name = targetId; 
-    
+    dataToSave.name = targetId;
+
+    // Historia wersji: poprzednia treść (jeśli projekt już istnieje) i nowy punkt zapisu.
+    if (targetId !== state.loadedProjectId) resetVersionSession();
+    const prevSnap = await getDoc(projectRef).catch(() => null);
+    if (prevSnap && prevSnap.exists()) {
+      await archiveVersion(targetId, prevSnap.data(), "Przed zapisem ręcznym", { force: true });
+    }
+
     await setDoc(projectRef, dataToSave);
 
     state.loadedProjectId = targetId;
     state.project.name = targetId;
     markSaved();
+    await archiveVersion(targetId, dataToSave, "Zapis ręczny", { force: true });
 
     alert(`✅ Projekt "${targetId}" został zapisany pomyślnie!`);
   } catch (error) {
     console.error("Szczegóły błędu Firebase:", error);
     alert("❌ Wystąpił błąd podczas zapisywania projektu:\n" + (error.message || "Brak szczegółów."));
   }
+}
+
+// Wstawia dane projektu (z chmury albo z wersji historii) do stanu aplikacji.
+function applyProjectData(data, projectId) {
+  state.project = data;
+  ensureRoomDefaults(state.project); // projekty zapisane przed dodaniem pomieszczeń mogą nie mieć tego pola
+  ensurePricingDefaults(state.project); // ...ani projekty sprzed dodania kosztorysu
+  ensureSidePanelsDefaults(state.project); // ...ani projekty sprzed dodania boków dokładanych
+  migrateLegacyRoom(state.project); // ...a te sprzed realnego renderowania pokoju mogą mieć martwy, za mały placeholder
+  // Projekty zapisane przed poprawką clampModuleToRoom (blendy L-kształtne)
+  // mogły zapisać pozycję z blendą przenikającą przez ścianę - ten stan
+  // wczytywał się bez żadnej walidacji, a re-clamp uruchamiał się dopiero
+  // przy KOLEJNEJ interaktywnej zmianie (drag/obrót/pole liczbowe), więc
+  // sama szafka po prostu wisiała tak przy każdym otwarciu projektu.
+  (state.project.modules || []).forEach(clampModuleToRoom);
+  state.activeModuleId = state.project.modules.length > 0 ? state.project.modules[0].id : null;
+  state.activeSidePanelId = null;
+  state.loadedProjectId = projectId;
+  resetHistory(); // cofanie między dwoma różnymi wczytanymi projektami nie ma sensu
 }
 
 // WCZYTYWANIE
@@ -238,22 +390,9 @@ export async function loadProjectFromCloud(projectId) {
     const docSnap = await getDoc(projectRef);
     
     if (docSnap.exists()) {
-      state.project = docSnap.data();
-      ensureRoomDefaults(state.project); // projekty zapisane przed dodaniem pomieszczeń mogą nie mieć tego pola
-      ensurePricingDefaults(state.project); // ...ani projekty sprzed dodania kosztorysu
-      ensureSidePanelsDefaults(state.project); // ...ani projekty sprzed dodania boków dokładanych
-      migrateLegacyRoom(state.project); // ...a te sprzed realnego renderowania pokoju mogą mieć martwy, za mały placeholder
-      // Projekty zapisane przed poprawką clampModuleToRoom (blendy L-kształtne)
-      // mogły zapisać pozycję z blendą przenikającą przez ścianę - ten stan
-      // wczytywał się bez żadnej walidacji, a re-clamp uruchamiał się dopiero
-      // przy KOLEJNEJ interaktywnej zmianie (drag/obrót/pole liczbowe), więc
-      // sama szafka po prostu wisiała tak przy każdym otwarciu projektu.
-      (state.project.modules || []).forEach(clampModuleToRoom);
-      state.activeModuleId = state.project.modules.length > 0 ? state.project.modules[0].id : null;
-      state.activeSidePanelId = null;
-      state.loadedProjectId = projectId;
+      applyProjectData(docSnap.data(), projectId);
+      resetVersionSession();
       markSaved();
-      resetHistory(); // cofanie między dwoma różnymi wczytanymi projektami nie ma sensu
       return true;
     } else {
       alert("⚠️ Nie znaleziono takiego projektu w bazie.");
@@ -272,6 +411,13 @@ export async function deleteProjectFromCloud(projectId) {
   try {
     const projectRef = doc(db, "projects", projectId);
     await deleteDoc(projectRef);
+    // Podkolekcje nie znikają razem z dokumentem - sprzątamy historię wersji.
+    try {
+      const vs = await getDocs(collection(db, "projects", projectId, "versions"));
+      if (!vs.empty) await deleteVersionDocs(projectId, vs.docs.map((d) => d.id));
+    } catch (e) {
+      console.warn("Nie udało się usunąć historii wersji:", e);
+    }
     
     // Jeśli usunęliśmy projekt, nad którym właśnie pracujemy, zresetujmy jego ślad w pamięci
     if (state.loadedProjectId === projectId) {
@@ -321,6 +467,16 @@ export async function saveProjectSilently() {
     const projectRef = doc(db, "projects", targetId);
     const dataToSave = JSON.parse(current);
     dataToSave.name = targetId;
+
+    // Historia wersji: raz na jakiś czas zachowujemy treść, którą zaraz nadpiszemy.
+    if (!versionsDisabled && Date.now() - lastArchiveAt >= VERSION_MIN_GAP_MS) {
+      try {
+        const prev = await getDoc(projectRef);
+        if (prev.exists()) await archiveVersion(targetId, prev.data(), "Autozapis");
+      } catch (e) {
+        console.warn("Historia wersji: nie odczytano poprzedniej treści:", e);
+      }
+    }
 
     await setDoc(projectRef, dataToSave);
     lastSavedSnapshot = current;
