@@ -12,6 +12,7 @@
 // u=szerokość-x, lewa u=głębokość-z.
 import { state, DEFAULT_ROOM } from "./state.js";
 import { getWorldFootprint, getCornerDepths } from "./layout.js";
+import { getOpenings } from "./openings.js";
 
 export const WALLS = [
   { id: 'tyl', label: 'Ściana tylna' },
@@ -59,6 +60,7 @@ export function getRoom(project = state.project) {
 }
 
 // Zwraca { room, walls: [{ id, label, length, items }] } - items posortowane po u0.
+// wall.openings: [{ id, kind, wall, u, width, height, sill }] (okna/drzwi/przeszkody z project.openings).
 // item: { mod, kind: 'cabinet'|'corner', arm, u0, u1, floorY, y0, y1, fronts: [{u0,u1,y0,y1,subtype}] }
 // floorY = spód nóżek nad podłogą, y0 = spód korpusu, y1 = góra korpusu.
 export function computeWallLayouts(project = state.project) {
@@ -106,6 +108,10 @@ export function computeWallLayouts(project = state.project) {
   });
 
   walls.forEach(w => w.items.sort((a, b) => a.u0 - b.u0));
+
+  // Okna, drzwi i przeszkody (core/openings.js) przypięte do swoich ścian.
+  const openings = getOpenings(project);
+  walls.forEach(w => { w.openings = openings.filter(o => o.wall === w.id); });
 
   // Obrysy szafek w rzucie z góry (x w prawo, z w dół, ściana tylna u góry) -
   // do miniplanu z oznaczeniem, na którą ścianę patrzy dany rzut.

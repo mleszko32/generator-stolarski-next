@@ -5,6 +5,8 @@
 // (core/storage.js) obsługuje tylko pojedyncze pole tekstowe, nie 3 pola liczbowe naraz.
 import { state, DEFAULT_ROOM } from "../core/state.js";
 import { getWorldFootprint } from "../core/layout.js";
+import { getOpenings, newOpening, OPENING_KINDS, OPENING_WALLS } from "../core/openings.js";
+import { escapeHtml } from "../utils/dom.js";
 import { update3D, updateRoom } from "../render/viewer3d.js";
 import { updateSidebar } from "./sidebar.js";
 
@@ -20,7 +22,7 @@ export function openRoomSettingsModal() {
 
   const modal = document.createElement('div');
   Object.assign(modal.style, {
-    backgroundColor: '#fff', width: '95%', maxWidth: '420px',
+    backgroundColor: '#fff', width: '95%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto',
     borderRadius: '8px', padding: '20px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
   });
 
@@ -39,6 +41,10 @@ export function openRoomSettingsModal() {
       <label>Wysokość ścian (mm):</label>
       <input type="number" id="input-room-height" value="${room.height}" min="1500" step="10" />
     </div>
+    <div style="margin:14px 0 6px 0; font-size:13px; font-weight:700; color:#1e293b;"><i class="ti ti-door" aria-hidden="true"></i> Okna, drzwi i przeszkody</div>
+    <div style="font-size:11px; color:#64748b; margin-bottom:8px;">Położenie liczone od lewego końca ściany, patrząc od środka pokoju. Parapet = wysokość dolnej krawędzi nad podłogą. Pojawiają się w 3D, w rzutach ścian i w kontroli projektu (kolizje z szafkami).</div>
+    <div id="openings-list" style="display:flex; flex-direction:column; gap:6px; margin-bottom:8px;"></div>
+    <button type="button" id="btn-opening-add" class="btn btn-sm" style="margin-bottom:12px;"><i class="ti ti-plus" aria-hidden="true"></i> Dodaj okno / drzwi / przeszkodę</button>
     <div id="room-overflow-warning" style="display:none; font-size:11px; color:#b91c1c; background:#fef2f2; border:1px solid #fecaca; border-radius:4px; padding:8px; margin-bottom:12px;"></div>
     <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">
       <button type="button" id="btn-room-cancel" class="btn btn-neutral btn-sm">Anuluj</button>
@@ -77,6 +83,41 @@ export function openRoomSettingsModal() {
   [inpWidth, inpDepth].forEach(inp => inp.addEventListener('input', checkOverflow));
   checkOverflow();
 
+  // Edytor przeszkód: pracujemy na kopii, do projektu trafia dopiero po "Zapisz".
+  let openings = getOpenings(state.project).map(o => ({ ...o }));
+  const listEl = modal.querySelector('#openings-list');
+  const numInput = (i, key, w, title) => `<input type="number" data-i="${i}" data-k="${key}" value="${openings[i][key]}" title="${title}" placeholder="${title}" step="10" style="width:${w}px" />`;
+  function renderOpenings() {
+    if (openings.length === 0) {
+      listEl.innerHTML = '<div style="font-size:12px; color:#94a3b8;">Brak - dodaj okno lub drzwi, żeby uwzględnić je w projekcie.</div>';
+      return;
+    }
+    listEl.innerHTML = openings.map((o, i) => `
+      <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; padding:6px; border:1px solid #e2e8f0; border-radius:6px;">
+        <select data-i="${i}" data-k="kind">${Object.entries(OPENING_KINDS).map(([k, v]) => `<option value="${k}" ${o.kind === k ? 'selected' : ''}>${escapeHtml(v.label)}</option>`).join('')}</select>
+        <select data-i="${i}" data-k="wall">${OPENING_WALLS.map(w => `<option value="${w.id}" ${o.wall === w.id ? 'selected' : ''}>${escapeHtml(w.label)}</option>`).join('')}</select>
+        ${numInput(i, 'u', 70, 'od lewej')}
+        ${numInput(i, 'width', 70, 'szerokość')}
+        ${numInput(i, 'height', 70, 'wysokość')}
+        ${numInput(i, 'sill', 70, 'parapet')}
+        <button type="button" data-del="${i}" class="btn btn-neutral btn-sm" title="Usuń"><i class="ti ti-trash" aria-hidden="true"></i></button>
+      </div>`).join('');
+    listEl.querySelectorAll('[data-k]').forEach(inp => inp.addEventListener('change', () => {
+      const o = openings[+inp.dataset.i];
+      const k = inp.dataset.k;
+      o[k] = (k === 'kind' || k === 'wall') ? inp.value : (parseFloat(inp.value) || 0);
+    }));
+    listEl.querySelectorAll('[data-del]').forEach(btn => btn.addEventListener('click', () => {
+      openings.splice(+btn.dataset.del, 1);
+      renderOpenings();
+    }));
+  }
+  modal.querySelector('#btn-opening-add').addEventListener('click', () => {
+    openings.push(newOpening('okno', 'tyl'));
+    renderOpenings();
+  });
+  renderOpenings();
+
   const close = () => document.body.removeChild(overlay);
 
   modal.querySelector('#btn-room-cancel').addEventListener('click', close);
@@ -89,6 +130,7 @@ export function openRoomSettingsModal() {
       return;
     }
     state.project.room = { width, depth, height };
+    state.project.openings = openings.filter(o => o.width > 0 && o.height > 0).map(o => ({ ...o }));
     close();
     updateRoom();
     update3D();

@@ -10,6 +10,8 @@ import { state, DEFAULT_ROOM } from "./state.js";
 import { getWorldFootprint, recalculateAllLayouts } from "./layout.js";
 import { getCabinetInnerRect } from "./zoneTree.js";
 import { collectProjectParts } from "../engine/cabinet.js";
+import { computeWallLayouts } from "./walls.js";
+import { openingInstrumental, WALL_LOCATIVE } from "./openings.js";
 
 export const MAX_DOOR_WIDTH = 600;   // szersze drzwi się wichrują / zawiasy nie dają rady
 export const MAX_SHELF_SPAN = 800;   // dłuższa półka ugina się pod obciążeniem
@@ -63,6 +65,7 @@ export function validateProject(project = state.project) {
     recalculateAllLayouts();
     modules.forEach((mod) => checkModule(mod));
     checkCollisions();
+    checkOpenings();
     checkParts();
   } finally {
     state.project = prev;
@@ -135,6 +138,25 @@ export function validateProject(project = state.project) {
         }
       }
     }
+  }
+
+  // Szafka stojąca przy ścianie, która zasłania okno/drzwi/przeszkodę (nakładanie
+  // w poziomie ORAZ w pionie - szafka pod parapetem albo pod oknem wiszącym jest OK).
+  function checkOpenings() {
+    const { walls } = computeWallLayouts(project);
+    walls.forEach((wall) => {
+      (wall.openings || []).forEach((op) => {
+        const o0 = op.u, o1 = op.u + op.width, y0 = op.sill, y1 = op.sill + op.height;
+        wall.items.forEach((it) => {
+          const ou = overlap1d(it.u0, it.u1, o0, o1);
+          const oy = overlap1d(it.y0, it.y1, y0, y1);
+          if (ou > OVERLAP_TOL && oy > OVERLAP_TOL) {
+            add(op.kind === "inne" ? "warn" : "error", it.mod,
+              `Koliduje z ${openingInstrumental(op)} na ${WALL_LOCATIVE[wall.id]} (nakładanie ${Math.round(ou)} mm w poziomie, ${Math.round(oy)} mm w pionie).`);
+          }
+        });
+      });
+    });
   }
 
   function checkParts() {

@@ -93,6 +93,13 @@ export function generateWallSVG(wall, room, meta = {}) {
   svg += `<rect x="${X(0)}" y="${Y(Hroom)}" width="${L}" height="${Hroom}" fill="#f8fafc" stroke="#94a3b8" stroke-width="${fs * 0.12}" />`;
   svg += `<line x1="${X(0) - fs}" y1="${Y(0)}" x2="${X(L) + fs}" y2="${Y(0)}" stroke="#334155" stroke-width="${fs * 0.22}" />`;
 
+  // okna, drzwi i przeszkody (pod szafkami, żeby kolizje było widać)
+  (wall.openings || []).forEach(op => {
+    const style = op.kind === 'drzwi' ? { fill: '#fef3c7', stroke: '#b45309' } : op.kind === 'inne' ? { fill: '#e5e7eb', stroke: '#6b7280' } : { fill: '#dbeafe', stroke: '#2563eb' };
+    svg += `<rect x="${X(op.u)}" y="${Y(op.sill + op.height)}" width="${op.width}" height="${op.height}" fill="${style.fill}" stroke="${style.stroke}" stroke-width="${fs * 0.14}" stroke-dasharray="${fs * 0.6},${fs * 0.3}" />`;
+    svg += `<text x="${X(op.u + op.width / 2)}" y="${Y(op.sill + op.height) + fs * 1.3}" font-size="${fs * 0.95}" fill="${style.stroke}" text-anchor="middle">${op.kind === 'drzwi' ? 'drzwi' : op.kind === 'inne' ? 'przeszkoda' : 'okno'} ${fmtMm(op.width)} × ${fmtMm(op.height)}${op.sill > 0 ? ', parapet ' + fmtMm(op.sill) : ''}</text>`;
+  });
+
   if (wall.items.length === 0) {
     svg += `<text x="${X(L / 2)}" y="${Y(Hroom / 2)}" font-size="${fs * 1.4}" fill="#94a3b8" text-anchor="middle">brak szafek przy tej ścianie</text>`;
   }

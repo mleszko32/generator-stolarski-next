@@ -16,6 +16,7 @@ import { toggleInteriorEditor, renderInteriorEditorIfVisible } from '../ui/inter
 
 import { updateSidebar } from '../ui/sidebar.js';
 import { worktopBoxes } from '../core/worktops.js';
+import { getOpenings, openingBox } from '../core/openings.js';
 import { initPropertiesPanel } from '../ui/properties.js';
 
 let alignMode = { active: false, sourceMod: null, sourceEl: null, banner: null };
@@ -216,6 +217,21 @@ function rebuildRoomGeometry() {
     mesh.receiveShadow = true;
     roomGroup.add(mesh);
     wallMeshes.push({ mesh, normal });
+  });
+
+  // Okna, drzwi i przeszkody (project.openings, core/openings.js) - cienkie bryły
+  // przy wewnętrznej ścianie. Trafiają na listę wallMeshes, więc przygasają razem
+  // ze swoją ścianą, gdy kamera patrzy zza niej.
+  const OPENING_COLORS = { okno: 0x93c5fd, drzwi: 0xb7791f, inne: 0x9ca3af };
+  getOpenings(state.project).forEach(op => {
+    const b = openingBox(op, { width: W, depth: D });
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(b.sx, b.sy, b.sz),
+      new THREE.MeshStandardMaterial({ color: OPENING_COLORS[op.kind] || 0x93c5fd, roughness: 0.6, metalness: 0, transparent: true, opacity: 1 })
+    );
+    mesh.position.set(b.cx, b.cy, b.cz);
+    roomGroup.add(mesh);
+    wallMeshes.push({ mesh, normal: new THREE.Vector3(b.normal[0], b.normal[1], b.normal[2]) });
   });
 }
 

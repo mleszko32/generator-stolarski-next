@@ -128,6 +128,14 @@ window event (dispatched by 3D drag) to re-render the properties panel.
 promise-based modal used instead of native `confirm` / `prompt`. The Firebase web config is
 committed inline (it is public by design).
 
+**Openings (windows/doors/obstacles)**: `project.openings[]` (top-level, NOT inside `room`, because the room modal replaces
+`project.room` wholesale) - `core/openings.js` (wall + `u` from the wall's left end seen from inside the room, width,
+height, sill). Edited in the room modal (`ui/roomPanel.js`), drawn in 3D (`viewer3d.js` rebuildRoomGeometry, dimmed with
+their wall) and in wall elevations (`wallElevations.js`), and checked against cabinets in `core/validate.js`.
+
+**Project check**: `core/validate.js` (`validateProject`) feeds the hub section "Kontrola projektu"
+(`ui/projectCheck.js`): collisions, room bounds, too-wide doors/shelves, parts not fitting the sheet, openings.
+
 **Client offer**: `core/offer.js` (pure: settings in `project.offer`, `buildOfferHtml`) + the "Oferta dla klienta" card in
 the hub's Kosztorys section (`ui/productionHub.js`). Shows scope + gross/net/VAT only (no costs/margin); the 3D image
 comes from `captureViewerSnapshot()` (`render/viewer3d.js`, current camera view).
