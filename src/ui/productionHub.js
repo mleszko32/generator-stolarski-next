@@ -15,6 +15,7 @@ import { initPropertiesPanel } from "./properties.js";
 import { mountCutPlan } from "./cutPlanModal.js";
 import { generateAllWallSVGs } from "../render/wallElevations.js";
 import { computeWorktops, getWorktopSettings, rectOf } from "../core/worktops.js";
+import { renderProjectCheck } from './projectCheck.js';
 import { openCsvExport, printHardwareList, openTechnicalDrawing, openKosztorysModal, updateSidebar } from "./sidebar.js";
 
 const SECTIONS = [
@@ -24,6 +25,7 @@ const SECTIONS = [
   { id: 'sciany', label: 'Rzuty ścian', icon: 'ti-wall' },
   { id: 'blaty', label: 'Blaty', icon: 'ti-layout-board' },
   { id: 'okucia', label: 'Okucia i okleina', icon: 'ti-shopping-cart' },
+  { id: 'kontrola', label: 'Kontrola projektu', icon: 'ti-checklist' },
   { id: 'kosztorys', label: 'Kosztorys', icon: 'ti-calculator' },
 ];
 
@@ -347,6 +349,16 @@ function renderKosztorys(el) {
   el.querySelector('#hub-cost').addEventListener('click', () => openKosztorysModal());
 }
 
+function renderKontrola(el) {
+  renderProjectCheck(el, (moduleId) => {
+    state.activeModuleId = moduleId;
+    closeProductionHub();
+    update3D();
+    updateSidebar();
+    initPropertiesPanel();
+  });
+}
+
 function renderRozkroj(el) {
   el.innerHTML = '<div id="hub-cutplan"></div>';
   mountCutPlan(el.querySelector('#hub-cutplan'));
@@ -359,6 +371,7 @@ const RENDERERS = {
   sciany: renderSciany,
   blaty: renderBlaty,
   okucia: renderOkucia,
+  kontrola: renderKontrola,
   kosztorys: renderKosztorys,
 };
 
