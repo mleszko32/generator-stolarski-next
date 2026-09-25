@@ -257,28 +257,63 @@ export function deleteModule(moduleId) {
   }
 }
 
+// Głęboka kopia modułu z nowymi id (modułu i wszystkich elementów). Elementy
+// powołują się na siebie nawzajem przez id (baseZone.boundLeft/Right/Bottom/Top
+// wskazują np. półkę lub przegrodę, do której "przyklejony" jest front), więc
+// przy zmianie id te odwołania trzeba przepisać - inaczej kopia traci
+// dynamiczne powiązania frontów z dzielnikami i zostaje ze sztywnymi liczbami.
+// Nowe id zachowuje początek starego (layout rozpoznaje fronty po prefiksie
+// "front" i "-L-"/"-P-" w id) i dostaje losowy przyrostek na końcu.
+export function cloneModuleWithNewIds(source) {
+  const copy = JSON.parse(JSON.stringify(source));
+  const rand = () => 'c' + Math.random().toString(36).substring(2, 7);
+  copy.id = 'mod-' + Date.now() + Math.random().toString(36).substring(2, 6);
+  copy.rotation = copy.rotation || 0; // zabezpieczenie dla modułów sprzed tego pola
+
+  const idMap = {};
+  (copy.elements || []).forEach(el => {
+    const base = String(el.id).replace(/-c[a-z0-9]{5}$/, '');
+    idMap[el.id] = base + '-' + rand();
+    el.id = idMap[el.id];
+  });
+  (copy.elements || []).forEach(el => {
+    const bz = el.baseZone;
+    if (!bz) return;
+    ['boundLeft', 'boundRight', 'boundBottom', 'boundTop'].forEach(k => {
+      if (bz[k] && idMap[bz[k]]) bz[k] = idMap[bz[k]];
+    });
+  });
+  return copy;
+}
+
+// Wstawia do projektu kopię modułu (z kopii zapasowej/biblioteki) na końcu rzędu.
+export function addModuleFromTemplate(templateModule, { suffix = '' } = {}) {
+  const newMod = cloneModuleWithNewIds(templateModule);
+  delete newMod.groupId; // grupa dotyczy modułów w konkretnym projekcie
+  if (suffix) newMod.name = newMod.name + suffix;
+  let nextX = 0;
+  if (state.project.modules.length > 0) {
+    nextX = Math.max(...state.project.modules.map(m => m.position.x + parseFloat(m.dimensions.width)));
+  }
+  newMod.position = { ...(newMod.position || { y: 0, z: 0 }), x: nextX };
+  state.project.modules.push(newMod);
+  state.activeModuleId = newMod.id;
+  return newMod;
+}
+
 export function duplicateModule(moduleId) {
   const target = state.project.modules.find(m => m.id === moduleId);
   if (!target) return null;
-  
-  const newMod = JSON.parse(JSON.stringify(target));
-  
-  newMod.id = 'mod-' + Date.now() + Math.random().toString(36).substring(2, 6);
+
+  const newMod = cloneModuleWithNewIds(target);
   newMod.name = newMod.name + " (Kopia)";
-  newMod.rotation = newMod.rotation || 0; // zabezpieczenie dla modułów sprzed tego pola
-  
+
   let nextX = 0;
   if (state.project.modules.length > 0) {
-    nextX = Math.max(...state.project.modules.map(m => m.position.x + parseFloat(m.dimensions.width))) + 50; 
+    nextX = Math.max(...state.project.modules.map(m => m.position.x + parseFloat(m.dimensions.width))) + 50;
   }
   newMod.position.x = nextX;
-  
-  if (newMod.elements) {
-    newMod.elements.forEach(el => {
-      el.id = 'el-' + Date.now() + Math.random().toString(36).substring(2, 9);
-    });
-  }
-  
+
   state.project.modules.push(newMod);
   state.activeModuleId = newMod.id;
   return newMod;

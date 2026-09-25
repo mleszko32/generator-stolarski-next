@@ -6,6 +6,7 @@ import { initPropertiesPanel, openCornerBlankPrintView } from "./properties.js";
 import { openCutPlanModal } from "./cutPlanModal.js";
 import { openProductionHub } from "./productionHub.js";
 import { escapeHtml } from "../utils/dom.js";
+import { openModuleLibrary } from "./moduleLibraryModal.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
 
@@ -1113,6 +1114,7 @@ export function updateSidebar() {
       </div>
       <button id="btn-add-corner" class="btn btn-neutral btn-block btn-sm" style="margin-top: 6px;" title="Szafka narożna z frontem łamanym (front prosty + skośny)"><i class="ti ti-plus" aria-hidden="true"></i> Narożna</button>
       <button id="btn-add-side-panel" class="btn btn-teal btn-block btn-sm" style="margin-top: 6px;" title="Dekoracyjny panel niezależny od modułów, np. na cały słup szafek"><i class="ti ti-plus" aria-hidden="true"></i> Bok dokładany</button>
+      <button id="btn-module-library" class="btn btn-block btn-sm" style="margin-top: 6px;" title="Własne szablony szafek: zapisz skonfigurowaną szafkę i wstawiaj ją do projektów"><i class="ti ti-books" aria-hidden="true"></i> Biblioteka szafek</button>
     </div>
     <hr style="margin: 15px 0; border: 0; border-top: 1px dashed #cbd5e1;">
   `;
@@ -1304,6 +1306,11 @@ export function updateSidebar() {
       update3D();
       updateSidebar();
     });
+  }
+
+  const btnModuleLibrary = document.getElementById('btn-module-library');
+  if (btnModuleLibrary) {
+    btnModuleLibrary.addEventListener('click', () => openModuleLibrary(() => { initPropertiesPanel(); update3D(); updateSidebar(); }));
   }
 
   const btnAddSidePanel = document.getElementById('btn-add-side-panel');

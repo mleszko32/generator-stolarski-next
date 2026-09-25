@@ -128,6 +128,11 @@ window event (dispatched by 3D drag) to re-render the properties panel.
 promise-based modal used instead of native `confirm` / `prompt`. The Firebase web config is
 committed inline (it is public by design).
 
+**Cabinet library**: `core/moduleLibrary.js` + `ui/moduleLibraryModal.js` (sidebar button "Biblioteka szafek") store
+module templates in `localStorage` (JSON export/import for moving between machines). Inserting goes through
+`addModuleFromTemplate` / `cloneModuleWithNewIds` (`core/state.js`), which remaps element ids **and** the
+`baseZone.bound*` references between elements (also used by `duplicateModule`).
+
 **Local backup**: `core/localBackup.js` keeps a `localStorage` copy of *unsaved* work (every 20 s, on tab hide;
 cleared once the project matches the cloud copy). On startup `main.js` offers to restore it; a restored
 project is deliberately NOT bound to a cloud project (`loadedProjectId = null`) so autosave never overwrites
