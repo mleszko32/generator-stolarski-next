@@ -398,7 +398,7 @@ export function calculateProjectHardware() {
 
   // Okleina krawędziowa: wszystkie formatki dookoła (poza plecami HDF) - patrz
   // engine/edgeBanding.js. Ilość w metrach bieżących z zapasem (EDGE_BANDING_RESERVE).
-  const edgeMeters = totalEdgeBandingMeters(calculateAllProjectParts());
+  const edgeMeters = totalEdgeBandingMeters(calculateAllProjectParts(), state.project.edgeBanding);
   if (edgeMeters > 0) {
     const edgeKey = `Okleina krawędziowa (mb, formatki dookoła + ${Math.round(EDGE_BANDING_RESERVE * 100)}% zapasu)`;
     hardwareList[edgeKey] = { name: edgeKey, qty: Math.ceil(edgeMeters * (1 + EDGE_BANDING_RESERVE) * 10) / 10, unit: 'mb' };

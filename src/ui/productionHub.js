@@ -8,7 +8,9 @@ import { escapeHtml } from "../utils/dom.js";
 import { fmtMm } from "../utils/math.js";
 import { state, getActiveModule } from "../core/state.js";
 import { collectProjectParts, calculateAllProjectParts, calculateProjectHardware, calculateProjectCost } from "../engine/cabinet.js";
-import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "../engine/edgeBanding.js";
+import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE, getPartEdges, withEdges, describeEdges } from "../engine/edgeBanding.js";
+import { edgeIconSvg } from "./edgeBandingUi.js";
+import { scheduleCheckpoint } from "../core/history.js";
 import { getCornerDepths, getWorldFootprint } from "../core/layout.js";
 import { update3D, captureViewerSnapshot } from "../render/viewer3d.js";
 import { buildOfferHtml, getOfferSettings } from "../core/offer.js";
@@ -36,16 +38,25 @@ const CATEGORY_ORDER = ['Korpus', 'Front', 'Szuflada', 'Plecy', 'Blat'];
 
 function fmt(n) { return Math.round((parseFloat(n) || 0) * 10) / 10; }
 
+// Wiersze tabel formatek zarejestrowane do edycji okleiny (indeks w data-r).
+let ebRows = [];
+
 function partsTable(rows, showModules) {
+  const rules = state.project.edgeBanding;
   return `<table class="hub-table">
-    <thead><tr><th>Formatka</th><th>Wymiar (mm)</th><th class="num">Ilość</th>${showModules ? '<th>Szafka</th>' : ''}<th>Materiał</th></tr></thead>
-    <tbody>${rows.map(r => `<tr>
+    <thead><tr><th>Formatka</th><th>Wymiar (mm)</th><th class="num">Ilość</th>${showModules ? '<th>Szafka</th>' : ''}<th>Materiał</th><th title="Kliknij krawędź, żeby ją okleić lub odkleić; klik w środek: dookoła / brak. Dotyczy wszystkich identycznych formatek w projekcie.">Okleina</th></tr></thead>
+    <tbody>${rows.map(r => {
+      const idx = ebRows.push(r) - 1;
+      const edges = getPartEdges(r, rules);
+      return `<tr>
       <td>${escapeHtml(r.name)}</td>
       <td>${fmt(r.length)} × ${fmt(r.width)}</td>
       <td class="num">${r.qty}</td>
       ${showModules ? `<td>${escapeHtml((r.modules || []).join(', '))}</td>` : ''}
       <td>${escapeHtml(r.category || '')}</td>
-    </tr>`).join('')}</tbody>
+      <td class="eb-cell" data-r="${idx}" style="white-space:nowrap">${edgeIconSvg(edges, { interactive: true })} <span class="hub-sub">${escapeHtml(describeEdges(edges))}</span></td>
+    </tr>`;
+    }).join('')}</tbody>
   </table>`;
 }
 
@@ -60,6 +71,7 @@ function aggregate(rows) {
 }
 
 function renderFormatki(el) {
+  ebRows = [];
   const raw = collectProjectParts();
   const total = raw.reduce((s, p) => s + (parseInt(p.qty, 10) || 1), 0);
   const activeName = getActiveModule()?.name;
@@ -98,7 +110,7 @@ function renderFormatki(el) {
 
   el.innerHTML = `
     <div class="hub-bar">
-      <div><h3>Formatki</h3><div class="hub-sub">${total} sztuk w projekcie</div></div>
+      <div><h3>Formatki</h3><div class="hub-sub">${total} sztuk w projekcie · okleina ${totalEdgeBandingMeters(raw, state.project.edgeBanding).toFixed(1)} mb netto (klikając krawędzie w kolumnie „Okleina” wybierasz, które okleić)</div></div>
       <div class="hub-actions">
         <label class="hub-sub">Grupuj:
           <select id="hub-group">
@@ -112,6 +124,22 @@ function renderFormatki(el) {
     </div>
     ${body}`;
   el.querySelector('#hub-group').addEventListener('change', e => { groupMode = e.target.value; renderFormatki(el); });
+  // Okleina: klik w krawędź przełącza ją, klik w środek ikony - dookoła / brak.
+  el.querySelectorAll('.eb-cell').forEach(cell => {
+    const row = ebRows[+cell.dataset.r];
+    cell.addEventListener('click', (ev) => {
+      const edgeEl = ev.target.closest('.eb-edge');
+      const allEl = ev.target.closest('.eb-all');
+      if (!edgeEl && !allEl) return;
+      const cur = getPartEdges(row, state.project.edgeBanding);
+      let next;
+      if (edgeEl) { next = cur.slice(); next[+edgeEl.dataset.i] = !next[+edgeEl.dataset.i]; }
+      else { const all = cur.every(Boolean); next = [!all, !all, !all, !all]; }
+      state.project.edgeBanding = withEdges(state.project.edgeBanding, row, next);
+      scheduleCheckpoint();
+      renderFormatki(el);
+    });
+  });
   el.querySelector('#hub-csv').addEventListener('click', () => openCsvExport());
 }
 
@@ -325,10 +353,10 @@ function renderSciany(el) {
 
 function renderOkucia(el) {
   const hw = calculateProjectHardware();
-  const edge = totalEdgeBandingMeters(collectProjectParts());
+  const edge = totalEdgeBandingMeters(collectProjectParts(), state.project.edgeBanding);
   el.innerHTML = `
     <div class="hub-bar">
-      <div><h3>Okucia i okleina</h3><div class="hub-sub">Lista zakupów z całego projektu. Okleina: wszystkie formatki dookoła (bez pleców HDF), ${edge.toFixed(1)} mb netto, z ${Math.round(EDGE_BANDING_RESERVE * 100)}% zapasu ${(edge * (1 + EDGE_BANDING_RESERVE)).toFixed(1)} mb.</div></div>
+      <div><h3>Okucia i okleina</h3><div class="hub-sub">Lista zakupów z całego projektu. Okleina wg wyboru krawędzi z listy formatek (domyślnie dookoła, bez pleców HDF), ${edge.toFixed(1)} mb netto, z ${Math.round(EDGE_BANDING_RESERVE * 100)}% zapasu ${(edge * (1 + EDGE_BANDING_RESERVE)).toFixed(1)} mb.</div></div>
       <div class="hub-actions"><button type="button" id="hub-hw-print" class="btn btn-sm">Drukuj listę zakupów</button></div>
     </div>
     ${hw.length === 0 ? `<p class="hub-empty">Lista zakupów jest pusta.</p>` : `

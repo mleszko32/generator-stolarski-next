@@ -133,6 +133,11 @@ committed inline (it is public by design).
 height, sill). Edited in the room modal (`ui/roomPanel.js`), drawn in 3D (`viewer3d.js` rebuildRoomGeometry, dimmed with
 their wall) and in wall elevations (`wallElevations.js`), and checked against cabinets in `core/validate.js`.
 
+**Edge banding**: `engine/edgeBanding.js`. Default = all four edges (none for "Plecy"/"Blat"); `project.edgeBanding` maps
+the part key `category|name|length|width` (the same identity the aggregated parts list uses, so it applies to all
+identical parts) to `[long1,long2,short1,short2]` booleans. Edited by clicking edges of the icon in the hub's
+Formatki table (`ui/edgeBandingUi.js`); feeds the metres in Okucia/cost, and the cut-plan labels.
+
 **Project check**: `core/validate.js` (`validateProject`) feeds the hub section "Kontrola projektu"
 (`ui/projectCheck.js`): collisions, room bounds, too-wide doors/shelves, parts not fitting the sheet, openings.
 

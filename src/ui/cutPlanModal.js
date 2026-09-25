@@ -10,7 +10,8 @@ import { escapeHtml } from "../utils/dom.js";
 import { state } from "../core/state.js";
 import { collectProjectParts } from "../engine/cabinet.js";
 import { nestParts } from "../engine/nesting.js";
-import { isEdgeBanded, totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "../engine/edgeBanding.js";
+import { isEdgeBanded, getPartEdges, describeEdges, totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "../engine/edgeBanding.js";
+import { edgeIconSvg } from "./edgeBandingUi.js";
 
 const DEFAULTS = { sheetW: 2800, sheetH: 2070, kerf: 3, trim: 10, rotateFronts: false };
 const CATEGORY_ORDER = ['Korpus', 'Front', 'Szuflada', 'Plecy'];
@@ -48,6 +49,7 @@ function buildPieces() {
         length: parseFloat(p.length) || 0,
         width: parseFloat(p.width) || 0,
         banded: isEdgeBanded(p),
+        edges: getPartEdges(p, state.project.edgeBanding),
       });
     }
   });
@@ -77,7 +79,7 @@ function computePlan() {
   groups.forEach(g => g.result.sheets.forEach(sh => sh.placements.forEach(pl => {
     location[pl.piece.id] = { category: g.category, sheetNo: sh.index + 1, sheetCount: g.result.sheetCount };
   })));
-  return { settings: s, raw, pieces, groups, location, edgeMeters: totalEdgeBandingMeters(raw) };
+  return { settings: s, raw, pieces, groups, location, edgeMeters: totalEdgeBandingMeters(raw, state.project.edgeBanding) };
 }
 
 function moduleColor(name, colors) {
@@ -185,7 +187,7 @@ function printLabels(plan) {
         <div class="nm">${escapeHtml(p.name)}</div>
         <div class="dim">${Math.round(p.length)} × ${Math.round(p.width)} mm</div>
         <div class="mat">${escapeHtml(p.category)}${loc ? ` · arkusz ${loc.sheetNo}/${loc.sheetCount}` : ''}</div>
-        <div class="edge">${p.banded ? 'Okleina: dookoła' : 'Bez okleiny'}</div>
+        <div class="edge">${edgeIconSvg(p.edges, { width: 34, height: 21 })} ${p.edges.some(Boolean) ? 'Okleina: ' + describeEdges(p.edges) : 'Bez okleiny'}</div>
       </div>
     </div>`;
   }).join('');
