@@ -301,7 +301,7 @@ export function init3DViewer() {
   camera.position.set(2500, 1500, 3500); // nadpisane zaraz po utworzeniu controls przez reframeCameraToRoom()
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, logarithmicDepthBuffer: true }); // log. bufor głębi: bliska płaszczyzna 1 mm bez migotania krawędzi przy zbliżeniach
-  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); // ekrany 3x+ nie potrzebują 9-krotnej liczby pikseli
   renderer.setSize(container.clientWidth, container.clientHeight);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -314,10 +314,14 @@ export function init3DViewer() {
   container.innerHTML = '';
   container.style.position = 'relative';
   container.appendChild(renderer.domElement);
+  if (import.meta.env && import.meta.env.DEV) window.__gsn = { renderer, scene, camera }; // tylko dev: podgląd statystyk renderera w konsoli
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
-  controls.dampingFactor = 0.05;
+  controls.dampingFactor = 0.1; // 0.05 dawało "ślizganie" widoku po puszczeniu myszy
+  // Jak w SketchUp/Blenderze: środkowy przycisk obraca (z Shift przesuwa), prawy przesuwa,
+  // kółko przybliża. Lewy przycisk zostaje dla zaznaczania i przeciągania szafek.
+  controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.PAN };
   // Zbliżanie do detali (łączenia, okucia): zoom w kierunku kursora, prawie do styku
   // i szybsze kółko - wcześniej kamera zatrzymywała się daleko, a bliska płaszczyzna
   // 10 mm ucinała szczegóły.
@@ -806,7 +810,11 @@ export function init3DViewer() {
   // gdyby overlay był jego dzieckiem, przycisk powrotu do 3D zniknąłby razem z nim.
   (container.parentElement || container).appendChild(uiOverlay);
 
+  ['pointerdown', 'pointermove', 'wheel', 'keydown', 'keyup'].forEach(ev =>
+    window.addEventListener(ev, () => requestRender(1200), { passive: true }));
+
   window.addEventListener('resize', () => {
+      requestRender();
       if (!container) return;
       camera.aspect = container.clientWidth / container.clientHeight;
       camera.updateProjectionMatrix();
@@ -839,9 +847,24 @@ export function captureViewerSnapshot(maxWidth = 1400) {
   }
 }
 
+// Render na żądanie: scena jest statyczna, dopóki użytkownik czegoś nie ruszy, więc
+// nie ma sensu rysować 60-70 klatek na sekundę z cieniami w bezczynności (grzało
+// kartę i zabierało zasoby przeglądarce). Klatki lecą, gdy kamera się porusza, przy
+// każdej interakcji (mysz, kółko, klawisz) i po każdej przebudowie sceny; w
+// bezczynności zostaje rzadki "oddech" (co ~0,5 s) na wypadek zmian bez zgłoszenia.
+let renderActiveUntil = 0;
+let lastIdleRender = 0;
+export function requestRender(ms = 1500) {
+  renderActiveUntil = Math.max(renderActiveUntil, performance.now() + ms);
+}
+const IDLE_RENDER_MS = 500;
+
 function animate() {
   requestAnimationFrame(animate);
-  controls.update();
+  const now = performance.now();
+  if (controls.update()) requestRender(600); // kamera jeszcze dojeżdża (damping)
+  if (now > renderActiveUntil && now - lastIdleRender < IDLE_RENDER_MS && !measureMode.active) return;
+  lastIdleRender = now;
   updateWallVisibility();
   if (measureMode.active) updateMeasureHover();
   renderer.render(scene, camera);
@@ -1244,7 +1267,31 @@ const mats = {
   }
 };
 const worktopMat = new THREE.MeshStandardMaterial({ color: 0x8a6a4a, roughness: 0.55, metalness: 0.0 });
-const holeMat = new THREE.MeshBasicMaterial({ color: 0xdc2626 }); 
+const holeMat = new THREE.MeshBasicMaterial({ color: 0xdc2626 });
+
+// Materiały współdzielone między klatkami przebudowy (nie wolno ich zwalniać
+// razem z siatką, bo używa ich następna wersja sceny).
+[...Object.values(mats.xray), ...Object.values(mats.solid), worktopMat, holeMat].forEach(m => { m.userData.shared = true; });
+
+// Kolory krawędzi mają po jednym wspólnym materiale (wcześniej każdy prostopadłościan
+// tworzył własny, co przy kilkunastu szafkach dawało tysiące materiałów).
+const lineMatCache = new Map();
+function getLineMat(color) {
+  let m = lineMatCache.get(color);
+  if (!m) { m = new THREE.LineBasicMaterial({ color }); m.userData.shared = true; lineMatCache.set(color, m); }
+  return m;
+}
+
+// Zwalnia geometrie i materiały (pamięć GPU) usuniętej ze sceny gałęzi. Bez tego
+// każde update3D() zostawiało po sobie setki geometrii, aż widok zaczynał zwalniać.
+function disposeObject(root) {
+  root.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    const m = o.material;
+    if (m) (Array.isArray(m) ? m : [m]).forEach(x => { if (!x.userData.shared) x.dispose(); });
+  });
+}
+
 
 function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, parentGroup, rotationY = 0) {
   const geo = new THREE.BoxGeometry(w, h, d);
@@ -1272,8 +1319,7 @@ function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, parentG
   let edgeColor = isXrayMode ? (type === 'drawerBox' ? 0xd97706 : 0x64748b) : 0x334155; 
   if (isSelected) edgeColor = 0x2563eb;
   
-  const lineMat = new THREE.LineBasicMaterial({ color: edgeColor, linewidth: isSelected ? 2 : 1 });
-  const line = new THREE.LineSegments(edges, lineMat);
+  const line = new THREE.LineSegments(edges, getLineMat(edgeColor));
   if (userData) line.userData = userData; 
 
   mesh.add(line);
@@ -1583,8 +1629,11 @@ export function update3D() {
   if (!cabinetGroup) return;
 
   while (cabinetGroup.children.length > 0) {
-      cabinetGroup.remove(cabinetGroup.children[0]);
+      const old = cabinetGroup.children[0];
+      cabinetGroup.remove(old);
+      disposeObject(old);
   }
+  requestRender();
 
   const th = parseFloat(state.project.materials?.boardThickness) || 18;
 
