@@ -801,6 +801,28 @@ export function init3DViewer() {
   animate();
 }
 
+// Zdjęcie bieżącego widoku 3D do oferty: JPEG na białym tle (scena ma
+// przezroczyste tło), do 1400 px szerokości. Renderujemy klatkę tuż przed
+// odczytem, bo bez preserveDrawingBuffer bufor po prezentacji jest pusty.
+export function captureViewerSnapshot(maxWidth = 1400) {
+  if (!renderer) return null;
+  try {
+    renderer.render(scene, camera);
+    const src = renderer.domElement;
+    const k = Math.min(1, maxWidth / src.width);
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(src.width * k));
+    c.height = Math.max(1, Math.round(src.height * k));
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(src, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.88);
+  } catch (e) {
+    return null;
+  }
+}
+
 function animate() {
   requestAnimationFrame(animate);
   controls.update();

@@ -7,10 +7,11 @@
 import { escapeHtml } from "../utils/dom.js";
 import { fmtMm } from "../utils/math.js";
 import { state, getActiveModule } from "../core/state.js";
-import { collectProjectParts, calculateAllProjectParts, calculateProjectHardware } from "../engine/cabinet.js";
+import { collectProjectParts, calculateAllProjectParts, calculateProjectHardware, calculateProjectCost } from "../engine/cabinet.js";
 import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "../engine/edgeBanding.js";
 import { getCornerDepths, getWorldFootprint } from "../core/layout.js";
-import { update3D } from "../render/viewer3d.js";
+import { update3D, captureViewerSnapshot } from "../render/viewer3d.js";
+import { buildOfferHtml, getOfferSettings } from "../core/offer.js";
 import { initPropertiesPanel } from "./properties.js";
 import { mountCutPlan } from "./cutPlanModal.js";
 import { generateAllWallSVGs } from "../render/wallElevations.js";
@@ -347,6 +348,40 @@ function renderKosztorys(el) {
       <button type="button" id="hub-cost" class="btn btn-primary btn-sm" style="margin-top:12px;">Otwórz kosztorys</button>
     </div>`;
   el.querySelector('#hub-cost').addEventListener('click', () => openKosztorysModal());
+  renderOfferCard(el);
+}
+
+// Oferta dla klienta: dane firmy/klienta zapisują się w projekcie (state.project.offer),
+// wydruk bierze cenę z kosztorysu (bez rozbicia na koszty i marżę) i zdjęcie
+// bieżącego widoku 3D.
+function renderOfferCard(el) {
+  const o = getOfferSettings(state.project);
+  const card = document.createElement('div');
+  card.className = 'hub-card';
+  card.style.marginTop = '14px';
+  card.innerHTML = `
+    <div class="hub-strong" style="margin-bottom:4px">Oferta dla klienta</div>
+    <div class="hub-sub" style="margin-bottom:10px">Wydruk zawiera zakres zabudowy, wizualizację 3D (bieżący widok sceny) i cenę netto / VAT / brutto - bez kosztów i marży. Dane zapisują się razem z projektem.</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px">
+      <label class="hub-sub">Nazwa firmy<br><input type="text" class="offer-f" data-k="company" value="${escapeHtml(o.company)}" style="width:100%"></label>
+      <label class="hub-sub">Klient<br><input type="text" class="offer-f" data-k="clientName" value="${escapeHtml(o.clientName)}" style="width:100%"></label>
+      <label class="hub-sub">Numer oferty<br><input type="text" class="offer-f" data-k="number" value="${escapeHtml(o.number)}" style="width:100%"></label>
+      <label class="hub-sub">Ważność oferty (dni)<br><input type="number" class="offer-f" data-k="validDays" value="${escapeHtml(o.validDays)}" min="0" style="width:100%"></label>
+    </div>
+    <label class="hub-sub" style="display:block;margin-top:8px">Dane kontaktowe (adres, telefon, e-mail)<br><textarea class="offer-f" data-k="contact" rows="2" style="width:100%">${escapeHtml(o.contact)}</textarea></label>
+    <label class="hub-sub" style="display:block;margin-top:8px">Uwagi (termin realizacji, warunki płatności)<br><textarea class="offer-f" data-k="notes" rows="3" style="width:100%">${escapeHtml(o.notes)}</textarea></label>
+    <label class="hub-sub" style="display:block;margin-top:8px"><input type="checkbox" id="offer-snap" checked> Dołącz zdjęcie widoku 3D</label>
+    <button type="button" id="offer-print" class="btn btn-primary btn-sm" style="margin-top:12px">Podgląd i wydruk oferty</button>`;
+  el.appendChild(card);
+
+  card.querySelectorAll('.offer-f').forEach(inp => inp.addEventListener('input', () => {
+    state.project.offer = { ...getOfferSettings(state.project), [inp.dataset.k]: inp.type === 'number' ? (parseFloat(inp.value) || 0) : inp.value };
+  }));
+  card.querySelector('#offer-print').addEventListener('click', () => {
+    const snapshot = card.querySelector('#offer-snap').checked ? captureViewerSnapshot() : null;
+    const html = buildOfferHtml({ project: state.project, cost: calculateProjectCost(), snapshot });
+    window.open(URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' })), '_blank');
+  });
 }
 
 function renderKontrola(el) {

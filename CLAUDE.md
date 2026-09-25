@@ -128,6 +128,10 @@ window event (dispatched by 3D drag) to re-render the properties panel.
 promise-based modal used instead of native `confirm` / `prompt`. The Firebase web config is
 committed inline (it is public by design).
 
+**Client offer**: `core/offer.js` (pure: settings in `project.offer`, `buildOfferHtml`) + the "Oferta dla klienta" card in
+the hub's Kosztorys section (`ui/productionHub.js`). Shows scope + gross/net/VAT only (no costs/margin); the 3D image
+comes from `captureViewerSnapshot()` (`render/viewer3d.js`, current camera view).
+
 **Cabinet library**: `core/moduleLibrary.js` + `ui/moduleLibraryModal.js` (sidebar button "Biblioteka szafek") store
 module templates in `localStorage` (JSON export/import for moving between machines). Inserting goes through
 `addModuleFromTemplate` / `cloneModuleWithNewIds` (`core/state.js`), which remaps element ids **and** the
