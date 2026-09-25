@@ -177,6 +177,12 @@ function markSaved() {
   lastSavedSnapshot = JSON.stringify(state.project);
 }
 
+// Czy bieżący projekt różni się od ostatnio zapisanego/wczytanego z chmury
+// (dla kopii lokalnej, patrz core/localBackup.js).
+export function hasUnsavedChanges() {
+  return JSON.stringify(state.project) !== lastSavedSnapshot;
+}
+
 // --- HISTORIA WERSJI ---
 // Przed nadpisaniem projektu w chmurze archiwizujemy jego poprzednią treść.
 // Wersje leżą w podkolekcjach projects/{id}/versions (małe metadane - z nich
@@ -328,7 +334,7 @@ export async function saveProjectToCloud(projectId = null) {
           targetId = newName.trim();
         }
       } else {
-        const newName = await showCustomDialog('prompt', 'Zapisz projekt', 'Podaj nazwę projektu do zapisu:', 'Zabudowa_1', "Zapisz", "Anuluj");
+        const newName = await showCustomDialog('prompt', 'Zapisz projekt', 'Podaj nazwę projektu do zapisu:', (state.project.name && state.project.name !== 'Zabudowa Wielomodułowa') ? state.project.name : 'Zabudowa_1', "Zapisz", "Anuluj");
         if (!newName || newName.trim() === "") return; 
         targetId = newName.trim();
       }
@@ -362,7 +368,7 @@ export async function saveProjectToCloud(projectId = null) {
 }
 
 // Wstawia dane projektu (z chmury albo z wersji historii) do stanu aplikacji.
-function applyProjectData(data, projectId) {
+export function applyProjectData(data, projectId) {
   state.project = data;
   ensureRoomDefaults(state.project); // projekty zapisane przed dodaniem pomieszczeń mogą nie mieć tego pola
   ensurePricingDefaults(state.project); // ...ani projekty sprzed dodania kosztorysu

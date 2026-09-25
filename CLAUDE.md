@@ -23,7 +23,7 @@ user-facing text and comments Polish to match.
 Tests are co-located as `src/**/*.test.js` and cover the pure domain math
 (`core/drawerMath`, `core/hingeMath`, `core/shelfMath`, `core/layout`) and the cut-list /
 hardware engine (`engine/cabinet`). Shared fixtures: `src/test/fixtures.js`. There is no
-linter and no CI config.
+linter. CI (`.github/workflows/test.yml`) runs `npm run test:run` and `npm run build` on every push / PR.
 
 The `/api/gemini` endpoint only runs under Vercel's serverless runtime. Plain `npm run dev`
 does not serve `api/`, so AI sketch import fails locally unless you run `vercel dev` and set
@@ -127,6 +127,11 @@ window event (dispatched by 3D drag) to re-render the properties panel.
 `getSavedProjectsList`. Also exports `showCustomDialog(type, title, msg, ...)` — a
 promise-based modal used instead of native `confirm` / `prompt`. The Firebase web config is
 committed inline (it is public by design).
+
+**Local backup**: `core/localBackup.js` keeps a `localStorage` copy of *unsaved* work (every 20 s, on tab hide;
+cleared once the project matches the cloud copy). On startup `main.js` offers to restore it; a restored
+project is deliberately NOT bound to a cloud project (`loadedProjectId = null`) so autosave never overwrites
+silently.
 
 **Version history**: before overwriting a project in the cloud (manual save, autosave at most once per
 10 min, restore) `storage.js` archives its previous content into subcollections `projects/{id}/versions`

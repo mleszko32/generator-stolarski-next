@@ -17,6 +17,8 @@ import { saveProjectToCloud, loadProjectFromCloud, getSavedProjectsList, deleteP
 import { onAuthChange, signInWithGoogle, signOutUser, getCurrentUser, saveProjectSilently } from "./core/storage.js";
 import { undo, redo, onHistoryChange, resetHistory } from "./core/history.js";
 import { openVersionHistory } from "./ui/versionHistory.js";
+import { readLocalBackup, clearLocalBackup, startLocalBackup } from "./core/localBackup.js";
+import { applyProjectData } from "./core/storage.js";
 
 console.log("Generator Stolarski Next uruchomiony");
 
@@ -303,6 +305,35 @@ if (btnLoad) {
     document.body.appendChild(modalOverlay);
   });
 }
+
+// --- KOPIA LOKALNA (niezapisana praca) ---
+// Kopia w localStorage istnieje tylko dla zmian, których nie ma w chmurze (patrz
+// core/localBackup.js). Jeśli została po poprzedniej sesji, proponujemy przywrócenie.
+// Po przywróceniu projekt NIE jest podpięty do projektu w chmurze (autozapis nie
+// nadpisze niczego po cichu) - trzeba go zapisać ręcznie.
+(async function offerLocalRestore() {
+  try {
+    const backup = readLocalBackup();
+    if (backup && state.project.modules.length === 0) {
+      const when = new Date(backup.savedAt).toLocaleString('pl-PL');
+      const name = backup.project.name || backup.loadedProjectId || 'bez nazwy';
+      const restore = await showCustomDialog(
+        'confirm', 'Niezapisana praca',
+        `Znaleziono kopię niezapisanej pracy z ${when} (projekt: ${name}, szafek: ${backup.project.modules.length}). Przywrócić? Po przywróceniu zapisz projekt w chmurze.`,
+        '', 'Przywróć', 'Odrzuć'
+      );
+      if (restore) {
+        applyProjectData(backup.project, null);
+        refreshAfterProjectLoad();
+      } else {
+        clearLocalBackup();
+      }
+    }
+  } catch (e) {
+    console.warn('Kopia lokalna: nie udało się przywrócić:', e);
+  }
+  startLocalBackup();
+})();
 
 window.addEventListener('cabinetMoved', () => {
   initPropertiesPanel(); // Odświeża suwaki i inputy z prawej strony
