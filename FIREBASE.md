@@ -1,10 +1,10 @@
 # Firebase — konfiguracja bezpieczeństwa
 
 Aplikacja korzysta z Firestore do zapisu projektów w chmurze. Dostęp jest
-ograniczony do jednego konta (właściciel), logowanie przez Google.
+ograniczony do listy kont Google (wszystkie widzą te same projekty).
 
-- Kod klienta: `src/core/storage.js` (stała `OWNER_EMAIL`).
-- Reguły bazy: `firestore.rules` (ten sam adres e-mail — musi się zgadzać).
+- Kod klienta: `src/core/storage.js` (lista `ALLOWED_EMAILS`).
+- Reguły bazy: `firestore.rules` (te same adresy e-mail — muszą się zgadzać).
 
 ## Jednorazowa konfiguracja w konsoli Firebase
 
@@ -29,12 +29,12 @@ zostają na miejscu i stają się dostępne po zalogowaniu właściciela.
 Authentication → **Settings** → Authorized domains. `localhost` jest domyślnie.
 Dodaj domenę produkcyjną (np. `*.vercel.app` albo własną).
 
-## Zmiana konta właściciela
+## Dodanie / usunięcie konta
 
-Podmień adres w **dwóch** miejscach i opublikuj reguły ponownie:
+Zmień adresy w **dwóch** miejscach i opublikuj reguły ponownie:
 
-1. `src/core/storage.js` → `OWNER_EMAIL`
-2. `firestore.rules` → warunek w `isOwner()`
+1. `src/core/storage.js` → `ALLOWED_EMAILS`
+2. `firestore.rules` → lista w `isOwner()`
 
 Alternatywnie w regułach można użyć UID zamiast e-maila (patrz komentarz w
 `firestore.rules`). UID: Authentication → Users.

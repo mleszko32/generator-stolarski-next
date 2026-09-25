@@ -29,10 +29,11 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
-// Jedyne konto z dostępem do chmury. TEN SAM adres musi być w firestore.rules —
+// Konta z dostępem do chmury. TE SAME adresy muszą być w firestore.rules —
 // tutaj to tylko wygodny check po stronie klienta (czytelny komunikat zamiast
 // surowego błędu "permission denied"), tam jest właściwe zabezpieczenie.
-export const OWNER_EMAIL = "mleszko32@gmail.com";
+export const ALLOWED_EMAILS = ["mleszko32@gmail.com", "mebleleszko@gmail.com"];
+const isAllowedEmail = (email) => !!email && ALLOWED_EMAILS.includes(String(email).toLowerCase());
 
 // --- AUTORYZACJA ---
 export function onAuthChange(callback) {
@@ -45,15 +46,15 @@ export function getCurrentUser() {
 
 export function isOwner() {
   const u = auth.currentUser;
-  return !!u && u.email === OWNER_EMAIL;
+  return !!u && isAllowedEmail(u.email);
 }
 
 export async function signInWithGoogle() {
   try {
     const { user } = await signInWithPopup(auth, provider);
-    if (user.email !== OWNER_EMAIL) {
+    if (!isAllowedEmail(user.email)) {
       await signOut(auth);
-      alert(`Zalogowano jako ${user.email}, ale dostęp ma tylko ${OWNER_EMAIL}. Wylogowano.`);
+      alert(`Zalogowano jako ${user.email}, ale konto nie ma dostępu. Wylogowano.`);
       return null;
     }
     return user;
@@ -83,7 +84,7 @@ function requireOwner() {
     return false;
   }
   if (!isOwner()) {
-    alert(`🔒 Dostęp do chmury ma tylko konto ${OWNER_EMAIL}.`);
+    alert(`🔒 To konto (${auth.currentUser.email}) nie ma dostępu do chmury.`);
     return false;
   }
   return true;

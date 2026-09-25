@@ -128,13 +128,14 @@ window event (dispatched by 3D drag) to re-render the properties panel.
 promise-based modal used instead of native `confirm` / `prompt`. The Firebase web config is
 committed inline (it is public by design).
 
-**Auth**: single-owner. Google sign-in (`signInWithGoogle` / `signOutUser` / `onAuthChange`
-/ `getCurrentUser`, wired in `main.js`, button in `layout.js`). Every cloud function bails
-via `requireOwner()` unless `auth.currentUser.email === OWNER_EMAIL`. The real gate is
-`firestore.rules` (same email) — see `FIREBASE.md` for the one-time console setup (enable
-Google provider, publish rules). The client check is only for a readable error message.
-Changing owner = edit `OWNER_EMAIL` in `storage.js` **and** the condition in
-`firestore.rules`, then republish rules.
+**Auth**: allowlist of Google accounts (all share the same `projects` collection). Google
+sign-in (`signInWithGoogle` / `signOutUser` / `onAuthChange` / `getCurrentUser`, wired in
+`main.js`, button in `layout.js`). Every cloud function bails via `requireOwner()` unless
+the signed-in email is in `ALLOWED_EMAILS` (`storage.js`). The real gate is `firestore.rules`
+(same emails) — see `FIREBASE.md` for the one-time console setup (enable Google provider,
+publish rules). The client check is only for a readable error message.
+Adding/removing a user = edit `ALLOWED_EMAILS` in `storage.js` **and** the list in
+`isOwner()` in `firestore.rules`, then republish rules.
 
 ### AI sketch import
 
