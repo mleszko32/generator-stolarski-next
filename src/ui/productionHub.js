@@ -19,7 +19,11 @@ import { mountCutPlan } from "./cutPlanModal.js";
 import { generateAllWallSVGs } from "../render/wallElevations.js";
 import { computeWorktops, getWorktopSettings, rectOf } from "../core/worktops.js";
 import { renderProjectCheck } from './projectCheck.js';
-import { openCsvExport, printHardwareList, openTechnicalDrawing, openKosztorysModal, updateSidebar } from "./sidebar.js";
+import { updateSidebar } from "./sidebar.js";
+import { openCsvExport } from "./csvEditor.js";
+import { printHardwareList } from "./hardwareList.js";
+import { openTechnicalDrawing } from "./technicalDrawing.js";
+import { openKosztorysModal } from "./kosztorysModal.js";
 
 const SECTIONS = [
   { id: 'formatki', label: 'Formatki', icon: 'ti-list-details' },

@@ -108,8 +108,9 @@ All panels render by assigning `innerHTML` template strings.
 
 - `layout.js` — static 3-column shell: `.sidebar-left`, `.center-panel #editor-3d-container`,
   `.sidebar-right`.
-- `sidebar.js` — left panel: module list, add buttons, AI import, cut-list / hardware / CSV
-  export, print, 2D drilling preview with pan/zoom.
+- `sidebar.js` — left panel: module list, add buttons, AI sketch import. The output windows it used to hold live in
+  their own files: `csvEditor.js` (CSV export), `kosztorysModal.js`, `hardwareList.js` (purchase list print),
+  `technicalDrawing.js` (2D drilling drawing popup + single-part A4 print).
 - `properties.js` — right panel: per-module and global property forms.
   `updateAll = () => { update3D(); updateSidebar(); }` is the standard "something changed"
   refresh; text inputs are debounced 50 ms.
