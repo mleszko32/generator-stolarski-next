@@ -17,6 +17,7 @@ import { saveProjectToCloud, loadProjectFromCloud, getSavedProjectsList, deleteP
 import { onAuthChange, signInWithGoogle, signOutUser, getCurrentUser, saveProjectSilently } from "./core/storage.js";
 import { undo, redo, onHistoryChange, resetHistory } from "./core/history.js";
 import { openVersionHistory } from "./ui/versionHistory.js";
+import { openModal } from "./utils/modal.js";
 import { readLocalBackup, clearLocalBackup, startLocalBackup } from "./core/localBackup.js";
 import { applyProjectData } from "./core/storage.js";
 
@@ -200,109 +201,47 @@ if (btnLoad) {
       return;
     }
 
-    // --- TWORZENIE OKIENKA POPUP (MODAL) ---
-    const modalOverlay = document.createElement('div');
-    Object.assign(modalOverlay.style, {
-      position: 'fixed', top: '0', left: '0', width: '100%', height: '100%',
-      backgroundColor: 'rgba(0,0,0,0.6)', zIndex: '9999', display: 'flex',
-      alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(2px)'
+    // Lista projektów w chmurze - to samo okno co reszta aplikacji (utils/modal.js).
+    const dlg = openModal({
+      title: 'Wczytaj projekt',
+      subtitle: 'Wybierz projekt z chmury. Aktualnie otwarty projekt zostanie zastąpiony (niezapisane zmiany przepadną).',
+      width: 480,
+      body: '<div id="load-list"></div>',
+      footer: [{ label: 'Zamknij' }],
     });
+    const listContainer = dlg.bodyEl.querySelector('#load-list');
 
-    const modalContent = document.createElement('div');
-    Object.assign(modalContent.style, {
-      backgroundColor: '#fff', padding: '24px', borderRadius: '8px',
-      width: '400px', maxHeight: '80vh', display: 'flex', flexDirection: 'column',
-      boxShadow: '0 10px 25px rgba(0,0,0,0.3)', fontFamily: 'sans-serif'
-    });
-
-    const title = document.createElement('h3');
-    title.innerText = "Wybierz projekt do wczytania";
-    title.style.marginTop = '0';
-    title.style.marginBottom = '15px';
-    title.style.color = '#1e293b';
-    modalContent.appendChild(title);
-
-    const listContainer = document.createElement('div');
-    Object.assign(listContainer.style, {
-      display: 'flex', flexDirection: 'column', gap: '8px',
-      overflowY: 'auto', paddingRight: '5px'
-    });
-
-    // Tworzenie przycisków dla każdego projektu
     projects.forEach(projName => {
       const row = document.createElement('div');
-      row.style.display = 'flex';
-      row.style.gap = '6px';
+      row.className = 'list-row';
+      row.innerHTML = `<i class="ti ti-folder li-icon" aria-hidden="true"></i>
+        <div class="grow list-row-title">${escapeHtml(projName)}</div>
+        <button type="button" class="btn btn-sm btn-primary load-open">Wczytaj</button>
+        <button type="button" class="btn btn-sm btn-danger load-del" title="Usuń projekt bezpowrotnie"><i class="ti ti-trash" aria-hidden="true"></i></button>`;
 
-      const btn = document.createElement('button');
-      btn.innerHTML = `<i class="ti ti-folder" aria-hidden="true"></i> <b>${escapeHtml(projName)}</b>`;
-      Object.assign(btn.style, {
-        flexGrow: '1', padding: '12px', backgroundColor: '#f8fafc', border: '1px solid #cbd5e1',
-        borderRadius: '6px', cursor: 'pointer', textAlign: 'left', color: '#334155', fontSize: '14px'
-      });
-      btn.onmouseenter = () => btn.style.backgroundColor = '#e2e8f0';
-      btn.onmouseleave = () => btn.style.backgroundColor = '#f8fafc';
-      
       // AKCJA: Wczytywanie projektu
-      btn.onclick = async () => {
-        modalOverlay.remove();
+      row.querySelector('.load-open').onclick = async () => {
+        dlg.close();
         btnLoad.innerHTML = navIcon('loader-2', 'Wczytywanie...');
-        
         const success = await loadProjectFromCloud(projName);
-        if (success) {
-          refreshAfterProjectLoad();
-        }
+        if (success) refreshAfterProjectLoad();
         btnLoad.innerHTML = navIcon('folder-open', 'Wczytaj projekt');
       };
 
-      // NOWOŚĆ: Przycisk usuwania
-      const delBtn = document.createElement('button');
-      delBtn.innerHTML = '<i class="ti ti-trash" aria-hidden="true"></i>';
-      delBtn.title = 'Usuń projekt bezpowrotnie';
-      Object.assign(delBtn.style, {
-        padding: '12px', backgroundColor: '#fee2e2', border: '1px solid #fca5a5',
-        borderRadius: '6px', cursor: 'pointer', color: '#991b1b', fontSize: '14px',
-        display: 'flex', alignItems: 'center', justifyContent: 'center'
-      });
-      delBtn.onmouseenter = () => delBtn.style.backgroundColor = '#fecaca';
-      delBtn.onmouseleave = () => delBtn.style.backgroundColor = '#fee2e2';
-
-      // AKCJA: Usuwanie z bazy po potwierdzeniu w Custom Dialog
-      delBtn.onclick = async () => {
+      // AKCJA: Usuwanie z bazy po potwierdzeniu
+      row.querySelector('.load-del').onclick = async () => {
         const confirmDelete = await showCustomDialog(
-            'confirm', 
-            'Usuwanie projektu', 
-            `Czy na pewno chcesz usunąć projekt "${projName}" z chmury? Tej operacji NIE można cofnąć!`,
-            "",
-            "Usuń trwale",
-            "Zostaw"
+          'confirm',
+          'Usuwanie projektu',
+          `Czy na pewno chcesz usunąć projekt "${projName}" z chmury? Tej operacji NIE można cofnąć!`,
+          '',
+          'Usuń trwale',
+          'Zostaw'
         );
-        
-        if (confirmDelete) {
-          const success = await deleteProjectFromCloud(projName);
-          if (success) {
-            row.remove(); // Usuwa kafelek projektu z listy bez odświeżania całej aplikacji
-          }
-        }
+        if (confirmDelete && await deleteProjectFromCloud(projName)) row.remove();
       };
-      
-      row.appendChild(btn);
-      row.appendChild(delBtn);
       listContainer.appendChild(row);
     });
-
-    const closeBtn = document.createElement('button');
-    closeBtn.innerText = "Zamknij okno";
-    Object.assign(closeBtn.style, {
-      marginTop: '20px', padding: '10px', width: '100%', cursor: 'pointer',
-      backgroundColor: '#94a3b8', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold'
-    });
-    closeBtn.onclick = () => modalOverlay.remove();
-
-    modalContent.appendChild(listContainer);
-    modalContent.appendChild(closeBtn);
-    modalOverlay.appendChild(modalContent);
-    document.body.appendChild(modalOverlay);
   });
 }
 

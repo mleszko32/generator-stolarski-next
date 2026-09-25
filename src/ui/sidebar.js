@@ -1,18 +1,12 @@
-import { calculateParts, calculateProjectHardware } from "../engine/cabinet.js";
-import { state, getActiveModule, addModule, deleteModule, duplicateModule, addSidePanel, deleteSidePanel, addCornerModule } from "../core/state.js";
+import { state, addModule, deleteModule, duplicateModule, addSidePanel, deleteSidePanel, addCornerModule } from "../core/state.js";
 import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel } from "./properties.js";
-import { openCutPlanModal } from "./cutPlanModal.js";
 import { openProductionHub } from "./productionHub.js";
 import { escapeHtml } from "../utils/dom.js";
 import { openModuleLibrary } from "./moduleLibraryModal.js";
 import { snapSidePanel } from "../core/sidePanelSnap.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
-import { openCsvExport } from "./csvEditor.js";
-import { openKosztorysModal } from "./kosztorysModal.js";
-import { printHardwareList } from "./hardwareList.js";
-import { openTechnicalDrawing } from "./technicalDrawing.js";
 
 function showLoading(msg) {
     let l = document.getElementById('ai-loader');
@@ -37,199 +31,95 @@ function hideLoading() {
 }
 
 
+const MODULE_ICONS = {
+  base_cabinet: 'ti-layout-bottombar',
+  upper_cabinet: 'ti-cloud',
+  tall_cabinet: 'ti-layout-sidebar',
+  corner_cabinet: 'ti-corner-up-right',
+};
+
+// Lewy panel: Szafki (lista + dodawanie), Boki dokładane, Narzędzia. Listy
+// formatek, nawiertów i okuć, które dawniej dublowały się tu i w oknie
+// "Produkcja i raporty", mieszkają teraz tylko w tym oknie (ui/productionHub.js).
 export function updateSidebar() {
   scheduleCheckpoint(); // patrz core/history.js — debounce'owany checkpoint historii cofnij/wprzód
   renderInteriorEditorIfVisible(); // patrz ui/interiorEditor.js
   const leftSidebar = document.querySelector(".sidebar-left");
-  const { parts, mountingData } = calculateParts();
-  const activeMod = getActiveModule();
-  const projectHardware = calculateProjectHardware();
-  
+  const modules = state.project.modules;
+
   let html = `
-    <h2 style="font-size: 14px; margin-bottom: 10px; color: #1e293b;">Lista Szafek (Moduły)</h2>
-    <div style="font-size: 10px; color: #64748b; margin-bottom: 8px;">Użyj SHIFT aby zaznaczyć wiele szafek.</div>
-  `;
+    <section class="panel-section">
+      <div class="panel-head">
+        <h2>Szafki</h2>
+        <span class="panel-hint">Shift = zaznacz wiele</span>
+      </div>`;
 
-  html += `
-      <div style="margin-bottom: 15px;">
-          <button id="btn-import-ai" class="btn btn-block">
-              <i class="ti ti-wand" aria-hidden="true"></i> Zbuduj projekt ze zdjęcia (AI)
-          </button>
-          <input type="file" id="input-ai-image" accept="image/png, image/jpeg" style="display: none;" />
-      </div>
-  `;
-
-  if (state.project.modules.length === 0) {
-     html += `<div style="font-size: 11px; color: #64748b; margin-bottom: 10px; text-align: center;">Brak szafek. Dodaj pierwszą ręcznie lub wczytaj szkic!</div>`;
+  if (modules.length === 0) {
+    html += `<div class="empty-note">Brak szafek. Dodaj pierwszą albo zbuduj projekt ze szkicu.</div>`;
   } else {
-    const isAllActive = state.activeModuleId === null;
-    const bgAll = isAllActive ? '#3b82f6' : '#f8fafc';
-    const colorAll = isAllActive ? '#ffffff' : '#1e293b';
-    const borderAll = isAllActive ? '#2563eb' : '#cbd5e1';
-    
-    html += `
-      <div id="btn-show-all" style="padding: 10px; margin-bottom: 15px; background-color: ${bgAll}; color: ${colorAll}; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; border: 1px solid ${borderAll}; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.2s;">
-        <i class="ti ti-eye-off" aria-hidden="true"></i> Odznacz wszystko
-      </div>
-    `;
-
-    state.project.modules.forEach(m => {
-      // Kliknięcie zgrupowanej szafki zaznacza CAŁĄ grupę (selectedModules),
-      // ale tylko JEDNA z nich jest "aktywna" (activeModuleId) - to ona ma
-      // otwarty panel właściwości/rysunek techniczny. Bez rozróżnienia obie
-      // były podświetlone identycznie na niebiesko, więc nie dało się
-      // rozpoznać, który moduł grupy jest faktycznie edytowany (zgłoszony bug).
+    html += `<button id="btn-show-all" class="btn btn-sm btn-block${state.activeModuleId === null ? ' active' : ''}" style="margin-bottom:8px"><i class="ti ti-eye-off" aria-hidden="true"></i> Odznacz wszystko</button>`;
+    modules.forEach(m => {
+      // Kliknięcie zgrupowanej szafki zaznacza CAŁĄ grupę (selectedModules), ale tylko
+      // JEDNA z nich jest "aktywna" (activeModuleId) - ma otwarty panel właściwości.
       const isActive = m.id === state.activeModuleId;
       const isSelected = state.selectedModules && state.selectedModules.has(m.id);
-      const bg = isActive ? '#3b82f6' : (isSelected ? '#dbeafe' : '#f8fafc');
-      const color = isActive ? '#ffffff' : '#1e293b';
-      const border = isActive ? '#2563eb' : (isSelected ? '#93c5fd' : '#cbd5e1');
-
-      let icon = '<i class="ti ti-layout-bottombar" aria-hidden="true"></i>';
-      if (m.type === 'upper_cabinet') icon = '<i class="ti ti-cloud" aria-hidden="true"></i>';
-      if (m.type === 'tall_cabinet') icon = '<i class="ti ti-layout-sidebar" aria-hidden="true"></i>';
-      if (m.type === 'corner_cabinet') icon = '<i class="ti ti-corner-up-right" aria-hidden="true"></i>';
-
-      const groupIcon = m.groupId ? `<span title="Zgrupowana z innymi szafkami" style="color: ${isActive ? '#bae6fd' : '#ef4444'}; font-size:12px; margin-left:6px;">🔗</span>` : '';
-
+      const cls = isActive ? ' is-active' : (isSelected ? ' is-selected' : '');
+      const group = m.groupId ? `<i class="ti ti-link li-group" title="Zgrupowana z innymi szafkami" aria-hidden="true"></i>` : '';
       html += `
-        <div class="module-item" data-id="${m.id}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; margin-bottom: 6px; background-color: ${bg}; color: ${color}; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; border: 1px solid ${border}; transition: all 0.2s; user-select: none;">
-          <div style="flex-grow: 1; pointer-events: none;">
-            ${icon} ${escapeHtml(m.name)} ${groupIcon} <span style="font-weight: normal; font-size: 11px; opacity: 0.8; margin-left: 2px;">(${m.dimensions.width}x${m.dimensions.height})</span>
+        <div class="list-item module-item${cls}" data-id="${m.id}">
+          <i class="ti ${MODULE_ICONS[m.type] || MODULE_ICONS.base_cabinet} li-icon" aria-hidden="true"></i>
+          <div class="li-main"><span class="li-name">${escapeHtml(m.name)}</span>${group}<span class="li-meta">${m.dimensions.width} × ${m.dimensions.height}</span></div>
+          <div class="li-actions">
+            <button class="icon-btn btn-mod-dup" data-id="${m.id}" title="Kopiuj szafkę"><i class="ti ti-copy" aria-hidden="true"></i></button>
+            <button class="icon-btn btn-mod-del" data-id="${m.id}" title="Usuń szafkę"><i class="ti ti-trash" aria-hidden="true"></i></button>
           </div>
-          <div style="display: flex; gap: 4px;">
-            <button class="btn-mod-action btn-mod-dup" data-id="${m.id}" title="Kopiuj szafkę" style="background: none; border: none; cursor: pointer; padding: 2px 4px; font-size: 14px; opacity: ${isActive ? 1 : 0.6}; transition: opacity 0.2s;"><i class="ti ti-copy" aria-hidden="true"></i></button>
-            <button class="btn-mod-action btn-mod-del" data-id="${m.id}" title="Usuń szafkę" style="background: none; border: none; cursor: pointer; padding: 2px 4px; font-size: 14px; opacity: ${isActive ? 1 : 0.6}; transition: opacity 0.2s;"><i class="ti ti-trash" aria-hidden="true"></i></button>
-          </div>
-        </div>
-      `;
+        </div>`;
     });
   }
 
   html += `
-      <div style="display: flex; gap: 4px; margin-top: 8px;">
-        <button id="btn-add-base" class="btn btn-sm" style="flex: 1;" title="Szafka dolna"><i class="ti ti-plus" aria-hidden="true"></i> Dolna</button>
-        <button id="btn-add-upper" class="btn btn-sm" style="flex: 1;" title="Szafka wisząca"><i class="ti ti-plus" aria-hidden="true"></i> Wisząca</button>
-        <button id="btn-add-tall" class="btn btn-sm" style="flex: 1;" title="Słupek"><i class="ti ti-plus" aria-hidden="true"></i> Słupek</button>
+      <div class="btn-grid" style="margin-top:8px">
+        <button id="btn-add-base" class="btn btn-sm" title="Szafka dolna"><i class="ti ti-plus" aria-hidden="true"></i> Dolna</button>
+        <button id="btn-add-upper" class="btn btn-sm" title="Szafka wisząca"><i class="ti ti-plus" aria-hidden="true"></i> Wisząca</button>
+        <button id="btn-add-tall" class="btn btn-sm" title="Słupek"><i class="ti ti-plus" aria-hidden="true"></i> Słupek</button>
+        <button id="btn-add-corner" class="btn btn-sm" title="Szafka narożna z frontem łamanym (front prosty + skośny)"><i class="ti ti-plus" aria-hidden="true"></i> Narożna</button>
       </div>
-      <button id="btn-add-corner" class="btn btn-neutral btn-block btn-sm" style="margin-top: 6px;" title="Szafka narożna z frontem łamanym (front prosty + skośny)"><i class="ti ti-plus" aria-hidden="true"></i> Narożna</button>
-      <button id="btn-add-side-panel" class="btn btn-teal btn-block btn-sm" style="margin-top: 6px;" title="Dekoracyjny panel niezależny od modułów, np. na cały słup szafek"><i class="ti ti-plus" aria-hidden="true"></i> Bok dokładany</button>
-      <button id="btn-module-library" class="btn btn-block btn-sm" style="margin-top: 6px;" title="Własne szablony szafek: zapisz skonfigurowaną szafkę i wstawiaj ją do projektów"><i class="ti ti-books" aria-hidden="true"></i> Biblioteka szafek</button>
-    </div>
-    <hr style="margin: 15px 0; border: 0; border-top: 1px dashed #cbd5e1;">
-  `;
+    </section>
 
-  // Boki dokładane (core/state.js: addSidePanel) - samodzielne obiekty
-  // projektu (nie właściwość modułu jak blenda), więc osobna lista niezależna
-  // od "Lista Szafek" wyżej.
-  if (state.project.sidePanels.length > 0) {
-    html += `<details open style="margin-bottom: 15px;"><summary style="font-weight: bold; cursor: pointer; outline: none; color: #0f766e;"><i class="ti ti-layout-board" aria-hidden="true"></i> Boki dokładane</summary><div style="margin-top: 8px;">`;
+    <section class="panel-section">
+      <div class="panel-head">
+        <h2>Boki dokładane</h2>
+        <button id="btn-add-side-panel" class="btn btn-sm" title="Dekoracyjny panel niezależny od szafek, np. na cały słup"><i class="ti ti-plus" aria-hidden="true"></i> Dodaj</button>
+      </div>`;
+
+  // Boki dokładane (core/state.js: addSidePanel) - samodzielne obiekty projektu.
+  if (state.project.sidePanels.length === 0) {
+    html += `<div class="empty-note">Brak boków dokładanych.</div>`;
+  } else {
     state.project.sidePanels.forEach(p => {
       const isActive = p.id === state.activeSidePanelId;
-      const bg = isActive ? '#0f766e' : '#f0fdfa';
-      const color = isActive ? '#ffffff' : '#134e4a';
-      const border = isActive ? '#0f766e' : '#99f6e4';
       html += `
-        <div class="side-panel-item" data-id="${p.id}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; margin-bottom: 6px; background-color: ${bg}; color: ${color}; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; border: 1px solid ${border}; transition: all 0.2s; user-select: none;">
-          <div style="flex-grow: 1; pointer-events: none;">
-            <i class="ti ti-layout-board" aria-hidden="true"></i> ${escapeHtml(p.name || 'Bok dokładany')} <span style="font-weight: normal; font-size: 11px; opacity: 0.8; margin-left: 2px;">(${p.dimensions.height}×${p.dimensions.depth})</span>
-          </div>
-          <button class="btn-side-panel-del" data-id="${p.id}" title="Usuń bok dokładany" style="background: none; border: none; cursor: pointer; padding: 2px 4px; font-size: 14px; opacity: ${isActive ? 1 : 0.6}; transition: opacity 0.2s;"><i class="ti ti-trash" aria-hidden="true"></i></button>
-        </div>
-      `;
+        <div class="list-item side-panel-item${isActive ? ' is-active' : ''}" data-id="${p.id}">
+          <i class="ti ti-layout-board li-icon" aria-hidden="true"></i>
+          <div class="li-main"><span class="li-name">${escapeHtml(p.name || 'Bok dokładany')}</span><span class="li-meta">${p.dimensions.height} × ${p.dimensions.depth}</span></div>
+          <div class="li-actions"><button class="icon-btn btn-side-panel-del" data-id="${p.id}" title="Usuń bok dokładany"><i class="ti ti-trash" aria-hidden="true"></i></button></div>
+        </div>`;
     });
-    html += `</div></details>`;
   }
 
-  if (state.project.modules.length > 0) {
-    html += `
-      <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 15px;">
-        <button id="btn-production" class="btn btn-block btn-sm">
-          <i class="ti ti-building-factory-2" aria-hidden="true"></i> Produkcja i raporty
-        </button>
+  html += `
+    </section>
+
+    <section class="panel-section">
+      <div class="panel-head"><h2>Narzędzia</h2></div>
+      <div class="btn-stack">
+        <button id="btn-module-library" class="btn btn-sm btn-block" title="Własne szablony szafek: zapisz skonfigurowaną szafkę i wstawiaj ją do projektów"><i class="ti ti-books" aria-hidden="true"></i> Biblioteka szafek</button>
+        <button id="btn-import-ai" class="btn btn-sm btn-block"><i class="ti ti-wand" aria-hidden="true"></i> Zbuduj projekt ze zdjęcia (AI)</button>
+        <input type="file" id="input-ai-image" accept="image/png, image/jpeg" style="display: none;" />
+        ${modules.length > 0 ? `<button id="btn-production" class="btn btn-sm btn-block btn-primary"><i class="ti ti-building-factory-2" aria-hidden="true"></i> Produkcja i raporty</button>` : ''}
       </div>
-    `;
-    if (!activeMod) {
-      html += `<div style="font-size: 11px; color: #ef4444; margin-top: -10px; margin-bottom: 15px; text-align: center;">Wybierz szafkę, aby wygenerować rysunek.</div>`;
-    }
-  }
-
-  if (activeMod) {
-    html += `<details style="margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">`;
-    html += `<summary style="font-weight: bold; cursor: pointer; outline: none;">Lista formatek (Aktywna)</summary>`;
-    
-    html += `
-      <div style="overflow-x: auto; margin-top: 10px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; background: #fff;">
-          <thead>
-            <tr style="background-color: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
-              <th style="padding: 8px; color: #334155; font-weight: bold;">Element</th>
-              <th style="padding: 8px; color: #334155; font-weight: bold;">Wymiar (mm)</th>
-              <th style="padding: 8px; text-align: center; color: #334155; font-weight: bold;">Ilość</th>
-            </tr>
-          </thead>
-          <tbody>
-    `;
-
-    if (parts && parts.length > 0) {
-        parts.forEach((part, index) => {
-            const rowBg = index % 2 === 0 ? '#ffffff' : '#f8fafc';
-            html += `
-                <tr style="background-color: ${rowBg}; border-bottom: 1px solid #e2e8f0; transition: background 0.2s;" onmouseover="this.style.backgroundColor='#eff6ff'" onmouseout="this.style.backgroundColor='${rowBg}'">
-                    <td style="padding: 8px; font-weight: 600; color: #1e293b;">${escapeHtml(part.name)}</td>
-                    <td style="padding: 8px; color: #64748b; white-space: nowrap;">${part.length} &times; ${part.width}</td>
-                    <td style="padding: 8px; text-align: center;">
-                        <span style="display: inline-block; background-color: #2563eb; color: #ffffff; font-weight: bold; padding: 2px 8px; border-radius: 12px; min-width: 14px; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.2);">
-                            ${part.qty}
-                        </span>
-                    </td>
-                </tr>
-            `;
-        });
-    } else {
-        html += `<tr><td colspan="3" style="padding: 15px; text-align: center; color: #94a3b8;">Brak elementów</td></tr>`;
-    }
-
-    html += `
-          </tbody>
-        </table>
-      </div>
-    </details>
-    `;
-
-    if (mountingData && mountingData.length > 0) {
-      html += `<details style="margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;"><summary style="font-weight: bold; cursor: pointer; outline: none;">Nawierty (Aktywna)</summary><ul class="parts-list" style="margin-top: 10px; padding-left: 0; list-style: none;">`;
-      let currentDrawerIndex = 1;
-      mountingData.forEach((item) => {
-        if (item.type === 'door') {
-          const sidePl = item.side === 'left' ? 'Lewe' : 'Prawe';
-          const holesHtml = item.hinges.map(h => `Oś Y: <b>${h.y.toFixed(1)} mm</b>`).join('<br>');
-          html += `<li style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #cbd5e1;"><strong>${escapeHtml(item.name)} (${sidePl})</strong><br><div style="margin-top: 4px; color: #1e293b;">Liczba zawiasów: <b>${item.hinges.length} szt.</b></div><div style="margin-top: 6px; font-size: 0.9em; padding-left: 10px; border-left: 3px solid #cbd5e1;"><b>Prowadniki:</b><br>${holesHtml}</div></li>`;
-        } else if (item.type === 'drawer') {
-          let slideY = item.slideSideHoles && item.slideSideHoles.length > 0 ? item.slideSideHoles[0].y : "Brak";
-          let frontHolesHtml = item.frontHoles ? item.frontHoles.map(h => `Y: <b>${Number(h.y).toFixed(1)} mm</b>`).join('<br>') : "";
-          html += `<li style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #cbd5e1;"><strong>Szuflada ${currentDrawerIndex}</strong><br><div style="margin-top: 4px; color: #1e293b;">Oś prowadnicy: <b>${slideY !== "Brak" ? slideY + ' mm' : 'Brak'}</b></div><div style="margin-top: 6px; font-size: 0.9em; padding-left: 10px; border-left: 3px solid #cbd5e1;"><b>Front (od dołu):</b><br>${frontHolesHtml}</div></li>`;
-          currentDrawerIndex++;
-        }
-      });
-      html += `</ul></details>`;
-    }
-  }
-
-  if (state.project.modules.length > 0) {
-    html += `<details style="background: #fffbeb; padding: 10px; border-radius: 6px; border: 1px solid #fcd34d;">`;
-    html += `<summary style="font-weight: bold; cursor: pointer; outline: none; color: #92400e;"><i class="ti ti-shopping-cart" aria-hidden="true"></i> Lista zakupów (Okucia)</summary>`;
-    html += `<ul class="parts-list" style="margin-top: 10px; padding-left: 20px;">`;
-    
-    if (projectHardware.length === 0) {
-      html += `<li style="font-size: 11px; color: #b45309;">Brak zdefiniowanych okuć w projekcie.</li>`;
-    } else {
-      projectHardware.forEach(hw => {
-        html += `<li style="margin-bottom: 6px; font-size: 12px; color: #78350f;"><strong>${escapeHtml(hw.name)}</strong><br><span style="color: #92400e;">Ilość: <b>${hw.qty} ${escapeHtml(hw.unit)}</b></span></li>`;
-      });
-    }
-    html += `</ul></details>`;
-  }
+    </section>
+  `;
 
   leftSidebar.innerHTML = html; 
 
@@ -475,35 +365,8 @@ export function updateSidebar() {
       });
   }
 
- const printBtn = document.getElementById('btn-print-2d');
-  if (printBtn && activeMod) {
-    printBtn.addEventListener('click', () => openTechnicalDrawing());
-  }
-
-  const exportBtn = document.getElementById('btn-export-csv');
-  if (exportBtn) {
-    exportBtn.addEventListener('click', () => openCsvExport());
-  }
-
-  const exportHardwareBtn = document.getElementById('btn-export-hardware');
-  if (exportHardwareBtn) {
-    exportHardwareBtn.addEventListener('click', () => printHardwareList());
-  }
-
   const productionBtn = document.getElementById('btn-production');
   if (productionBtn) productionBtn.addEventListener('click', () => openProductionHub());
 
-  const cutPlanBtn = document.getElementById('btn-cutplan');
-  if (cutPlanBtn) {
-    cutPlanBtn.addEventListener('click', () => {
-      openCutPlanModal();
-    });
-  }
 
-  const kosztorysBtn = document.getElementById('btn-kosztorys');
-  if (kosztorysBtn) {
-    kosztorysBtn.addEventListener('click', () => {
-      openKosztorysModal();
-    });
-  }
 }

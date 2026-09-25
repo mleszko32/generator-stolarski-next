@@ -203,27 +203,9 @@ function printLabels(plan) {
   openPrintWindow('Etykiety formatek', `<div class="grid">${labels}</div>`, css);
 }
 
-export function openCutPlanModal() {
-  const overlay = document.createElement('div');
-  Object.assign(overlay.style, {
-    position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
-    backgroundColor: 'rgba(15, 23, 42, 0.8)', zIndex: '10000', display: 'flex',
-    alignItems: 'center', justifyContent: 'center',
-  });
-  const modal = document.createElement('div');
-  Object.assign(modal.style, {
-    backgroundColor: '#fff', width: '95%', maxWidth: '1000px', maxHeight: '92vh',
-    overflowY: 'auto', borderRadius: '8px', padding: '20px',
-    boxShadow: '0 10px 25px rgba(0,0,0,0.2)', fontFamily: 'sans-serif',
-  });
-
-  overlay.appendChild(modal);
-  document.body.appendChild(overlay);
-  mountCutPlan(modal, () => document.body.removeChild(overlay));
-}
 
 // Buduje zawartość okna rozkroju w podanym kontenerze - używane zarówno przez
-// samodzielne okno (openCutPlanModal), jak i sekcję "Rozkrój i etykiety" w oknie
+// sekcję "Rozkrój i etykiety" w oknie
 // Produkcja (ui/productionHub.js). onClose != null dodaje przycisk Zamknij.
 export function mountCutPlan(modal, onClose = null) {
   const s = getSettings();

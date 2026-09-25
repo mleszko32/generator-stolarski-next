@@ -11,6 +11,7 @@ import {
 import { state, ensureRoomDefaults, ensurePricingDefaults, ensureSidePanelsDefaults } from "./state.js";
 import { migrateLegacyRoom, clampModuleToRoom } from "./layout.js";
 import { resetHistory } from "./history.js";
+import { openModal } from "../utils/modal.js";
 
 // Konfiguracja klienta Firebase jest z założenia publiczna (leci do przeglądarki)
 // i sama z siebie niczego nie chroni. Realną barierą są reguły Firestore w
@@ -91,82 +92,47 @@ function requireOwner() {
 }
 
 // --- WŁASNY SYSTEM MODALI (Uniwersalny z możliwością zmiany nazw przycisków) ---
+// Zbudowany na wspólnym oknie (utils/modal.js), więc wygląda jak reszta okien aplikacji.
 export function showCustomDialog(type, title, message, defaultValue = "", okText = "OK", cancelText = "Anuluj") {
   return new Promise((resolve) => {
-    const overlay = document.createElement('div');
-    Object.assign(overlay.style, {
-      position: 'fixed', top: '0', left: '0', width: '100%', height: '100%',
-      backgroundColor: 'rgba(0,0,0,0.6)', zIndex: '10000', display: 'flex',
-      alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(3px)'
-    });
+    let settled = false;
+    const finish = (value) => { if (!settled) { settled = true; resolve(value); } };
 
-    const box = document.createElement('div');
-    Object.assign(box.style, {
-      background: 'white', padding: '24px', borderRadius: '8px', width: '350px',
-      boxShadow: '0 10px 25px rgba(0,0,0,0.2)', fontFamily: 'sans-serif', color: '#1e293b'
-    });
-
-    const h3 = document.createElement('h3');
-    h3.innerText = title;
-    h3.style.marginTop = '0';
-    
-    const p = document.createElement('p');
+    const body = document.createElement("div");
+    const p = document.createElement("p");
     p.innerText = message;
-    p.style.fontSize = '14px';
-    p.style.marginBottom = '20px';
+    p.style.fontSize = "var(--fs-md)";
+    p.style.whiteSpace = "pre-line";
+    body.appendChild(p);
 
-    box.appendChild(h3);
-    box.appendChild(p);
-
-    let input;
-    if (type === 'prompt') {
-      input = document.createElement('input');
-      input.type = 'text';
+    let input = null;
+    if (type === "prompt") {
+      input = document.createElement("input");
+      input.type = "text";
+      input.className = "input";
+      input.style.width = "100%";
+      input.style.marginTop = "12px";
       input.value = defaultValue;
-      Object.assign(input.style, {
-        width: '100%', padding: '10px', marginBottom: '20px', border: '1px solid #cbd5e1',
-        borderRadius: '4px', boxSizing: 'border-box', outline: 'none'
-      });
-      box.appendChild(input);
+      body.appendChild(input);
     }
 
-    const btnContainer = document.createElement('div');
-    btnContainer.style.display = 'flex';
-    btnContainer.style.gap = '10px';
-    btnContainer.style.justifyContent = 'flex-end';
+    // Jeśli okText wskazuje na usunięcie, przycisk dostaje ostrzegawczy kolor.
+    const okKind = okText.toLowerCase().includes("usuń") ? "danger" : "primary";
+    const okValue = () => (type === "confirm" ? true : (input ? input.value : true));
 
-    const btnCancel = document.createElement('button');
-    btnCancel.innerText = cancelText;
-    Object.assign(btnCancel.style, {
-      padding: '8px 16px', background: '#e2e8f0', color: '#334155', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold'
+    const dlg = openModal({
+      title, width: 380, body, closeButton: false,
+      onClose: () => finish(type === "confirm" ? false : null),
+      footer: [
+        { label: cancelText },
+        { label: okText, kind: okKind, onClick: (close) => { finish(okValue()); close(); } },
+      ],
     });
-    
-    const btnOk = document.createElement('button');
-    btnOk.innerText = okText;
-    
-    // Jeśli okText wskazuje na usunięcie, dajmy mu ostrzegawczy kolor
-    const okBgColor = okText.toLowerCase().includes('usuń') ? '#ef4444' : '#3b82f6';
-    Object.assign(btnOk.style, {
-      padding: '8px 16px', background: okBgColor, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold'
-    });
-
-    btnCancel.onclick = () => {
-      document.body.removeChild(overlay);
-      resolve(type === 'confirm' ? false : null);
-    };
-
-    btnOk.onclick = () => {
-      document.body.removeChild(overlay);
-      resolve(type === 'confirm' ? true : (input ? input.value : true));
-    };
-
-    btnContainer.appendChild(btnCancel);
-    btnContainer.appendChild(btnOk);
-    box.appendChild(btnContainer);
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-    
-    if (input) input.focus();
+    if (input) {
+      input.focus();
+      input.select();
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") { finish(okValue()); dlg.close(); } });
+    }
   });
 }
 

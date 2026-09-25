@@ -23,7 +23,7 @@ import { updateSidebar } from "./sidebar.js";
 import { openCsvExport } from "./csvEditor.js";
 import { printHardwareList } from "./hardwareList.js";
 import { openTechnicalDrawing } from "./technicalDrawing.js";
-import { openKosztorysModal } from "./kosztorysModal.js";
+import { mountKosztorys } from "./kosztorysModal.js";
 
 const SECTIONS = [
   { id: 'formatki', label: 'Formatki', icon: 'ti-list-details' },
@@ -373,13 +373,9 @@ function renderOkucia(el) {
 
 function renderKosztorys(el) {
   el.innerHTML = `
-    <div class="hub-bar"><div><h3>Kosztorys</h3><div class="hub-sub">Materiały (ceny za m² per kategoria), okucia, okleina i marża.</div></div></div>
-    <div class="hub-card">
-      <div class="hub-sub">Projekt</div>
-      <div class="hub-strong">${escapeHtml(state.project.name || 'bez nazwy')}</div>
-      <button type="button" id="hub-cost" class="btn btn-primary btn-sm" style="margin-top:12px;">Otwórz kosztorys</button>
-    </div>`;
-  el.querySelector('#hub-cost').addEventListener('click', () => openKosztorysModal());
+    <div class="hub-bar"><div><h3>Kosztorys</h3><div class="hub-sub">${escapeHtml(state.project.name || 'bez nazwy')} · ceny edytowalne, liczone na żywo, zapisują się razem z projektem.</div></div></div>
+    <div id="hub-cost-root"></div>`;
+  mountKosztorys(el.querySelector('#hub-cost-root'));
   renderOfferCard(el);
 }
 
@@ -485,7 +481,7 @@ export function openProductionHub(section = 'formatki') {
   overlay.querySelectorAll('.hub-nav-item').forEach(b => b.addEventListener('click', () => show(b.dataset.section)));
   overlay.querySelector('#hub-close').addEventListener('click', closeProductionHub);
   overlay.addEventListener('click', e => { if (e.target === overlay) closeProductionHub(); });
-  escHandler = (e) => { if (e.key === 'Escape' && !document.querySelector('.hub-overlay ~ div[style*="z-index: 10000"]')) closeProductionHub(); };
+  escHandler = (e) => { if (e.key === 'Escape' && !document.querySelector('.modal-overlay, .hub-overlay ~ div[style*="z-index: 10000"]')) closeProductionHub(); };
   document.addEventListener('keydown', escHandler);
   show(section);
 }

@@ -3,10 +3,24 @@
 import { calculateProjectHardware, calculateProjectCost } from "../engine/cabinet.js";
 import { state } from "../core/state.js";
 import { escapeHtml } from "../utils/dom.js";
+import { openModal } from "../utils/modal.js";
 
 function formatPLN(n) {
     return (Number(n) || 0).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' zł';
 }
+
+// Etykiety kategorii formatek (patrz engine/cabinet.js: kategorie części)
+// - front to zwykle inny, droższy materiał niż korpus (lakier, fornir,
+//   okleina), stąd osobny, opisowy wiersz zamiast jednej wspólnej "płyty".
+const MATERIAL_LABELS = {
+    Korpus: 'Korpus',
+    Front: 'Front (lakier / fornir / okleina)',
+    Szuflada: 'Szuflady (dno, tył)',
+    Plecy: 'Plecy (HDF)'
+};
+
+const numField = (id, value, unit, extra = '') =>
+    `<span class="cost-input"><input type="number" class="input" id="kosztorys-${id}" value="${value}" step="any" min="0" ${extra}> ${unit}</span>`;
 
 // Szacunkowy kosztorys materiałowy - ceny płyty/HDF/okuć edytowalne na żywo,
 // zapisywane bezpośrednio w state.project.pricing (patrz core/state.js:
@@ -15,111 +29,59 @@ function formatPLN(n) {
 // okuć jest dynamiczna (patrz engine/cabinet.js: calculateProjectHardware),
 // więc ceny okuć trzymane są w słowniku nazwa->cena, uzupełnianym o nowe
 // pozycje w miarę jak pojawiają się w projekcie.
-export function openKosztorysModal() {
+// root: element, w którym budujemy edytor (sekcja "Kosztorys" okna Produkcja albo treść okna).
+export function mountKosztorys(root) {
     const pricing = state.project.pricing;
 
-    const overlay = document.createElement('div');
-    Object.assign(overlay.style, {
-        position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
-        backgroundColor: 'rgba(15, 23, 42, 0.8)', zIndex: '10000', display: 'flex',
-        alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '40px 16px'
-    });
+    const foot = (label, id, extra = '') => `<div class="cost-line${extra}"><span>${label}</span><span id="kosztorys-foot-${id}">—</span></div>`;
 
-    const modal = document.createElement('div');
-    Object.assign(modal.style, {
-        backgroundColor: '#fff', width: '100%', maxWidth: '640px', borderRadius: '8px',
-        boxShadow: '0 10px 25px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden'
-    });
-
-    modal.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; padding:20px 22px 16px 22px; border-bottom:1px solid #e2e8f0;">
-            <div>
-                <h2 style="margin:0 0 2px 0; font-size:18px; color:#1e293b;"><i class="ti ti-calculator" aria-hidden="true"></i> Kosztorys projektu</h2>
-                <p style="margin:0; color:#64748b; font-size:12.5px;">${escapeHtml(state.project.name)} · ceny edytowalne, liczone na żywo</p>
-            </div>
-            <button id="kosztorys-close" style="border:none; background:#f8fafc; color:#64748b; width:28px; height:28px; border-radius:6px; font-size:14px; cursor:pointer; flex-shrink:0;">✕</button>
-        </div>
-        <div style="padding:18px 22px; display:flex; flex-direction:column; gap:20px; max-height:60vh; overflow-y:auto;">
-
-            <section>
-                <h3 style="margin:0 0 8px 0; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#64748b;">Materiały płytowe</h3>
-                <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
-                    <thead><tr>
-                        <th style="text-align:left; font-size:10.5px; color:#64748b; font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid #cbd5e1;">Materiał</th>
-                        <th style="text-align:right; font-size:10.5px; color:#64748b; font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid #cbd5e1;">Powierzchnia</th>
-                        <th style="text-align:right; font-size:10.5px; color:#64748b; font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid #cbd5e1;">Cena / m²</th>
-                        <th style="text-align:right; font-size:10.5px; color:#64748b; font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid #cbd5e1;">Koszt</th>
-                    </tr></thead>
+    root.innerHTML = `
+            <section class="cost-section">
+                <h3>Materiały płytowe</h3>
+                <table class="cost-table">
+                    <thead><tr><th>Materiał</th><th class="num">Powierzchnia</th><th class="num">Cena / m²</th><th class="num">Koszt</th></tr></thead>
                     <tbody id="kosztorys-materials-tbody"></tbody>
                 </table>
             </section>
-
-            <section>
-                <h3 style="margin:0 0 8px 0; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#64748b;">Okucia</h3>
-                <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
-                    <thead><tr>
-                        <th style="text-align:left; font-size:10.5px; color:#64748b; font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid #cbd5e1;">Pozycja</th>
-                        <th style="text-align:right; font-size:10.5px; color:#64748b; font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid #cbd5e1;">Ilość</th>
-                        <th style="text-align:right; font-size:10.5px; color:#64748b; font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid #cbd5e1;">Cena jedn.</th>
-                        <th style="text-align:right; font-size:10.5px; color:#64748b; font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid #cbd5e1;">Koszt</th>
-                    </tr></thead>
+            <section class="cost-section">
+                <h3>Okucia</h3>
+                <table class="cost-table">
+                    <thead><tr><th>Pozycja</th><th class="num">Ilość</th><th class="num">Cena jedn.</th><th class="num">Koszt</th></tr></thead>
                     <tbody id="kosztorys-hardware-tbody"></tbody>
                 </table>
             </section>
-
-            <section>
-                <h3 style="margin:0 0 8px 0; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#64748b;">Robocizna, montaż, transport</h3>
-                <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
-                    <tr><td style="padding:6px 8px 6px 0;">Robocizna (warsztat)</td><td style="text-align:right;"><input type="number" id="kosztorys-labor-hours" value="${pricing.labor.hours}" step="any" min="0" style="width:64px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px; font-size:12.5px;">&nbsp;h</td><td style="text-align:right;"><input type="number" id="kosztorys-labor-rate" value="${pricing.labor.rate}" step="any" min="0" style="width:70px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px; font-size:12.5px;">&nbsp;zł/h</td><td id="kosztorys-labor-cost" style="text-align:right; font-weight:600;">—</td></tr>
-                    <tr><td style="padding:6px 8px 6px 0;">Montaż</td><td style="text-align:right;"><input type="number" id="kosztorys-assembly-hours" value="${pricing.assembly.hours}" step="any" min="0" style="width:64px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px; font-size:12.5px;">&nbsp;h</td><td style="text-align:right;"><input type="number" id="kosztorys-assembly-rate" value="${pricing.assembly.rate}" step="any" min="0" style="width:70px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px; font-size:12.5px;">&nbsp;zł/h</td><td id="kosztorys-assembly-cost" style="text-align:right; font-weight:600;">—</td></tr>
-                    <tr><td style="padding:6px 8px 6px 0;">Transport</td><td></td><td style="text-align:right;"><input type="number" id="kosztorys-transport" value="${pricing.transport}" step="any" min="0" style="width:70px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px; font-size:12.5px;">&nbsp;zł</td><td></td></tr>
+            <section class="cost-section">
+                <h3>Robocizna, montaż, transport</h3>
+                <table class="cost-table">
+                    <tbody>
+                        <tr><td>Robocizna (warsztat)</td><td class="num">${numField('labor-hours', pricing.labor.hours, 'h')}</td><td class="num">${numField('labor-rate', pricing.labor.rate, 'zł/h')}</td><td class="num" id="kosztorys-labor-cost">—</td></tr>
+                        <tr><td>Montaż</td><td class="num">${numField('assembly-hours', pricing.assembly.hours, 'h')}</td><td class="num">${numField('assembly-rate', pricing.assembly.rate, 'zł/h')}</td><td class="num" id="kosztorys-assembly-cost">—</td></tr>
+                        <tr><td>Transport</td><td></td><td class="num">${numField('transport', pricing.transport, 'zł')}</td><td></td></tr>
+                    </tbody>
                 </table>
             </section>
-
-            <div style="display:flex; align-items:center; justify-content:space-between; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:10px 14px;">
-                <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:#92400e;">
-                    Marża
-                    <input type="number" id="kosztorys-margin" value="${pricing.marginPercent}" step="1" min="0" style="width:56px; text-align:right; border:1px solid #fcd34d; border-radius:5px; padding:4px 6px; font-size:12.5px; color:#92400e; font-weight:700;">%
-                </label>
-                <span style="font-size:11px; color:#92400e; opacity:.8;">liczona od sumy kosztów</span>
-            </div>
-            <div style="display:flex; gap:24px; font-size:12.5px; font-weight:600; color:#334155;">
-                <label>Rabat <input type="number" id="kosztorys-discount" value="${pricing.discountPercent}" step="any" min="0" max="100" style="width:56px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px;">%</label>
-                <label>VAT <input type="number" id="kosztorys-vat" value="${pricing.vatPercent}" step="any" min="0" style="width:56px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px;">%</label>
-            </div>
-
-        </div>
-        <div style="border-top:1px solid #e2e8f0; padding:16px 22px 20px 22px; display:flex; flex-direction:column; gap:6px; background:#f8fafc;">
-            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Materiały</span><span id="kosztorys-foot-plyty" style="color:#1e293b;">—</span></div>
-            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Okucia</span><span id="kosztorys-foot-okucia" style="color:#1e293b;">—</span></div>
-            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Robocizna</span><span id="kosztorys-foot-labor" style="color:#1e293b;">—</span></div>
-            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Montaż</span><span id="kosztorys-foot-assembly" style="color:#1e293b;">—</span></div>
-            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Transport</span><span id="kosztorys-foot-transport" style="color:#1e293b;">—</span></div>
-            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span><b>Suma kosztów</b></span><span id="kosztorys-foot-subtotal" style="color:#1e293b;">—</span></div>
-            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Marża (<span id="kosztorys-foot-marginpct">0</span>%)</span><span id="kosztorys-foot-margin" style="color:#1e293b;">—</span></div>
-            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>Rabat (<span id="kosztorys-foot-discpct">0</span>%)</span><span id="kosztorys-foot-discount" style="color:#1e293b;">—</span></div>
-            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span><b>Cena netto</b></span><span id="kosztorys-foot-net" style="color:#1e293b;">—</span></div>
-            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#64748b;"><span>VAT (<span id="kosztorys-foot-vatpct">23</span>%)</span><span id="kosztorys-foot-vat" style="color:#1e293b;">—</span></div>
-            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:6px; padding-top:10px; border-top:1px dashed #cbd5e1;">
-                <span style="font-weight:700; font-size:13px;">Cena brutto</span>
-                <span id="kosztorys-foot-total" style="font-weight:800; font-size:22px; color:#059669;">—</span>
-            </div>
-            <p style="font-size:10.5px; color:#64748b; margin:8px 0 0 0;">Ceny zapisują się razem z projektem (przycisk "Zapisz projekt"). Ilości pobrane z listy formatek i listy okuć.</p>
-        </div>
-    `;
-
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
-
-    // Etykiety kategorii formatek (patrz engine/cabinet.js: kategorie części)
-    // - front to zwykle inny, droższy materiał niż korpus (lakier, fornir,
-    //   okleina), stąd osobny, opisowy wiersz zamiast jednej wspólnej "płyty".
-    const MATERIAL_LABELS = {
-        Korpus: 'Korpus',
-        Front: 'Front (lakier / fornir / okleina)',
-        Szuflada: 'Szuflady (dno, tył)',
-        Plecy: 'Plecy (HDF)'
-    };
+            <section class="cost-section">
+                <h3>Marża, rabat, VAT</h3>
+                <div class="field-row">
+                    <div class="field"><label>Marża (%) - od sumy kosztów</label><input type="number" class="input" id="kosztorys-margin" value="${pricing.marginPercent}" step="1" min="0"></div>
+                    <div class="field"><label>Rabat (%)</label><input type="number" class="input" id="kosztorys-discount" value="${pricing.discountPercent}" step="any" min="0" max="100"></div>
+                    <div class="field"><label>VAT (%)</label><input type="number" class="input" id="kosztorys-vat" value="${pricing.vatPercent}" step="any" min="0"></div>
+                </div>
+            </section>
+            <section class="cost-summary">
+                ${foot('Materiały', 'plyty')}
+                ${foot('Okucia', 'okucia')}
+                ${foot('Robocizna', 'labor')}
+                ${foot('Montaż', 'assembly')}
+                ${foot('Transport', 'transport')}
+                ${foot('<b>Suma kosztów</b>', 'subtotal')}
+                <div class="cost-line"><span>Marża (<span id="kosztorys-foot-marginpct">0</span>%)</span><span id="kosztorys-foot-margin">—</span></div>
+                <div class="cost-line"><span>Rabat (<span id="kosztorys-foot-discpct">0</span>%)</span><span id="kosztorys-foot-discount">—</span></div>
+                ${foot('<b>Cena netto</b>', 'net')}
+                <div class="cost-line"><span>VAT (<span id="kosztorys-foot-vatpct">23</span>%)</span><span id="kosztorys-foot-vat">—</span></div>
+                <div class="cost-line cost-total"><span>Cena brutto</span><span id="kosztorys-foot-total">—</span></div>
+            </section>`;
+    const modal = root;
 
     const materialsTbody = modal.querySelector('#kosztorys-materials-tbody');
     const hardwareTbody = modal.querySelector('#kosztorys-hardware-tbody');
@@ -160,11 +122,11 @@ export function openKosztorysModal() {
             cell.textContent = line ? formatPLN(line.cost) : formatPLN(0);
         });
 
-        modal.querySelector('#kosztorys-foot-plyty').textContent = formatPLN(cost.materialsSubtotal);
-        modal.querySelector('#kosztorys-foot-okucia').textContent = formatPLN(cost.hardwareSubtotal);
-        modal.querySelector('#kosztorys-foot-margin').textContent = formatPLN(cost.marginAmount);
-        modal.querySelector('#kosztorys-foot-marginpct').textContent = cost.marginPercent;
         const set = (id, v) => { modal.querySelector(id).textContent = v; };
+        set('#kosztorys-foot-plyty', formatPLN(cost.materialsSubtotal));
+        set('#kosztorys-foot-okucia', formatPLN(cost.hardwareSubtotal));
+        set('#kosztorys-foot-margin', formatPLN(cost.marginAmount));
+        set('#kosztorys-foot-marginpct', cost.marginPercent);
         set('#kosztorys-labor-cost', formatPLN(cost.laborCost));
         set('#kosztorys-assembly-cost', formatPLN(cost.assemblyCost));
         set('#kosztorys-foot-labor', formatPLN(cost.laborCost));
@@ -182,15 +144,15 @@ export function openKosztorysModal() {
     function renderMaterialRows() {
         const cost = calculateProjectCost();
         if (cost.materials.length === 0) {
-            materialsTbody.innerHTML = `<tr><td colspan="4" style="padding:12px 0; text-align:center; color:#94a3b8;">Projekt jest pusty</td></tr>`;
+            materialsTbody.innerHTML = `<tr><td colspan="4" class="empty-note">Projekt jest pusty</td></tr>`;
             return;
         }
-        materialsTbody.innerHTML = cost.materials.map((m, idx) => `
+        materialsTbody.innerHTML = cost.materials.map(m => `
             <tr>
-                <td style="padding:8px 8px 8px 0; ${idx < cost.materials.length - 1 ? 'border-bottom:1px solid #f1f5f9;' : ''}">${escapeHtml(MATERIAL_LABELS[m.category] || m.category)}</td>
-                <td class="kosztorys-mat-area" data-cat="${escapeHtml(m.category)}" style="padding:8px 8px 8px 0; ${idx < cost.materials.length - 1 ? 'border-bottom:1px solid #f1f5f9;' : ''} text-align:right;">${m.areaM2.toFixed(2)}&nbsp;m²</td>
-                <td style="padding:8px 8px 8px 0; ${idx < cost.materials.length - 1 ? 'border-bottom:1px solid #f1f5f9;' : ''} text-align:right;"><input type="number" class="kosztorys-mat-price" data-cat="${escapeHtml(m.category)}" value="${m.pricePerM2}" step="1" min="0" style="width:70px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px; font-size:12.5px;">&nbsp;zł</td>
-                <td class="kosztorys-mat-cost" data-cat="${escapeHtml(m.category)}" style="padding:8px 8px 8px 0; ${idx < cost.materials.length - 1 ? 'border-bottom:1px solid #f1f5f9;' : ''} text-align:right; font-weight:600;">${formatPLN(m.cost)}</td>
+                <td>${escapeHtml(MATERIAL_LABELS[m.category] || m.category)}</td>
+                <td class="num kosztorys-mat-area" data-cat="${escapeHtml(m.category)}">${m.areaM2.toFixed(2)}&nbsp;m²</td>
+                <td class="num"><span class="cost-input"><input type="number" class="input kosztorys-mat-price" data-cat="${escapeHtml(m.category)}" value="${m.pricePerM2}" step="1" min="0"> zł</span></td>
+                <td class="num kosztorys-mat-cost" data-cat="${escapeHtml(m.category)}"><b>${formatPLN(m.cost)}</b></td>
             </tr>
         `).join('');
         materialsTbody.querySelectorAll('.kosztorys-mat-price').forEach(input => {
@@ -201,15 +163,15 @@ export function openKosztorysModal() {
     function renderHardwareRows() {
         const cost = calculateProjectCost();
         if (cost.hardware.length === 0) {
-            hardwareTbody.innerHTML = `<tr><td colspan="4" style="padding:12px 0; text-align:center; color:#94a3b8;">Brak okuć w projekcie</td></tr>`;
+            hardwareTbody.innerHTML = `<tr><td colspan="4" class="empty-note">Brak okuć w projekcie</td></tr>`;
             return;
         }
         hardwareTbody.innerHTML = cost.hardware.map(hw => `
             <tr>
-                <td style="padding:8px 8px 8px 0; border-bottom:1px solid #f1f5f9;">${escapeHtml(hw.name)}</td>
-                <td style="padding:8px 8px 8px 0; border-bottom:1px solid #f1f5f9; text-align:right; white-space:nowrap;">${hw.qty} ${escapeHtml(hw.unit)}</td>
-                <td style="padding:8px 8px 8px 0; border-bottom:1px solid #f1f5f9; text-align:right;"><input type="number" class="kosztorys-hw-price" data-name="${escapeHtml(hw.name)}" value="${hw.price}" step="0.1" min="0" style="width:64px; text-align:right; border:1px solid #cbd5e1; border-radius:5px; padding:4px 6px; font-size:12.5px;">&nbsp;zł</td>
-                <td class="kosztorys-hw-cost" data-name="${escapeHtml(hw.name)}" style="padding:8px 8px 8px 0; border-bottom:1px solid #f1f5f9; text-align:right; font-weight:600;">${formatPLN(hw.cost)}</td>
+                <td>${escapeHtml(hw.name)}</td>
+                <td class="num">${hw.qty} ${escapeHtml(hw.unit)}</td>
+                <td class="num"><span class="cost-input"><input type="number" class="input kosztorys-hw-price" data-name="${escapeHtml(hw.name)}" value="${hw.price}" step="0.1" min="0"> zł</span></td>
+                <td class="num kosztorys-hw-cost" data-name="${escapeHtml(hw.name)}"><b>${formatPLN(hw.cost)}</b></td>
             </tr>
         `).join('');
         hardwareTbody.querySelectorAll('.kosztorys-hw-price').forEach(input => {
@@ -223,6 +185,14 @@ export function openKosztorysModal() {
 
     modal.querySelector('#kosztorys-margin').addEventListener('input', recalc);
     ['labor-hours','labor-rate','assembly-hours','assembly-rate','transport','discount','vat'].forEach(k => modal.querySelector('#kosztorys-' + k).addEventListener('input', recalc));
-    modal.querySelector('#kosztorys-close').addEventListener('click', () => document.body.removeChild(overlay));
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) document.body.removeChild(overlay); });
+}
+
+export function openKosztorysModal() {
+    const dlg = openModal({
+        title: 'Kosztorys projektu',
+        subtitle: `${state.project.name || 'bez nazwy'} · ceny edytowalne, liczone na żywo. Zapisują się razem z projektem.`,
+        width: 680,
+        footer: [{ label: 'Zamknij' }],
+    });
+    mountKosztorys(dlg.bodyEl);
 }

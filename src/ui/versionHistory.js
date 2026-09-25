@@ -5,6 +5,7 @@
 import { state } from "../core/state.js";
 import { listProjectVersions, restoreProjectVersion, deleteProjectVersion, showCustomDialog } from "../core/storage.js";
 import { escapeHtml } from "../utils/dom.js";
+import { openModal } from "../utils/modal.js";
 
 function formatWhen(ts) {
   const d = new Date(ts);
@@ -30,99 +31,62 @@ export async function openVersionHistory(onRestored) {
     return;
   }
 
-  const overlay = document.createElement("div");
-  Object.assign(overlay.style, {
-    position: "fixed", top: "0", left: "0", width: "100%", height: "100%",
-    backgroundColor: "rgba(0,0,0,0.6)", zIndex: "9999", display: "flex",
-    alignItems: "center", justifyContent: "center", backdropFilter: "blur(2px)"
+  const dlg = openModal({
+    title: "Historia wersji",
+    subtitle: `Projekt: ${projectId}. Wersja powstaje przed nadpisaniem projektu w chmurze (zapis ręczny, autozapis co najwyżej raz na 10 min) i przed każdym przywróceniem.`,
+    width: 560,
+    body: '<div id="vh-list"><div class="empty-note">Wczytuję listę…</div></div>',
+    footer: [{ label: "Zamknij" }],
   });
-  const box = document.createElement("div");
-  Object.assign(box.style, {
-    backgroundColor: "#fff", padding: "24px", borderRadius: "8px", width: "520px",
-    maxWidth: "94vw", maxHeight: "82vh", display: "flex", flexDirection: "column",
-    boxShadow: "0 10px 25px rgba(0,0,0,0.3)", fontFamily: "sans-serif"
-  });
-  box.innerHTML = `
-    <h3 style="margin:0 0 4px; color:#1e293b;">Historia wersji</h3>
-    <div style="font-size:13px; color:#64748b; margin-bottom:14px;">Projekt: <b>${escapeHtml(projectId)}</b>. Wersja powstaje przed nadpisaniem projektu w chmurze (zapis ręczny, autozapis co najwyżej raz na 10 min) i przed każdym przywróceniem.</div>
-    <div id="vh-list" style="overflow-y:auto; display:flex; flex-direction:column; gap:8px; padding-right:4px;"><div style="color:#64748b; font-size:14px;">Wczytuję listę…</div></div>
-    <button id="vh-close" style="margin-top:18px; padding:10px; width:100%; cursor:pointer; background:#94a3b8; color:#fff; border:none; border-radius:6px; font-weight:bold;">Zamknij okno</button>
-  `;
-  overlay.appendChild(box);
-  document.body.appendChild(overlay);
+  const listEl = dlg.bodyEl.querySelector("#vh-list");
 
-  const listEl = box.querySelector("#vh-list");
-  const close = () => overlay.remove();
-  box.querySelector("#vh-close").onclick = close;
-  overlay.addEventListener("mousedown", (e) => { if (e.target === overlay) close(); });
-
-  async function render() {
-    const versions = await listProjectVersions(projectId);
-    if (versions === null) {
-      listEl.innerHTML = `<div style="color:#b91c1c; font-size:14px;">Nie udało się pobrać historii. Jeśli działa to pierwszy raz, opublikuj aktualne reguły z pliku <code>firestore.rules</code> w konsoli Firebase (patrz FIREBASE.md).</div>`;
-      return;
-    }
-    if (versions.length === 0) {
-      listEl.innerHTML = `<div style="color:#64748b; font-size:14px;">Brak zapisanych wersji. Pierwsza pojawi się przy następnym zapisie projektu.</div>`;
-      return;
-    }
-    listEl.innerHTML = "";
-    versions.forEach((v) => {
-      const row = document.createElement("div");
-      Object.assign(row.style, {
-        display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px",
-        border: "1px solid #cbd5e1", borderRadius: "6px", background: "#f8fafc"
-      });
-      const info = document.createElement("div");
-      info.style.flex = "1";
-      info.innerHTML = `
-        <div style="font-size:14px; color:#1e293b;"><b>${escapeHtml(formatWhen(v.createdAt))}</b> <span style="color:#64748b; font-size:12px;">(${escapeHtml(formatAgo(v.createdAt))})</span></div>
-        <div style="font-size:12px; color:#64748b;">${escapeHtml(v.label || "Wersja")} · ${v.moduleCount ?? "?"} szafek · ${v.sizeKB ?? "?"} KB${v.author ? " · " + escapeHtml(v.author) : ""}</div>`;
-
-      const btnRestore = document.createElement("button");
-      btnRestore.textContent = "Przywróć";
-      Object.assign(btnRestore.style, {
-        padding: "8px 12px", cursor: "pointer", background: "#2563eb", color: "#fff",
-        border: "none", borderRadius: "6px", fontWeight: "bold", fontSize: "13px"
-      });
-      btnRestore.onclick = async () => {
-        const ok = await showCustomDialog(
-          "confirm", "Przywrócenie wersji",
-          `Przywrócić stan projektu z ${formatWhen(v.createdAt)}? Bieżący stan zostanie zachowany w historii, więc przywrócenie da się cofnąć.`,
-          "", "Przywróć", "Anuluj"
-        );
-        if (!ok) return;
-        btnRestore.disabled = true;
-        btnRestore.textContent = "Przywracam…";
-        const done = await restoreProjectVersion(projectId, v.id);
-        if (done) {
-          close();
-          if (onRestored) onRestored();
-        } else {
-          btnRestore.disabled = false;
-          btnRestore.textContent = "Przywróć";
-        }
-      };
-
-      const btnDel = document.createElement("button");
-      btnDel.innerHTML = '<i class="ti ti-trash" aria-hidden="true"></i>';
-      btnDel.title = "Usuń tę wersję z historii";
-      Object.assign(btnDel.style, {
-        padding: "8px 10px", cursor: "pointer", background: "#fee2e2", color: "#991b1b",
-        border: "1px solid #fca5a5", borderRadius: "6px"
-      });
-      btnDel.onclick = async () => {
-        const ok = await showCustomDialog("confirm", "Usuwanie wersji", "Usunąć tę wersję z historii? Tej operacji nie można cofnąć.", "", "Usuń", "Zostaw");
-        if (!ok) return;
-        if (await deleteProjectVersion(projectId, v.id)) row.remove();
-      };
-
-      row.appendChild(info);
-      row.appendChild(btnRestore);
-      row.appendChild(btnDel);
-      listEl.appendChild(row);
-    });
+  const versions = await listProjectVersions(projectId);
+  if (versions === null) {
+    listEl.innerHTML = `<div class="notice notice-danger">Nie udało się pobrać historii. Jeśli działa to pierwszy raz, opublikuj aktualne reguły z pliku <code>firestore.rules</code> w konsoli Firebase (patrz FIREBASE.md).</div>`;
+    return;
+  }
+  if (versions.length === 0) {
+    listEl.innerHTML = `<div class="empty-note">Brak zapisanych wersji. Pierwsza pojawi się przy następnym zapisie projektu.</div>`;
+    return;
   }
 
-  render();
+  listEl.innerHTML = "";
+  versions.forEach((v) => {
+    const row = document.createElement("div");
+    row.className = "list-row";
+    row.innerHTML = `<div class="grow">
+        <div class="list-row-title">${escapeHtml(formatWhen(v.createdAt))} <span class="list-row-sub">(${escapeHtml(formatAgo(v.createdAt))})</span></div>
+        <div class="list-row-sub">${escapeHtml(v.label || "Wersja")} · ${v.moduleCount ?? "?"} szafek · ${v.sizeKB ?? "?"} KB${v.author ? " · " + escapeHtml(v.author) : ""}</div>
+      </div>
+      <button type="button" class="btn btn-sm btn-primary vh-restore">Przywróć</button>
+      <button type="button" class="btn btn-sm btn-danger vh-del" title="Usuń tę wersję z historii"><i class="ti ti-trash" aria-hidden="true"></i></button>`;
+
+    const btnRestore = row.querySelector(".vh-restore");
+    btnRestore.onclick = async () => {
+      const ok = await showCustomDialog(
+        "confirm", "Przywrócenie wersji",
+        `Przywrócić stan projektu z ${formatWhen(v.createdAt)}? Bieżący stan zostanie zachowany w historii, więc przywrócenie da się cofnąć.`,
+        "", "Przywróć", "Anuluj"
+      );
+      if (!ok) return;
+      btnRestore.disabled = true;
+      btnRestore.textContent = "Przywracam…";
+      const done = await restoreProjectVersion(projectId, v.id);
+      if (done) {
+        dlg.close();
+        if (onRestored) onRestored();
+      } else {
+        btnRestore.disabled = false;
+        btnRestore.textContent = "Przywróć";
+      }
+    };
+
+    row.querySelector(".vh-del").onclick = async () => {
+      const ok = await showCustomDialog("confirm", "Usuwanie wersji", "Usunąć tę wersję z historii? Tej operacji nie można cofnąć.", "", "Usuń", "Zostaw");
+      if (!ok) return;
+      if (await deleteProjectVersion(projectId, v.id)) row.remove();
+    };
+
+    listEl.appendChild(row);
+  });
 }

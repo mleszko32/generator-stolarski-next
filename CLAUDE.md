@@ -115,6 +115,19 @@ All panels render by assigning `innerHTML` template strings.
   `updateAll = () => { update3D(); updateSidebar(); }` is the standard "something changed"
   refresh; text inputs are debounced 50 ms.
 
+### UI conventions (keep the interface consistent)
+
+- One font stack and type scale (`--font`, `--fs-*`) and one set of tokens in `src/styles/global.css`; do not add
+  per-file `font-family`, hex colours or button styles inline - use the shared classes.
+- **Buttons**: `.btn` (secondary), `.btn-primary` (one main action per view), `.btn-danger`, `.btn-sm`, `.icon-btn`.
+- **Dialogs**: always `openModal()` from `src/utils/modal.js` (`.modal-*` classes; Esc / backdrop close the topmost one).
+  `showCustomDialog` (core/storage.js) is built on it. Do not hand-build overlays.
+- **Lists**: `.list-item` (side panels), `.list-row` (inside dialogs); **fields**: `.field` + `.input`; **messages**:
+  `.notice-*`, `.badge-*`, `.empty-note`; tables: `.hub-table` / `.cost-table`.
+- **One entry point per feature**: parts lists, drilling drawings, purchase list, cut plan/labels, cost estimate and the
+  project check live only in the "Produkcja i raporty" hub (`ui/productionHub.js`). The left panel is only
+  Szafki / Boki dokładane / Narzędzia - do not re-add duplicate lists there.
+
 ### Update flow
 
 Mutate `state` → call `update3D()` and `updateSidebar()` → also call `initPropertiesPanel()`

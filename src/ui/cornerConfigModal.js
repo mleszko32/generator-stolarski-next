@@ -29,22 +29,20 @@ export function openCornerConfigModal(mod) {
   const fcNow = { ...(state.project.front?.clearance || {}), ...(mod.front?.clearance || {}) };
   const cornerClearanceNow = parseFloat(fcNow.right ?? fcNow.sides ?? 1.5) || 0;
   const cornerFrontGap = parseFloat(mod.front?.gap ?? state.project.front?.gap) || 3;
+  // Ta sama obudowa co reszta okien (klasy .modal-* z styles/global.css); treść ma
+  // własny, bardzo długi układ, więc całość przewija się w oknie.
   const overlay = document.createElement('div');
-  Object.assign(overlay.style, {
-    position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
-    backgroundColor: 'rgba(15, 23, 42, 0.8)', zIndex: '10000', display: 'flex',
-    alignItems: 'center', justifyContent: 'center',
-  });
+  overlay.className = 'modal-overlay';
 
   const modal = document.createElement('div');
-  Object.assign(modal.style, {
-    backgroundColor: '#fff', width: '95%', maxWidth: '900px', maxHeight: '92vh',
-    overflowY: 'auto', borderRadius: '8px', padding: '20px',
-    boxShadow: '0 10px 25px rgba(0,0,0,0.2)', fontFamily: 'sans-serif',
-  });
+  modal.className = 'modal';
+  modal.style.setProperty('--modal-w', '900px');
+  modal.style.display = 'block';
+  modal.style.overflowY = 'auto';
+  modal.style.padding = '20px';
 
   modal.innerHTML = `
-    <h2 style="margin:0 0 4px 0; color:#1e293b; font-size:16px;"><i class="ti ti-ruler-2" aria-hidden="true"></i> Konfigurator szafki narożnej: <span style="color:#2563eb;">${escapeHtml(mod.name)}</span></h2>
+    <h2 class="modal-title" style="margin-bottom:4px"><i class="ti ti-ruler-2" aria-hidden="true"></i> Konfigurator szafki narożnej: <span style="color:#2563eb;">${escapeHtml(mod.name)}</span></h2>
     <div style="font-size:11px; color:#64748b; margin-bottom:14px;">Kąt prosty 90°, dwa ramiona. Kliknij wnękę w ramieniu, żeby ją podzielić albo obsadzić frontem - tak samo jak w edytorze wnętrza zwykłej szafki.</div>
 
     <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:12px; margin-bottom:14px;">
