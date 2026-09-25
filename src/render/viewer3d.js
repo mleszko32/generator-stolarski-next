@@ -17,6 +17,7 @@ import { toggleInteriorEditor, renderInteriorEditorIfVisible } from '../ui/inter
 import { updateSidebar } from '../ui/sidebar.js';
 import { worktopBoxes } from '../core/worktops.js';
 import { getOpenings, openingBox } from '../core/openings.js';
+import { snapSidePanel } from '../core/sidePanelSnap.js';
 import { initPropertiesPanel } from '../ui/properties.js';
 
 let alignMode = { active: false, sourceMod: null, sourceEl: null, banner: null };
@@ -49,6 +50,7 @@ let dragTarget = null;
 let dragModule = null;
 const dragOffset = new THREE.Vector3();
 const dragPlane = new THREE.Plane();
+const sidePanelNdcShift = new THREE.Vector2(); // przesunięcie kursora względem podstawy boku (patrz pointerdown)
 const SNAP_DIST = 40;
 let dragSelectionOrigins = new Map();
 let wasSelectedOnDown = false;
@@ -458,8 +460,12 @@ export function init3DViewer() {
                   isDraggingSidePanel = true;
                   controls.enabled = false;
 
+                  // Płaszczyzna przeciągania boku leży na jego PODSTAWIE (poziom y boku), nie na
+                  // wysokości klikniętego punktu: bok ma 2,6 m, więc złapany wysoko dawał
+                  // płaszczyznę prawie równoległą do kierunku patrzenia i kilkumilimetrowy
+                  // ruch myszy przesuwał go o metry.
                   const normal = new THREE.Vector3(0, 1, 0);
-                  dragPlane.setFromNormalAndCoplanarPoint(normal, intersects[0].point);
+                  dragPlane.setFromNormalAndCoplanarPoint(normal, new THREE.Vector3(0, parseFloat(dragSidePanel.position.y) || 0, 0));
 
                   const wasActive = state.activeSidePanelId === dragSidePanel.id;
                   if (!wasActive) {
@@ -474,7 +480,15 @@ export function init3DViewer() {
                       dragSidePanelTarget = group;
                   }
 
-                  dragOffset.copy(dragSidePanelTarget.position).sub(intersects[0].point);
+                  // Ruch myszy liczymy względem EKRANOWEJ pozycji podstawy boku: zapamiętujemy,
+                  // o ile kursor (złapany np. wysoko na boku) jest przesunięty względem
+                  // podstawy, i przy przeciąganiu tnie promień przez podstawę leżącą na podłodze.
+                  // Dzięki temu podstawa boku jedzie 1:1 za kursorem, a płaszczyzna nie jest
+                  // prawie równoległa do promienia (bok złapany za górę skakał o metry).
+                  const basePoint = new THREE.Vector3(dragSidePanelTarget.position.x, parseFloat(dragSidePanel.position.y) || 0, dragSidePanelTarget.position.z);
+                  const baseNdc = basePoint.clone().project(camera);
+                  sidePanelNdcShift.set(baseNdc.x - mouse.x, baseNdc.y - mouse.y);
+                  dragOffset.set(0, 0, 0);
               }
           }
       }
@@ -487,51 +501,21 @@ export function init3DViewer() {
           mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
           raycaster.setFromCamera(mouse, camera);
 
+          mouse.add(sidePanelNdcShift);
+          raycaster.setFromCamera(mouse, camera);
+
           const intersect = new THREE.Vector3();
-          raycaster.ray.intersectPlane(dragPlane, intersect);
-          if (!intersect) return;
+          if (!raycaster.ray.intersectPlane(dragPlane, intersect)) return;
 
           const newGroupPos = intersect.clone().add(dragOffset);
           const { worldW, worldD } = getWorldFootprint(dragSidePanel);
           const room = getRoom();
 
-          let snapX = newGroupPos.x - worldW / 2;
-          let snapZ = newGroupPos.z - worldD / 2;
-
-          // Przyciąganie do ścian pokoju.
-          if (Math.abs(snapX) < SNAP_DIST) snapX = 0;
-          if (Math.abs(snapZ) < SNAP_DIST) snapZ = 0;
-          if (Math.abs((snapX + worldW) - room.width) < SNAP_DIST) snapX = room.width - worldW;
-          if (Math.abs((snapZ + worldD) - room.depth) < SNAP_DIST) snapZ = room.depth - worldD;
-
-          // Przyciąganie krawędzią do krawędzi modułów i innych boków
-          // dokładanych ("żeby się przyklejały" - zgłoszona potrzeba) -
-          // dokładnie ta sama logika co przy module, tylko bez cudzych blend
-          // (bok dokładany nie ma swoich, a sąsiad w kolizji liczy się i tak
-          // po jego własnym world-space AABB, patrz getModuleBox).
-          const neighborBoxes = [];
-          state.project.modules.forEach(m => {
-              const box = getModuleBox(m);
-              neighborBoxes.push({ x0: box.x0, x1: box.x1, z0: box.z0, z1: box.z1 });
-          });
-          state.project.sidePanels.forEach(p => {
-              if (p.id === dragSidePanel.id) return;
-              const fp = getWorldFootprint(p);
-              const px = parseFloat(p.position.x) || 0;
-              const pz = parseFloat(p.position.z) || 0;
-              neighborBoxes.push({ x0: px, x1: px + fp.worldW, z0: pz, z1: pz + fp.worldD });
-          });
-
-          neighborBoxes.forEach(box => {
-              if (Math.abs(snapX - box.x1) < SNAP_DIST) snapX = box.x1;
-              else if (Math.abs((snapX + worldW) - box.x0) < SNAP_DIST) snapX = box.x0 - worldW;
-
-              if (Math.abs(snapZ - box.z1) < SNAP_DIST) snapZ = box.z1;
-              else if (Math.abs((snapZ + worldD) - box.z0) < SNAP_DIST) snapZ = box.z0 - worldD;
-          });
-
-          snapX = Math.max(0, Math.min(room.width - worldW, snapX));
-          snapZ = Math.max(0, Math.min(room.depth - worldD, snapZ));
+          // Przyciąganie do szafek (z blendami), innych boków i ścian oraz wypchnięcie
+          // z korpusu - patrz core/sidePanelSnap.js.
+          const snapped = snapSidePanel(dragSidePanel, newGroupPos.x - worldW / 2, newGroupPos.z - worldD / 2, state.project, SNAP_DIST);
+          const snapX = snapped.x;
+          const snapZ = snapped.z;
 
           dragSidePanel.position.x = Math.round(snapX * 100) / 100;
           dragSidePanel.position.z = Math.round(snapZ * 100) / 100;

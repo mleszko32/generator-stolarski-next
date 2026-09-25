@@ -6,6 +6,7 @@ import { openCutPlanModal } from "./cutPlanModal.js";
 import { openProductionHub } from "./productionHub.js";
 import { escapeHtml } from "../utils/dom.js";
 import { openModuleLibrary } from "./moduleLibraryModal.js";
+import { snapSidePanel } from "../core/sidePanelSnap.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
 import { openCsvExport } from "./csvEditor.js";
@@ -314,7 +315,15 @@ export function updateSidebar() {
 
   const btnAddSidePanel = document.getElementById('btn-add-side-panel');
   if (btnAddSidePanel) {
-    btnAddSidePanel.addEventListener('click', () => { addSidePanel(); initPropertiesPanel(); update3D(); updateSidebar(); });
+    btnAddSidePanel.addEventListener('click', () => {
+      const panel = addSidePanel();
+      // Nowy bok startuje w (0,0,0), czyli zwykle w środku pierwszej szafki - przyciągamy
+      // go do sąsiedztwa szafek, żeby nie wchodził w korpus.
+      const at = snapSidePanel(panel, 0, 0, state.project);
+      panel.position.x = at.x;
+      panel.position.z = at.z;
+      initPropertiesPanel(); update3D(); updateSidebar();
+    });
   }
 
   document.querySelectorAll('.side-panel-item').forEach(el => {

@@ -134,6 +134,11 @@ committed inline (it is public by design).
 height, sill). Edited in the room modal (`ui/roomPanel.js`), drawn in 3D (`viewer3d.js` rebuildRoomGeometry, dimmed with
 their wall) and in wall elevations (`wallElevations.js`), and checked against cabinets in `core/validate.js`.
 
+**Side-panel snapping**: `core/sidePanelSnap.js` (`snapSidePanel`, pure, tested) is used while dragging a "bok dokładany" and
+when adding one: snaps to cabinet sides **including fillers**, aligns back/front edges, walls only if no cabinet was
+caught, and pushes the panel out of any cabinet/panel it overlaps (nearest free spot inside the room, sideways first).
+The drag itself tracks the panel base on the floor plane (screen-anchored), not the grab-height plane.
+
 **Edge banding**: `engine/edgeBanding.js`. Default = all four edges (none for "Plecy"/"Blat"); `project.edgeBanding` maps
 the part key `category|name|length|width` (the same identity the aggregated parts list uses, so it applies to all
 identical parts) to `[long1,long2,short1,short2]` booleans. Edited by clicking edges of the icon in the hub's
