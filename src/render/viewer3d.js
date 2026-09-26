@@ -1827,7 +1827,9 @@ export function update3D() {
               else if (el.typ === 'front') {
                   const isInternal = el.subtype === 'szuflada-wewnetrzna';
                   
-                  if (!isFrontsVisible && !isInternal) {
+                  // Ukryte fronty znikają, ale SKRZYNKI SZUFLAD zostają (widać wtedy, co jest za frontem);
+                  // drzwi bez frontu nie mają nic do pokazania.
+                  if (!isFrontsVisible && !isInternal && !el.subtype.includes('szuflada')) {
                       return; 
                   }
 
@@ -1849,10 +1851,12 @@ export function update3D() {
                       zForFront = posZ + D + 2;
                   }
                   
-                  addBox(el.w, el.h, isInternal ? innerFrontThick : 18, posX + el.x, posY + el.y, zForFront, 'front', isActive, udElement, innerGroup);
+                  if (isFrontsVisible || isInternal) {
+                      addBox(el.w, el.h, isInternal ? innerFrontThick : 18, posX + el.x, posY + el.y, zForFront, 'front', isActive, udElement, innerGroup);
+                  }
 
                   if (el.subtype.includes('szuflada')) {
-                      if (isXrayMode) {
+                      if (isXrayMode || !isFrontsVisible) {
                           const isBottomInZone = el.frontIndex === 0;
                           
                           let availableSpace = el.h;
@@ -1954,7 +1958,7 @@ export function update3D() {
                                   addHole(2.5, th, rightHoleX, posY + calcY, posZ + D - h.x - slideZOffset, 'x', innerGroup); 
                               });
                           }
-                          if (dHoles && dHoles.frontHoles) {
+                          if (dHoles && dHoles.frontHoles && (isFrontsVisible || isInternal)) {
                               dHoles.frontHoles.forEach(h => {
                                   let calcY = isTopBottomFull ? el.y + h.y - th : el.y + h.y;
                                   addHole(2.5, 12, posX + el.x + (h.xOffsetLeft || 20.5), posY + calcY, zForFront + (isInternal ? innerFrontThick/2 : 9), 'z', innerGroup); 
