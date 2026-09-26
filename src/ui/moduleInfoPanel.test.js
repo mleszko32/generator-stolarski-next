@@ -12,10 +12,12 @@ const drawer = (i, y, h) => ({
 describe("moduleInfoHtml", () => {
   beforeEach(() => setProject(freshProject({ modules: [baseModule()] })));
 
-  it("szuflady: krótko - system, typ i długość, takie same zliczone razem", () => {
+  it("szuflady: osobna linia na każdą, system/typ/długość i wymiar korpusu, bez frontu i skrzynki", () => {
     state.project.modules[0].elements = [drawer(0, 16.5, 330), drawer(1, 350, 330)];
     const html = moduleInfoHtml(state.project.modules[0]);
-    expect(html).toMatch(/2× Blum MERIVOBOX typ [A-Z], dł\. 500/);
+    expect(html).toContain("Szuflada 1");
+    expect(html).toContain("Szuflada 2");
+    expect(html.match(/Blum MERIVOBOX typ [A-Z], dł\. 500 · korpus 564 × [0-9.]+/g)).toHaveLength(2);
     expect(html).not.toContain("skrzynka");
     expect(html).not.toContain("front 5");
   });

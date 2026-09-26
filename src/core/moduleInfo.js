@@ -51,6 +51,8 @@ export function getModuleSummary(mod, project) {
         height: r1(info.rect.y1 - info.rect.y0),
         system: info.comps.systemName,
         variant: info.comps.back.variantType,
+        openingW: r1(info.openingW),
+        openingH: r1(info.openingH),
       } : null;
       return { label: `Szuflada ${i + 1}${f.subtype === "szuflada-wewnetrzna" ? " (wewn.)" : ""}`, w: r1(num(f.w)), h: r1(num(f.h)), box };
     });

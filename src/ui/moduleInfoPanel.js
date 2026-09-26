@@ -29,17 +29,15 @@ export function moduleInfoHtml(mod) {
   }
 
   if (s.drawers.length) {
-    // Krótko: system, typ i długość szuflady; takie same szuflady zliczamy razem.
-    const groups = new Map();
+    // Jedna linia na szufladę: system, typ, długość i miejsce w korpusie (wnęka szer. × wys.),
+    // bez wymiarów frontu i skrzynki.
+    rows.push(`<div class="info-sub">Szuflady</div>`);
     s.drawers.forEach((d) => {
       const spec = d.box
-        ? `${escapeHtml(d.box.system || "")}${d.box.variant ? " typ " + escapeHtml(d.box.variant) : ""}, dł. ${d.box.length}`
+        ? `${escapeHtml(d.box.system || "")}${d.box.variant ? " typ " + escapeHtml(d.box.variant) : ""}, dł. ${d.box.length} · korpus ${d.box.openingW} × ${d.box.openingH}`
         : "brak danych systemu";
-      const key = spec + (d.label.includes("wewn.") ? " (wewn.)" : "");
-      groups.set(key, (groups.get(key) || 0) + 1);
+      rows.push(row(escapeHtml(d.label), spec));
     });
-    rows.push(`<div class="info-sub">Szuflady</div>`);
-    groups.forEach((count, spec) => rows.push(`<div class="info-row"><span class="info-v" style="text-align:left">${count > 1 ? count + "× " : ""}${spec}</span></div>`));
   }
 
   if (s.shelves.length || s.dividers) {

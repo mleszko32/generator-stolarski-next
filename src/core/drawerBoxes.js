@@ -56,7 +56,7 @@ export function getDrawerBoxInfo(mod, el, project) {
   const isBottomOuter = !!el.baseZone && num(el.baseZone.minY) <= th + 0.5;
   const y0 = y + (isBottomInZone && isBottomOuter && !isInset ? th : 0);
   const x0 = th + (innerW - dw) / 2 - SIDE_T;
-  return { rect: { x0, x1: x0 + dw + 2 * SIDE_T, y0, y1: y0 + SIDE_T + dh }, comps, system: sys };
+  return { rect: { x0, x1: x0 + dw + 2 * SIDE_T, y0, y1: y0 + SIDE_T + dh }, comps, system: sys, openingW: innerW, openingH: availableSpace };
 }
 
 // Sam obrys skrzynki (patrz getDrawerBoxInfo) albo null.
