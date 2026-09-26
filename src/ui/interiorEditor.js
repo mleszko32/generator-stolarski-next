@@ -428,6 +428,10 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     const frontsHidden = hasFront && !areFrontsVisible();
     if (hasFront) {
       renderFrontOverlay(node, stage, px, mod, parentH, parentV, frontsHidden);
+      // Front zewnętrzny (drzwi, szuflady) całkowicie zasłania wnętrze: półki, przegrody,
+      // wnęki i szuflady wewnętrzne za nim rysują się dopiero po ukryciu frontów.
+      const covers = !frontsHidden && node.fronts.some((fr) => fr.subtype !== "szuflada-wewnetrzna");
+      if (covers) return;
     }
     if (node.type === "leaf") {
       if (!hasFront) renderLeaf(node, stage, px, mod, insideFront, parentH, parentV);
@@ -723,45 +727,42 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     appendDimTag(el, node, mod, parentH, parentV);
   }
 
-  // Puszki zawiasów (Ø35) na widocznych frontach drzwiowych: pozycje z calculateHinges
-  // (te same, co w rysunku technicznym i liście okuć - z omijaniem półek), środek puszki
-  // 22,5 mm od krawędzi drzwi po stronie zawiasów. Po ukryciu frontów ich nie rysujemy -
-  // wtedy edytuje się wnętrze.
-  function appendHingeCups(overlayEl, node, mod, px) {
-    const { minX, maxY } = node.rect;
+  // Puszki zawiasów (Ø35) jednego frontu drzwiowego: pozycje z calculateHinges (te same,
+  // co w rysunku technicznym i liście okuć - z omijaniem półek), środek puszki 22,5 mm od
+  // krawędzi drzwi po stronie zawiasów. (originX, originTopY) = lewy górny róg elementu, w
+  // którym puszki będą umieszczone (w mm modułu, y do góry). Zwraca listę elementów DOM.
+  function hingeCupEls(front, mod, px, originX, originTopY) {
+    if (!(front.subtype || "").includes("drzwi")) return [];
     const th = parseFloat(state.project.materials?.boardThickness) || 18;
     const els = mod.elements || [];
-    node.fronts.forEach((front) => {
-      if (!(front.subtype || "").includes("drzwi")) return;
-      const obstacles = els.filter((o) =>
-        (o.typ === "poziom" || o.subtype === "szuflada-wewnetrzna") && (!front.cornerArm || o.cornerArm === front.cornerArm));
-      const side = front.cornerArm ? getCornerDoorHingeSide(mod, front) : hingeSideOf(front);
-      let hinges = [];
-      try { hinges = calculateHinges(front, th, obstacles, side) || []; } catch (e) { hinges = []; }
-      const fx = parseFloat(front.x), fw = parseFloat(front.w);
-      if (!Number.isFinite(fx) || !Number.isFinite(fw)) return;
-      const cupX = side === "left" ? fx + 22.5 : fx + fw - 22.5;
-      const d = Math.max(px.toPxLen(35), 8);
-      hinges.forEach((h) => {
-        const cup = document.createElement("div");
-        cup.title = "Puszka zawiasu Ø35";
-        Object.assign(cup.style, {
-          position: "absolute",
-          left: px.toPxLen(cupX - minX) - d / 2 + "px",
-          top: px.toPxLen(maxY - h.y) - d / 2 + "px",
-          width: d + "px",
-          height: d + "px",
-          boxSizing: "border-box",
-          borderRadius: "50%",
-          border: "1.5px solid #334155",
-          background: "#ffffff",
-          pointerEvents: "none",
-        });
-        const dot = document.createElement("div");
-        Object.assign(dot.style, { position: "absolute", left: "50%", top: "50%", width: "3px", height: "3px", margin: "-1.5px 0 0 -1.5px", borderRadius: "50%", background: "#334155" });
-        cup.appendChild(dot);
-        overlayEl.appendChild(cup);
+    const obstacles = els.filter((o) =>
+      (o.typ === "poziom" || o.subtype === "szuflada-wewnetrzna") && (!front.cornerArm || o.cornerArm === front.cornerArm));
+    const side = front.cornerArm ? getCornerDoorHingeSide(mod, front) : hingeSideOf(front);
+    let hinges = [];
+    try { hinges = calculateHinges(front, th, obstacles, side) || []; } catch (e) { hinges = []; }
+    const fx = parseFloat(front.x), fw = parseFloat(front.w);
+    if (!Number.isFinite(fx) || !Number.isFinite(fw)) return [];
+    const cupX = side === "left" ? fx + 22.5 : fx + fw - 22.5;
+    const d = Math.max(px.toPxLen(35), 8);
+    return hinges.map((h) => {
+      const cup = document.createElement("div");
+      cup.title = "Puszka zawiasu Ø35";
+      Object.assign(cup.style, {
+        position: "absolute",
+        left: px.toPxLen(cupX - originX) - d / 2 + "px",
+        top: px.toPxLen(originTopY - h.y) - d / 2 + "px",
+        width: d + "px",
+        height: d + "px",
+        boxSizing: "border-box",
+        borderRadius: "50%",
+        border: "1.5px solid #334155",
+        background: "#ffffff",
+        pointerEvents: "none",
       });
+      const dot = document.createElement("div");
+      Object.assign(dot.style, { position: "absolute", left: "50%", top: "50%", width: "3px", height: "3px", margin: "-1.5px 0 0 -1.5px", borderRadius: "50%", background: "#334155" });
+      cup.appendChild(dot);
+      return cup;
     });
   }
 
@@ -785,15 +786,26 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     // pusta wnęka", więc dla takich węzłów etykieta frontu idzie do rogu.
     const hasNestedContent = node.type === "split";
     const colors = FRONT_COLORS[node.fronts[0].subtype] || { fill: "#f1f5f9", border: "#94a3b8" };
-    const badgeStyle = hidden || hasNestedContent;
+    const badgeStyle = hidden;
+
+    // Widoczny front zasłania wnętrze i rysuje się w PRAWDZIWYM rozmiarze (el.x/y/w/h po
+    // layoucie), więc widać jego nakładanie na boki i wieńce korpusu. Przy ukrytych frontach
+    // (i dla grup frontów - te mają własne boksy niżej) zostaje obrys całej wnęki.
+    const f0 = node.fronts[0];
+    const rx = parseFloat(f0.x), ry = parseFloat(f0.y), rw = parseFloat(f0.w), rh = parseFloat(f0.h);
+    const useReal = !isMultiFront && !hidden && [rx, ry, rw, rh].every((v) => Number.isFinite(v));
+    const gx0 = useReal ? rx : minX;
+    const gTop = useReal ? ry + rh : maxY;
+    const gW = useReal ? rw : maxX - minX;
+    const gH = useReal ? rh : maxY - minY;
 
     const el = document.createElement("div");
     Object.assign(el.style, {
       position: "absolute",
-      left: px.toPxX(minX) + "px",
-      top: px.toPxY(maxY) + "px",
-      width: px.toPxLen(maxX - minX) + "px",
-      height: px.toPxLen(maxY - minY) + "px",
+      left: px.toPxX(gx0) + "px",
+      top: px.toPxY(gTop) + "px",
+      width: px.toPxLen(gW) + "px",
+      height: px.toPxLen(gH) + "px",
       boxSizing: "border-box",
       border: hidden ? "1px dashed rgba(100,116,139,0.6)" : isMultiFront ? `1px dashed ${colors.border}` : `1.5px solid ${colors.border}`,
       background: hidden ? "transparent" : isMultiFront ? "transparent" : colors.fill,
@@ -847,7 +859,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       el.appendChild(badge);
     }
 
-    if (!hidden) appendHingeCups(el, node, mod, px);
+    if (!hidden && !isMultiFront) hingeCupEls(f0, mod, px, gx0, gTop).forEach((c) => el.appendChild(c));
 
     el.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -878,13 +890,14 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          overflow: "hidden",
+          overflow: "visible",
           whiteSpace: "nowrap",
           fontSize: "10px",
           color: colors.border,
           pointerEvents: "none",
         });
         box.appendChild(document.createTextNode(frontLabelText(front)));
+        hingeCupEls(front, mod, px, fx, fy + fh).forEach((c) => box.appendChild(c));
         stage.appendChild(box);
       });
     }
