@@ -40,6 +40,35 @@ function moduleBox(mod) {
 
 const overlap1d = (a0, a1, b0, b1) => Math.min(a1, b1) - Math.max(a0, b0);
 
+// Kolizje wnętrza szafki: półka lub przegroda pionowa leżąca W STREFIE SZUFLAD (baseZone
+// frontów szufladowych po layoucie). Szuflady zajmują całą strefę - półka w środku oznacza,
+// że korpus szuflady jej nie ominie, więc się nie zmieści ani nie wysunie. Półka dokładnie na
+// granicy stref (tam, gdzie stykają się dwie grupy szuflad) jest poprawna. Zakłada aktualny
+// layout (baseZone przeliczone) - wołający robi recalculateLayout / update3D.
+// Zwraca listę komunikatów (po jednym na element).
+export function findInteriorCollisions(mod) {
+  const els = mod.elements || [];
+  const zones = els
+    .filter((e) => e.typ === "front" && (e.subtype === "szuflada" || e.subtype === "szuflada-wewnetrzna") && e.baseZone)
+    .map((d) => ({
+      arm: d.cornerArm,
+      x0: num(d.baseZone.minX), x1: num(d.baseZone.maxX),
+      y0: num(d.baseZone.minY) + num(d.baseZone.offsetBottom),
+      y1: num(d.baseZone.maxY) - num(d.baseZone.offsetTop),
+    }));
+  const out = [];
+  els.filter((e) => e.typ === "poziom" || e.typ === "pion").forEach((p) => {
+    const px0 = num(p.x), px1 = px0 + num(p.w), py0 = num(p.y), py1 = py0 + num(p.h);
+    const hit = zones.some((z) => z.arm === p.cornerArm
+      && overlap1d(px0, px1, z.x0, z.x1) > 1 && overlap1d(py0, py1, z.y0, z.y1) > 1);
+    if (!hit) return;
+    out.push(p.typ === "poziom"
+      ? `Półka na wysokości ${Math.round(py0)} mm leży w strefie szuflad - szuflady się nie zmieszczą ani nie wysuną. Przesuń półkę poza strefę szuflad albo usuń podział.`
+      : `Przegroda pionowa (x ${Math.round(px0)} mm) przecina strefę szuflad - szuflady się nie zmieszczą. Usuń przegrodę albo zmień strefę szuflad.`);
+  });
+  return out;
+}
+
 // project: domyślnie bieżący projekt z `state`. Zwraca { issues, counts }.
 // Każda uwaga: { level: 'error'|'warn'|'info', moduleId, moduleName, message }.
 export function validateProject(project = state.project) {
@@ -90,6 +119,8 @@ export function validateProject(project = state.project) {
     if (box.y1 > roomH + OVERLAP_TOL) {
       add("error", mod, `Sięga wyżej (${Math.round(box.y1)} mm) niż wysokość pomieszczenia (${Math.round(roomH)} mm).`);
     }
+
+    findInteriorCollisions(mod).forEach((msg) => add("error", mod, msg));
 
     const elements = mod.elements || [];
     if (elements.length === 0) {

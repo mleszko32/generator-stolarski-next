@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { validateProject } from "./validate.js";
+import { validateProject, findInteriorCollisions } from "./validate.js";
 import { freshProject, baseModule, fullZoneFront, setProject } from "../test/fixtures.js";
 import { state } from "./state.js";
 
@@ -76,5 +76,46 @@ describe("validateProject", () => {
     const levels = validateProject().issues.map((i) => i.level);
     expect(levels).toEqual([...levels].sort((a, b) => ({ error: 0, warn: 1, info: 2 }[a] - { error: 0, warn: 1, info: 2 }[b])));
     expect(messages(validateProject()).length).toBeGreaterThan(1);
+  });
+});
+
+describe("kolizje wnętrza: półka w strefie szuflad", () => {
+  const drawerFront = (over = {}) => ({
+    id: "front-d1", typ: "front", subtype: "szuflada", frontIndex: 0, frontCount: 3, gap: 3,
+    baseZone: { minX: 18, maxX: 582, minY: 18, maxY: 702, offsetBottom: 0, offsetTop: 0 },
+    ...over,
+  });
+  const shelf = (y) => ({ id: "p1", typ: "poziom", x: 18, y, w: 564, h: 18, isStructural: false });
+
+  beforeEach(() => {
+    setProject(freshProject({ modules: [baseModule()] }));
+  });
+
+  it("półka w środku strefy 3 szuflad jest błędem", () => {
+    state.project.modules[0].elements = [drawerFront(), shelf(350)];
+    const res = validateProject();
+    expect(has(res, "error", "strefie szuflad")).toBe(true);
+  });
+
+  it("półka poza strefą szuflad (nad nimi) jest poprawna", () => {
+    state.project.modules[0].elements = [
+      drawerFront({ baseZone: { minX: 18, maxX: 582, minY: 18, maxY: 400, offsetBottom: 0, offsetTop: 0 } }),
+      shelf(400),
+    ];
+    expect(has(validateProject(), "error", "strefie szuflad")).toBe(false);
+  });
+
+  it("przegroda pionowa przecinająca strefę szuflad jest błędem", () => {
+    state.project.modules[0].elements = [
+      drawerFront(),
+      { id: "pion1", typ: "pion", x: 291, y: 18, w: 18, h: 684, isStructural: true },
+    ];
+    expect(has(validateProject(), "error", "Przegroda pionowa")).toBe(true);
+  });
+
+  it("findInteriorCollisions zwraca komunikaty dla szafki", () => {
+    const mod = state.project.modules[0];
+    mod.elements = [drawerFront(), shelf(350)];
+    expect(findInteriorCollisions(mod)).toHaveLength(1);
   });
 });

@@ -45,6 +45,7 @@ import { updateSidebar } from "./sidebar.js";
 import { initPropertiesPanel } from "./properties.js";
 import { calculateHinges } from "../core/hingeMath.js";
 import { getCornerDoorHingeSide } from "../engine/cabinet.js";
+import { findInteriorCollisions } from "../core/validate.js";
 
 const FRONT_LABELS = {
   drzwi: "Drzwi",
@@ -298,6 +299,19 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     const titleName = items.length > 1 ? `grupa (${items.length} szafki: ${items.map((it) => it.mod.name).join(", ")})` : escapeHtml(mod.name);
     title.innerHTML = `🗂️ Wnętrze: <b>${titleName}${titleSuffix}</b> <span style="color:#94a3b8; font-weight:normal;">— klik w wnękę: podziel / obsadź · klik w dzielnik: przesuń / usuń · przeciągnij tło: przesuń · scroll: przybliż</span>`;
     Object.assign(title.style, { position: "absolute", top: "10px", left: "16px", fontSize: "13px", color: "#1e3a8a", pointerEvents: "none" });
+
+    // Ostrzeżenie o kolizjach wnętrza (np. półka w strefie szuflad) - od razu po edycji.
+    const collisions = items.flatMap((it) => findInteriorCollisions(it.mod).map((msg) => (items.length > 1 ? it.mod.name + ": " : "") + msg));
+    if (collisions.length) {
+      const warn = document.createElement("div");
+      warn.innerHTML = `<b>⚠ Kolizja w środku szafki</b><br>${collisions.slice(0, 3).map(escapeHtml).join("<br>")}${collisions.length > 3 ? `<br>… i ${collisions.length - 3} więcej (zakładka Kontrola projektu)` : ""}`;
+      Object.assign(warn.style, {
+        position: "absolute", top: "44px", left: "16px", maxWidth: "min(560px, 60%)", padding: "8px 12px",
+        background: "#fee2e2", border: "1px solid #fca5a5", color: "#991b1b", borderRadius: "6px",
+        fontSize: "12px", lineHeight: "1.4", pointerEvents: "none", zIndex: "5",
+      });
+      viewport.appendChild(warn);
+    }
     viewport.appendChild(title);
 
     appendZoomControls(viewport);
