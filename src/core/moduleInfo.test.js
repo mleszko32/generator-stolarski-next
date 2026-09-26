@@ -15,7 +15,7 @@ describe("getModuleSummary", () => {
   it("podaje wymiary korpusu i wnętrza", () => {
     const s = getModuleSummary(state.project.modules[0], state.project);
     expect(s.dims).toEqual({ w: 600, h: 720, d: 513 });
-    expect(s.inner).toEqual({ w: 564, h: 684, d: 513 });
+    expect(s.inner).toEqual({ w: 564, h: 684, d: 510 }); // bez pleców (513 - 3)
     expect(s.legs).toBe(100); // fixture: nóżki 100 mm
   });
 
@@ -42,5 +42,13 @@ describe("getModuleSummary", () => {
     const s = getModuleSummary(state.project.modules[0], state.project);
     expect(s.shelves).toEqual([{ y: 300, fixed: false }, { y: 500, fixed: true }]);
     expect(s.dividers).toBe(1);
+  });
+});
+
+describe("głębokość wnętrza w podsumowaniu", () => {
+  it("plecy w nucie: bez pleców i bez cofnięcia (513 - 20 - 3 = 490)", () => {
+    setProject(freshProject({ modules: [baseModule({ backPanel: { type: "nut", offset: 20, grooveDepth: 7, nutBuild: "all", clearance: 2 } })] }));
+    const s = getModuleSummary(state.project.modules[0], state.project);
+    expect(s.inner.d).toBe(490);
   });
 });

@@ -26,6 +26,11 @@ export function getModuleSummary(mod, project) {
   const th = num(project.materials && project.materials.boardThickness, 18) || 18;
   const W = num(mod.dimensions.width), H = num(mod.dimensions.height), D = num(mod.dimensions.depth);
   const els = mod.elements || [];
+  // Głębokość wnętrza BEZ pleców (tak jak głębokość wieńców w liście formatek): przy plecach
+  // nakładanych D - grubość HDF, przy plecach w nucie D - cofnięcie - grubość HDF.
+  const backThick = num(project.materials && project.materials.backThickness, 3) || 3;
+  const backP = mod.backPanel || { type: "nakladane", offset: 16 };
+  const innerD = backP.type === "nut" ? D - num(backP.offset, 16) - backThick : D - backThick;
   const legs = mod.legs && mod.legs.active ? num(mod.legs.height, 100) : 0;
 
   const byPosition = (a, b) => num(a.y) - num(b.y) || num(a.x) - num(b.x);
@@ -65,7 +70,7 @@ export function getModuleSummary(mod, project) {
   return {
     type: TYPE_LABELS[mod.type] || "Szafka",
     dims: { w: r1(W), h: r1(H), d: r1(D) },
-    inner: { w: r1(W - 2 * th), h: r1(H - 2 * th), d: r1(D) },
+    inner: { w: r1(W - 2 * th), h: r1(H - 2 * th), d: r1(innerD) },
     legs,
     doors,
     drawers,
