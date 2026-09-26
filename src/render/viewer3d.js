@@ -18,6 +18,7 @@ import { updateSidebar } from '../ui/sidebar.js';
 import { worktopBoxes } from '../core/worktops.js';
 import { getOpenings, openingBox } from '../core/openings.js';
 import { snapSidePanel } from '../core/sidePanelSnap.js';
+import { refreshModuleInfoCard } from '../ui/moduleInfoPanel.js';
 import { initPropertiesPanel } from '../ui/properties.js';
 
 let alignMode = { active: false, sourceMod: null, sourceEl: null, banner: null };
@@ -1610,6 +1611,7 @@ function renderCornerCabinet(mod, isActive, th) {
 export function update3D() {
   scheduleCheckpoint(); // patrz core/history.js — debounce'owany checkpoint historii cofnij/wprzód
   renderInteriorEditorIfVisible(); // patrz ui/interiorEditor.js — odświeża się tylko, gdy jest widoczny
+  refreshModuleInfoCard(); // karta "Informacje o szafce" w prawym panelu - na żywo po każdej zmianie
   if (!cabinetGroup) return;
 
   while (cabinetGroup.children.length > 0) {

@@ -3,7 +3,7 @@
 // wnętrza, fronty, szuflady (front i skrzynka) i półki - żeby nie trzeba było
 // szukać liczb po zakładkach. Dane z core/moduleInfo.js.
 import { getModuleSummary } from "../core/moduleInfo.js";
-import { state } from "../core/state.js";
+import { state, getActiveModule } from "../core/state.js";
 import { escapeHtml } from "../utils/dom.js";
 
 const OPEN_KEY = "moduleInfoOpen";
@@ -56,4 +56,18 @@ export function moduleInfoHtml(mod) {
     <summary><i class="ti ti-info-circle" aria-hidden="true"></i> Informacje o szafce</summary>
     <div class="info-body">${rows.join("")}</div>
   </details>`;
+}
+
+// Odświeża kartę "na żywo" po każdej zmianie sceny (wołane z update3D): podmienia tylko
+// jej zawartość, nie rusza reszty panelu (pola formularza zostają, kursor się nie gubi)
+// ani stanu zwinięcia karty. Nic nie robi, gdy karty nie ma (np. szafka narożna, bok).
+export function refreshModuleInfoCard() {
+  const el = document.querySelector(".sidebar-right .prop-info");
+  if (!el) return;
+  const mod = getActiveModule();
+  if (!mod || mod.type === "corner_cabinet") return;
+  const tmp = document.createElement("div");
+  tmp.innerHTML = moduleInfoHtml(mod);
+  const next = tmp.firstElementChild;
+  if (next && next.innerHTML !== el.innerHTML) el.innerHTML = next.innerHTML;
 }
