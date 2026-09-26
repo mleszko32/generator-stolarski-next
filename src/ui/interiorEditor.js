@@ -741,7 +741,9 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     // pusta wnęka", więc dla takich węzłów etykieta frontu idzie do rogu.
     const hasNestedContent = node.type === "split";
     const colors = FRONT_COLORS[node.fronts[0].subtype] || { fill: "#f1f5f9", border: "#94a3b8" };
-    const badgeStyle = hidden || hasNestedContent;
+    // Front jest zawsze tylko lekkim, prześwitującym nakryciem z etykietą w rogu - wnętrze
+    // (półki, przegrody, wnęki) ma być widać i edytowalne także przy włączonych frontach.
+    const badgeStyle = true;
 
     const el = document.createElement("div");
     Object.assign(el.style, {
@@ -752,7 +754,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       height: px.toPxLen(maxY - minY) + "px",
       boxSizing: "border-box",
       border: hidden ? "1px dashed rgba(100,116,139,0.6)" : isMultiFront ? `1px dashed ${colors.border}` : `1.5px solid ${colors.border}`,
-      background: hidden ? "transparent" : isMultiFront ? "transparent" : colors.fill,
+      background: hidden || isMultiFront ? "transparent" : colors.fill + "66",
       display: isMultiFront || badgeStyle ? "block" : "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -764,18 +766,6 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
 
     if (!isMultiFront) {
       const labelText = frontLabelText(node.fronts[0]) + (hidden ? " (ukryty)" : "");
-      const hingeSide = hingeSideOf(node.fronts[0]);
-      if (hingeSide && !hidden) {
-        // Czerwony pasek na krawędzi zawiasów - od razu widać, po której stronie są.
-        const bar = document.createElement("div");
-        bar.title = hingeSide === "left" ? "Zawiasy z lewej" : "Zawiasy z prawej";
-        Object.assign(bar.style, {
-          position: "absolute", top: "0", bottom: "0", width: "5px",
-          [hingeSide === "left" ? "left" : "right"]: "0",
-          background: "#dc2626", pointerEvents: "none",
-        });
-        el.appendChild(bar);
-      }
       if (badgeStyle) {
         const badge = document.createElement("div");
         badge.innerText = labelText;
@@ -840,7 +830,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
           height: px.toPxLen(fh) + "px",
           boxSizing: "border-box",
           border: `1.5px solid ${colors.border}`,
-          background: colors.fill,
+          background: colors.fill + "66",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -850,15 +840,6 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
           color: colors.border,
           pointerEvents: "none",
         });
-        const boxSide = hingeSideOf(front);
-        if (boxSide) {
-          const bar = document.createElement("div");
-          Object.assign(bar.style, {
-            position: "absolute", top: "0", bottom: "0", width: "4px",
-            [boxSide === "left" ? "left" : "right"]: "0", background: "#dc2626",
-          });
-          box.appendChild(bar);
-        }
         box.appendChild(document.createTextNode(frontLabelText(front)));
         stage.appendChild(box);
       });
