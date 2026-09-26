@@ -574,3 +574,14 @@ button, input, select, textarea { font-family: inherit; }
 .property-group.seg, .seg { flex-direction: row; }
 .hub-content h4 { font-size: var(--fs-md); font-weight: 700; margin: 16px 0 6px; color: var(--text-primary); }
 .hub-content > label.hub-sub { display: flex; align-items: center; gap: 6px; }
+
+/* Karta "Informacje o szafce" (ui/moduleInfoPanel.js) */
+.prop-info { border: 1px solid var(--border); border-radius: 8px; background: var(--surface-subtle); margin-bottom: 10px; }
+.prop-info > summary { cursor: pointer; padding: 8px 12px; font-size: var(--fs-sm); font-weight: 700; color: var(--text-primary); list-style: none; display: flex; align-items: center; gap: 6px; }
+.prop-info > summary::-webkit-details-marker { display: none; }
+.prop-info > summary .hint { margin: 0 0 0 auto; font-weight: 400; }
+.prop-info .info-body { padding: 2px 12px 10px; font-size: var(--fs-sm); }
+.prop-info .info-row { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; border-bottom: 1px dotted var(--border); }
+.prop-info .info-k { color: var(--text-secondary); flex-shrink: 0; }
+.prop-info .info-v { text-align: right; color: var(--text-primary); }
+.prop-info .info-sub { margin: 8px 0 2px; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); }

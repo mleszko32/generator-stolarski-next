@@ -13,6 +13,7 @@ import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
 import { buildZoneTree, rescaleSubtree } from "../core/zoneTree.js";
 import { openCornerConfigModal } from "./cornerConfigModal.js";
+import { moduleInfoHtml } from "./moduleInfoPanel.js";
 import { generateCornerBlankSVG, generateCornerPartsDrawings } from "../render/viewer2d.js";
 
 function getSelectedMods() {
@@ -500,6 +501,8 @@ export function initPropertiesPanel() {
         <input type="text" id="input-mod-name" value="${escapeHtml(activeModule.name)}" style="font-weight: 600;" />
       </div>
     </div>
+
+    ${moduleInfoHtml(activeModule)}
 
     ${tabContent("wymiary", `
       <h3>Wymiary Modułu</h3>

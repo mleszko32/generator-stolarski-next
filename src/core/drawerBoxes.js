@@ -17,8 +17,9 @@ const SIDE_T = 16;   // grubość boku i dna szuflady
 const FRONT_TO_BACK_CLEARANCE = 19; // tył szuflady w głąb korpusu (jak w 3D i formatkach)
 
 // mod: szafka, el: front szufladowy, project: state.project.
-// Zwraca { x0, x1, y0, y1 } (obrys całej skrzynki razem z bokami) albo null.
-export function getDrawerBoxRect(mod, el, project) {
+// Zwraca { rect: {x0,x1,y0,y1}, comps, system } (rect = obrys całej skrzynki razem z bokami;
+// comps = składniki z getDrawerComponents: długość nominalna, dno, tył) albo null.
+export function getDrawerBoxInfo(mod, el, project) {
   const th = num(project.materials && project.materials.boardThickness, 18) || 18;
   const W = num(mod.dimensions && mod.dimensions.width);
   const D = num(mod.dimensions && mod.dimensions.depth);
@@ -48,5 +49,11 @@ export function getDrawerBoxRect(mod, el, project) {
   const isBottomOuter = !!el.baseZone && num(el.baseZone.minY) <= th + 0.5;
   const y0 = y + (isBottomInZone && isBottomOuter && !isInset ? th : 0);
   const x0 = th + (innerW - dw) / 2 - SIDE_T;
-  return { x0, x1: x0 + dw + 2 * SIDE_T, y0, y1: y0 + SIDE_T + dh };
+  return { rect: { x0, x1: x0 + dw + 2 * SIDE_T, y0, y1: y0 + SIDE_T + dh }, comps, system: sys };
+}
+
+// Sam obrys skrzynki (patrz getDrawerBoxInfo) albo null.
+export function getDrawerBoxRect(mod, el, project) {
+  const info = getDrawerBoxInfo(mod, el, project);
+  return info ? info.rect : null;
 }
