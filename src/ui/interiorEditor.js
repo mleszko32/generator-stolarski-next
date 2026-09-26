@@ -43,6 +43,8 @@ import {
 import { update3D, enterAlignMode, areFrontsVisible } from "../render/viewer3d.js";
 import { updateSidebar } from "./sidebar.js";
 import { initPropertiesPanel } from "./properties.js";
+import { calculateHinges } from "../core/hingeMath.js";
+import { getCornerDoorHingeSide } from "../engine/cabinet.js";
 
 const FRONT_LABELS = {
   drzwi: "Drzwi",
@@ -721,6 +723,48 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     appendDimTag(el, node, mod, parentH, parentV);
   }
 
+  // Puszki zawiasów (Ø35) na widocznych frontach drzwiowych: pozycje z calculateHinges
+  // (te same, co w rysunku technicznym i liście okuć - z omijaniem półek), środek puszki
+  // 22,5 mm od krawędzi drzwi po stronie zawiasów. Po ukryciu frontów ich nie rysujemy -
+  // wtedy edytuje się wnętrze.
+  function appendHingeCups(overlayEl, node, mod, px) {
+    const { minX, maxY } = node.rect;
+    const th = parseFloat(state.project.materials?.boardThickness) || 18;
+    const els = mod.elements || [];
+    node.fronts.forEach((front) => {
+      if (!(front.subtype || "").includes("drzwi")) return;
+      const obstacles = els.filter((o) =>
+        (o.typ === "poziom" || o.subtype === "szuflada-wewnetrzna") && (!front.cornerArm || o.cornerArm === front.cornerArm));
+      const side = front.cornerArm ? getCornerDoorHingeSide(mod, front) : hingeSideOf(front);
+      let hinges = [];
+      try { hinges = calculateHinges(front, th, obstacles, side) || []; } catch (e) { hinges = []; }
+      const fx = parseFloat(front.x), fw = parseFloat(front.w);
+      if (!Number.isFinite(fx) || !Number.isFinite(fw)) return;
+      const cupX = side === "left" ? fx + 22.5 : fx + fw - 22.5;
+      const d = Math.max(px.toPxLen(35), 8);
+      hinges.forEach((h) => {
+        const cup = document.createElement("div");
+        cup.title = "Puszka zawiasu Ø35";
+        Object.assign(cup.style, {
+          position: "absolute",
+          left: px.toPxLen(cupX - minX) - d / 2 + "px",
+          top: px.toPxLen(maxY - h.y) - d / 2 + "px",
+          width: d + "px",
+          height: d + "px",
+          boxSizing: "border-box",
+          borderRadius: "50%",
+          border: "1.5px solid #334155",
+          background: "#ffffff",
+          pointerEvents: "none",
+        });
+        const dot = document.createElement("div");
+        Object.assign(dot.style, { position: "absolute", left: "50%", top: "50%", width: "3px", height: "3px", margin: "-1.5px 0 0 -1.5px", borderRadius: "50%", background: "#334155" });
+        cup.appendChild(dot);
+        overlayEl.appendChild(cup);
+      });
+    });
+  }
+
   // Rysuje front (jeden albo kilka, np. 3 szuflady jedna nad drugą) rozpięty na
   // CAŁYM node.rect - node może być 'leaf' ALBO 'split' (patrz komentarz przy
   // renderNode). Przy kilku frontach w tej samej wnęce sam prostokąt node.rect
@@ -741,9 +785,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     // pusta wnęka", więc dla takich węzłów etykieta frontu idzie do rogu.
     const hasNestedContent = node.type === "split";
     const colors = FRONT_COLORS[node.fronts[0].subtype] || { fill: "#f1f5f9", border: "#94a3b8" };
-    // Front jest zawsze tylko lekkim, prześwitującym nakryciem z etykietą w rogu - wnętrze
-    // (półki, przegrody, wnęki) ma być widać i edytowalne także przy włączonych frontach.
-    const badgeStyle = true;
+    const badgeStyle = hidden || hasNestedContent;
 
     const el = document.createElement("div");
     Object.assign(el.style, {
@@ -754,7 +796,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       height: px.toPxLen(maxY - minY) + "px",
       boxSizing: "border-box",
       border: hidden ? "1px dashed rgba(100,116,139,0.6)" : isMultiFront ? `1px dashed ${colors.border}` : `1.5px solid ${colors.border}`,
-      background: hidden || isMultiFront ? "transparent" : colors.fill + "66",
+      background: hidden ? "transparent" : isMultiFront ? "transparent" : colors.fill,
       display: isMultiFront || badgeStyle ? "block" : "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -805,6 +847,8 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       el.appendChild(badge);
     }
 
+    if (!hidden) appendHingeCups(el, node, mod, px);
+
     el.addEventListener("click", (e) => {
       e.stopPropagation();
       selectNode(node, el, stage, px, mod, "occupied");
@@ -830,7 +874,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
           height: px.toPxLen(fh) + "px",
           boxSizing: "border-box",
           border: `1.5px solid ${colors.border}`,
-          background: colors.fill + "66",
+          background: colors.fill,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
