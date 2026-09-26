@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { migrateLegacyFillers, addBlenda, addSidePanel, ensureSidePanelsDefaults, state } from "./state.js";
+import { migrateLegacyFillers, addBlenda, addSidePanel, addModule, ensureSidePanelsDefaults, state } from "./state.js";
 import { calculateAllProjectParts } from "../engine/cabinet.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
 
@@ -101,5 +101,13 @@ describe("blenda jako osobny element", () => {
     b.flange = "brak";
     parts = calculateAllProjectParts().filter((p) => p.name.includes("Mocowanie"));
     expect(parts).toHaveLength(0);
+  });
+});
+
+describe("domyślne ustawienia nutu nowej szafki", () => {
+  it("boki nutowane, wieńce skracane, nut 13 mm, odsunięcie bez zmian (20 mm)", () => {
+    setProject(freshProject({ modules: [], sidePanels: [] }));
+    const mod = addModule("base_cabinet");
+    expect(mod.backPanel).toMatchObject({ nutBuild: "sides", grooveDepth: 13, offset: 20 });
   });
 });

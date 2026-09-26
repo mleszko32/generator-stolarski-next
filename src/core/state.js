@@ -221,7 +221,7 @@ export function addModule(type = "base_cabinet") {
     dimensions: { width: 600, height: height, depth: depth },
     position: { x: nextX, y: posY, z: 0 },
     rotation: 0, // stopnie: 0/90/180/270 - w którą ścianę "patrzy" front modułu
-    backPanel: { type: "nakladane", offset: 20, grooveDepth: 7, nutBuild: "all", clearance: 2 },
+    backPanel: { type: "nakladane", offset: 20, grooveDepth: 13, nutBuild: "sides", clearance: 2 }, // ustawienia nutu po przełączeniu na plecy w nucie: boki nutowane, wieńce skracane, nut 13 mm
     legs: legs,
     // NOWOŚĆ: Lokalne, edytowalne ustawienia zawiasów dla konkretnego modułu
     front: { hinges: { topOffset: 100, bottomOffset: 100, margin: 40 } },
@@ -266,7 +266,7 @@ export function addCornerModule() {
     dimensions: { width: legA, legB: legB, depth: depth, height: height },
     position: { x: nextX, y: 0, z: 0 },
     rotation: 0,
-    backPanel: { type: "nakladane", offset: 20, grooveDepth: 7, nutBuild: "all", clearance: 2 },
+    backPanel: { type: "nakladane", offset: 20, grooveDepth: 13, nutBuild: "sides", clearance: 2 }, // ustawienia nutu po przełączeniu na plecy w nucie: boki nutowane, wieńce skracane, nut 13 mm
     legs: { active: true, height: 100, plinth: true, plinthOffset: 40 },
     front: { hinges: { topOffset: 100, bottomOffset: 100, margin: 40 } },
     elements: []
