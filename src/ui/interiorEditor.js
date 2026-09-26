@@ -46,6 +46,7 @@ import { initPropertiesPanel } from "./properties.js";
 import { calculateHinges } from "../core/hingeMath.js";
 import { getCornerDoorHingeSide } from "../engine/cabinet.js";
 import { findInteriorCollisions } from "../core/validate.js";
+import { getDrawerBoxRect } from "../core/drawerBoxes.js";
 
 const FRONT_LABELS = {
   drzwi: "Drzwi",
@@ -882,6 +883,40 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
 
     stage.appendChild(el);
     appendDimTag(el, node, mod, parentH, parentV, isMultiFront ? null : node.fronts[0]);
+
+    // Ukryte fronty: rysujemy skrzynki szuflad (dno, boki, tył) w ich prawdziwym położeniu,
+    // żeby wnętrze szafki z szufladami nie wyglądało na puste i było widać, ile miejsca zajmują.
+    if (hidden) {
+      node.fronts.filter((fr) => (fr.subtype || "").includes("szuflada")).forEach((fr) => {
+        const g = getDrawerBoxRect(mod, fr, state.project);
+        if (!g) return;
+        const box = document.createElement("div");
+        Object.assign(box.style, {
+          position: "absolute",
+          left: px.toPxX(g.x0) + "px",
+          top: px.toPxY(g.y1) + "px",
+          width: px.toPxLen(g.x1 - g.x0) + "px",
+          height: px.toPxLen(g.y1 - g.y0) + "px",
+          boxSizing: "border-box",
+          border: "1.5px solid #d97706",
+          background: "rgba(245,158,11,0.14)",
+          pointerEvents: "none",
+        });
+        const bottom = document.createElement("div");
+        Object.assign(bottom.style, {
+          position: "absolute", left: "0", right: "0", bottom: "0",
+          height: Math.max(px.toPxLen(16), 3) + "px", background: "rgba(217,119,6,0.4)",
+        });
+        const inner = document.createElement("div");
+        Object.assign(inner.style, {
+          position: "absolute", left: Math.max(px.toPxLen(16), 3) + "px", right: Math.max(px.toPxLen(16), 3) + "px",
+          top: "0", bottom: Math.max(px.toPxLen(16), 3) + "px", borderLeft: "1px solid #d97706", borderRight: "1px solid #d97706",
+        });
+        box.appendChild(bottom);
+        box.appendChild(inner);
+        stage.appendChild(box);
+      });
+    }
 
     if (isMultiFront && !hidden) {
       node.fronts.forEach((front) => {
