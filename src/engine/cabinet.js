@@ -165,7 +165,7 @@ export function collectProjectParts() {
   // więc trafiają do wspólnej listy formatek projektu, ale nie do
   // calculateParts() (lista formatek AKTYWNEGO modułu).
   (config.sidePanels || []).forEach(panel => {
-    allParts.push(...getSidePanelParts(panel, config).map(p => ({ ...p, moduleName: panel.name || 'Bok dokładany' })));
+    allParts.push(...getSidePanelParts(panel, config).map(p => ({ ...p, moduleName: panel.name || (panel.kind === 'blenda' ? 'Blenda' : 'Bok dokładany') })));
   });
 
   // Szafka narożna (mod.type === 'corner_cabinet') wyłączona z tego wspólnego
@@ -1120,6 +1120,25 @@ function getFillerParts(mod, config) {
   return parts;
 }
 
+// Blenda (core/state.js: addBlenda): czoło (dekor frontów) + kołnierz mocujący (płyta
+// korpusu), jak dawne blendy szafki. Kołnierz biegnie wzdłuż krawędzi czoła wskazanej w
+// panel.flange: lewa/prawa - równolegle do wysokości, gora/dol - do szerokości.
+function getBlendaParts(panel, config) {
+  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const w = parseFloat(panel.dimensions?.width) || 0;
+  const h = parseFloat(panel.dimensions?.height) || 0;
+  const d = parseFloat(panel.dimensions?.depth) || 0;
+  const label = panel.decor ? `Blenda (${panel.decor})` : 'Blenda';
+  const base = panel.name ? `${label} — ${panel.name}` : label;
+  const parts = [{ name: `${base} (Czoło)`, length: h, width: w, qty: 1, category: "Front" }];
+  const flange = panel.flange || 'prawa';
+  if (flange !== 'brak' && d - th > 0) {
+    const along = (flange === 'lewa' || flange === 'prawa') ? h : w;
+    parts.push({ name: `${base} (Mocowanie wewn.)`, length: along, width: d - th, qty: 1, category: "Korpus" });
+  }
+  return parts;
+}
+
 // Bok dokładany (core/state.js: addSidePanel) to samodzielny, płaski
 // obiekt projektu (nie właściwość jednego modułu jak blenda) - fizycznie
 // to tylko jedna płyta (front, dekor), więc jedna formatka: wysokość x
@@ -1128,6 +1147,7 @@ function getFillerParts(mod, config) {
 // fornir/okleina) - w Kosztorysie (calculateProjectCost) liczy się razem
 // z frontami, dając realną sumę m² tego dekoru do wyceny.
 function getSidePanelParts(panel, config) {
+  if (panel.kind === 'blenda') return getBlendaParts(panel, config);
   const label = panel.decor ? `Bok dokładany (${panel.decor})` : 'Bok dokładany';
   const name = panel.name ? `${label} — ${panel.name}` : label;
   return [{

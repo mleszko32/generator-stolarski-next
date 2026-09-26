@@ -57,6 +57,7 @@ const WALL_LABEL = { tyl: 'tylna', prawa: 'prawa', przednia: 'przednia', lewa: '
 function sidePanelIntervals(project, room, wallId, tol) {
   const out = [];
   (project.sidePanels || []).forEach(p => {
+    if (p.kind === 'blenda') return; // blenda to listwa przy szafce, nie bok, który blat ma przykrywać
     const { worldW, worldD } = getWorldFootprint(p);
     const x = parseFloat(p.position?.x) || 0, z = parseFloat(p.position?.z) || 0;
     const y0 = parseFloat(p.position?.y) || 0;

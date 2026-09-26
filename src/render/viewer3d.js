@@ -2119,7 +2119,22 @@ export function update3D() {
           panelGroup.position.set(x + worldW / 2, y + H / 2, z + worldD / 2);
           panelGroup.rotation.y = -((parseFloat(panel.rotation) || 0) * Math.PI / 180);
 
-          addBox(W, H, D, -W / 2, -H / 2, -D / 2, 'front', isActiveSide, { sidePanelId: panel.id }, panelGroup);
+          if (panel.kind === 'blenda') {
+              // czoło z przodu (+Z) i kołnierz mocujący za nim, przy wskazanej krawędzi
+              const ud = { sidePanelId: panel.id };
+              const bth = parseFloat(state.project.materials?.boardThickness) || 18;
+              addBox(W, H, bth, -W / 2, -H / 2, D / 2 - bth, 'front', isActiveSide, ud, panelGroup);
+              const fl = panel.flange || 'prawa';
+              const fd = D - bth;
+              if (fl !== 'brak' && fd > 0) {
+                  if (fl === 'lewa') addBox(bth, H, fd, -W / 2, -H / 2, -D / 2, 'corpus', isActiveSide, ud, panelGroup);
+                  else if (fl === 'prawa') addBox(bth, H, fd, W / 2 - bth, -H / 2, -D / 2, 'corpus', isActiveSide, ud, panelGroup);
+                  else if (fl === 'gora') addBox(W, bth, fd, -W / 2, H / 2 - bth, -D / 2, 'corpus', isActiveSide, ud, panelGroup);
+                  else addBox(W, bth, fd, -W / 2, -H / 2, -D / 2, 'corpus', isActiveSide, ud, panelGroup);
+              }
+          } else {
+              addBox(W, H, D, -W / 2, -H / 2, -D / 2, 'front', isActiveSide, { sidePanelId: panel.id }, panelGroup);
+          }
 
           cabinetGroup.add(panelGroup);
       });

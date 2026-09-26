@@ -93,7 +93,75 @@ export function ensureSidePanelsDefaults(project) {
   if (!Array.isArray(project.sidePanels)) {
     project.sidePanels = [];
   }
+  migrateLegacyFillers(project);
   return project.sidePanels;
+}
+
+// Blendy maskujące były kiedyś właściwością szafki (mod.fillers.left/right/top).
+// Teraz to osobne elementy projektu, jak boki dokładane: wpis w project.sidePanels
+// z kind: 'blenda' (patrz addBlenda). Stare projekty przenosimy przy wczytaniu:
+// każda aktywna blenda szafki staje się osobnym elementem w TYM SAMYM miejscu w
+// pokoju (z uwzględnieniem obrotu szafki), a mod.fillers znika. Idempotentne.
+export function migrateLegacyFillers(project) {
+  const num = (v, d = 0) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
+  const th = num(project.materials && project.materials.boardThickness, 18) || 18;
+  const parseVal = (v, fallback) => (v !== null && v !== undefined && v !== '' ? num(v, fallback) : fallback);
+
+  (project.modules || []).forEach((mod) => {
+    const f = mod.fillers;
+    if (!f) return;
+    delete mod.fillers;
+    if (mod.type === 'corner_cabinet' || !mod.dimensions) return;
+
+    const W = num(mod.dimensions.width), D = num(mod.dimensions.depth), H = num(mod.dimensions.height);
+    const rot = ((num(mod.rotation) % 360) + 360) % 360;
+    const swapped = rot === 90 || rot === 270;
+    const worldW = swapped ? D : W, worldD = swapped ? W : D;
+    const cx = num(mod.position && mod.position.x) + worldW / 2;
+    const cz = num(mod.position && mod.position.z) + worldD / 2;
+    const a = -rot * Math.PI / 180;
+    const cos = Math.cos(a), sin = Math.sin(a);
+    const toWorld = (lx, lz) => {
+      const dx = lx - W / 2, dz = lz - D / 2;
+      return { x: cx + dx * cos + dz * sin, z: cz - dx * sin + dz * cos };
+    };
+    const frontType = (mod.front && mod.front.type) || (project.front && project.front.type) || 'nakladane';
+    const zF = frontType === 'wpuszczane' ? D - th : D + 2;
+    const baseY = (mod.legs && mod.legs.active) ? (num(mod.legs.height, 100) || 100) : 0;
+    const modY = num(mod.position && mod.position.y);
+
+    const make = (label, lx0, bw, height, y, fDepth, flange) => {
+      const lz0 = zF - (fDepth - th);
+      const w = toWorld(lx0 + bw / 2, lz0 + fDepth / 2);
+      const pW = swapped ? fDepth : bw, pD = swapped ? bw : fDepth;
+      project.sidePanels.push({
+        id: 'blenda-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+        kind: 'blenda',
+        name: `Blenda ${label} (${mod.name || 'szafka'})`,
+        decor: '',
+        flange,
+        position: { x: Math.round((w.x - pW / 2) * 100) / 100, y, z: Math.round((w.z - pD / 2) * 100) / 100 },
+        rotation: rot,
+        dimensions: { width: bw, height, depth: fDepth },
+      });
+    };
+
+    let leftW = 0, rightW = 0;
+    if (f.left && f.left.active) {
+      leftW = num(f.left.width, 50) || 50;
+      make('lewa', -leftW, leftW, parseVal(f.left.height, H), modY + baseY + parseVal(f.left.offsetY, 0), num(f.left.depth, 80) || 80, 'prawa');
+    }
+    if (f.right && f.right.active) {
+      rightW = num(f.right.width, 50) || 50;
+      make('prawa', W, rightW, parseVal(f.right.height, H), modY + baseY + parseVal(f.right.offsetY, 0), num(f.right.depth, 80) || 80, 'lewa');
+    }
+    if (f.top && f.top.active) {
+      const autoW = W + leftW + rightW;
+      const topW = parseVal(f.top.width, autoW);
+      const startX = -leftW + (autoW - topW) / 2;
+      make('górna', startX, topW, parseVal(f.top.height, 50), modY + baseY + H + parseVal(f.top.offsetY, 0), num(f.top.depth, 80) || 80, 'dol');
+    }
+  });
 }
 
 export const state = {
@@ -215,13 +283,17 @@ export function getActiveSidePanel() {
   return state.project.sidePanels.find(p => p.id === state.activeSidePanelId) || null;
 }
 
-export function addSidePanel() {
+// kind: 'bok' (domyślnie) albo 'blenda' - obie to samodzielne płyty w project.sidePanels,
+// różnią się kształtem (blenda to listwa z czołem i kołnierzem mocującym) i formatkami.
+export function addSidePanel(kind = 'bok') {
+  if (kind === 'blenda') return addBlenda();
   const newId = 'side-' + Date.now();
   const room = state.project.room || DEFAULT_ROOM;
+  const bokCount = state.project.sidePanels.filter(p => p.kind !== 'blenda').length;
 
   const newPanel = {
     id: newId,
-    name: 'Bok dokładany ' + (state.project.sidePanels.length + 1),
+    name: 'Bok dokładany ' + (bokCount + 1),
     decor: '', // wolna etykieta dekoru (np. "Front biały połysk") - trafia do nazwy formatki
     position: { x: 0, y: 0, z: 0 },
     rotation: 0,
@@ -240,6 +312,30 @@ export function addSidePanel() {
   state.activeSidePanelId = newId;
   state.activeModuleId = null;
 
+  return newPanel;
+}
+
+// Blenda maskująca: osobny element (jak bok dokładany), listwa zakrywająca szczelinę
+// między szafką a ścianą albo sufitem. dimensions: width = widoczna szerokość czoła
+// (wzdłuż X), height = wysokość, depth = głębokość całości (czoło + kołnierz mocujący).
+// flange: krawędź czoła, przy której jest kołnierz mocujący do szafki:
+// 'lewa' | 'prawa' | 'gora' | 'dol' | 'brak'. Nieobrócona blenda ma czoło z przodu (+Z).
+export function addBlenda() {
+  const newId = 'blenda-' + Date.now();
+  const count = state.project.sidePanels.filter(p => p.kind === 'blenda').length;
+  const newPanel = {
+    id: newId,
+    kind: 'blenda',
+    name: 'Blenda ' + (count + 1),
+    decor: '',
+    flange: 'prawa',
+    position: { x: 0, y: 100, z: 0 },
+    rotation: 0,
+    dimensions: { width: 50, height: 720, depth: 80 },
+  };
+  state.project.sidePanels.push(newPanel);
+  state.activeSidePanelId = newId;
+  state.activeModuleId = null;
   return newPanel;
 }
 

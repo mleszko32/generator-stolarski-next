@@ -92,20 +92,32 @@ export function updateSidebar() {
         <button id="btn-add-side-panel" class="btn btn-sm" title="Dekoracyjny panel niezależny od szafek, np. na cały słup"><i class="ti ti-plus" aria-hidden="true"></i> Dodaj</button>
       </div>`;
 
-  // Boki dokładane (core/state.js: addSidePanel) - samodzielne obiekty projektu.
-  if (state.project.sidePanels.length === 0) {
-    html += `<div class="empty-note">Brak boków dokładanych.</div>`;
-  } else {
-    state.project.sidePanels.forEach(p => {
-      const isActive = p.id === state.activeSidePanelId;
-      html += `
+  // Boki dokładane i blendy (core/state.js: addSidePanel / addBlenda) - samodzielne
+  // obiekty projektu, obie listy z jednej tablicy project.sidePanels (pole kind).
+  const sideItem = (p, icon, fallbackName, delTitle, meta) => {
+    const isActive = p.id === state.activeSidePanelId;
+    return `
         <div class="list-item side-panel-item${isActive ? ' is-active' : ''}" data-id="${p.id}">
-          <i class="ti ti-layout-board li-icon" aria-hidden="true"></i>
-          <div class="li-main"><span class="li-name">${escapeHtml(p.name || 'Bok dokładany')}</span><span class="li-meta">${p.dimensions.height} × ${p.dimensions.depth}</span></div>
-          <div class="li-actions"><button class="icon-btn btn-side-panel-del" data-id="${p.id}" title="Usuń bok dokładany"><i class="ti ti-trash" aria-hidden="true"></i></button></div>
+          <i class="ti ${icon} li-icon" aria-hidden="true"></i>
+          <div class="li-main"><span class="li-name">${escapeHtml(p.name || fallbackName)}</span><span class="li-meta">${meta}</span></div>
+          <div class="li-actions"><button class="icon-btn btn-side-panel-del" data-id="${p.id}" title="${delTitle}"><i class="ti ti-trash" aria-hidden="true"></i></button></div>
         </div>`;
-    });
-  }
+  };
+  const boks = state.project.sidePanels.filter(p => p.kind !== 'blenda');
+  const blendy = state.project.sidePanels.filter(p => p.kind === 'blenda');
+  if (boks.length === 0) html += `<div class="empty-note">Brak boków dokładanych.</div>`;
+  boks.forEach(p => { html += sideItem(p, 'ti-layout-board', 'Bok dokładany', 'Usuń bok dokładany', `${p.dimensions.height} × ${p.dimensions.depth}`); });
+
+  html += `
+    </section>
+
+    <section class="panel-section">
+      <div class="panel-head">
+        <h2>Blendy</h2>
+        <button id="btn-add-blenda" class="btn btn-sm" title="Listwa maskująca szczelinę przy ścianie lub suficie (czoło + kołnierz mocujący)"><i class="ti ti-plus" aria-hidden="true"></i> Dodaj</button>
+      </div>`;
+  if (blendy.length === 0) html += `<div class="empty-note">Brak blend.</div>`;
+  blendy.forEach(p => { html += sideItem(p, 'ti-layout-distribute-vertical', 'Blenda', 'Usuń blendę', `${p.dimensions.width} × ${p.dimensions.height}`); });
 
   html += `
     </section>
@@ -201,6 +213,18 @@ export function updateSidebar() {
   const btnModuleLibrary = document.getElementById('btn-module-library');
   if (btnModuleLibrary) {
     btnModuleLibrary.addEventListener('click', () => openModuleLibrary(() => { initPropertiesPanel(); update3D(); updateSidebar(); }));
+  }
+
+  const btnAddBlenda = document.getElementById('btn-add-blenda');
+  if (btnAddBlenda) {
+    btnAddBlenda.addEventListener('click', () => {
+      const blenda = addSidePanel('blenda');
+      // Startuje w (0,0,0) - przyciągamy do sąsiedztwa szafek, żeby nie wchodziła w korpus.
+      const at = snapSidePanel(blenda, 0, 0, state.project);
+      blenda.position.x = at.x;
+      blenda.position.z = at.z;
+      initPropertiesPanel(); update3D(); updateSidebar();
+    });
   }
 
   const btnAddSidePanel = document.getElementById('btn-add-side-panel');

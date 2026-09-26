@@ -1022,8 +1022,13 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
         splitZoneVertical(mod, selectedNode, cornerArm);
         refreshAfterEdit();
       });
-      addBtn("▭ Drzwi", "Zabuduj wnękę pojedynczymi drzwiami", () => {
-        assignFront(mod, selectedNode, "drzwi", { cornerArm });
+      // Strona zawiasów wybierana od razu przy zabudowie wnęki (dawniej w zakładce Front).
+      addBtn("▭ Drzwi - zawias z lewej", "Pojedyncze drzwi, zawiasy z lewej strony", () => {
+        assignFront(mod, selectedNode, "drzwi", { cornerArm, openingSide: "left" });
+        refreshAfterEdit();
+      });
+      addBtn("▭ Drzwi - zawias z prawej", "Pojedyncze drzwi, zawiasy z prawej strony", () => {
+        assignFront(mod, selectedNode, "drzwi", { cornerArm, openingSide: "right" });
         refreshAfterEdit();
       });
       addBtn("▭▭ Drzwi L/P", "Zabuduj wnękę parą drzwi", () => {

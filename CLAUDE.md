@@ -147,6 +147,13 @@ committed inline (it is public by design).
 height, sill). Edited in the room modal (`ui/roomPanel.js`), drawn in 3D (`viewer3d.js` rebuildRoomGeometry, dimmed with
 their wall) and in wall elevations (`wallElevations.js`), and checked against cabinets in `core/validate.js`.
 
+**Blendy (fillers)** are standalone elements like "boki dokładane": entries of `project.sidePanels` with `kind: 'blenda'`
+(`addBlenda` in `core/state.js`; `dimensions` = visible width × height × total depth, `flange` = which edge of the front strip
+carries the mounting flange). They reuse the side-panel drag/snap/list/properties code and produce two parts (front strip,
+internal mounting). The old per-module `mod.fillers` is migrated on load by `migrateLegacyFillers` (called from
+`ensureSidePanelsDefaults`) and then deleted; the legacy read paths in layout/viewer are only a fallback.
+The hinge side of a single door is chosen in the interior editor ("Drzwi - zawias z lewej/prawej"), not in the Front tab.
+
 **Side-panel snapping**: `core/sidePanelSnap.js` (`snapSidePanel`, pure, tested) is used while dragging a "bok dokładany" and
 when adding one: snaps to cabinet sides **including fillers**, aligns back/front edges, walls only if no cabinet was
 caught, and pushes the panel out of any cabinet/panel it overlaps (nearest free spot inside the room, sideways first).

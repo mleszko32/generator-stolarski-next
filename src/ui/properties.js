@@ -33,7 +33,7 @@ const TABS = [
   { id: "front", label: "Front", icon: "ti-door" },
   { id: "szuflady", label: "Szuflady", icon: "ti-box" },
   { id: "konstrukcja", label: "Konstrukcja", icon: "ti-layout-board" },
-  { id: "nogi", label: "Nóżki i blendy", icon: "ti-arrows-vertical" },
+  { id: "nogi", label: "Nóżki", icon: "ti-arrows-vertical" },
   { id: "zawiasy", label: "Zawiasy", icon: "ti-settings" },
 ];
 const OPEN_SECTIONS_KEY = "propertiesOpenSections";
@@ -96,7 +96,57 @@ const TRAVERSE_LABELS = { front: "Przedni", rear: "Tylny" };
 // nie właściwość modułu, więc dostaje osobny, krótki formularz zamiast
 // całego "Parametry szafki" (zakładki front/szuflady/konstrukcja/zawiasy nie
 // mają tu zastosowania - to tylko płaska, dekoracyjna płyta).
+function renderBlendaProperties(rightSidebar, panel) {
+  const flanges = [['prawa', 'Z prawej strony czoła'], ['lewa', 'Z lewej strony czoła'], ['gora', 'Przy górnej krawędzi'], ['dol', 'Przy dolnej krawędzi'], ['brak', 'Bez kołnierza']];
+  rightSidebar.innerHTML = `
+    <h2>Parametry blendy</h2>
+    <div class="property-group prop-box">
+      <label style="font-weight: 600;">Nazwa:</label>
+      <input type="text" id="input-side-name" value="${escapeHtml(panel.name || '')}" style="font-weight: 600;" />
+    </div>
+    <div class="property-group">
+      <label>Dekor (opis do formatki):</label>
+      <input type="text" id="input-side-decor" value="${escapeHtml(panel.decor || '')}" placeholder="np. Front biały połysk" />
+    </div>
+
+    <h3>Wymiary</h3>
+    <div class="property-group"><label>Szerokość czoła (mm):</label><input type="number" id="input-side-width" value="${panel.dimensions.width}" /></div>
+    <div class="property-group"><label>Wysokość (mm):</label><input type="number" id="input-side-height" value="${panel.dimensions.height}" /></div>
+    <div class="property-group"><label>Głębokość z mocowaniem (mm):</label><input type="number" id="input-side-depth" value="${panel.dimensions.depth}" /></div>
+    <div class="property-group"><label>Kołnierz mocujący do szafki:</label>
+      <select id="input-blenda-flange">${flanges.map(([v, l]) => `<option value="${v}" ${(panel.flange || 'prawa') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+    </div>
+    <div class="hint">Czoło jest z przodu (dekor frontów), kołnierz to płyta korpusu za nim. Górną blendę zrób szerokością na całą zabudowę i kołnierzem przy dolnej krawędzi.</div>
+
+    <hr class="divider">
+
+    <h3>Pozycja w przestrzeni (3D)</h3>
+    <div class="property-group prop-box">
+      <div class="mb-8"><label class="fs-xs">Odsunięcie od lewej ściany (X) [mm]:</label><input type="number" id="input-side-pos-x" value="${panel.position.x}" /></div>
+      <div class="mb-8"><label class="fs-xs">Odsunięcie od tylnej ściany (Z) [mm]:</label><input type="number" id="input-side-pos-z" value="${panel.position.z || 0}" /></div>
+      <div><label class="fs-xs">Wysokość dołu od podłogi (Y) [mm]:</label><input type="number" id="input-side-pos-y" value="${panel.position.y || 0}" /></div>
+    </div>
+    <div class="hint">Przeciągnij blendę myszą w widoku 3D - przyciągnie się do boku szafki. Przy szafce na nóżkach dół blendy jest zwykle na wysokości nóżek (Y = 100).</div>
+
+    <h3>Obrót (co 90°)</h3>
+    <div class="property-group seg">
+      ${[0, 90, 180, 270].map(rot => {
+          const active = (panel.rotation || 0) === rot;
+          return `<button type="button" class="seg-btn btn-side-rotate${active ? ' active' : ''}" data-rot="${rot}">${rot}°</button>`;
+      }).join('')}
+    </div>
+    <div class="hint">0° = czoło zwrócone do przodu pokoju (jak szafka nieobrócona).</div>
+
+    <hr class="divider">
+    <button type="button" id="btn-side-delete" class="btn btn-danger btn-block btn-sm"><i class="ti ti-trash" aria-hidden="true"></i> Usuń blendę</button>
+  `;
+  bindSidePanelInputs(rightSidebar, panel);
+  const flangeSel = document.getElementById('input-blenda-flange');
+  if (flangeSel) flangeSel.addEventListener('change', (e) => { panel.flange = e.target.value; update3D(); updateSidebar(); });
+}
+
 function renderSidePanelProperties(rightSidebar, panel) {
+  if (panel.kind === 'blenda') { renderBlendaProperties(rightSidebar, panel); return; }
   rightSidebar.innerHTML = `
     <h2>Parametry boku dokładanego</h2>
     <div class="property-group prop-box">
@@ -135,6 +185,11 @@ function renderSidePanelProperties(rightSidebar, panel) {
     <button type="button" id="btn-side-delete" class="btn btn-danger btn-block btn-sm"><i class="ti ti-trash" aria-hidden="true"></i> Usuń bok dokładany</button>
   `;
 
+  bindSidePanelInputs(rightSidebar, panel);
+}
+
+// Pola wspólne dla boku dokładanego i blendy (nazwa, dekor, wymiary, pozycja, obrót, usuń).
+function bindSidePanelInputs(rightSidebar, panel) {
   const bindText = (id, apply) => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('input', (e) => { apply(e.target.value); update3D(); updateSidebar(); });
@@ -348,26 +403,11 @@ export function initPropertiesPanel() {
   const multiCount = state.selectedModules && state.selectedModules.size > 1 ? state.selectedModules.size : 1;
   if (!activeModule.legs) activeModule.legs = { active: false, height: 100, plinth: false, plinthOffset: 40 };
 
-  // Inicjalizacja struktury blend z dodanym parametrem "offsetY" (Przesunięcie pionowe)
-  if (!activeModule.fillers) {
-      activeModule.fillers = {
-          left: { active: false, width: 50, depth: 80, height: null, offsetY: 0 },
-          right: { active: false, width: 50, depth: 80, height: null, offsetY: 0 },
-          top: { active: false, height: 50, depth: 80, width: null, offsetY: 0 }
-      };
-  } else {
-      // Zabezpieczenie dla wcześniej zapisanych szafek
-      if (activeModule.fillers.left.offsetY === undefined) activeModule.fillers.left.offsetY = 0;
-      if (activeModule.fillers.right.offsetY === undefined) activeModule.fillers.right.offsetY = 0;
-      if (activeModule.fillers.top.offsetY === undefined) activeModule.fillers.top.offsetY = 0;
-  }
-
   const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(state.project.construction || {}), ...(activeModule.construction || {}) };
   const backP = activeModule.backPanel;
   const f = { ...(state.project.front || {}), ...(activeModule.front || {}) };
   const fc = { ...(state.project.front?.clearance || {}), ...(activeModule.front?.clearance || {}) };
   const fh = { topOffset: 100, bottomOffset: 100, margin: 40, forceCount: 0, ...(state.project.front?.hinges || {}), ...(activeModule.front?.hinges || {}) };
-  const fill = activeModule.fillers;
   const th = parseFloat(state.project.materials.boardThickness) || 18;
 
   let actualBottomText = "";
@@ -419,31 +459,6 @@ export function initPropertiesPanel() {
           label: `Szuflada ${idx + 1}${front.subtype === 'szuflada-wewnetrzna' ? ' (wewn.)' : ''}`,
       }));
 
-  // Drzwi szafki (pojedyncze i pary L/P) do wyboru strony zawiasów w sekcji Front.
-  const doorFrontsList = (activeModule.elements || [])
-      .filter(el => el.typ === 'front' && el.subtype && el.subtype.includes('drzwi'))
-      .sort((a, b) => (parseFloat(a.y) || 0) - (parseFloat(b.y) || 0) || (parseFloat(a.x) || 0) - (parseFloat(b.x) || 0))
-      .map((front, idx) => ({
-          front,
-          label: `Drzwi ${idx + 1} · ${fmtMm(front.w || 0)}×${fmtMm(front.h || 0)} mm`,
-      }));
-  const doorSideHtml = doorFrontsList.length === 0
-      ? '<div class="hint">Ta szafka nie ma jeszcze drzwi.</div>'
-      : `<div class="row mb-8">
-           <button type="button" class="btn btn-sm btn-door-all flex-1" data-side="left">Wszystkie lewe</button>
-           <button type="button" class="btn btn-sm btn-door-all flex-1" data-side="right">Wszystkie prawe</button>
-         </div>` + doorFrontsList.map(({ front, label }) => {
-          if (front.subtype === 'drzwi-lp') {
-              return `<div class="property-group" style="margin-top: 8px;"><label>${escapeHtml(label)}</label><div style="font-size: 12px; color: #64748b;">Para L/P: lewe skrzydło ma zawiasy z lewej, prawe z prawej.</div></div>`;
-          }
-          const isRight = front.openingSide === 'right';
-          return `<div class="property-group" style="margin-top: 8px;"><label>${escapeHtml(label)} - zawiasy:</label>
-              <select class="input-door-side" data-front-id="${front.id}">
-                <option value="left" ${!isRight ? 'selected' : ''}>Z lewej (drzwi lewe)</option>
-                <option value="right" ${isRight ? 'selected' : ''}>Z prawej (drzwi prawe)</option>
-              </select></div>`;
-      }).join('');
-
   // Grupowanie modułów — dotąd edytowalne tylko z menu kontekstowego 3D
   // (render/viewer3d.js), teraz też tutaj (patrz plan przeniesienia okienek 3D
   // do panelu bocznego). "Można połączyć w grupę" tylko gdy zaznaczenie ma
@@ -484,14 +499,6 @@ export function initPropertiesPanel() {
         <label>Nazwa szafki:</label>
         <input type="text" id="input-mod-name" value="${escapeHtml(activeModule.name)}" style="font-weight: 600;" />
       </div>
-      ${activeModule.type !== 'corner_cabinet' ? `<div class="property-group">
-        <label>Rodzaj szafki:</label>
-        <select id="input-mod-type">
-          <option value="base_cabinet" ${activeModule.type === 'base_cabinet' ? 'selected' : ''}>Dolna (stoi na podłodze)</option>
-          <option value="upper_cabinet" ${activeModule.type === 'upper_cabinet' ? 'selected' : ''}>Wisząca</option>
-          <option value="tall_cabinet" ${activeModule.type === 'tall_cabinet' ? 'selected' : ''}>Słupek</option>
-        </select>
-      </div>` : ''}
     </div>
 
     ${tabContent("wymiary", `
@@ -538,8 +545,6 @@ export function initPropertiesPanel() {
         <div class="property-group"><label>Luz dół (mm):</label><input type="number" id="input-front-bottom" value="${fc.bottom ?? 2}" step="0.5" /></div>
       </div>
 
-      <h3>Strona zawiasów drzwi</h3>
-      ${doorSideHtml}
     `)}
 
     ${tabContent("szuflady", `
@@ -700,50 +705,6 @@ export function initPropertiesPanel() {
         </div>
       ` : ''}
 
-      <hr class="divider">
-
-      <h3>Blendy maskujące (L-kształtne)</h3>
-      <div class="prop-box">
-
-        <div style="margin-bottom: 10px;">
-          <div class="row-center">
-              <input class="pointer" type="checkbox" id="input-filler-left-active" ${fill.left.active ? 'checked' : ''} />
-              <label for="input-filler-left-active" style="cursor: pointer; font-weight: 600;">Blenda Lewa</label>
-          </div>
-          <div id="filler-left-opts" style="display: ${fill.left.active ? 'block' : 'none'}; padding-left: 24px; margin-top: 8px;">
-              <div class="property-group"><label class="fs-xs">Szerokość czoła (mm):</label><input type="number" id="input-filler-left-w" value="${fill.left.width}" /></div>
-              <div class="property-group"><label class="fs-xs">Wysokość (puste = szafka):</label><input type="number" id="input-filler-left-h" placeholder="${activeModule.dimensions.height}" value="${fill.left.height || ''}" /></div>
-              <div class="property-group"><label class="fs-xs">Przesunięcie w pionie Y (mm):</label><input type="number" id="input-filler-left-y" value="${fill.left.offsetY ?? 0}" /></div>
-              <div class="property-group mb-0"><label class="fs-xs">Głęb. mocowania (mm):</label><input type="number" id="input-filler-left-d" value="${fill.left.depth}" /></div>
-          </div>
-        </div>
-
-        <div style="margin-bottom: 10px;">
-          <div class="row-center">
-              <input class="pointer" type="checkbox" id="input-filler-right-active" ${fill.right.active ? 'checked' : ''} />
-              <label for="input-filler-right-active" style="cursor: pointer; font-weight: 600;">Blenda Prawa</label>
-          </div>
-          <div id="filler-right-opts" style="display: ${fill.right.active ? 'block' : 'none'}; padding-left: 24px; margin-top: 8px;">
-              <div class="property-group"><label class="fs-xs">Szerokość czoła (mm):</label><input type="number" id="input-filler-right-w" value="${fill.right.width}" /></div>
-              <div class="property-group"><label class="fs-xs">Wysokość (puste = szafka):</label><input type="number" id="input-filler-right-h" placeholder="${activeModule.dimensions.height}" value="${fill.right.height || ''}" /></div>
-              <div class="property-group"><label class="fs-xs">Przesunięcie w pionie Y (mm):</label><input type="number" id="input-filler-right-y" value="${fill.right.offsetY ?? 0}" /></div>
-              <div class="property-group mb-0"><label class="fs-xs">Głęb. mocowania (mm):</label><input type="number" id="input-filler-right-d" value="${fill.right.depth}" /></div>
-          </div>
-        </div>
-
-        <div class="mb-0">
-          <div class="row-center">
-              <input class="pointer" type="checkbox" id="input-filler-top-active" ${fill.top.active ? 'checked' : ''} />
-              <label for="input-filler-top-active" style="cursor: pointer; font-weight: 600;">Blenda Górna (Sufitowa)</label>
-          </div>
-          <div id="filler-top-opts" style="display: ${fill.top.active ? 'block' : 'none'}; padding-left: 24px; margin-top: 8px;">
-              <div class="property-group"><label class="fs-xs">Wysokość czoła (mm):</label><input type="number" id="input-filler-top-h" value="${fill.top.height}" /></div>
-              <div class="property-group"><label class="fs-xs">Szerokość (puste = zabudowa):</label><input type="number" id="input-filler-top-w" placeholder="Całkowita" value="${fill.top.width || ''}" /></div>
-              <div class="property-group"><label class="fs-xs">Przesunięcie w pionie Y (mm):</label><input type="number" id="input-filler-top-y" value="${fill.top.offsetY ?? 0}" /></div>
-              <div class="property-group mb-0"><label class="fs-xs">Głęb. mocowania (mm):</label><input type="number" id="input-filler-top-d" value="${fill.top.depth}" /></div>
-          </div>
-        </div>
-      </div>
     `)}
 
     ${tabContent("zawiasy", `
@@ -823,29 +784,6 @@ function setupEventListeners() {
   // POPRAWKA: W trakcie wpisywania odświeża się tylko widok 3D, panel nie znika!
   const debouncedUpdateAll = () => { clearTimeout(typingTimer); typingTimer = setTimeout(() => { updateAll(); }, 50); };
 
-  // Zmiana rodzaju szafki (dolna / wisząca / słupek): lista i rzuty ścian, blaty i
-  // etykiety idą po mod.type. Na dolną lub słupek szafka schodzi na podłogę (zostaje
-  // przy ustawionych nóżkach - można je wyłączyć), na wiszącą idzie na 1450 mm bez nóżek.
-  const modTypeInput = document.getElementById('input-mod-type');
-  if (modTypeInput) modTypeInput.addEventListener('change', (e) => {
-      const t = e.target.value;
-      getSelectedMods().forEach(mod => {
-          if (mod.type === 'corner_cabinet') return;
-          mod.type = t;
-          // domyślna nazwa (np. "Szafka wisząca 3") idzie za rodzajem; własnej nazwy nie ruszamy
-          const NAMES = { base_cabinet: 'Szafka dolna', upper_cabinet: 'Szafka wisząca', tall_cabinet: 'Słupek' };
-          Object.values(NAMES).forEach(n => { if (typeof mod.name === 'string' && mod.name.startsWith(n + ' ')) mod.name = NAMES[t] + mod.name.slice(n.length); });
-          if (!mod.legs) mod.legs = { active: false, height: 100, plinth: false, plinthOffset: 40 };
-          if (t === 'upper_cabinet') {
-              mod.legs.active = false;
-              if ((parseFloat(mod.position.y) || 0) < 600) mod.position.y = 1450;
-          } else if ((parseFloat(mod.position.y) || 0) >= 600) {
-              mod.position.y = 0;
-          }
-      });
-      initPropertiesPanel(); updateAll();
-  });
-
   const nameInput = document.getElementById('input-mod-name');
   if (nameInput) {
       nameInput.addEventListener('input', (e) => {
@@ -854,35 +792,6 @@ function setupEventListeners() {
       });
       nameInput.addEventListener('change', () => initPropertiesPanel());
   }
-
-  ['left', 'right', 'top'].forEach(side => {
-      const chk = document.getElementById(`input-filler-${side}-active`);
-      const opts = document.getElementById(`filler-${side}-opts`);
-      if (chk && opts) {
-          chk.addEventListener('change', (e) => {
-              getSelectedMods().forEach(mod => {
-                  mod.fillers[side].active = e.target.checked;
-                  if (side === 'left') {
-                      const fillerW = parseFloat(mod.fillers.left.width) || 50;
-                      if (e.target.checked) {
-                          mod.position.x = (parseFloat(mod.position.x) || 0) + fillerW;
-                      } else {
-                          mod.position.x = Math.max(0, (parseFloat(mod.position.x) || 0) - fillerW);
-                      }
-                  }
-                  // Zabezpieczenie dla PRAWEJ blendy (i domknięcie lewej) -
-                  // clampModuleToRoom teraz sam wie o aktywnych blendach
-                  // (patrz core/layout.js) - bez tego blenda dostawiona do
-                  // szafki dosuniętej do ściany przenikała przez nią.
-                  clampModuleToRoom(mod);
-                  const inpX = document.getElementById('input-pos-x');
-                  if (inpX) inpX.value = mod.position.x;
-              });
-              opts.style.display = e.target.checked ? 'block' : 'none';
-              updateAll();
-          });
-      }
-  });
 
   const legsActiveInput = document.getElementById('input-legs-active');
   const legsOptions = document.getElementById('legs-options');
@@ -1029,25 +938,6 @@ function setupEventListeners() {
       const side = btn.dataset.side;
       getSelectedMods().forEach(mod => {
         if (mod.construction?.traverses?.[side]) delete mod.construction.traverses[side].width;
-      });
-      updateAll();
-      initPropertiesPanel();
-    });
-  });
-
-  document.querySelectorAll('.input-door-side').forEach(sel => {
-    sel.addEventListener('change', (e) => {
-      const front = findFront(sel.dataset.frontId);
-      if (front) front.openingSide = e.target.value === 'right' ? 'right' : 'left';
-      updateAll();
-      initPropertiesPanel();
-    });
-  });
-  document.querySelectorAll('.btn-door-all').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const side = btn.dataset.side === 'right' ? 'right' : 'left';
-      (getActiveModule()?.elements || []).forEach(el => {
-        if (el.typ === 'front' && el.subtype === 'drzwi') el.openingSide = side;
       });
       updateAll();
       initPropertiesPanel();
@@ -1204,21 +1094,6 @@ function setupEventListeners() {
         // zerem/NaN w połowie wpisywania.
         if (isExprField && Number.isNaN(val)) return;
         getSelectedMods().forEach(mod => {
-
-            if (id === 'filler-left-w') mod.fillers.left.width = val;
-            if (id === 'filler-left-h') mod.fillers.left.height = val;
-            if (id === 'filler-left-d') mod.fillers.left.depth = val;
-            if (id === 'filler-left-y') mod.fillers.left.offsetY = val;
-
-            if (id === 'filler-right-w') mod.fillers.right.width = val;
-            if (id === 'filler-right-h') mod.fillers.right.height = val;
-            if (id === 'filler-right-d') mod.fillers.right.depth = val;
-            if (id === 'filler-right-y') mod.fillers.right.offsetY = val;
-
-            if (id === 'filler-top-h') mod.fillers.top.height = val;
-            if (id === 'filler-top-w') mod.fillers.top.width = val;
-            if (id === 'filler-top-d') mod.fillers.top.depth = val;
-            if (id === 'filler-top-y') mod.fillers.top.offsetY = val;
 
             if (['hinge-top', 'hinge-bottom', 'hinge-margin', 'hinge-count'].includes(id)) {
                 if (!mod.front) mod.front = {};
