@@ -446,7 +446,12 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       // Front zewnętrzny (drzwi, szuflady) całkowicie zasłania wnętrze: półki, przegrody,
       // wnęki i szuflady wewnętrzne za nim rysują się dopiero po ukryciu frontów.
       const covers = !frontsHidden && node.fronts.some((fr) => fr.subtype !== "szuflada-wewnetrzna");
-      if (covers) return;
+      if (covers) {
+        // Szuflady wewnętrzne są ZA frontem, ale mają być widoczne w prawdziwych wymiarach
+        // także przy włączonych frontach - rysujemy je na wierzchu zasłaniającego frontu.
+        collectInnerDrawerNodes(node).forEach((n) => renderFrontOverlay(n, stage, px, mod, null, null, false));
+        return;
+      }
     }
     if (node.type === "leaf") {
       if (!hasFront) renderLeaf(node, stage, px, mod, insideFront, parentH, parentV);
@@ -458,6 +463,17 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     renderNode(node.a, stage, px, mod, nestedInsideFront, nextParentH, nextParentV);
     renderNode(node.b, stage, px, mod, nestedInsideFront, nextParentH, nextParentV);
     renderDividerHandle(node, stage, px, mod);
+  }
+
+  // Węzły-potomki (bez samego `node`), którym przypisano szuflady wewnętrzne.
+  function collectInnerDrawerNodes(node) {
+    const out = [];
+    const walk = (n) => {
+      if (n !== node && n.fronts.length > 0 && n.fronts.every((fr) => fr.subtype === "szuflada-wewnetrzna")) out.push(n);
+      if (n.type !== "leaf") { walk(n.a); walk(n.b); }
+    };
+    walk(node);
+    return out;
   }
 
   // Czy `node` leży po stronie 'a' (dół/lewo) czy 'b' (góra/prawo) dzielnika
@@ -886,8 +902,9 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
 
     // Ukryte fronty: rysujemy skrzynki szuflad (dno, boki, tył) w ich prawdziwym położeniu,
     // żeby wnętrze szafki z szufladami nie wyglądało na puste i było widać, ile miejsca zajmują.
-    if (hidden) {
-      node.fronts.filter((fr) => (fr.subtype || "").includes("szuflada")).forEach((fr) => {
+    // Szuflady wewnętrzne pokazują skrzynkę zawsze (na wierzchu swojego frontu).
+    if (hidden || node.fronts.some((fr) => fr.subtype === "szuflada-wewnetrzna")) {
+      node.fronts.filter((fr) => (fr.subtype || "").includes("szuflada") && (hidden || fr.subtype === "szuflada-wewnetrzna")).forEach((fr) => {
         const g = getDrawerBoxRect(mod, fr, state.project);
         if (!g) return;
         const box = document.createElement("div");
