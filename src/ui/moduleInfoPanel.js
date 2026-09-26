@@ -29,14 +29,17 @@ export function moduleInfoHtml(mod) {
   }
 
   if (s.drawers.length) {
-    rows.push(`<div class="info-sub">Szuflady</div>`);
+    // Krótko: system, typ i długość szuflady; takie same szuflady zliczamy razem.
+    const groups = new Map();
     s.drawers.forEach((d) => {
-      rows.push(row(escapeHtml(d.label), `front ${d.w} × ${d.h} mm`));
-      if (d.box) {
-        rows.push(row("&nbsp;&nbsp;skrzynka", `dł. ${d.box.length} × szer. ${d.box.width} × wys. ${d.box.height} mm`));
-        rows.push(row("&nbsp;&nbsp;system", `${escapeHtml(d.box.system || "")}${d.box.variant ? ", typ " + escapeHtml(d.box.variant) : ""}`));
-      }
+      const spec = d.box
+        ? `${escapeHtml(d.box.system || "")}${d.box.variant ? " typ " + escapeHtml(d.box.variant) : ""}, dł. ${d.box.length}`
+        : "brak danych systemu";
+      const key = spec + (d.label.includes("wewn.") ? " (wewn.)" : "");
+      groups.set(key, (groups.get(key) || 0) + 1);
     });
+    rows.push(`<div class="info-sub">Szuflady</div>`);
+    groups.forEach((count, spec) => rows.push(`<div class="info-row"><span class="info-v" style="text-align:left">${count > 1 ? count + "× " : ""}${spec}</span></div>`));
   }
 
   if (s.shelves.length || s.dividers) {
