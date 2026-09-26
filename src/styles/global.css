@@ -508,3 +508,69 @@ button, input, select, textarea { font-family: inherit; }
 .csv-table .csv-cat-input[data-cat="Szuflada"] { color: #d97706; }
 .csv-table .csv-cat-input[data-cat="Plecy"] { color: #059669; }
 .csv-del { text-align: center; }
+
+/* =========================================
+   PRAWY PANEL (ui/properties.js) - wspólne wzorce formularzy
+   ========================================= */
+.property-group { margin-top: 14px; }
+.property-group label { font-size: var(--fs-sm); font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
+.property-group input, .property-group select, .property-group textarea {
+  padding: 7px 9px; border: 1px solid var(--border); border-radius: var(--radius);
+  font-size: var(--fs-md); color: var(--text-primary); background: var(--surface-panel);
+}
+.property-group input:focus, .property-group select:focus { border-color: var(--accent); }
+.sidebar-right hr, .divider { margin: 14px 0; border: 0; border-top: 1px solid var(--border); }
+
+.prop-box {
+  background: var(--surface-subtle); padding: 10px; border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: 12px;
+}
+.prop-box > .property-group:first-child, .prop-box > .property-group:first-of-type { margin-top: 0; }
+.prop-box-title { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: var(--fs-sm); color: var(--text-primary); margin-bottom: 8px; }
+
+.hint { font-size: var(--fs-xs); color: var(--text-secondary); margin-top: 4px; }
+.hint-warn {
+  font-size: var(--fs-xs); margin-top: 4px; padding: 4px 8px; color: var(--warn-fg);
+  background: var(--warn-bg); border-left: 3px solid #d97706; border-radius: 3px;
+}
+.fs-xs { font-size: var(--fs-xs); }
+.no-shrink { flex-shrink: 0; }
+.grow { flex: 1; margin-bottom: 0; }
+.flex-1 { flex: 1; }
+.mb-0 { margin-bottom: 0; }
+.mb-8 { margin-bottom: 8px; }
+.pointer { cursor: pointer; }
+.row { display: flex; gap: 6px; }
+.row-center { display: flex; align-items: center; gap: 8px; }
+.row-center.tight { gap: 4px; }
+
+/* Przyciski wyboru jednej wartości (obrót 0/90/180/270) */
+.seg { display: flex; gap: 0; }
+.seg-btn {
+  flex: 1; padding: 7px 4px; font-size: var(--fs-sm); font-weight: 600; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface-panel); color: var(--text-primary);
+  margin-left: -1px; position: relative;
+}
+.seg-btn:first-child { margin-left: 0; border-radius: var(--radius) 0 0 var(--radius); }
+.seg-btn:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+.seg-btn:hover { background: var(--surface-subtle); }
+.seg-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; z-index: 1; }
+
+.minw-0 { min-width: 0; }
+.property-group input.is-overridden, .is-overridden { border-color: var(--accent); background: #eff6ff; }
+.btn-reset {
+  border: 1px solid var(--border); background: var(--surface-panel); color: var(--accent); border-radius: var(--radius);
+  width: 24px; height: 24px; cursor: pointer; font-weight: 700; flex-shrink: 0;
+}
+.btn-reset:hover { background: var(--surface-subtle); border-color: var(--accent); }
+
+/* Okno Produkcja - wspólne elementy sekcji */
+.field-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0 12px; }
+.hub-details { margin-top: 10px; border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; background: var(--surface-panel); }
+.hub-details > summary { cursor: pointer; font-weight: 600; font-size: var(--fs-md); color: var(--text-primary); }
+.hub-details[open] > summary { margin-bottom: 8px; }
+.hub-content .field input[type="text"], .hub-content .field input[type="number"], .hub-content .field textarea, .hub-content .field select { width: 100%; }
+.hub-content .hub-actions .btn { white-space: nowrap; }
+.property-group.seg, .seg { flex-direction: row; }
+.hub-content h4 { font-size: var(--fs-md); font-weight: 700; margin: 16px 0 6px; color: var(--text-primary); }
+.hub-content > label.hub-sub { display: flex; align-items: center; gap: 6px; }

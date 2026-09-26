@@ -108,18 +108,18 @@ function sheetSvg(sheet, settings, colors) {
 function summaryTable(plan) {
   const rows = plan.groups.map(g => `
     <tr>
-      <td style="padding:5px 8px;">${escapeHtml(g.category)}</td>
-      <td style="padding:5px 8px; text-align:right;">${g.pieces.length}</td>
-      <td style="padding:5px 8px; text-align:right; font-weight:bold;">${g.result.sheetCount}</td>
-      <td style="padding:5px 8px; text-align:right;">${g.result.sheetCount ? g.result.wastePct.toFixed(1) + ' %' : '-'}</td>
+      <td>${escapeHtml(g.category)}</td>
+      <td class="num">${g.pieces.length}</td>
+      <td class="num"><b>${g.result.sheetCount}</b></td>
+      <td class="num">${g.result.sheetCount ? g.result.wastePct.toFixed(1) + ' %' : '-'}</td>
     </tr>`).join('');
   return `
-    <table style="width:100%; border-collapse:collapse; font-size:12px; background:#fff; border:1px solid #e2e8f0;">
-      <thead><tr style="background:#f1f5f9; text-align:left;">
-        <th style="padding:6px 8px;">Materiał (kategoria)</th>
-        <th style="padding:6px 8px; text-align:right;">Formatek</th>
-        <th style="padding:6px 8px; text-align:right;">Arkuszy</th>
-        <th style="padding:6px 8px; text-align:right;">Odpad</th>
+    <table class="hub-table">
+      <thead><tr>
+        <th>Materiał (kategoria)</th>
+        <th class="num">Formatek</th>
+        <th class="num">Arkuszy</th>
+        <th class="num">Odpad</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
@@ -128,7 +128,7 @@ function summaryTable(plan) {
 function unplacedHtml(plan) {
   const list = plan.groups.flatMap(g => g.result.unplaced);
   if (list.length === 0) return '';
-  return `<div style="background:#fee2e2; border:1px solid #fca5a5; color:#991b1b; padding:8px 10px; border-radius:6px; font-size:12px; margin-top:8px;">
+  return `<div class="notice notice-danger" style="margin-top:8px;">
     <i class="ti ti-alert-triangle" aria-hidden="true"></i> ${list.length} formatek nie mieści się na arkuszu ${plan.settings.sheetW}×${plan.settings.sheetH} mm (z obrzeżem): ${list.slice(0, 8).map(p => `${escapeHtml(p.id)} (${Math.round(p.length)}×${Math.round(p.width)})`).join(', ')}${list.length > 8 ? '…' : ''}
   </div>`;
 }
@@ -151,7 +151,7 @@ function printCutPlan(plan) {
   const colors = new Map();
   const s = plan.settings;
   let body = `<h1 style="font-size:20px; margin:0 0 4px;">Rozkrój płyt: ${escapeHtml(state.project.name || 'projekt')}</h1>
-    <div style="font-size:12px; color:#64748b; margin-bottom:12px;">Arkusz ${s.sheetW}×${s.sheetH} mm · cięcie ${s.kerf} mm · obrzeże ${s.trim} mm · okleina: wszystkie formatki dookoła, razem ${plan.edgeMeters.toFixed(1)} mb (do zamówienia ${(plan.edgeMeters * (1 + EDGE_BANDING_RESERVE)).toFixed(1)} mb z ${Math.round(EDGE_BANDING_RESERVE * 100)}% zapasu)</div>
+    <div style="font-size:12px; color:#64748b; margin-bottom:12px;">Arkusz ${s.sheetW}×${s.sheetH} mm · cięcie ${s.kerf} mm · obrzeże ${s.trim} mm · okleina wg wyboru krawędzi, razem ${plan.edgeMeters.toFixed(1)} mb (do zamówienia ${(plan.edgeMeters * (1 + EDGE_BANDING_RESERVE)).toFixed(1)} mb z ${Math.round(EDGE_BANDING_RESERVE * 100)}% zapasu)</div>
     ${summaryTable(plan)}`;
   plan.groups.forEach(g => {
     g.result.sheets.forEach(sh => {
@@ -210,21 +210,24 @@ function printLabels(plan) {
 export function mountCutPlan(modal, onClose = null) {
   const s = getSettings();
   modal.innerHTML = `
-    <h2 style="margin:0 0 4px; color:#1e293b; font-size:16px;"><i class="ti ti-cut" aria-hidden="true"></i> Rozkrój i etykiety</h2>
-    <div style="font-size:11px; color:#64748b; margin-bottom:12px;">Układ formatek na arkuszach (cięcia na wylot, do wykonania na pilarce), zużycie okleiny (wszystkie formatki dookoła, poza plecami HDF) i etykiety z kodem QR.</div>
-    <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:10px;">
-      <div class="property-group" style="flex:1; min-width:120px;"><label>Arkusz - długość (mm):</label><input type="number" id="cp-sheetW" value="${s.sheetW}" /></div>
-      <div class="property-group" style="flex:1; min-width:120px;"><label>Arkusz - szerokość (mm):</label><input type="number" id="cp-sheetH" value="${s.sheetH}" /></div>
-      <div class="property-group" style="flex:1; min-width:120px;"><label>Szerokość cięcia (mm):</label><input type="number" id="cp-kerf" value="${s.kerf}" step="0.5" /></div>
-      <div class="property-group" style="flex:1; min-width:120px;"><label>Obrzeże arkusza (mm):</label><input type="number" id="cp-trim" value="${s.trim}" /></div>
-      <label style="display:flex; align-items:center; gap:6px; font-size:12px;"><input type="checkbox" id="cp-rotate-fronts" ${s.rotateFronts ? 'checked' : ''} /> Pozwól obracać fronty (bez pilnowania słojów)</label>
+    <div class="hub-bar">
+      <div><h3>Rozkrój i etykiety</h3><div class="hub-sub">Układ formatek na arkuszach (cięcia na wylot, do wykonania na pilarce), zużycie okleiny wg wyboru krawędzi i etykiety z kodem QR.</div></div>
+      <div class="hub-actions">
+        <button type="button" id="cp-print-plan" class="btn btn-sm"><i class="ti ti-printer" aria-hidden="true"></i> Drukuj rozkrój</button>
+        <button type="button" id="cp-print-labels" class="btn btn-sm"><i class="ti ti-tag" aria-hidden="true"></i> Drukuj etykiety</button>
+        ${onClose ? '<button type="button" id="cp-close" class="btn btn-primary btn-sm">Zamknij</button>' : ''}
+      </div>
+    </div>
+    <div class="prop-box" style="margin-bottom:14px">
+      <div class="field-row">
+        <div class="field mb-0"><label>Arkusz - długość (mm)</label><input type="number" id="cp-sheetW" value="${s.sheetW}" /></div>
+        <div class="field mb-0"><label>Arkusz - szerokość (mm)</label><input type="number" id="cp-sheetH" value="${s.sheetH}" /></div>
+        <div class="field mb-0"><label>Szerokość cięcia (mm)</label><input type="number" id="cp-kerf" value="${s.kerf}" step="0.5" /></div>
+        <div class="field mb-0"><label>Obrzeże arkusza (mm)</label><input type="number" id="cp-trim" value="${s.trim}" /></div>
+      </div>
+      <label class="hub-sub row-center" style="margin-top:8px"><input type="checkbox" id="cp-rotate-fronts" ${s.rotateFronts ? 'checked' : ''} /> Pozwól obracać fronty (bez pilnowania słojów)</label>
     </div>
     <div id="cp-results"></div>
-    <div style="display:flex; gap:8px; margin-top:14px; justify-content:flex-end; flex-wrap:wrap;">
-      <button type="button" id="cp-print-plan" class="btn btn-sm"><i class="ti ti-printer" aria-hidden="true"></i> Drukuj rozkrój</button>
-      <button type="button" id="cp-print-labels" class="btn btn-sm"><i class="ti ti-tag" aria-hidden="true"></i> Drukuj etykiety</button>
-      ${onClose ? '<button type="button" id="cp-close" class="btn btn-primary btn-sm">Zamknij</button>' : ''}
-    </div>
   `;
 
   const resultsEl = modal.querySelector('#cp-results');
@@ -236,14 +239,14 @@ export function mountCutPlan(modal, onClose = null) {
     const totalSheets = plan.groups.reduce((sum, g) => sum + g.result.sheetCount, 0);
     let html = '';
     if (plan.pieces.length === 0) {
-      html = `<div style="font-size:12px; color:#94a3b8; font-style:italic;">Projekt nie ma jeszcze formatek.</div>`;
+      html = `<p class="hub-empty">Projekt nie ma jeszcze formatek.</p>`;
     } else {
       html += summaryTable(plan);
-      html += `<div style="font-size:12px; color:#334155; margin-top:8px;">Razem <b>${totalSheets}</b> arkuszy · okleina dookoła: <b>${plan.edgeMeters.toFixed(1)} mb</b>, do zamówienia z ${Math.round(EDGE_BANDING_RESERVE * 100)}% zapasu: <b>${(plan.edgeMeters * (1 + EDGE_BANDING_RESERVE)).toFixed(1)} mb</b> (plecy HDF bez okleiny)</div>`;
+      html += `<div class="hub-sub" style="margin-top:8px">Razem <b>${totalSheets}</b> arkuszy · okleina wg wyboru krawędzi: <b>${plan.edgeMeters.toFixed(1)} mb</b>, do zamówienia z ${Math.round(EDGE_BANDING_RESERVE * 100)}% zapasu: <b>${(plan.edgeMeters * (1 + EDGE_BANDING_RESERVE)).toFixed(1)} mb</b> (plecy HDF domyślnie bez okleiny)</div>`;
       html += unplacedHtml(plan);
       plan.groups.forEach(g => {
         g.result.sheets.forEach((sh, i) => {
-          html += `<details ${i === 0 ? 'open' : ''} style="margin-top:10px;"><summary style="cursor:pointer; font-weight:bold; font-size:13px; color:#1e3a8a;">${escapeHtml(g.category)} - arkusz ${sh.index + 1} z ${g.result.sheetCount} <span style="font-weight:normal; color:#64748b;">(${sh.placements.length} formatek, odpad ${sh.wastePct.toFixed(1)} %)</span></summary>${sheetSvg(sh, plan.settings, colors)}</details>`;
+          html += `<details class="hub-details" ${i === 0 ? 'open' : ''}><summary>${escapeHtml(g.category)} - arkusz ${sh.index + 1} z ${g.result.sheetCount} <span class="hub-sub">(${sh.placements.length} formatek, odpad ${sh.wastePct.toFixed(1)} %)</span></summary>${sheetSvg(sh, plan.settings, colors)}</details>`;
         });
       });
     }

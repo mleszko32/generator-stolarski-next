@@ -243,9 +243,9 @@ function renderBlaty(el) {
     <div class="hub-bar"><div><h3>Blaty</h3>
       <div class="hub-sub">Blat leży od ściany na 0 i ma stałą głębokość, więc nawis wynika z położenia szafek pod spodem. Blaty układane są nad ciągłymi rzędami szafek dolnych; w narożniku jeden blat idzie do ściany, drugi jest skrócony o jego głębokość (złącze kątowe „na łyżwę”, wykonywane frezem w warsztacie).</div></div></div>
     <label class="hub-sub"><input type="checkbox" id="wt-enabled" ${s.enabled ? 'checked' : ''}/> Dodaj blaty do projektu (3D, formatki, kosztorys)</label>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;margin:12px 0">
-      ${WT_FIELDS.map(([k, l, st]) => `<label class="hub-sub">${l}<br><input type="number" class="wt-f" data-k="${k}" value="${s[k]}" step="${st}" style="width:100%"></label>`).join('')}
-      <label class="hub-sub">Łączenie w narożnikach (domyślne)<br><select id="wt-joint"><option value="lyzwa" ${s.joint === 'lyzwa' ? 'selected' : ''}>Na łyżwę</option><option value="styk" ${s.joint === 'styk' ? 'selected' : ''}>Na styk</option></select></label>
+    <div class="field-grid" style="margin:12px 0">
+      ${WT_FIELDS.map(([k, l, st]) => `<div class="field"><label>${l}</label><input type="number" class="wt-f" data-k="${k}" value="${s[k]}" step="${st}"></div>`).join('')}
+      <div class="field"><label>Łączenie w narożnikach (domyślne)</label><select id="wt-joint"><option value="lyzwa" ${s.joint === 'lyzwa' ? 'selected' : ''}>Na łyżwę</option><option value="styk" ${s.joint === 'styk' ? 'selected' : ''}>Na styk</option></select></div>
     </div>
     ${offRows ? `<div style="margin-bottom:12px">${offRows}</div>` : ''}
     ${scheme}
@@ -390,16 +390,16 @@ function renderOfferCard(el) {
   card.innerHTML = `
     <div class="hub-strong" style="margin-bottom:4px">Oferta dla klienta</div>
     <div class="hub-sub" style="margin-bottom:10px">Wydruk zawiera zakres zabudowy, wizualizację 3D (bieżący widok sceny) i cenę netto / VAT / brutto - bez kosztów i marży. Dane zapisują się razem z projektem.</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px">
-      <label class="hub-sub">Nazwa firmy<br><input type="text" class="offer-f" data-k="company" value="${escapeHtml(o.company)}" style="width:100%"></label>
-      <label class="hub-sub">Klient<br><input type="text" class="offer-f" data-k="clientName" value="${escapeHtml(o.clientName)}" style="width:100%"></label>
-      <label class="hub-sub">Numer oferty<br><input type="text" class="offer-f" data-k="number" value="${escapeHtml(o.number)}" style="width:100%"></label>
-      <label class="hub-sub">Ważność oferty (dni)<br><input type="number" class="offer-f" data-k="validDays" value="${escapeHtml(o.validDays)}" min="0" style="width:100%"></label>
+    <div class="field-grid">
+      <div class="field"><label>Nazwa firmy</label><input type="text" class="offer-f" data-k="company" value="${escapeHtml(o.company)}"></div>
+      <div class="field"><label>Klient</label><input type="text" class="offer-f" data-k="clientName" value="${escapeHtml(o.clientName)}"></div>
+      <div class="field"><label>Numer oferty</label><input type="text" class="offer-f" data-k="number" value="${escapeHtml(o.number)}"></div>
+      <div class="field"><label>Ważność oferty (dni)</label><input type="number" class="offer-f" data-k="validDays" value="${escapeHtml(o.validDays)}" min="0"></div>
     </div>
-    <label class="hub-sub" style="display:block;margin-top:8px">Dane kontaktowe (adres, telefon, e-mail)<br><textarea class="offer-f" data-k="contact" rows="2" style="width:100%">${escapeHtml(o.contact)}</textarea></label>
-    <label class="hub-sub" style="display:block;margin-top:8px">Uwagi (termin realizacji, warunki płatności)<br><textarea class="offer-f" data-k="notes" rows="3" style="width:100%">${escapeHtml(o.notes)}</textarea></label>
-    <label class="hub-sub" style="display:block;margin-top:8px"><input type="checkbox" id="offer-snap" checked> Dołącz zdjęcie widoku 3D</label>
-    <button type="button" id="offer-print" class="btn btn-primary btn-sm" style="margin-top:12px">Podgląd i wydruk oferty</button>`;
+    <div class="field"><label>Dane kontaktowe (adres, telefon, e-mail)</label><textarea class="offer-f" data-k="contact" rows="2">${escapeHtml(o.contact)}</textarea></div>
+    <div class="field"><label>Uwagi (termin realizacji, warunki płatności)</label><textarea class="offer-f" data-k="notes" rows="3">${escapeHtml(o.notes)}</textarea></div>
+    <label class="hub-sub row-center" style="margin-bottom:12px"><input type="checkbox" id="offer-snap" checked> Dołącz zdjęcie widoku 3D</label>
+    <button type="button" id="offer-print" class="btn btn-primary btn-sm">Podgląd i wydruk oferty</button>`;
   el.appendChild(card);
 
   card.querySelectorAll('.offer-f').forEach(inp => inp.addEventListener('input', () => {
