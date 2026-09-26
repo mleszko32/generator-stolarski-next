@@ -1892,9 +1892,15 @@ export function update3D() {
                           // wpuszczanego, mimo że cutlist się nie zmieniał.
                           const innerWidth = W - (th * 2);
                           
-                          let availableDepth = D - 19; 
+                          // Jak w liście formatek (engine/cabinet.js: getFrontsAndDrawers): głębokość wieńców
+                          // korpusu, od niej front wewnętrzny albo grubość frontu wpuszczanego. Wcześniej stałe
+                          // D - 19 dawało o stopień krótszą prowadnicę (450 zamiast 500 NL) niż formatka dna.
+                          const backThickForNL = parseFloat(state.project.materials?.backThickness) || 3;
+                          let availableDepth = backP.type === 'nut' ? D - backP.offset - backThickForNL : D - backThickForNL;
                           if (isInternal) {
                               availableDepth -= (innerFrontThick + innerSetback);
+                          } else if (isInsetFront) {
+                              availableDepth -= th;
                           }
                           
                           if (el.forceNL && !isNaN(parseFloat(el.forceNL))) {

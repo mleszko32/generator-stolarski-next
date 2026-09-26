@@ -14,7 +14,6 @@ const num = (v, d = 0) => {
 };
 
 const SIDE_T = 16;   // grubość boku i dna szuflady
-const FRONT_TO_BACK_CLEARANCE = 19; // tył szuflady w głąb korpusu (jak w 3D i formatkach)
 
 // mod: szafka, el: front szufladowy, project: state.project.
 // Zwraca { rect: {x0,x1,y0,y1}, comps, system } (rect = obrys całej skrzynki razem z bokami;
@@ -34,8 +33,16 @@ export function getDrawerBoxInfo(mod, el, project) {
   if (y + h > H - th) availableSpace -= th;
 
   const innerW = W - th * 2;
-  let depth = D - FRONT_TO_BACK_CLEARANCE;
+  // Głębokość dla doboru długości nominalnej (NL) - TAK SAMO jak lista formatek
+  // (engine/cabinet.js: getFrontsAndDrawers): głębokość wieńców korpusu (bez płyty pleców;
+  // przy plecach w nucie jeszcze bez cofnięcia), a od niej front wewnętrzny albo grubość
+  // frontu wpuszczanego. Wcześniej 3D i ta funkcja odejmowały stałe 19 mm i dobierały o
+  // stopień krótszą prowadnicę (450 zamiast 500) niż formatka dna.
+  const backThick = num(project.materials && project.materials.backThickness, 3) || 3;
+  const backP = mod.backPanel || { type: "nakladane", offset: 16 };
+  let depth = backP.type === "nut" ? D - num(backP.offset, 16) - backThick : D - backThick;
   if (isInternal) depth -= num(el.innerFrontThickness, 18) + num(el.innerSetback, 2);
+  else if (isInset) depth -= th;
   const forceNL = parseFloat(el.forceNL);
   if (Number.isFinite(forceNL)) depth = forceNL + 10;
 

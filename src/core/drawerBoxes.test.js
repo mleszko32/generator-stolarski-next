@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { getDrawerBoxRect } from "./drawerBoxes.js";
+import { getDrawerBoxRect, getDrawerBoxInfo } from "./drawerBoxes.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
 import { state } from "./state.js";
 
@@ -38,5 +38,38 @@ describe("getDrawerBoxRect", () => {
     console.error = () => {};
     expect(getDrawerBoxRect(state.project.modules[0], drawer(), state.project)).toBeNull();
     console.error = orig;
+  });
+});
+
+// Długość nominalna (NL) skrzynki w 3D / rysunku 2D / karcie MUSI zgadzać się z formatką dna
+// z listy formatek ("Dno W600 NL500") - wcześniej 3D dobierało o stopień krótszą prowadnicę.
+import { calculateAllProjectParts } from "../engine/cabinet.js";
+
+describe("NL zgodne z listą formatek", () => {
+  const drawerEl = (over = {}) => ({
+    id: "front-d1", typ: "front", subtype: "szuflada", frontIndex: 0, frontCount: 1, distribution: "1", gap: 3,
+    baseZone: { minX: 18, maxX: 582, minY: 18, maxY: 702, offsetBottom: 0, offsetTop: 0 }, ...over,
+  });
+  const nlFromCutList = () => {
+    const dno = calculateAllProjectParts().find((p) => /^Dno /.test(p.name));
+    return parseInt(/NL(\d+)/.exec(dno.name)[1], 10);
+  };
+
+  it("szafka o głębokości 513 (bok 510): NL 500 zarówno na liście, jak i w skrzynce", () => {
+    setProject(freshProject({ modules: [baseModule({ elements: [drawerEl()] })] }));
+    const m = state.project.modules[0];
+    expect(nlFromCutList()).toBe(500);
+    expect(getDrawerBoxInfo(m, m.elements[0], state.project).comps.nominalLength).toBe(500);
+  });
+
+  it("front wpuszczany i plecy w nucie też dają tę samą NL co lista", () => {
+    setProject(freshProject({ modules: [baseModule({ elements: [drawerEl()] })] }));
+    state.project.front.type = "wpuszczane";
+    let m = state.project.modules[0];
+    expect(getDrawerBoxInfo(m, m.elements[0], state.project).comps.nominalLength).toBe(nlFromCutList());
+
+    state.project.front.type = "nakladane";
+    m.backPanel = { type: "nut", offset: 20, grooveDepth: 7, nutBuild: "all", clearance: 2 };
+    expect(getDrawerBoxInfo(m, m.elements[0], state.project).comps.nominalLength).toBe(nlFromCutList());
   });
 });
