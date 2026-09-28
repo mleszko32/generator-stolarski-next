@@ -311,10 +311,23 @@ export function recalculateLayout(mod) {
               const isBottomOuter = minY <= th + 1;
               const isTopOuter = maxY >= (hasTraverses && isVerticalTraverse ? height - traverseWidth - 1 : height - th - 1);
 
+              // Domyślnie granica wewnętrzna (front kończy się na prawdziwym wieńcu/
+              // półce, nie na krawędzi korpusu ani na innym froncie) dzieli szczelinę
+              // `gap` po połowie z obu stron osi wieńca (nakładanie = th/2 - gap/2).
+              // `el.gapFromAxisTop/Bottom` pozwala to nadpisać PER FRONT: użytkownik
+              // wpisuje wprost żądaną odległość krawędzi frontu od OSI (środka
+              // grubości) sąsiedniego wieńca, niezależnie od `gap` - przydatne, gdy
+              // dwa fronty mają dać dokładnie zadaną (niekoniecznie symetryczną albo
+              // powiązaną z `gap`) odległość od tej samej osi, np. przy wyrównywaniu
+              // do wieńca w sąsiedniej kolumnie/szafce.
+              const axisGap = (v) => (v !== undefined && v !== null && v !== '' && !isNaN(v)) ? parseFloat(v) : null;
+              const gapFromAxisTop = axisGap(el.gapFromAxisTop);
+              const gapFromAxisBottom = axisGap(el.gapFromAxisBottom);
+
               const overLeft = isLeftOuter ? (isInset ? -cLeft : th - cLeft) : (isBoundLeftFront ? -gapVal : ((th / 2) - (gapVal / 2)));
               const overRight = isRightOuter ? (isInset ? -cRight : th - cRight) : (isBoundRightFront ? -gapVal : ((th / 2) - (gapVal / 2)));
-              const overBottom = isBottomOuter ? (isInset ? -cBottom : th - cBottom) : (isBoundBottomFront ? -gapVal : ((th / 2) - (gapVal / 2)));
-              const overTop = isTopOuter ? (isInset ? -cTop : th - cTop) : (isBoundTopFront ? -gapVal : ((th / 2) - (gapVal / 2)));
+              const overBottom = isBottomOuter ? (isInset ? -cBottom : th - cBottom) : (isBoundBottomFront ? -gapVal : (gapFromAxisBottom !== null ? (th / 2) - gapFromAxisBottom : (th / 2) - (gapVal / 2)));
+              const overTop = isTopOuter ? (isInset ? -cTop : th - cTop) : (isBoundTopFront ? -gapVal : (gapFromAxisTop !== null ? (th / 2) - gapFromAxisTop : (th / 2) - (gapVal / 2)));
 
               startX = minX - overLeft;
               totalW = (maxX - minX) + overLeft + overRight;

@@ -226,6 +226,31 @@ describe("integracja z recalculateLayout (core/layout.js)", () => {
     expect(front.y).toBeCloseTo(yBefore + delta);
     expect(front.h).toBeCloseTo(hBefore - delta);
   });
+
+  it("gapFromAxisTop/Bottom nadpisuje domyślny podział szczeliny po połowie na granicy z wieńcem", () => {
+    const mod = setup();
+    let root = buildZoneTree(mod);
+    splitZoneHorizontal(mod, root); // półka pomiędzy dolną (a) i górną (b) wnęką
+    root = buildZoneTree(mod);
+    assignFront(mod, root.a, "drzwi"); // drzwi w DOLNEJ wnęce, boundTop = ta półka
+
+    const th = 18;
+    const shelf = mod.elements.find((el) => el.typ === "poziom");
+    const axisY = shelf.y + th / 2;
+
+    recalculateLayout(mod);
+    const front = mod.elements.find((el) => el.typ === "front");
+    // domyślnie: front.y + front.h siedzi gap/2 (1.5mm przy domyślnym gap=3) od osi półki
+    expect(axisY - (front.y + front.h)).toBeCloseTo(1.5, 1);
+
+    front.gapFromAxisTop = 5;
+    recalculateLayout(mod);
+    expect(axisY - (front.y + front.h)).toBeCloseTo(5, 1);
+
+    front.gapFromAxisTop = 0;
+    recalculateLayout(mod);
+    expect(front.y + front.h).toBeCloseTo(axisY, 1); // front sięga dokładnie do osi
+  });
 });
 
 describe("removeSplit", () => {

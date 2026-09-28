@@ -460,6 +460,24 @@ export function initPropertiesPanel() {
           label: `Szuflada ${idx + 1}${front.subtype === 'szuflada-wewnetrzna' ? ' (wewn.)' : ''}`,
       }));
 
+  // Lista WSZYSTKICH frontów (drzwi i szuflady) do ręcznego "luzu od osi wieńca"
+  // (core/layout.js: el.gapFromAxisTop/Bottom) - nadpisuje domyślny symetryczny
+  // podział szczeliny `gap` na krawędzi stykającej się z wewnętrznym wieńcem/
+  // półką, per front z osobna (np. gdy dwa fronty z sąsiednich kolumn mają się
+  // zejść dokładnie na osi wspólnego wieńca, a nie automatycznie po połowie
+  // `gap`). Pole ma sens tylko na granicy wewnętrznej - na krawędzi korpusu
+  // albo obok innego frontu jest po prostu ignorowane (patrz layout.js).
+  const AXIS_GAP_SUBTYPE_LABELS = { drzwi: 'Drzwi', szuflada: 'Szuflada', 'szuflada-wewnetrzna': 'Szuflada wewn.' };
+  const allFrontsList = (activeModule.elements || [])
+      .filter(el => el.typ === 'front' && el.subtype)
+      .sort((a, b) => (parseFloat(a.y) || 0) - (parseFloat(b.y) || 0))
+      .map((front, idx) => ({
+          front,
+          label: front.subtype === 'drzwi-lp'
+              ? `Drzwi ${front.id.includes('-L-') ? 'Lewe' : 'Prawe'}`
+              : `${AXIS_GAP_SUBTYPE_LABELS[front.subtype] || front.subtype} ${idx + 1}`,
+      }));
+
   // Grupowanie modułów — dotąd edytowalne tylko z menu kontekstowego 3D
   // (render/viewer3d.js), teraz też tutaj (patrz plan przeniesienia okienek 3D
   // do panelu bocznego). "Można połączyć w grupę" tylko gdy zaznaczenie ma
@@ -547,6 +565,24 @@ export function initPropertiesPanel() {
         <div class="property-group"><label>Luz góra (mm):</label><input type="number" id="input-front-top" value="${fc.top ?? 2}" step="0.5" /></div>
         <div class="property-group"><label>Luz dół (mm):</label><input type="number" id="input-front-bottom" value="${fc.bottom ?? 2}" step="0.5" /></div>
       </div>
+      <div class="hint">Powyższe "Luz góra/dół" działają tylko na krawędzi, które dotykają prawdziwej góry/dołu korpusu. Front kończący się na wewnętrznym wieńcu/półce ma nakładanie liczone osobno (patrz niżej).</div>
+
+      ${allFrontsList.length ? `
+        <h3>Luz od osi wieńca (per front)</h3>
+        <div class="hint" style="margin-bottom: 8px;">Tylko dla krawędzi stykającej się z WEWNĘTRZNYM wieńcem/półką (nie krawędzią korpusu ani innym frontem) — domyślnie taki front dzieli szczelinę "Przerwa między frontami" po połowie z obu stron osi wieńca. Wpisz tu wprost żądaną odległość krawędzi TEGO frontu od osi (środka grubości) wieńca, żeby to nadpisać niezależnie od "Przerwa między frontami".</div>
+        ${allFrontsList.map(({ front, label }) => `
+          <div class="row mb-8">
+            <div class="property-group grow">
+              <label class="fs-xs">${escapeHtml(label)} — od osi góra [mm]:</label>
+              <input type="number" class="input-front-axisgap-top" data-front-id="${front.id}" placeholder="Auto (gap/2)" value="${front.gapFromAxisTop ?? ''}" step="0.5" />
+            </div>
+            <div class="property-group grow">
+              <label class="fs-xs">— od osi dół [mm]:</label>
+              <input type="number" class="input-front-axisgap-bottom" data-front-id="${front.id}" placeholder="Auto (gap/2)" value="${front.gapFromAxisBottom ?? ''}" step="0.5" />
+            </div>
+          </div>
+        `).join('')}
+      ` : ''}
 
     `)}
 
@@ -986,6 +1022,8 @@ function setupEventListeners() {
   wireFrontNumberOverride('input-front-force-w', 'forceW');
   wireFrontNumberOverride('input-front-force-offset-y', 'forceOffsetY');
   wireFrontNumberOverride('input-front-force-offset-x', 'forceOffsetX');
+  wireFrontNumberOverride('input-front-axisgap-top', 'gapFromAxisTop');
+  wireFrontNumberOverride('input-front-axisgap-bottom', 'gapFromAxisBottom');
 
   document.querySelectorAll('.input-inner-front-thickness').forEach(inp => {
     inp.addEventListener('change', (e) => {
