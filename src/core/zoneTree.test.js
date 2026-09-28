@@ -12,6 +12,8 @@ import {
   rescaleSubtree,
   axisAncestorChain,
   resizeAlongAxis,
+  siblingLeavesOf,
+  assignFrontAcrossLeaves,
 } from "./zoneTree.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
 import { recalculateLayout } from "./layout.js";
@@ -705,5 +707,123 @@ describe("resizeAlongAxis - realny przypadek: 6 wnęk, zablokowane wszystkie opr
     expect(n2.rect.maxY - n2.rect.minY).toBeGreaterThanOrEqual(30 - 0.01); // MIN_GAP, nie ujemna/zerowa
     expect(n1.rect.maxY - n1.rect.minY).toBeCloseTo(h1 + h2 - 30);
     expect(n3.rect.maxY - n3.rect.minY).toBeCloseTo(h3); // dalsze wnęki nietknięte, kolejność się nie posypała
+  });
+});
+
+describe("scalanie kilku sąsiednich, pustych wnęk pod jeden front (assignFrontAcrossLeaves)", () => {
+  // Buduje kolumnę o `count` wnękach (count-1 półek) i zwraca je posortowane od dołu.
+  // siblingLeavesOf tylko czyta boundLeftId/boundRightId z `node` (nie musi to być
+  // liść) - dla pojedynczej kolumny bez przegród to zawsze "cab-left"/"cab-right",
+  // więc `root` (dowolnego typu) wystarczy jako punkt odniesienia.
+  function buildColumn(mod, count) {
+    for (let i = 1; i < count; i++) {
+      const root = buildZoneTree(mod);
+      const leaves = siblingLeavesOf(root, root, true);
+      splitZoneHorizontal(mod, leaves[leaves.length - 1]); // zawsze dzielimy aktualnie NAJWYŻSZĄ wnękę
+    }
+    const root = buildZoneTree(mod);
+    return siblingLeavesOf(root, root, true);
+  }
+
+  it("scala DWIE DOLNE wnęki (z trzech) - front na osobnym poddrzewie, górna wnęka zostaje pusta", () => {
+    const mod = setup();
+    const leaves = buildColumn(mod, 3);
+    expect(leaves).toHaveLength(3);
+
+    assignFrontAcrossLeaves(mod, [leaves[0], leaves[1]], true, "drzwi", { openingSide: "left" });
+
+    const tree = buildZoneTree(mod);
+    expect(tree.type).toBe("split");
+    expect(tree.fronts).toHaveLength(0); // root sam nie ma frontu - front jest niżej, na a
+    expect(tree.a.fronts).toHaveLength(1);
+    expect(tree.a.fronts[0].subtype).toBe("drzwi");
+    expect(tree.a.type).toBe("split"); // pod frontem nadal REALNA półka między wnęką 1 i 2
+    expect(tree.a.a.fronts).toHaveLength(0);
+    expect(tree.a.b.fronts).toHaveLength(0);
+    expect(tree.b.type).toBe("leaf"); // najwyższa wnęka - poza scaleniem, dalej pusta
+    expect(tree.b.fronts).toHaveLength(0);
+    // baseZone scalonego frontu sięga od dołu wnęki 1 do góry wnęki 2
+    expect(tree.a.fronts[0].baseZone.minY).toBeCloseTo(leaves[0].rect.minY);
+    expect(tree.a.fronts[0].baseZone.maxY).toBeCloseTo(leaves[1].rect.maxY);
+  });
+
+  it("scala DWIE ŚRODKOWE wnęki (z czterech), NIE sięgając ani dołu, ani góry kolumny", () => {
+    const mod = setup();
+    const leaves = buildColumn(mod, 4);
+    expect(leaves).toHaveLength(4);
+
+    assignFrontAcrossLeaves(mod, [leaves[1], leaves[2]], true, "szuflada", { distribution: "1" });
+
+    const tree = buildZoneTree(mod);
+    // dół (wnęka 0) zostaje osobną, pustą wnęką
+    expect(tree.type).toBe("split");
+    expect(tree.a.type).toBe("leaf");
+    expect(tree.a.fronts).toHaveLength(0);
+    // b = scalone (1+2) jako poddrzewo z frontem na górze, plus wnęka 3 osobno
+    expect(tree.b.type).toBe("split");
+    expect(tree.b.fronts).toHaveLength(0); // front jest na b.a, nie na całym b
+    expect(tree.b.a.fronts).toHaveLength(1);
+    expect(tree.b.a.fronts[0].subtype).toBe("szuflada");
+    expect(tree.b.a.type).toBe("split"); // realna półka między wnęką 1 i 2 wciąż istnieje
+    expect(tree.b.b.type).toBe("leaf"); // wnęka 3 (najwyższa) - dalej osobno, pusta
+    expect(tree.b.b.fronts).toHaveLength(0);
+  });
+
+  it("scalony front dostaje prawdziwą, ciągłą geometrię w recalculateLayout (nie tylko w drzewie edytora)", () => {
+    const mod = setup();
+    const leaves = buildColumn(mod, 3);
+    const singleLeafHeight = leaves[0].rect.maxY - leaves[0].rect.minY;
+    const topOfMerge = leaves[1].rect.maxY;
+
+    assignFrontAcrossLeaves(mod, [leaves[0], leaves[1]], true, "drzwi", {});
+    recalculateLayout(mod);
+
+    const front = mod.elements.find((el) => el.typ === "front");
+    // górna krawędź scalenia to REALNA półka (nie krawędź korpusu) - front standardowo
+    // nakłada się na połowę szczeliny/grubości półki (th/2 - gap/2), tak jak przy każdej
+    // innej granicy wewnętrznej niezwiązanej z sąsiednim frontem.
+    const gap = 3;
+    const overlayPastShelf = 18 / 2 - gap / 2;
+    expect(front.y + front.h).toBeCloseTo(topOfMerge + overlayPastShelf, 0);
+    // front obejmuje OBIE wnęki naraz (plus grubość półki między nimi), nie tylko jedną.
+    expect(front.h).toBeGreaterThan(singleLeafHeight * 1.5);
+  });
+
+  it("siblingLeavesOf rozróżnia kolumny - nie miesza wnęk zza przegrody pionowej", () => {
+    const mod = setup();
+    let root = buildZoneTree(mod);
+    splitZoneVertical(mod, root); // dwie kolumny
+    root = buildZoneTree(mod);
+    splitZoneHorizontal(mod, root.a); // lewa kolumna: dwie wnęki; prawa: nadal jedna
+
+    root = buildZoneTree(mod);
+    const leftLeaves = siblingLeavesOf(root, root.a.a, true);
+    const rightLeaves = siblingLeavesOf(root, root.b, true);
+    expect(leftLeaves).toHaveLength(2);
+    expect(rightLeaves).toHaveLength(1);
+  });
+
+  it("scalanie w poziomie (dwie kolumny obok siebie) obejmuje pełną szerokość", () => {
+    const mod = setup();
+    let root = buildZoneTree(mod);
+    splitZoneVertical(mod, root);
+    root = buildZoneTree(mod);
+    const [left, right] = siblingLeavesOf(root, root.a, false);
+
+    assignFrontAcrossLeaves(mod, [left, right], false, "drzwi-lp", {});
+    const tree = buildZoneTree(mod);
+    // Realna przegroda między kolumnami nadal fizycznie istnieje - drzewo to nadal "split",
+    // ale front jest przypięty na tym węźle (obejmuje obie kolumny), tak jak przy każdym innym
+    // "froncie na węźle split" w tej aplikacji.
+    expect(tree.type).toBe("split");
+    expect(tree.fronts).toHaveLength(2); // drzwi-lp = para (lewe+prawe)
+    expect(tree.rect).toEqual(INNER);
+  });
+
+  it("mniej niż dwie wnęki - nic nie robi", () => {
+    const mod = setup();
+    const root = buildZoneTree(mod);
+    expect(assignFrontAcrossLeaves(mod, [root], true, "drzwi", {})).toBeNull();
+    expect(mod.elements.filter((e) => e.typ === "front")).toHaveLength(0);
   });
 });

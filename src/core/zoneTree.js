@@ -84,6 +84,38 @@ export function buildZoneTree(mod, opts = {}) {
     ? [`corner-${cornerArm}-left`, `corner-${cornerArm}-right`, `corner-${cornerArm}-bottom`, `corner-${cornerArm}-top`]
     : ["cab-left", "cab-right", "cab-bottom", "cab-top"];
 
+  // Front obejmujący WIĘCEJ niż jedną wnękę, ale nie sięgający dalszej krawędzi
+  // bieżącego zakresu (np. drzwi zasłaniające dwie ŚRODKOWE półki w kolumnie z
+  // sześcioma wnękami - core/zoneTree.js: assignFrontAcrossLeaves, wołane z
+  // Shift+klikiem w ui/interiorEditor.js). Taki front zaczyna się DOKŁADNIE na
+  // krawędzi, od której zawsze zaczyna się bieżący zakres (partition() zawsze
+  // "obcina" od jednej strony - patrz komentarz na górze pliku), więc rozpoznanie
+  // go tu jest wystarczające, żeby rządził wyborem PIERWSZEGO dzielnika: musi
+  // nim być ten, którego pozycja pokrywa się z KOŃCEM frontu, inaczej front nie
+  // dopasuje się do żadnego poddrzewa (frontsMatchingZone wymaga dokładnego
+  // dopasowania WSZYSTKICH czterech krawędzi).
+  function anchoredFront(rect, wantH) {
+    return (mod.elements || []).find((el) => {
+      if (el.typ !== "front" || !el.baseZone) return false;
+      if (cornerArm ? el.cornerArm !== cornerArm : !!el.cornerArm) return false;
+      const bz = el.baseZone;
+      if (wantH) {
+        return (
+          Math.abs(parseFloat(bz.minX) - rect.minX) < EPS &&
+          Math.abs(parseFloat(bz.maxX) - rect.maxX) < EPS &&
+          Math.abs(parseFloat(bz.minY) - rect.minY) < EPS &&
+          parseFloat(bz.maxY) < rect.maxY - EPS
+        );
+      }
+      return (
+        Math.abs(parseFloat(bz.minY) - rect.minY) < EPS &&
+        Math.abs(parseFloat(bz.maxY) - rect.maxY) < EPS &&
+        Math.abs(parseFloat(bz.minX) - rect.minX) < EPS &&
+        parseFloat(bz.maxX) < rect.maxX - EPS
+      );
+    });
+  }
+
   function partition(rect, boundLeftId, boundRightId, boundBottomId, boundTopId) {
     const fronts = frontsMatchingZone(mod, rect, cornerArm);
 
@@ -98,7 +130,12 @@ export function buildZoneTree(mod, opts = {}) {
       .sort((a, b) => a.x - b.x);
 
     if (pionCandidates.length > 0) {
-      const pion = pionCandidates[0];
+      let pion = pionCandidates[0];
+      const anchoredV = anchoredFront(rect, false);
+      if (anchoredV) {
+        const preferred = pionCandidates.find((p) => Math.abs(p.x - parseFloat(anchoredV.baseZone.maxX)) < EPS);
+        if (preferred) pion = preferred;
+      }
       const a = partition({ ...rect, maxX: pion.x }, boundLeftId, pion.id, boundBottomId, boundTopId);
       const b = partition({ ...rect, minX: pion.x + pion.w }, pion.id, boundRightId, boundBottomId, boundTopId);
       return { type: "split", axis: "v", divider: pion, rect, a, b, fronts, boundLeftId, boundRightId, boundBottomId, boundTopId };
@@ -115,7 +152,12 @@ export function buildZoneTree(mod, opts = {}) {
       .sort((a, b) => a.y - b.y);
 
     if (poziomCandidates.length > 0) {
-      const poziom = poziomCandidates[0];
+      let poziom = poziomCandidates[0];
+      const anchoredH = anchoredFront(rect, true);
+      if (anchoredH) {
+        const preferred = poziomCandidates.find((p) => Math.abs(p.y - parseFloat(anchoredH.baseZone.maxY)) < EPS);
+        if (preferred) poziom = preferred;
+      }
       const a = partition({ ...rect, maxY: poziom.y }, boundLeftId, boundRightId, boundBottomId, poziom.id);
       const b = partition({ ...rect, minY: poziom.y + poziom.h }, boundLeftId, boundRightId, poziom.id, boundTopId);
       return { type: "split", axis: "h", divider: poziom, rect, a, b, fronts, boundLeftId, boundRightId, boundBottomId, boundTopId };
@@ -396,6 +438,64 @@ export function assignFront(mod, node, subtype, opts = {}) {
       });
     }
   }
+}
+
+// Liście (core/zoneTree.js buildZoneTree) leżące w TEJ SAMEJ kolumnie co `node`
+// (wantH=true: to samo boundLeftId/boundRightId - scalanie w pionie, wzdłuż
+// wysokości) albo w tym samym wierszu (wantH=false: to samo boundBottomId/
+// boundTopId - scalanie w poziomie, wzdłuż szerokości), posortowane wzdłuż osi
+// scalania. Używane przez ui/interiorEditor.js (Shift+klik), żeby sprawdzić,
+// czy dwie wnęki są BEZPOŚREDNIO sąsiadujące, zanim pozwoli je scalić jednym
+// frontem (assignFrontAcrossLeaves niżej).
+export function siblingLeavesOf(root, node, wantH) {
+  const all = [];
+  (function walk(n) {
+    if (n.type === "leaf") { all.push(n); return; }
+    walk(n.a);
+    walk(n.b);
+  })(root);
+  const sameGroup = wantH
+    ? all.filter((l) => l.boundLeftId === node.boundLeftId && l.boundRightId === node.boundRightId)
+    : all.filter((l) => l.boundBottomId === node.boundBottomId && l.boundTopId === node.boundTopId);
+  sameGroup.sort((a, b) => (wantH ? a.rect.minY - b.rect.minY : a.rect.minX - b.rect.minX));
+  return sameGroup;
+}
+
+// Obsadza JEDNYM frontem kilka sąsiednich, PUSTYCH wnęk naraz (np. jedne drzwi
+// zasłaniające dwie już istniejące, osobne półki) - `leaves` muszą być
+// bezpośrednio sąsiadujące (patrz siblingLeavesOf, sprawdzane przez wołający,
+// ui/interiorEditor.js), w tej samej kolumnie (wantH=true) albo wierszu
+// (wantH=false). Fizyczne półki/przegrody MIĘDZY zaznaczonymi wnękami
+// ZOSTAJĄ (front tylko je zasłania - patrz komentarz o frontach na węzłach
+// 'split' na górze pliku i core/zoneTree.js: partition/anchoredFront, które
+// przy najbliższym buildZoneTree() poprawnie odtworzą to jako zagnieżdżone
+// poddrzewo z tym jednym frontem na górze). subtype/opts jak w assignFront.
+export function assignFrontAcrossLeaves(mod, leaves, wantH, subtype, opts = {}) {
+  if (!leaves || leaves.length < 2) return null;
+  const sorted = [...leaves].sort((a, b) => (wantH ? a.rect.minY - b.rect.minY : a.rect.minX - b.rect.minX));
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  leaves.forEach((l) => clearNodeFronts(mod, l));
+
+  const node = wantH
+    ? {
+        rect: { minX: first.rect.minX, maxX: first.rect.maxX, minY: first.rect.minY, maxY: last.rect.maxY },
+        boundLeftId: first.boundLeftId,
+        boundRightId: first.boundRightId,
+        boundBottomId: first.boundBottomId,
+        boundTopId: last.boundTopId,
+        fronts: [],
+      }
+    : {
+        rect: { minX: first.rect.minX, maxX: last.rect.maxX, minY: first.rect.minY, maxY: first.rect.maxY },
+        boundLeftId: first.boundLeftId,
+        boundRightId: last.boundRightId,
+        boundBottomId: first.boundBottomId,
+        boundTopId: first.boundTopId,
+        fronts: [],
+      };
+  assignFront(mod, node, subtype, opts);
+  return node;
 }
 
 // Przeskalowuje WSZYSTKIE poziomy/piony zagnieżdżone w poddrzewie tak, by ich

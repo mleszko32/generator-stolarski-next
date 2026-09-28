@@ -39,6 +39,8 @@ import {
   moveSplit,
   addEvenShelves,
   resizeAlongAxis,
+  siblingLeavesOf,
+  assignFrontAcrossLeaves,
 } from "../core/zoneTree.js";
 import { update3D, enterAlignMode, areFrontsVisible } from "../render/viewer3d.js";
 import { updateSidebar } from "./sidebar.js";
@@ -99,6 +101,151 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
   let lastModId = null; // zmiana aktywnego modułu = reset widoku (patrz render())
   let worldEl = null; // ostatnio narysowany <div> ze skalowaną treścią - potrzebny applyViewTransform() wołanemu z dala od render() (drag/scroll)
 
+  // Zaznaczenie kilku pustych wnęk pod jeden wspólny front (Shift+klik, patrz
+  // renderLeaf/toggleMergeSelect) - lista {modId, rect} (nie referencje do
+  // węzłów drzewa, bo drzewo jest budowane od nowa przy każdym render()).
+  // mergeWantH ustala się przy DRUGIM zaznaczeniu (core/zoneTree.js:
+  // siblingLeavesOf - true = ta sama kolumna/scalanie w pionie, false = ten
+  // sam wiersz/scalanie w poziomie) i blokuje oś do końca zaznaczania.
+  let mergeSelection = [];
+  let mergeWantH = null;
+
+  function rectsClose(a, b) {
+    return Math.abs(a.minX - b.minX) < 0.5 && Math.abs(a.maxX - b.maxX) < 0.5 &&
+      Math.abs(a.minY - b.minY) < 0.5 && Math.abs(a.maxY - b.maxY) < 0.5;
+  }
+
+  function findLeafByRect(root, rect) {
+    let found = null;
+    (function walk(n) {
+      if (found || !n) return;
+      if (n.type === "leaf") { if (rectsClose(n.rect, rect)) found = n; return; }
+      walk(n.a); walk(n.b);
+    })(root);
+    return found;
+  }
+
+  function isNodeInMergeSelection(node, mod) {
+    return mergeSelection.some((s) => s.modId === mod.id && rectsClose(s.rect, node.rect));
+  }
+
+  function clearMergeSelection() {
+    mergeSelection = [];
+    mergeWantH = null;
+  }
+
+  // Shift+klik w pustą wnękę: buduje/rozszerza zaznaczenie do scalenia pod
+  // jeden front. Druga i kolejne wnęki muszą BEZPOŚREDNIO sąsiadować z
+  // dotychczasowym zaznaczeniem (na końcu łańcucha, ta sama kolumna/wiersz) -
+  // inaczej zaznaczenie zaczyna się od nowa od klikniętej wnęki (prostsze niż
+  // komunikat błędu, od razu widać po podświetleniu, co się stało).
+  function toggleMergeSelect(node, mod) {
+    const existingIdx = mergeSelection.findIndex((s) => s.modId === mod.id && rectsClose(s.rect, node.rect));
+    if (existingIdx >= 0) {
+      mergeSelection.splice(existingIdx, 1);
+      if (mergeSelection.length === 0) mergeWantH = null;
+      render();
+      return;
+    }
+
+    if (mergeSelection.length === 0 || mergeSelection[0].modId !== mod.id) {
+      mergeSelection = [{ modId: mod.id, rect: node.rect }];
+      mergeWantH = null;
+      render();
+      return;
+    }
+
+    const root = treesByModId[mod.id];
+    const firstLeaf = root && findLeafByRect(root, mergeSelection[0].rect);
+    if (!firstLeaf) {
+      mergeSelection = [{ modId: mod.id, rect: node.rect }];
+      mergeWantH = null;
+      render();
+      return;
+    }
+
+    const axes = mergeWantH === null ? [true, false] : [mergeWantH];
+    for (const wantH of axes) {
+      const group = siblingLeavesOf(root, firstLeaf, wantH);
+      const idxOf = (rect) => group.findIndex((l) => rectsClose(l.rect, rect));
+      const newIdx = idxOf(node.rect);
+      if (newIdx < 0) continue;
+      const selectedIdx = mergeSelection.map((s) => idxOf(s.rect)).filter((i) => i >= 0);
+      if (!selectedIdx.length) continue;
+      const lo = Math.min(...selectedIdx), hi = Math.max(...selectedIdx);
+      if (newIdx === lo - 1 || newIdx === hi + 1) {
+        mergeWantH = wantH;
+        mergeSelection.push({ modId: mod.id, rect: node.rect });
+        render();
+        return;
+      }
+    }
+
+    mergeSelection = [{ modId: mod.id, rect: node.rect }];
+    mergeWantH = null;
+    render();
+  }
+
+  // Pływający pasek "Scal N wnęk" - te same opcje frontu co zwykły pasek
+  // pustej wnęki (patrz selectNode/mode==='empty'), ale celuje w
+  // assignFrontAcrossLeaves zamiast assignFront. Doklejany w render(), poza
+  // world (nie skaluje się z przybliżeniem), tak jak pasek zoomu.
+  function appendMergeToolbar(viewport, mod) {
+    if (!mergeSelection.length || mergeSelection[0].modId !== mod.id) return;
+
+    const toolbar = document.createElement("div");
+    Object.assign(toolbar.style, {
+      position: "absolute", left: "16px", bottom: "50px", zIndex: "200",
+      background: "#1e293b", borderRadius: "8px", padding: "8px",
+      display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px",
+      boxShadow: "0 8px 20px -6px rgba(0,0,0,.4)", maxWidth: "440px",
+    });
+
+    const info = document.createElement("div");
+    info.innerText = mergeSelection.length < 2
+      ? "🔗 Zaznaczono 1 wnękę - Shift+klik sąsiedniej, żeby scalić"
+      : `🔗 Scal ${mergeSelection.length} wnęki jednym frontem:`;
+    Object.assign(info.style, { fontFamily: "sans-serif", fontSize: "11.5px", fontWeight: "bold", color: "#fff" });
+    toolbar.appendChild(info);
+
+    const addBtn = (label, title, onClick, danger = false) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.innerText = label;
+      b.title = title;
+      Object.assign(b.style, {
+        fontFamily: "sans-serif", fontSize: "11.5px", fontWeight: "bold", color: "#fff",
+        background: danger ? "#7f1d1d" : "#334155", border: "none", borderRadius: "5px",
+        padding: "7px 9px", cursor: "pointer", whiteSpace: "nowrap",
+      });
+      b.addEventListener("mouseenter", () => { b.style.background = danger ? "#991b1b" : "#475569"; });
+      b.addEventListener("mouseleave", () => { b.style.background = danger ? "#7f1d1d" : "#334155"; });
+      b.addEventListener("click", (e) => { e.stopPropagation(); onClick(); });
+      toolbar.appendChild(b);
+      return b;
+    };
+
+    if (mergeSelection.length >= 2) {
+      const doMerge = (subtype, opts = {}) => {
+        const root = treesByModId[mod.id];
+        const leaves = mergeSelection.map((s) => findLeafByRect(root, s.rect)).filter(Boolean);
+        if (leaves.length < 2) return;
+        assignFrontAcrossLeaves(mod, leaves, mergeWantH, subtype, { cornerArm, ...opts });
+        clearMergeSelection();
+        refreshAfterEdit();
+      };
+      addBtn("▭ Drzwi - zawias z lewej", "Jeden front na całą zaznaczoną strefę, zawiasy z lewej", () => doMerge("drzwi", { openingSide: "left" }));
+      addBtn("▭ Drzwi - zawias z prawej", "Jeden front na całą zaznaczoną strefę, zawiasy z prawej", () => doMerge("drzwi", { openingSide: "right" }));
+      addBtn("▭▭ Drzwi L/P", "Para drzwi na całą zaznaczoną strefę", () => doMerge("drzwi-lp"));
+      addBtn("📦 Szuflada zewn.", "Jedna szuflada na całą zaznaczoną strefę", () => doMerge("szuflada", { distribution: "1" }));
+      addBtn("📥 Szuflada wewn.", "Jedna szuflada wewnętrzna na całą zaznaczoną strefę", () => doMerge("szuflada-wewnetrzna", { distribution: "1" }));
+    }
+
+    addBtn("✕ Anuluj zaznaczenie", "Odznacz wszystkie wnęki", () => { clearMergeSelection(); render(); }, true);
+
+    viewport.appendChild(toolbar);
+  }
+
   function isVisible() {
     const el = getContainer();
     return !!el && el.style.display !== "none";
@@ -111,6 +258,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
   function refreshAfterEdit() {
     selectedNode = null;
     toolbarMode = null;
+    clearMergeSelection();
     update3D();
     updateSidebar();
     initPropertiesPanel();
@@ -151,6 +299,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     if (sceneKey !== lastModId) {
       view = { x: 0, y: 0, scale: 1 };
       lastModId = sceneKey;
+      clearMergeSelection();
     }
 
     // Przesunięcie każdego członka grupy WZGLĘDEM aktywnego modułu, w
@@ -298,7 +447,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     const title = document.createElement("div");
     const titleSuffix = cornerArm ? ` — ramię ${cornerArm}` : "";
     const titleName = items.length > 1 ? `grupa (${items.length} szafki: ${items.map((it) => it.mod.name).join(", ")})` : escapeHtml(mod.name);
-    title.innerHTML = `🗂️ Wnętrze: <b>${titleName}${titleSuffix}</b> <span style="color:#94a3b8; font-weight:normal;">— klik w wnękę: podziel / obsadź · klik w dzielnik: przesuń / usuń · przeciągnij tło: przesuń · scroll: przybliż</span>`;
+    title.innerHTML = `🗂️ Wnętrze: <b>${titleName}${titleSuffix}</b> <span style="color:#94a3b8; font-weight:normal;">— klik w wnękę: podziel / obsadź · Shift+klik: zaznacz kilka wnęk do scalenia jednym frontem · klik w dzielnik: przesuń / usuń · przeciągnij tło: przesuń · scroll: przybliż</span>`;
     Object.assign(title.style, { position: "absolute", top: "10px", left: "16px", fontSize: "13px", color: "#1e3a8a", pointerEvents: "none" });
 
     // Ostrzeżenie o kolizjach wnętrza (np. półka w strefie szuflad) - od razu po edycji.
@@ -316,6 +465,10 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     viewport.appendChild(title);
 
     appendZoomControls(viewport);
+    if (mergeSelection.length) {
+      const selMod = groupMods.find((m) => m.id === mergeSelection[0].modId);
+      if (selMod) appendMergeToolbar(viewport, selMod);
+    }
 
     container.appendChild(viewport);
 
@@ -719,8 +872,9 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
   function renderLeaf(node, stage, px, mod, insideFront = false, parentH = null, parentV = null) {
     const { minX, maxX, minY, maxY } = node.rect;
     const el = document.createElement("div");
-    const idleBg = insideFront ? "transparent" : "#f8fafc";
-    const hoverBg = insideFront ? "rgba(224,242,254,0.55)" : "#e0f2fe";
+    const selected = isNodeInMergeSelection(node, mod);
+    const idleBg = selected ? "#fef3c7" : (insideFront ? "transparent" : "#f8fafc");
+    const hoverBg = selected ? "#fde68a" : (insideFront ? "rgba(224,242,254,0.55)" : "#e0f2fe");
 
     Object.assign(el.style, {
       position: "absolute",
@@ -729,28 +883,33 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       width: px.toPxLen(maxX - minX) + "px",
       height: px.toPxLen(maxY - minY) + "px",
       boxSizing: "border-box",
-      border: insideFront ? "1px dashed rgba(100,116,139,0.6)" : "1px dashed #cbd5e1",
+      border: selected ? "2px solid #f59e0b" : (insideFront ? "1px dashed rgba(100,116,139,0.6)" : "1px dashed #cbd5e1"),
       background: idleBg,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       cursor: "pointer",
       fontSize: "11px",
-      color: insideFront ? "#475569" : "#94a3b8",
+      color: selected ? "#92400e" : (insideFront ? "#475569" : "#94a3b8"),
+      fontWeight: selected ? "bold" : "normal",
       transition: "background .12s",
     });
     el.dataset.leaf = "1";
     const plusIcon = document.createElement("i");
-    plusIcon.className = "ti ti-plus";
+    plusIcon.className = selected ? "ti ti-check" : "ti ti-plus";
     plusIcon.setAttribute("aria-hidden", "true");
     plusIcon.style.marginRight = "4px";
     el.appendChild(plusIcon);
-    el.appendChild(document.createTextNode("pusta wnęka"));
+    el.appendChild(document.createTextNode(selected ? "zaznaczona" : "pusta wnęka"));
 
     el.addEventListener("mouseenter", () => { el.style.background = hoverBg; });
     el.addEventListener("mouseleave", () => { el.style.background = idleBg; });
     el.addEventListener("click", (e) => {
       e.stopPropagation();
+      if (e.shiftKey) {
+        toggleMergeSelect(node, mod);
+        return;
+      }
       selectNode(node, el, stage, px, mod, "empty");
     });
 
