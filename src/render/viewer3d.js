@@ -38,6 +38,13 @@ let measureHoverMarker = null;
 const MEASURE_SNAP_PX = 20;
 let isXrayMode = true;
 let isFrontsVisible = true;
+// Etykiety z nazwami szafek unoszące się nad każdą z nich w 3D (zgłoszona
+// potrzeba: przy wielu modułach nie dało się z widoku poznać, która szafka to
+// która, bez klikania każdej po kolei) - stan zapamiętany, żeby nie trzeba było
+// włączać na nowo po każdym przeładowaniu strony.
+let showLabels = true;
+try { showLabels = localStorage.getItem('viewerShowLabels') !== '0'; } catch (e) {}
+let labelsGroup;
 
 // Odczyt stanu przycisku "Ukryj/Pokaż fronty zewn." dla ui/interiorEditor.js -
 // ten sam przełącznik ma teraz ukrywać fronty także we Wnętrzu 2D, nie tylko
@@ -376,6 +383,16 @@ export function init3DViewer() {
   // pomiaru musiałyby znikać przy każdej niepowiązanej zmianie.
   measureGroup = new THREE.Group();
   scene.add(measureGroup);
+
+  // Etykiety nazw szafek - osobna grupa DOTAJĘTA WPROST DO SCENE (nie do
+  // cabinetGroup), z tego samego powodu co measureGroup: żeby samo
+  // pokazanie/ukrycie etykiet (toggleLabelsBtn niżej) mogło przełączyć tylko
+  // .visible bez pełnego update3D(). Zawartość i tak jest przebudowywana przy
+  // każdym update3D() razem z cabinetGroup (patrz tam), bo pozycje/nazwy mogły
+  // się zmienić.
+  labelsGroup = new THREE.Group();
+  labelsGroup.visible = showLabels;
+  scene.add(labelsGroup);
 
   reframeCameraToRoom();
 
@@ -786,8 +803,23 @@ export function init3DViewer() {
   toggleMeasureBtn.onclick = () => toggleMeasureMode();
   measureMode.btn = toggleMeasureBtn;
 
+  const labelsBtnHtml = (on) => `<i class="ti ti-tag" aria-hidden="true"></i> ${on ? 'Ukryj nazwy' : 'Pokaż nazwy'}`;
+  const toggleLabelsBtn = document.createElement('button');
+  toggleLabelsBtn.innerHTML = labelsBtnHtml(showLabels);
+  toggleLabelsBtn.title = 'Etykiety z nazwami szafek nad każdą z nich';
+  toggleLabelsBtn.className = 'btn view-btn' + (showLabels ? ' active' : '');
+  toggleLabelsBtn.onclick = () => {
+      showLabels = !showLabels;
+      try { localStorage.setItem('viewerShowLabels', showLabels ? '1' : '0'); } catch (e) {}
+      toggleLabelsBtn.innerHTML = labelsBtnHtml(showLabels);
+      toggleLabelsBtn.classList.toggle('active', showLabels);
+      if (labelsGroup) labelsGroup.visible = showLabels;
+      requestRender();
+  };
+
   uiOverlay.appendChild(toggleBtn);
   uiOverlay.appendChild(toggleFrontsBtn);
+  uiOverlay.appendChild(toggleLabelsBtn);
   uiOverlay.appendChild(toggleInteriorBtn);
   uiOverlay.appendChild(toggleMeasureBtn);
   // NAPRAWA: overlay wpięty w .center-panel (nie w #editor-3d-container), bo
@@ -1273,8 +1305,61 @@ function disposeObject(root) {
   root.traverse(o => {
     if (o.geometry) o.geometry.dispose();
     const m = o.material;
-    if (m) (Array.isArray(m) ? m : [m]).forEach(x => { if (!x.userData.shared) x.dispose(); });
+    if (m) (Array.isArray(m) ? m : [m]).forEach(x => {
+      if (!x.userData.shared) {
+        if (x.map) x.map.dispose(); // etykiety (createLabelSprite) mają własną, jednorazową teksturę canvas
+        x.dispose();
+      }
+    });
   });
+}
+
+// Rysuje zaokrąglony prostokąt (tło etykiety) na canvasie 2D.
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// Etykieta z nazwą szafki - canvas 2D wypalony na teksturze THREE.Sprite (nie
+// CSS2DRenderer: sprite jest zwykłym obiektem sceny, więc rysuje się razem z
+// resztą w tym samym renderer.render(scene, camera) bez osobnej pętli
+// renderowania/synchronizacji). depthTest:false -> zawsze czytelna na wierzchu,
+// nawet zza innej szafki albo ściany - to ma pomagać ZNALEŹĆ szafkę, więc
+// nie powinna dać się niechcący zasłonić.
+function createLabelSprite(text) {
+  const fontPx = 44;
+  const padX = 22, padY = 14;
+  const measCanvas = document.createElement('canvas');
+  const measCtx = measCanvas.getContext('2d');
+  measCtx.font = `600 ${fontPx}px sans-serif`;
+  const textW = Math.max(1, Math.ceil(measCtx.measureText(text).width));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = textW + padX * 2;
+  canvas.height = fontPx + padY * 2;
+  const ctx = canvas.getContext('2d');
+  ctx.font = `600 ${fontPx}px sans-serif`; // reset po zmianie canvas.width/height (czyści stan kontekstu)
+  ctx.fillStyle = 'rgba(30,41,59,0.82)';
+  roundRectPath(ctx, 0, 0, canvas.width, canvas.height, 12);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2 + 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false });
+  const sprite = new THREE.Sprite(material);
+  sprite.renderOrder = 999;
+  const worldH = 130; // mm - wysokość etykiety w scenie (skalowana z zoomem jak reszta bryły)
+  sprite.scale.set(worldH * (canvas.width / canvas.height), worldH, 1);
+  return sprite;
 }
 
 
@@ -1618,6 +1703,13 @@ export function update3D() {
       const old = cabinetGroup.children[0];
       cabinetGroup.remove(old);
       disposeObject(old);
+  }
+  if (labelsGroup) {
+      while (labelsGroup.children.length > 0) {
+          const old = labelsGroup.children[0];
+          labelsGroup.remove(old);
+          disposeObject(old);
+      }
   }
   requestRender();
 
@@ -2100,6 +2192,27 @@ export function update3D() {
 
       cabinetGroup.add(modGroup);
   });
+
+  // Etykiety nazw szafek (toggleLabelsBtn niżej) - osobny, prosty przebieg po
+  // modułach zamiast wpięcia w pętlę wyżej: ta pętla ma wczesny `return` dla
+  // szafki narożnej (osobna, nieprostokątna ścieżka renderowania), więc
+  // etykieta w środku niej zostałaby pominięta dla narożników. getWorldFootprint
+  // (core/layout.js) liczy odcisk na podłodze identycznie dla obu typów (już
+  // uwzględnia narożnik jako legA×legB), więc pozycja środka i wysokość górnej
+  // krawędzi liczą się tu tym samym, jednym wzorem dla każdej szafki.
+  if (labelsGroup) {
+      state.project.modules.forEach(mod => {
+          const { worldW, worldD } = getWorldFootprint(mod);
+          const centerX = (parseFloat(mod.position.x) || 0) + worldW / 2;
+          const centerZ = (parseFloat(mod.position.z) || 0) + worldD / 2;
+          const legH = (mod.legs && mod.legs.active) ? (parseFloat(mod.legs.height) || 100) : 0;
+          const topY = (parseFloat(mod.position.y) || 0) + legH + (parseFloat(mod.dimensions.height) || 720);
+
+          const label = createLabelSprite(mod.name || 'Szafka');
+          label.position.set(centerX, topY + 90, centerZ);
+          labelsGroup.add(label);
+      });
+  }
 
   // Boki dokładane (core/state.js: addSidePanel) - samodzielne, płaskie
   // obiekty projektu (NIE dzieci żadnego modGroup, jak blenda), bo mają

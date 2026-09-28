@@ -216,7 +216,13 @@ export function addModule(type = "base_cabinet") {
   
   const newModule = {
     id: newId,
-    name: name + ' ' + (state.project.modules.length + 1),
+    // Numer TYLKO wśród szafek tego samego typu (nie globalny licznik wszystkich
+    // szafek w projekcie) - inaczej "Słupek 1"/"Słupek 2" przeskakiwały numery za
+    // każdym razem, gdy między nimi dodano inny typ szafki, i nie dało się po
+    // nazwie zorientować, która jest która (zgłoszone jako "gubię się w nazwach").
+    // Nowe szafki i tak lądują zawsze najdalej na prawo (nextX niżej), więc numer
+    // kolejności dodania pokrywa się w praktyce z kolejnością w pokoju od lewej.
+    name: name + ' ' + (state.project.modules.filter(m => m.type === type).length + 1),
     type: type,
     dimensions: { width: 600, height: height, depth: depth },
     position: { x: nextX, y: posY, z: 0 },
@@ -261,7 +267,7 @@ export function addCornerModule() {
 
   const newModule = {
     id: newId,
-    name: 'Szafka narożna ' + (state.project.modules.length + 1),
+    name: 'Szafka narożna ' + (state.project.modules.filter(m => m.type === 'corner_cabinet').length + 1),
     type: 'corner_cabinet',
     dimensions: { width: legA, legB: legB, depth: depth, height: height },
     position: { x: nextX, y: 0, z: 0 },
