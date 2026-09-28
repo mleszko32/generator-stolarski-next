@@ -321,22 +321,33 @@ function renderRysunki(el) {
 }
 
 let showEmptyWalls = false;
+// Tryb wymiarowania rzutów - globalny dla całego wydruku (patrz
+// render/wallElevations.js: dimMode), nie per ściana: 'fronts' (domyślny) =
+// fronty widoczne, wymiar szer.×wys. na każdym; 'shelves' = fronty ukryte,
+// widać półki i wolną wysokość każdej wnęki między nimi. Zgłoszona potrzeba -
+// czytać albo rozmiary frontów, albo układ wnętrza, bez ręcznego przeliczania.
+let wallDimMode = 'fronts';
 
 // Rzuty ścian pomieszczenia: każda ściana widziana od środka, z szafkami,
 // łańcuchem szerokości, poziomami i wymiarami pionowymi (render/wallElevations.js).
 function renderSciany(el) {
-  const all = generateAllWallSVGs(state.project);
+  const all = generateAllWallSVGs(state.project, { dimMode: wallDimMode });
   const shown = all.filter(w => showEmptyWalls || w.wall.items.length > 0);
   el.innerHTML = `
     <div class="hub-bar">
       <div><h3>Rzuty ścian</h3><div class="hub-sub">Widok każdej ściany od środka pokoju: szafki z frontami, szerokości i odstępy w rzędzie pod podłogą, poziomy wysokości oraz wymiary pionowe. Szafka narożna jest pokazana na obu ścianach, przy których stoi.</div></div>
       <div class="hub-actions">
         <label class="hub-sub"><input type="checkbox" id="hub-empty-walls" ${showEmptyWalls ? 'checked' : ''} /> pokaż ściany bez szafek</label>
+        <select id="hub-wall-dimmode" title="Co pokazać i wymiarować na frontach szafek">
+          <option value="fronts" ${wallDimMode === 'fronts' ? 'selected' : ''}>Fronty + ich wymiary</option>
+          <option value="shelves" ${wallDimMode === 'shelves' ? 'selected' : ''}>Bez frontów: półki + wolne wysokości</option>
+        </select>
         <button type="button" id="hub-walls-print" class="btn btn-sm" ${shown.length ? '' : 'disabled'}>Drukuj rzuty ścian</button>
       </div>
     </div>
     ${shown.length === 0 ? '<p class="hub-empty">Żadna szafka nie stoi jeszcze przy ścianie (sprawdź położenie i obrót szafek).</p>' : shown.map(w => `<div class="hub-wall">${w.svg}</div>`).join('')}`;
   el.querySelector('#hub-empty-walls').addEventListener('change', e => { showEmptyWalls = e.target.checked; renderSciany(el); });
+  el.querySelector('#hub-wall-dimmode').addEventListener('change', e => { wallDimMode = e.target.value; renderSciany(el); });
   el.querySelector('#hub-walls-print').addEventListener('click', () => {
     const pages = shown.map(w => `<div class="page">${w.svg}</div>`).join('');
     const html = `<!DOCTYPE html><html lang="pl"><head><meta charset="UTF-8"><title>Rzuty ścian</title>

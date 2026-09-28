@@ -53,6 +53,17 @@ describe('rzuty ścian - przypisanie szafek do ścian', () => {
     expect(f.y0).toBe(102);
   });
 
+  it('półki (typ poziom) też mają współrzędne względem początku szafki, jak fronty', () => {
+    const m = mod('a', 500, 0, 0);
+    m.elements.push({ id: 'a-s', typ: 'poziom', x: 18, y: 350, w: 564, h: 18, isStructural: false });
+    state.project.modules = [m];
+    const s = wall(computeWallLayouts(), 'tyl').items[0].shelves[0];
+    expect(s.u0).toBe(518);
+    expect(s.u1).toBe(518 + 564);
+    expect(s.y0).toBe(450); // y0 szafki (100, nóżki) + el.y (350)
+    expect(s.y1).toBe(468);
+  });
+
   it('szafka narożna trafia na dwie ściany (rotacja 0: tylna i lewa)', () => {
     const corner = addCornerModule();
     corner.position = { x: 0, y: 0, z: 0 };

@@ -50,6 +50,15 @@ function frontsOf(mod) {
   return (mod.elements || []).filter(el => el.typ === 'front' && el.subtype !== 'szuflada-wewnetrzna');
 }
 
+// Półki (core/zoneTree.js: typ 'poziom') do trybu rzutu "bez frontów, wymiary
+// wnęk" (render/wallElevations.js) - pomijamy 'poziom-narozny' (wspólna półka
+// L obu ramion szafki narożnej, ui/cornerConfigModal.js): jej geometria nie
+// mieści się w prostym "jeden zakres u na ramię" modelu poniżej, więc na razie
+// zostaje poza tym widokiem (tak jak rysunek techniczny wieńca narożnego).
+function shelvesOf(mod) {
+  return (mod.elements || []).filter(el => el.typ === 'poziom');
+}
+
 export function getRoom(project = state.project) {
   const r = project.room || DEFAULT_ROOM;
   return {
@@ -61,7 +70,8 @@ export function getRoom(project = state.project) {
 
 // Zwraca { room, walls: [{ id, label, length, items }] } - items posortowane po u0.
 // wall.openings: [{ id, kind, wall, u, width, height, sill }] (okna/drzwi/przeszkody z project.openings).
-// item: { mod, kind: 'cabinet'|'corner', arm, u0, u1, floorY, y0, y1, fronts: [{u0,u1,y0,y1,subtype}] }
+// item: { mod, kind: 'cabinet'|'corner', arm, u0, u1, floorY, y0, y1,
+//         fronts: [{u0,u1,y0,y1,subtype}], shelves: [{u0,u1,y0,y1}] }
 // floorY = spód nóżek nad podłogą, y0 = spód korpusu, y1 = góra korpusu.
 export function computeWallLayouts(project = state.project) {
   const room = getRoom(project);
@@ -91,7 +101,13 @@ export function computeWallLayouts(project = state.project) {
           const fu0 = cornerHigh ? u1 - (off + w) : u0 + off;
           return { u0: fu0, u1: fu0 + w, y0: y0 + (parseFloat(el.y) || 0), y1: y0 + (parseFloat(el.y) || 0) + (parseFloat(el.h) || 0), subtype: el.subtype };
         });
-        byId[wallId].items.push({ mod, kind: 'corner', arm, u0, u1, floorY, y0, y1, fronts });
+        const shelves = shelvesOf(mod).filter(el => el.cornerArm === arm).map(el => {
+          const off = otherDepth + (parseFloat(el.x) || 0);
+          const w = parseFloat(el.w) || 0;
+          const su0 = cornerHigh ? u1 - (off + w) : u0 + off;
+          return { u0: su0, u1: su0 + w, y0: y0 + (parseFloat(el.y) || 0), y1: y0 + (parseFloat(el.y) || 0) + (parseFloat(el.h) || 0) };
+        });
+        byId[wallId].items.push({ mod, kind: 'corner', arm, u0, u1, floorY, y0, y1, fronts, shelves });
       });
       return;
     }
@@ -104,7 +120,13 @@ export function computeWallLayouts(project = state.project) {
       const fy0 = y0 + (parseFloat(el.y) || 0);
       return { u0: fu0, u1: fu0 + fw, y0: fy0, y1: fy0 + (parseFloat(el.h) || 0), subtype: el.subtype };
     });
-    byId[wallId].items.push({ mod, kind: 'cabinet', arm: null, u0, u1, floorY, y0, y1, fronts });
+    const shelves = shelvesOf(mod).map(el => {
+      const sw = parseFloat(el.w) || 0;
+      const su0 = u0 + (parseFloat(el.x) || 0);
+      const sy0 = y0 + (parseFloat(el.y) || 0);
+      return { u0: su0, u1: su0 + sw, y0: sy0, y1: sy0 + (parseFloat(el.h) || 0) };
+    });
+    byId[wallId].items.push({ mod, kind: 'cabinet', arm: null, u0, u1, floorY, y0, y1, fronts, shelves });
   });
 
   walls.forEach(w => w.items.sort((a, b) => a.u0 - b.u0));

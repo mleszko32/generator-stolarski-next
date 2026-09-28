@@ -48,6 +48,13 @@ function planInset(wallId, room, plan, x0, y0, size, fs) {
 }
 
 export function generateWallSVG(wall, room, meta = {}) {
+  // Tryb wymiarowania (przełącznik w ui/productionHub.js, globalny dla
+  // całego wydruku - patrz uzasadnienie tam): 'fronts' (domyślny, jak dotąd)
+  // pokazuje fronty z wymiarem szer.×wys. na każdym z nich; 'shelves' chowa
+  // fronty i pokazuje same półki z wolną wysokością każdej wnęki między nimi
+  // (core/walls.js: item.shelves, ta sama półka co w core/zoneTree.js/
+  // ui/interiorEditor.js, tylko rzutowana na współrzędne ściany).
+  const dimMode = meta.dimMode === 'shelves' ? 'shelves' : 'fronts';
   const L = wall.length;
   const Hroom = room.height;
   const fs = Math.max(22, Math.round(L * 0.0125));
@@ -112,10 +119,52 @@ export function generateWallSVG(wall, room, meta = {}) {
       svg += `<rect x="${X(it.u0)}" y="${Y(it.y0)}" width="${w}" height="${it.y0 - it.floorY}" fill="#e2e8f0" stroke="#94a3b8" stroke-width="${fs * 0.08}" />`;
     }
     svg += `<rect x="${X(it.u0)}" y="${Y(it.y1)}" width="${w}" height="${it.y1 - it.y0}" fill="#ffffff" stroke="#334155" stroke-width="${fs * 0.14}" />`;
-    it.fronts.forEach(f => {
-      const isDrawer = (f.subtype || '').includes('szuflada');
-      svg += `<rect x="${X(f.u0)}" y="${Y(f.y1)}" width="${f.u1 - f.u0}" height="${f.y1 - f.y0}" fill="${isDrawer ? '#eff6ff' : '#f0fdf4'}" stroke="${isDrawer ? '#3b82f6' : '#22c55e'}" stroke-width="${fs * 0.08}" />`;
-    });
+
+    if (dimMode === 'fronts') {
+      it.fronts.forEach(f => {
+        const isDrawer = (f.subtype || '').includes('szuflada');
+        svg += `<rect x="${X(f.u0)}" y="${Y(f.y1)}" width="${f.u1 - f.u0}" height="${f.y1 - f.y0}" fill="${isDrawer ? '#eff6ff' : '#f0fdf4'}" stroke="${isDrawer ? '#3b82f6' : '#22c55e'}" stroke-width="${fs * 0.08}" />`;
+        // wymiar pojedynczego frontu (szer.×wys.) na środku jego prostokąta -
+        // tylko gdy się realnie mieści, inaczej nachodziłby na sąsiednie fronty.
+        const fw = f.u1 - f.u0, fh = f.y1 - f.y0;
+        const dimText = `${fmtMm(fw)}×${fmtMm(fh)}`;
+        const dimFs = fs * 0.72;
+        if (fw > dimText.length * dimFs * 0.52 && fh > dimFs * 1.8) {
+          svg += `<text x="${X((f.u0 + f.u1) / 2)}" y="${Y((f.y0 + f.y1) / 2) + dimFs * 0.32}" font-size="${dimFs}" fill="${isDrawer ? '#1d4ed8' : '#15803d'}" text-anchor="middle">${dimText}</text>`;
+        }
+      });
+    } else {
+      // Półki tej szafki pogrupowane wg zakresu u (kolumna wydzielona
+      // przegrodą pionową ma inny zakres u niż sąsiednia) - każda kolumna
+      // dostaje własny łańcuch wolnych wysokości: podłoga/dolna krawędź
+      // korpusu -> pierwsza półka -> ... -> góra korpusu. Szafka bez żadnej
+      // półki liczy się jako jedna kolumna na całą szerokość (cała wnęka
+      // pusta, wolna wysokość = wysokość korpusu).
+      const groups = new Map();
+      (it.shelves || []).forEach(s => {
+        const key = Math.round(s.u0) + '|' + Math.round(s.u1);
+        if (!groups.has(key)) groups.set(key, { u0: s.u0, u1: s.u1, boards: [] });
+        groups.get(key).boards.push(s);
+      });
+      if (groups.size === 0) groups.set('_', { u0: it.u0, u1: it.u1, boards: [] });
+
+      groups.forEach(g => {
+        g.boards.sort((a, b) => a.y0 - b.y0);
+        g.boards.forEach(s => {
+          svg += `<rect x="${X(s.u0)}" y="${Y(s.y1)}" width="${s.u1 - s.u0}" height="${s.y1 - s.y0}" fill="#e2e8f0" stroke="#94a3b8" stroke-width="${fs * 0.08}" />`;
+        });
+        let cursor = it.y0;
+        const gaps = [];
+        g.boards.forEach(s => { gaps.push([cursor, s.y0]); cursor = s.y1; });
+        gaps.push([cursor, it.y1]);
+        const dimFs = fs * 0.85;
+        gaps.forEach(([gy0, gy1]) => {
+          if (gy1 - gy0 < 1) return;
+          svg += `<text x="${X((g.u0 + g.u1) / 2)}" y="${(Y(gy0) + Y(gy1)) / 2 + dimFs * 0.32}" font-size="${dimFs}" font-weight="bold" fill="${NAVY}" text-anchor="middle">${fmtMm(gy1 - gy0)}</text>`;
+        });
+      });
+    }
+
     const fit = (t) => escapeHtml(t.length * fs * 0.55 > w ? t.slice(0, Math.max(3, Math.floor(w / (fs * 0.55)) - 1)) + '…' : t);
     svg += `<text x="${X((it.u0 + it.u1) / 2)}" y="${Y(it.y1) + fs * 1.5}" font-size="${fs * 1.05}" font-weight="bold" fill="#0f172a" text-anchor="middle">${moduleCode(it)}</text>`;
     const label = moduleLabel(it);
@@ -244,9 +293,9 @@ export function generateWallSVG(wall, room, meta = {}) {
   return svg;
 }
 
-export function generateAllWallSVGs(project) {
+export function generateAllWallSVGs(project, opts = {}) {
   const { room, walls, plan } = computeWallLayouts(project);
   const wt = computeWorktops(project);
-  const meta = { worktops: wt.settings.enabled ? wt.pieces : [], plan, projectName: project.name, date: new Date().toLocaleDateString('pl-PL') };
+  const meta = { worktops: wt.settings.enabled ? wt.pieces : [], plan, projectName: project.name, date: new Date().toLocaleDateString('pl-PL'), dimMode: opts.dimMode };
   return walls.map(w => ({ wall: w, room, svg: generateWallSVG(w, room, meta) }));
 }
