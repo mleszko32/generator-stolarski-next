@@ -180,6 +180,17 @@ Formatki table (`ui/edgeBandingUi.js`); feeds the metres in Okucia/cost, and the
 **Project check**: `core/validate.js` (`validateProject`) feeds the hub section "Kontrola projektu"
 (`ui/projectCheck.js`): collisions, room bounds, too-wide doors/shelves, parts not fitting the sheet, openings.
 
+**Front materials**: fronts have their own price catalog, not one shared price like the other cut-list categories
+(Korpus/Szuflada/Plecy stay a single zł/m² each) — `project.pricing.frontMaterials[]` (`{id, name, pricePerM2}`,
+`core/state.js: ensurePricingDefaults`, migrated from the old single `pricing.materials.Front` value as a "Standard"
+entry so nobody loses a price they'd already entered). Each front element optionally carries `front.materialId`
+(picked per front in `ui/properties.js`'s Front tab); unset, or pointing at a deleted entry, silently falls back to
+the first catalog entry (`engine/cabinet.js: calculateProjectCost` — deliberately no "unknown material" row). The
+part-identity keys in `calculateParts`/`calculateAllProjectParts` include `materialId` so two identical-size fronts
+in different materials never collapse into one cut-list line. `ui/kosztorysModal.js` renders one editable row per
+catalog entry (add/rename/delete) inside the existing "Materiały płytowe" table, and calls `initPropertiesPanel()`
+after structural catalog changes so the per-front picker stays in sync.
+
 **Client offer**: `core/offer.js` (pure: settings in `project.offer`, `buildOfferHtml`) + the "Oferta dla klienta" card in
 the hub's Kosztorys section (`ui/productionHub.js`). Shows scope + gross/net/VAT only (no costs/margin); the 3D image
 comes from `captureViewerSnapshot()` (`render/viewer3d.js`, current camera view).

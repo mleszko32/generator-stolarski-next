@@ -568,6 +568,17 @@ export function initPropertiesPanel() {
       <div class="hint">Powyższe "Luz góra/dół" działają tylko na krawędzi, które dotykają prawdziwej góry/dołu korpusu. Front kończący się na wewnętrznym wieńcu/półce ma nakładanie liczone osobno (patrz niżej).</div>
 
       ${allFrontsList.length ? `
+        <h3>Materiał frontu (per front)</h3>
+        <div class="hint" style="margin-bottom: 8px;">Ceny materiałów edytujesz w Kosztorysie (Produkcja i raporty) — tu tylko wybierasz, którego materiału użyć dla tego frontu. Bez wyboru liczy się pierwszy materiał z listy.</div>
+        ${allFrontsList.map(({ front, label }) => `
+          <div class="property-group mb-8">
+            <label class="fs-xs">${escapeHtml(label)} — materiał:</label>
+            <select class="input-front-material" data-front-id="${front.id}">
+              ${(state.project.pricing?.frontMaterials || []).map((mat, i) => `<option value="${escapeHtml(mat.id)}" ${(front.materialId ? front.materialId === mat.id : i === 0) ? 'selected' : ''}>${escapeHtml(mat.name)}</option>`).join('')}
+            </select>
+          </div>
+        `).join('')}
+
         <h3>Luz od osi wieńca (per front)</h3>
         <div class="hint" style="margin-bottom: 8px;">Tylko dla krawędzi stykającej się z WEWNĘTRZNYM wieńcem/półką (nie krawędzią korpusu ani innym frontem) — domyślnie taki front dzieli szczelinę "Przerwa między frontami" po połowie z obu stron osi wieńca. Wpisz tu wprost żądaną odległość krawędzi TEGO frontu od osi (środka grubości) wieńca, żeby to nadpisać niezależnie od "Przerwa między frontami".</div>
         ${allFrontsList.map(({ front, label }) => `
@@ -1024,6 +1035,13 @@ function setupEventListeners() {
   wireFrontNumberOverride('input-front-force-offset-x', 'forceOffsetX');
   wireFrontNumberOverride('input-front-axisgap-top', 'gapFromAxisTop');
   wireFrontNumberOverride('input-front-axisgap-bottom', 'gapFromAxisBottom');
+  document.querySelectorAll('.input-front-material').forEach(sel => {
+    sel.addEventListener('change', (e) => {
+      const front = findFront(sel.dataset.frontId);
+      if (front) front.materialId = e.target.value;
+      updateAll();
+    });
+  });
 
   document.querySelectorAll('.input-inner-front-thickness').forEach(inp => {
     inp.addEventListener('change', (e) => {

@@ -4,20 +4,25 @@ import { calculateProjectHardware, calculateProjectCost } from "../engine/cabine
 import { state } from "../core/state.js";
 import { escapeHtml } from "../utils/dom.js";
 import { openModal } from "../utils/modal.js";
+import { initPropertiesPanel } from "./properties.js";
 
 function formatPLN(n) {
     return (Number(n) || 0).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' zł';
 }
 
-// Etykiety kategorii formatek (patrz engine/cabinet.js: kategorie części)
-// - front to zwykle inny, droższy materiał niż korpus (lakier, fornir,
-//   okleina), stąd osobny, opisowy wiersz zamiast jednej wspólnej "płyty".
+// Etykiety kategorii formatek (patrz engine/cabinet.js: kategorie części).
+// Front NIE ma tu wpisu - ma własny katalog materiałów (pricing.frontMaterials,
+// core/state.js), renderowany osobno w renderMaterialRows() niżej, bo jedna
+// wspólna cena nie starcza (lakier / fornir / okleina to różne ceny/m²).
 const MATERIAL_LABELS = {
     Korpus: 'Korpus',
-    Front: 'Front (lakier / fornir / okleina)',
     Szuflada: 'Szuflady (dno, tył)',
     Plecy: 'Plecy (HDF)'
 };
+
+function newMaterialId() {
+    return 'mat-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
 
 const numField = (id, value, unit, extra = '') =>
     `<span class="cost-input"><input type="number" class="input" id="kosztorys-${id}" value="${value}" step="any" min="0" ${extra}> ${unit}</span>`;
@@ -39,8 +44,9 @@ export function mountKosztorys(root) {
             <section class="cost-section">
                 <h3>Materiały płytowe</h3>
                 <table class="cost-table">
-                    <thead><tr><th>Materiał</th><th class="num">Powierzchnia</th><th class="num">Cena / m²</th><th class="num">Koszt</th></tr></thead>
+                    <thead><tr><th>Materiał</th><th class="num">Powierzchnia</th><th class="num">Cena / m²</th><th class="num">Koszt</th><th></th></tr></thead>
                     <tbody id="kosztorys-materials-tbody"></tbody>
+                    <tfoot><tr><td colspan="5"><button type="button" id="kosztorys-add-front-material" class="btn btn-sm"><i class="ti ti-plus" aria-hidden="true"></i> Dodaj materiał frontu</button></td></tr></tfoot>
                 </table>
             </section>
             <section class="cost-section">
@@ -91,6 +97,14 @@ export function mountKosztorys(root) {
             const cat = input.getAttribute('data-cat');
             pricing.materials[cat] = parseFloat(input.value) || 0;
         });
+        modal.querySelectorAll('.kosztorys-front-mat-price').forEach(input => {
+            const mat = pricing.frontMaterials.find(m => m.id === input.getAttribute('data-material-id'));
+            if (mat) mat.pricePerM2 = parseFloat(input.value) || 0;
+        });
+        modal.querySelectorAll('.kosztorys-mat-name').forEach(input => {
+            const mat = pricing.frontMaterials.find(m => m.id === input.getAttribute('data-material-id'));
+            if (mat) mat.name = input.value.trim() || 'Bez nazwy';
+        });
         modal.querySelectorAll('.kosztorys-hw-price').forEach(input => {
             const name = input.getAttribute('data-name');
             pricing.hardware[name] = parseFloat(input.value) || 0;
@@ -108,12 +122,22 @@ export function mountKosztorys(root) {
 
         modal.querySelectorAll('.kosztorys-mat-area').forEach(cell => {
             const cat = cell.getAttribute('data-cat');
-            const line = cost.materials.find(m => m.category === cat);
+            const line = cost.materials.find(m => m.category === cat && !m.materialId);
             cell.textContent = (line ? line.areaM2 : 0).toFixed(2) + ' m²';
         });
         modal.querySelectorAll('.kosztorys-mat-cost').forEach(cell => {
             const cat = cell.getAttribute('data-cat');
-            const line = cost.materials.find(m => m.category === cat);
+            const line = cost.materials.find(m => m.category === cat && !m.materialId);
+            cell.textContent = formatPLN(line ? line.cost : 0);
+        });
+        modal.querySelectorAll('.kosztorys-front-mat-area').forEach(cell => {
+            const id = cell.getAttribute('data-material-id');
+            const line = cost.materials.find(m => m.materialId === id);
+            cell.textContent = (line ? line.areaM2 : 0).toFixed(2) + ' m²';
+        });
+        modal.querySelectorAll('.kosztorys-front-mat-cost').forEach(cell => {
+            const id = cell.getAttribute('data-material-id');
+            const line = cost.materials.find(m => m.materialId === id);
             cell.textContent = formatPLN(line ? line.cost : 0);
         });
         modal.querySelectorAll('.kosztorys-hw-cost').forEach(cell => {
@@ -141,23 +165,62 @@ export function mountKosztorys(root) {
         set('#kosztorys-foot-total', formatPLN(cost.gross));
     }
 
+    // Fronty z pricing.frontMaterials dostają WŁASNY wiersz KAŻDY (nazwa do
+    // edycji, własna cena, usuwanie) - niezależnie od tego, czy akurat jakiś
+    // front już go używa (żeby dało się przygotować ceny materiałów, zanim
+    // przypiszesz je do frontów w Wnętrzu/Froncie). Pozostałe kategorie
+    // (Korpus/Szuflada/Plecy) bez zmian - jedna wspólna cena, wiersz tylko
+    // gdy realnie występują w projekcie.
     function renderMaterialRows() {
         const cost = calculateProjectCost();
-        if (cost.materials.length === 0) {
-            materialsTbody.innerHTML = `<tr><td colspan="4" class="empty-note">Projekt jest pusty</td></tr>`;
-            return;
-        }
-        materialsTbody.innerHTML = cost.materials.map(m => `
+        const otherRows = cost.materials.filter(m => m.category !== 'Front');
+        const korpusHtml = otherRows.filter(m => m.category === 'Korpus').map(otherRowHtml).join('');
+        const restHtml = otherRows.filter(m => m.category !== 'Korpus').map(otherRowHtml).join('');
+
+        const frontRows = Array.isArray(pricing.frontMaterials) ? pricing.frontMaterials : [];
+        const canDeleteFront = frontRows.length > 1;
+        const frontHtml = frontRows.map(mat => `
+            <tr>
+                <td><input type="text" class="input kosztorys-mat-name" data-material-id="${escapeHtml(mat.id)}" value="${escapeHtml(mat.name)}" placeholder="Nazwa materiału frontu"></td>
+                <td class="num kosztorys-front-mat-area" data-material-id="${escapeHtml(mat.id)}">0,00&nbsp;m²</td>
+                <td class="num"><span class="cost-input"><input type="number" class="input kosztorys-front-mat-price" data-material-id="${escapeHtml(mat.id)}" value="${mat.pricePerM2}" step="1" min="0"> zł</span></td>
+                <td class="num kosztorys-front-mat-cost" data-material-id="${escapeHtml(mat.id)}"><b>—</b></td>
+                <td>${canDeleteFront ? `<button type="button" class="icon-btn kosztorys-mat-del" data-material-id="${escapeHtml(mat.id)}" title="Usuń materiał"><i class="ti ti-trash" aria-hidden="true"></i></button>` : ''}</td>
+            </tr>
+        `).join('');
+
+        materialsTbody.innerHTML = (korpusHtml + frontHtml + restHtml) || `<tr><td colspan="5" class="empty-note">Projekt jest pusty</td></tr>`;
+
+        materialsTbody.querySelectorAll('.kosztorys-mat-price, .kosztorys-front-mat-price, .kosztorys-mat-name').forEach(input => {
+            input.addEventListener('input', recalc);
+        });
+        // Nazwa materiału: odśwież listę per front (ui/properties.js) dopiero po
+        // skończeniu wpisywania (change, nie input) - żeby nie przerywać pisania
+        // pełnym przebudowaniem panelu na każdą literę.
+        materialsTbody.querySelectorAll('.kosztorys-mat-name').forEach(input => {
+            input.addEventListener('change', initPropertiesPanel);
+        });
+        materialsTbody.querySelectorAll('.kosztorys-mat-del').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.getAttribute('data-material-id');
+                if (pricing.frontMaterials.length <= 1) return; // zawsze musi zostać co najmniej jeden (fallback dla frontów bez wybranego materiału)
+                pricing.frontMaterials = pricing.frontMaterials.filter(m => m.id !== id);
+                renderMaterialRows();
+                recalc();
+                initPropertiesPanel(); // odśwież listę materiałów w wyborze per front (ui/properties.js), jeśli otwarta
+            });
+        });
+    }
+
+    function otherRowHtml(m) {
+        return `
             <tr>
                 <td>${escapeHtml(MATERIAL_LABELS[m.category] || m.category)}</td>
                 <td class="num kosztorys-mat-area" data-cat="${escapeHtml(m.category)}">${m.areaM2.toFixed(2)}&nbsp;m²</td>
                 <td class="num"><span class="cost-input"><input type="number" class="input kosztorys-mat-price" data-cat="${escapeHtml(m.category)}" value="${m.pricePerM2}" step="1" min="0"> zł</span></td>
                 <td class="num kosztorys-mat-cost" data-cat="${escapeHtml(m.category)}"><b>${formatPLN(m.cost)}</b></td>
-            </tr>
-        `).join('');
-        materialsTbody.querySelectorAll('.kosztorys-mat-price').forEach(input => {
-            input.addEventListener('input', recalc);
-        });
+                <td></td>
+            </tr>`;
     }
 
     function renderHardwareRows() {
@@ -183,6 +246,12 @@ export function mountKosztorys(root) {
     renderHardwareRows();
     recalc();
 
+    modal.querySelector('#kosztorys-add-front-material').addEventListener('click', () => {
+        pricing.frontMaterials.push({ id: newMaterialId(), name: 'Nowy materiał', pricePerM2: 0 });
+        renderMaterialRows();
+        recalc();
+        initPropertiesPanel(); // odśwież listę materiałów w wyborze per front (ui/properties.js), jeśli otwarta
+    });
     modal.querySelector('#kosztorys-margin').addEventListener('input', recalc);
     ['labor-hours','labor-rate','assembly-hours','assembly-rate','transport','discount','vat'].forEach(k => modal.querySelector('#kosztorys-' + k).addEventListener('input', recalc));
 }

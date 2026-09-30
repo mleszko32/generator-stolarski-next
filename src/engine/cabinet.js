@@ -47,7 +47,10 @@ export function calculateParts() {
 
   const aggregated = {};
   rawParts.forEach(part => {
-     const key = `${part.category}_${part.name}_${part.length}_${part.width}`;
+     // materialId w kluczu: dwa fronty o tym samym rozmiarze, ale innym
+     // materiale (core/state.js: pricing.frontMaterials), to RÓŻNE formatki -
+     // bez tego druga po prostu zliczyłaby się do ilości pierwszej.
+     const key = `${part.category}_${part.name}_${part.length}_${part.width}_${part.materialId || ''}`;
      if (aggregated[key]) {
          aggregated[key].qty += part.qty;
      } else {
@@ -249,7 +252,8 @@ export function calculateAllProjectParts() {
   const allParts = collectProjectParts();
   const aggregated = {};
   allParts.forEach(part => {
-     const key = `${part.category}_${part.name}_${part.length}_${part.width}`;
+     // materialId w kluczu - patrz calculateParts() wyżej (ten sam powód).
+     const key = `${part.category}_${part.name}_${part.length}_${part.width}_${part.materialId || ''}`;
      if (aggregated[key]) {
          aggregated[key].qty += part.qty;
          if (!aggregated[key].modules.includes(part.moduleName)) {
@@ -262,6 +266,7 @@ export function calculateAllProjectParts() {
              length: part.length,
              width: part.width,
              qty: part.qty,
+             materialId: part.materialId,
              modules: [part.moduleName]
          };
      }
@@ -426,23 +431,47 @@ export function calculateProjectCost() {
   const parts = calculateAllProjectParts();
   const hardware = calculateProjectHardware();
 
-  const areaMm2ByCategory = {};
+  // Fronty mają WŁASNY katalog materiałów (pricing.frontMaterials, core/
+  // state.js), nie jedną wspólną cenę jak pozostałe kategorie - front bez
+  // wybranego materiału (front.materialId nieustawione) ORAZ front, którego
+  // materiał ktoś skasował z katalogu (stara, nieistniejąca już referencja),
+  // po cichu ląduje na PIERWSZYM wpisie katalogu zamiast pokazywać osobny,
+  // mylący wiersz "nieznany materiał, 0 zł".
+  const frontCatalog = Array.isArray(pricing.frontMaterials) && pricing.frontMaterials.length
+    ? pricing.frontMaterials
+    : [{ id: 'default', name: 'Standard', pricePerM2: 0 }];
+  const frontMaterialById = Object.fromEntries(frontCatalog.map(m => [m.id, m]));
+  const resolveFrontMaterial = (materialId) => (materialId && frontMaterialById[materialId]) || frontCatalog[0];
+
+  const areaMm2ByKey = {}; // klucz = kategoria, albo "Front::<materialId>" dla frontów
   parts.forEach(p => {
     const areaMm2 = (parseFloat(p.length) || 0) * (parseFloat(p.width) || 0) * (parseFloat(p.qty) || 0);
     const cat = p.category || 'Inne';
-    areaMm2ByCategory[cat] = (areaMm2ByCategory[cat] || 0) + areaMm2;
+    const key = cat === 'Front' ? `Front::${resolveFrontMaterial(p.materialId).id}` : cat;
+    areaMm2ByKey[key] = (areaMm2ByKey[key] || 0) + areaMm2;
   });
 
-  const categories = Object.keys(areaMm2ByCategory).sort((a, b) => {
-    const ia = MATERIAL_CATEGORY_ORDER.indexOf(a);
-    const ib = MATERIAL_CATEGORY_ORDER.indexOf(b);
-    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  const frontOrderIndex = (id) => { const i = frontCatalog.findIndex(m => m.id === id); return i === -1 ? 99 : i; };
+  const keys = Object.keys(areaMm2ByKey).sort((a, b) => {
+    const catA = a.startsWith('Front::') ? 'Front' : a;
+    const catB = b.startsWith('Front::') ? 'Front' : b;
+    const ia = MATERIAL_CATEGORY_ORDER.indexOf(catA);
+    const ib = MATERIAL_CATEGORY_ORDER.indexOf(catB);
+    const byCat = (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    if (byCat !== 0) return byCat;
+    if (catA === 'Front') return frontOrderIndex(a.slice(7)) - frontOrderIndex(b.slice(7));
+    return 0;
   });
 
-  const materials = categories.map(cat => {
-    const areaM2 = areaMm2ByCategory[cat] / 1e6;
-    const pricePerM2 = parseFloat((pricing.materials || {})[cat]) || 0;
-    return { category: cat, areaM2, pricePerM2, cost: areaM2 * pricePerM2 };
+  const materials = keys.map(key => {
+    const areaM2 = areaMm2ByKey[key] / 1e6;
+    if (key.startsWith('Front::')) {
+      const mat = frontMaterialById[key.slice(7)] || frontCatalog[0];
+      const pricePerM2 = parseFloat(mat.pricePerM2) || 0;
+      return { category: 'Front', materialId: mat.id, materialName: mat.name, areaM2, pricePerM2, cost: areaM2 * pricePerM2 };
+    }
+    const pricePerM2 = parseFloat((pricing.materials || {})[key]) || 0;
+    return { category: key, areaM2, pricePerM2, cost: areaM2 * pricePerM2 };
   });
 
   const hardwareLines = hardware.map(hw => {
@@ -977,7 +1006,7 @@ function getFrontsAndDrawers(mod, config) {
       partName = `Drzwi ${side}`;
     }
 
-    parts.push({ name: partName, length: parseFloat((front.h || 0).toFixed(1)), width: parseFloat((front.w || 0).toFixed(1)), qty: 1, category: "Front" });
+    parts.push({ name: partName, length: parseFloat((front.h || 0).toFixed(1)), width: parseFloat((front.w || 0).toFixed(1)), qty: 1, category: "Front", materialId: front.materialId });
 
     if (front.subtype.includes('szuflada')) {
       const isBottomInZone = front.frontIndex === 0;

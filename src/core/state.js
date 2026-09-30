@@ -76,6 +76,18 @@ export function ensurePricingDefaults(project) {
   PRICING_MATERIAL_CATEGORIES.forEach(cat => {
     p.materials[cat] = parseFloat(p.materials[cat]) || 0;
   });
+
+  // Katalog materiałów frontów (zgłoszona potrzeba: różne fronty w tym samym
+  // projekcie mogą mieć różną cenę/m² - lakier, fornir, okleina - nie tylko
+  // jedną wspólną cenę jak dotąd p.materials.Front). front.materialId
+  // (core/state.js: elementy typu 'front') wskazuje wpis w tej liście po id;
+  // brak pola = pierwszy wpis (patrz engine/cabinet.js: calculateProjectCost).
+  // Migracja: pierwszy wpis "Standard" dziedziczy dotychczasową
+  // p.materials.Front, żeby nikt nie stracił ceny, którą już wpisał.
+  if (!Array.isArray(p.frontMaterials) || p.frontMaterials.length === 0) {
+    p.frontMaterials = [{ id: 'default', name: 'Standard', pricePerM2: p.materials.Front }];
+  }
+
   p.marginPercent = parseFloat(p.marginPercent) || 0;
   if (!p.hardware || typeof p.hardware !== 'object') p.hardware = {};
   migratePricingExtras(p);

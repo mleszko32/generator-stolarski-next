@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { state, ensurePricingDefaults, migratePricingExtras } from '../core/state.js';
-import { calculateProjectCost } from './cabinet.js';
-import { freshProject, setProject } from '../test/fixtures.js';
+import { calculateProjectCost, calculateAllProjectParts } from './cabinet.js';
+import { freshProject, baseModule, fullZoneFront, setProject } from '../test/fixtures.js';
 
 // Pusty projekt (bez szafek) - koszt materiałów i okuć = 0, więc liczby zależą
 // tylko od robocizny, montażu, transportu, marży, rabatu i VAT.
@@ -53,6 +53,61 @@ describe('kosztorys - robocizna, montaż, transport, marża, rabat, VAT', () => 
   });
 });
 
+describe('kosztorys - materiały frontów (per front, pricing.frontMaterials)', () => {
+  function withTwoFronts(materialIdA, materialIdB) {
+    const modA = baseModule({ id: 'a', elements: [fullZoneFront({ id: 'fa', materialId: materialIdA })] });
+    const modB = baseModule({ id: 'b', elements: [fullZoneFront({ id: 'fb', materialId: materialIdB })], position: { x: 700, y: 0, z: 0 } });
+    setProject(freshProject({ modules: [modA, modB] }));
+    state.project.pricing = {
+      frontMaterials: [
+        { id: 'lakier', name: 'Lakier', pricePerM2: 1000 },
+        { id: 'fornir', name: 'Fornir', pricePerM2: 2000 },
+      ],
+    };
+    ensurePricingDefaults(state.project);
+    return calculateProjectCost();
+  }
+
+  it('dwa fronty tej samej wielkości, różny materiał -> DWA osobne wiersze Front, każdy z własną ceną', () => {
+    const c = withTwoFronts('lakier', 'fornir');
+    const frontLines = c.materials.filter(m => m.category === 'Front');
+    expect(frontLines).toHaveLength(2);
+    const lakier = frontLines.find(l => l.materialId === 'lakier');
+    const fornir = frontLines.find(l => l.materialId === 'fornir');
+    expect(lakier.areaM2).toBeCloseTo(fornir.areaM2, 6); // te same wymiary frontu w obu modułach
+    expect(lakier.pricePerM2).toBe(1000);
+    expect(fornir.pricePerM2).toBe(2000);
+    expect(fornir.cost).toBeCloseTo(lakier.cost * 2, 6); // 2x cena przy tym samym m²
+  });
+
+  it('front bez wybranego materiału liczy się jak pierwszy wpis katalogu', () => {
+    const c = withTwoFronts(undefined, 'lakier');
+    const frontLines = c.materials.filter(m => m.category === 'Front');
+    // oba fronty (bez materialId i z materialId:'lakier', pierwszy wpis katalogu) trafiają do TEJ SAMEJ puli "lakier"
+    expect(frontLines).toHaveLength(1);
+    expect(frontLines[0].materialId).toBe('lakier');
+  });
+
+  it('materialId wskazujący na skasowany wpis katalogu po cichu wraca do pierwszego materiału (bez crasha)', () => {
+    const c = withTwoFronts('nieistniejacy-material', 'lakier');
+    const frontLines = c.materials.filter(m => m.category === 'Front');
+    expect(frontLines).toHaveLength(1);
+    expect(frontLines[0].materialId).toBe('lakier');
+  });
+
+  it('formatki o tym samym rozmiarze, ale innym materiale, NIE scalają się w jedną pozycję (qty)', () => {
+    setProject(freshProject({
+      modules: [
+        baseModule({ id: 'a', elements: [fullZoneFront({ id: 'fa', materialId: 'lakier' })] }),
+        baseModule({ id: 'b', elements: [fullZoneFront({ id: 'fb', materialId: 'fornir' })], position: { x: 700, y: 0, z: 0 } }),
+      ],
+    }));
+    const parts = calculateAllProjectParts().filter(p => p.category === 'Front');
+    expect(parts).toHaveLength(2);
+    expect(parts.every(p => p.qty === 1)).toBe(true);
+  });
+});
+
 describe('migracja pól kosztorysu', () => {
   it('starsze projekty dostają domyślne pola i zachowują ceny', () => {
     setProject(freshProject({ modules: [] }));
@@ -60,6 +115,7 @@ describe('migracja pól kosztorysu', () => {
     ensurePricingDefaults(state.project);
     const p = state.project.pricing;
     expect(p.materials.Korpus).toBe(50);
+    expect(p.frontMaterials).toEqual([{ id: 'default', name: 'Standard', pricePerM2: 50 }]); // dziedziczy starą p.materials.Front
     expect(p.marginPercent).toBe(15);
     expect(p.labor).toEqual({ hours: 0, rate: 0 });
     expect(p.assembly).toEqual({ hours: 0, rate: 0 });
