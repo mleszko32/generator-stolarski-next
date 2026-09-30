@@ -12,6 +12,7 @@ import { state, ensureRoomDefaults, ensurePricingDefaults, ensureSidePanelsDefau
 import { migrateLegacyRoom, clampModuleToRoom } from "./layout.js";
 import { resetHistory } from "./history.js";
 import { openModal } from "../utils/modal.js";
+import { validateProjectData } from "./projectSchema.js";
 
 // Konfiguracja klienta Firebase jest z założenia publiczna (leci do przeglądarki)
 // i sama z siebie niczego nie chroni. Realną barierą są reguły Firestore w
@@ -260,7 +261,7 @@ export async function restoreProjectVersion(projectId, versionId) {
     }
     const data = JSON.parse(snap.data().json);
     await archiveVersion(projectId, state.project, "Przed przywróceniem wersji", { force: true });
-    applyProjectData(data, projectId);
+    if (!applyProjectData(data, projectId)) return false; // state.project nietknięty, nie ma czego zapisywać
     const toSave = JSON.parse(JSON.stringify(state.project));
     toSave.name = projectId;
     await setDoc(doc(db, "projects", projectId), toSave);
@@ -333,9 +334,21 @@ export async function saveProjectToCloud(projectId = null) {
   }
 }
 
-// Wstawia dane projektu (z chmury albo z wersji historii) do stanu aplikacji.
+// Wstawia dane projektu (z chmury, z wersji historii albo z kopii lokalnej)
+// do stanu aplikacji. Najpierw sprawdza kształt danych (core/projectSchema.js)
+// - uszkodzony/ręcznie edytowany JSON dawał dotąd niejasny crash dopiero
+// głęboko w recalculateLayout()/update3D(). Przy odrzuceniu state.project
+// ZOSTAJE nietknięty (nie nadpisujemy działającego projektu połową złych
+// danych) i funkcja zwraca false - wołający MUSI to sprawdzić i przerwać
+// (nie kontynuować tak, jakby wczytanie się udało).
 export function applyProjectData(data, projectId) {
-  state.project = data;
+  const validated = validateProjectData(data);
+  if (!validated.success) {
+    console.error("Odrzucono wczytanie projektu - nieprawidłowy kształt danych:", validated.issues);
+    alert("❌ Nie udało się wczytać projektu - uszkodzone dane:\n" + validated.issues.join("\n"));
+    return false;
+  }
+  state.project = validated.data;
   ensureRoomDefaults(state.project); // projekty zapisane przed dodaniem pomieszczeń mogą nie mieć tego pola
   ensurePricingDefaults(state.project); // ...ani projekty sprzed dodania kosztorysu
   ensureSidePanelsDefaults(state.project); // ...ani projekty sprzed dodania boków dokładanych
@@ -350,6 +363,7 @@ export function applyProjectData(data, projectId) {
   state.activeSidePanelId = null;
   state.loadedProjectId = projectId;
   resetHistory(); // cofanie między dwoma różnymi wczytanymi projektami nie ma sensu
+  return true;
 }
 
 // WCZYTYWANIE
@@ -362,7 +376,7 @@ export async function loadProjectFromCloud(projectId) {
     const docSnap = await getDoc(projectRef);
     
     if (docSnap.exists()) {
-      applyProjectData(docSnap.data(), projectId);
+      if (!applyProjectData(docSnap.data(), projectId)) return false;
       resetVersionSession();
       markSaved();
       return true;

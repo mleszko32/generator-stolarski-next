@@ -147,6 +147,14 @@ window event (dispatched by 3D drag) to re-render the properties panel.
 promise-based modal used instead of native `confirm` / `prompt`. The Firebase web config is
 committed inline (it is public by design).
 
+`applyProjectData(data, projectId)` is the single choke point every loaded project passes
+through (cloud load, version-history restore, local-backup restore) before it becomes
+`state.project`. It validates `data` first via `core/projectSchema.js` (Zod, structural checks
+only — `modules` an array, each module has `id`/`type`/`dimensions`/`elements` array, everything
+else passes through untouched) and returns `false` without touching `state.project` if the data
+is malformed, instead of corrupting the live app with half-applied garbage. Callers must check
+the return value.
+
 **Openings (windows/doors/obstacles)**: `project.openings[]` (top-level, NOT inside `room`, because the room modal replaces
 `project.room` wholesale) - `core/openings.js` (wall + `u` from the wall's left end seen from inside the room, width,
 height, sill). Edited in the room modal (`ui/roomPanel.js`), drawn in 3D (`viewer3d.js` rebuildRoomGeometry, dimmed with

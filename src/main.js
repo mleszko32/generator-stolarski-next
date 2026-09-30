@@ -262,8 +262,7 @@ if (btnLoad) {
         '', 'Przywróć', 'Odrzuć'
       );
       if (restore) {
-        applyProjectData(backup.project, null);
-        refreshAfterProjectLoad();
+        if (applyProjectData(backup.project, null)) refreshAfterProjectLoad();
       } else {
         clearLocalBackup();
       }
