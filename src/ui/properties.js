@@ -98,6 +98,24 @@ const TRAVERSE_LABELS = { front: "Przedni", rear: "Tylny" };
 // nie właściwość modułu, więc dostaje osobny, krótki formularz zamiast
 // całego "Parametry szafki" (zakładki front/szuflady/konstrukcja/zawiasy nie
 // mają tu zastosowania - to tylko płaska, dekoracyjna płyta).
+// Wspólny wybór materiału (ten sam katalog co front.materialId, patrz
+// .input-front-material niżej) dla blendy/boku dokładanego - to zwykle ten
+// sam, droższy dekor co fronty, więc korzysta z tego samego cennika zamiast
+// dublować go osobno dla "Front" w kosztorysie (engine/cabinet.js:
+// resolveFrontMaterial obsługuje panel.materialId tak samo jak front.materialId).
+function materialSelectHtml(panel) {
+  const mats = state.project.pricing?.frontMaterials || [];
+  return `
+    <div class="property-group">
+      <label>Materiał (cennik frontów):</label>
+      <select id="input-side-material">
+        ${mats.map((mat, i) => `<option value="${escapeHtml(mat.id)}" ${(panel.materialId ? panel.materialId === mat.id : i === 0) ? 'selected' : ''}>${escapeHtml(mat.name)}</option>`).join('')}
+        <option value="__new__">+ Nowy materiał…</option>
+      </select>
+    </div>
+  `;
+}
+
 function renderBlendaProperties(rightSidebar, panel) {
   const flanges = [['prawa', 'Z prawej strony czoła'], ['lewa', 'Z lewej strony czoła'], ['gora', 'Przy górnej krawędzi'], ['dol', 'Przy dolnej krawędzi'], ['brak', 'Bez kołnierza']];
   rightSidebar.innerHTML = `
@@ -110,6 +128,7 @@ function renderBlendaProperties(rightSidebar, panel) {
       <label>Dekor (opis do formatki):</label>
       <input type="text" id="input-side-decor" value="${escapeHtml(panel.decor || '')}" placeholder="np. Front biały połysk" />
     </div>
+    ${materialSelectHtml(panel)}
 
     <h3>Wymiary</h3>
     <div class="property-group"><label>Szerokość czoła (mm):</label><input type="number" id="input-side-width" value="${panel.dimensions.width}" /></div>
@@ -159,6 +178,7 @@ function renderSidePanelProperties(rightSidebar, panel) {
       <label>Dekor (opis do formatki):</label>
       <input type="text" id="input-side-decor" value="${escapeHtml(panel.decor || '')}" placeholder="np. Front biały połysk" />
     </div>
+    ${materialSelectHtml(panel)}
 
     <h3>Wymiary</h3>
     <div class="property-group"><label>Grubość płyty (mm):</label><input type="number" id="input-side-width" value="${panel.dimensions.width}" /></div>
@@ -209,6 +229,24 @@ function bindSidePanelInputs(rightSidebar, panel) {
   bindNumber('input-side-pos-x', v => panel.position.x = v);
   bindNumber('input-side-pos-z', v => panel.position.z = v);
   bindNumber('input-side-pos-y', v => panel.position.y = v);
+
+  const materialSel = document.getElementById('input-side-material');
+  if (materialSel) {
+    materialSel.addEventListener('change', async (e) => {
+      if (e.target.value === '__new__') {
+        const name = await showCustomDialog('prompt', 'Nowy materiał', 'Nazwa materiału (cenę ustawisz w Kosztorysie, gdy już będzie użyty):', '', 'Dodaj');
+        if (!name || !name.trim()) { materialSel.value = panel.materialId || (state.project.pricing.frontMaterials[0]?.id ?? ''); return; }
+        const id = 'mat-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+        state.project.pricing.frontMaterials.push({ id, name: name.trim(), pricePerM2: 0 });
+        panel.materialId = id;
+      } else {
+        panel.materialId = e.target.value;
+      }
+      update3D();
+      updateSidebar();
+      initPropertiesPanel();
+    });
+  }
 
   rightSidebar.querySelectorAll('.btn-side-rotate').forEach(btn => {
     btn.addEventListener('click', () => {

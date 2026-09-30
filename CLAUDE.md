@@ -186,6 +186,9 @@ Formatki table (`ui/edgeBandingUi.js`); feeds the metres in Okucia/cost, and the
 entry so nobody loses a price they'd already entered). Each front element optionally carries `front.materialId`
 (picked per front in `ui/properties.js`'s Front tab); unset, or pointing at a deleted entry, silently falls back to
 the first catalog entry (`engine/cabinet.js: calculateProjectCost` — deliberately no "unknown material" row). The
+same catalog and fallback rule apply to standalone "boki dokładane" and blendy — `sidePanels[].materialId`, picked
+via the shared `materialSelectHtml()`/`bindSidePanelInputs()` in `ui/properties.js` (their cut-list part is
+category `"Front"` too, see `getSidePanelParts`/`getBlendaParts` in `engine/cabinet.js`). The
 part-identity keys in `calculateParts`/`calculateAllProjectParts` include `materialId` so two identical-size fronts
 in different materials never collapse into one cut-list line. `ui/kosztorysModal.js` renders one editable row per
 catalog entry (add/rename/delete) inside the existing "Materiały płytowe" table, and calls `initPropertiesPanel()`

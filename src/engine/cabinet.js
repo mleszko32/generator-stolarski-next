@@ -1159,7 +1159,7 @@ function getBlendaParts(panel, config) {
   const d = parseFloat(panel.dimensions?.depth) || 0;
   const label = panel.decor ? `Blenda (${panel.decor})` : 'Blenda';
   const base = panel.name ? `${label} — ${panel.name}` : label;
-  const parts = [{ name: `${base} (Czoło)`, length: h, width: w, qty: 1, category: "Front" }];
+  const parts = [{ name: `${base} (Czoło)`, length: h, width: w, qty: 1, category: "Front", materialId: panel.materialId }];
   const flange = panel.flange || 'prawa';
   if (flange !== 'brak' && d - th > 0) {
     const along = (flange === 'lewa' || flange === 'prawa') ? h : w;
@@ -1184,6 +1184,7 @@ function getSidePanelParts(panel, config) {
     length: parseFloat(panel.dimensions?.height) || 0,
     width: parseFloat(panel.dimensions?.depth) || 0,
     qty: 1,
-    category: "Front"
+    category: "Front",
+    materialId: panel.materialId
   }];
 }
