@@ -7,6 +7,8 @@ import { openModal } from "../utils/modal.js";
 import { initPropertiesPanel } from "./properties.js";
 import { update3D } from "../render/viewer3d.js";
 import { updateSidebar } from "./sidebar.js";
+import { showCustomDialog } from "../core/storage.js";
+import { loadPriceDefaults, savePriceDefaults, applyPriceDefaults, exportPriceDefaultsJson, importPriceDefaultsJson } from "../core/priceLibrary.js";
 
 // "Zastosuj do wszystkich dolnych/górnych" (zgłoszona potrzeba: w kuchni
 // fronty szafek dolnych i wiszących często mają inny materiał/kolor, ale
@@ -60,6 +62,14 @@ export function mountKosztorys(root) {
 
     root.innerHTML = `
             <section class="cost-section">
+                <div class="btn-row" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                    <button id="kosztorys-price-save" type="button" class="btn btn-sm"><i class="ti ti-device-floppy" aria-hidden="true"></i> Zapisz jako domyślne ceny</button>
+                    <button id="kosztorys-price-load" type="button" class="btn btn-sm"><i class="ti ti-download" aria-hidden="true"></i> Wczytaj z bazy cen</button>
+                    <button id="kosztorys-price-export" type="button" class="btn btn-sm"><i class="ti ti-file-export" aria-hidden="true"></i> Eksport (plik JSON)</button>
+                    <button id="kosztorys-price-import" type="button" class="btn btn-sm"><i class="ti ti-upload" aria-hidden="true"></i> Import z pliku</button>
+                    <input id="kosztorys-price-file" type="file" accept="application/json,.json" style="display:none">
+                </div>
+                <div class="hint" style="margin-bottom:14px;">Baza cen to jeden zapamiętany cennik w tej przeglądarce (materiały, fronty, okucia) - "Zapisz" zapamiętuje ceny z TEGO projektu, "Wczytaj" nakłada je na aktywny projekt bez kasowania pozycji, których baza nie zna. Eksport/import JSON przenosi bazę na inny komputer.</div>
                 <h3>Materiały płytowe</h3>
                 <table class="cost-table">
                     <thead><tr><th>Materiał</th><th class="num">Powierzchnia</th><th class="num">Cena / m²</th><th class="num">Koszt</th><th></th></tr></thead>
@@ -272,6 +282,50 @@ export function mountKosztorys(root) {
             input.addEventListener('input', recalc);
         });
     }
+
+    modal.querySelector('#kosztorys-price-save').addEventListener('click', async () => {
+        const ok = await showCustomDialog('confirm', 'Zapisz jako domyślne ceny', 'Nadpisać zapisaną bazę cen aktualnym cennikiem tego projektu?', '', 'Zapisz', 'Anuluj');
+        if (!ok) return;
+        savePriceDefaults(pricing);
+    });
+    modal.querySelector('#kosztorys-price-load').addEventListener('click', async () => {
+        const snapshot = loadPriceDefaults();
+        if (!snapshot) {
+            alert('Baza cen jest pusta - najpierw zapisz ceny z jakiegoś projektu jako domyślne (albo zaimportuj plik).');
+            return;
+        }
+        const savedDate = new Date(snapshot.savedAt).toLocaleDateString('pl-PL');
+        const ok = await showCustomDialog('confirm', 'Wczytaj z bazy cen', `Nałożyć zapisane ceny (z ${savedDate}) na ten projekt? Pozycje, których baza nie zna, zostaną bez zmian.`, '', 'Wczytaj', 'Anuluj');
+        if (!ok) return;
+        applyPriceDefaults(pricing, snapshot);
+        renderMaterialRows();
+        renderHardwareRows();
+        recalc();
+        initPropertiesPanel(); // katalog frontMaterials mógł dostać nowe pozycje - odśwież selektor materiału przy frontach
+    });
+    modal.querySelector('#kosztorys-price-export').addEventListener('click', () => {
+        if (!loadPriceDefaults()) {
+            alert('Baza cen jest pusta - najpierw zapisz ceny jako domyślne.');
+            return;
+        }
+        const blob = new Blob([exportPriceDefaultsJson()], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'baza-cen.json';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+    const priceFileInput = modal.querySelector('#kosztorys-price-file');
+    modal.querySelector('#kosztorys-price-import').addEventListener('click', () => priceFileInput.click());
+    priceFileInput.addEventListener('change', async () => {
+        const file = priceFileInput.files && priceFileInput.files[0];
+        if (!file) return;
+        const ok = importPriceDefaultsJson(await file.text());
+        priceFileInput.value = '';
+        alert(ok ? 'Baza cen zaimportowana. Użyj „Wczytaj z bazy cen", żeby nałożyć ją na ten projekt.' : '❌ To nie jest poprawny plik bazy cen.');
+    });
 
     renderMaterialRows();
     renderHardwareRows();

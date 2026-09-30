@@ -203,6 +203,14 @@ module templates in `localStorage` (JSON export/import for moving between machin
 `addModuleFromTemplate` / `cloneModuleWithNewIds` (`core/state.js`), which remaps element ids **and** the
 `baseZone.bound*` references between elements (also used by `duplicateModule`).
 
+**Price database**: `core/priceLibrary.js` (button row at the top of Kosztorys, `ui/kosztorysModal.js`) - one
+`localStorage` snapshot of `project.pricing` (board/hardware prices, front materials catalog) that can be saved from
+one project and applied to another, so prices don't have to be re-typed for every new project. Same storage/export
+pattern as the cabinet library, but a single slot (not a named list) since there's no real case for several price
+catalogs at once. `applyPriceDefaults` never deletes anything the snapshot doesn't know about - it only overwrites
+matching board/hardware categories and matches front materials **by name** (not id, since ids are generated
+independently per project) to update its price or add it if missing.
+
 **Local backup**: `core/localBackup.js` keeps a `localStorage` copy of *unsaved* work (every 20 s, on tab hide;
 cleared once the project matches the cloud copy). On startup `main.js` offers to restore it; a restored
 project is deliberately NOT bound to a cloud project (`loadedProjectId = null`) so autosave never overwrites
