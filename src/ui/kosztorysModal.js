@@ -12,17 +12,16 @@ function formatPLN(n) {
 
 // Etykiety kategorii formatek (patrz engine/cabinet.js: kategorie części).
 // Front NIE ma tu wpisu - ma własny katalog materiałów (pricing.frontMaterials,
-// core/state.js), renderowany osobno w renderMaterialRows() niżej, bo jedna
-// wspólna cena nie starcza (lakier / fornir / okleina to różne ceny/m²).
+// core/state.js), renderowany osobno w renderMaterialRows() niżej (frontRowHtml)
+// bo jedna wspólna cena nie starcza (lakier / fornir / okleina to różne ceny/m²).
+// Nowe materiały dopisuje się przy froncie (ui/properties.js: "+ Nowy materiał…"),
+// nie tutaj - tu pokazuje się wiersz tylko dla materiału, którego jakiś front
+// faktycznie już używa (ta sama zasada co dla Korpus/Szuflada/Plecy).
 const MATERIAL_LABELS = {
     Korpus: 'Korpus',
     Szuflada: 'Szuflady (dno, tył)',
     Plecy: 'Plecy (HDF)'
 };
-
-function newMaterialId() {
-    return 'mat-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-}
 
 const numField = (id, value, unit, extra = '') =>
     `<span class="cost-input"><input type="number" class="input" id="kosztorys-${id}" value="${value}" step="any" min="0" ${extra}> ${unit}</span>`;
@@ -46,7 +45,6 @@ export function mountKosztorys(root) {
                 <table class="cost-table">
                     <thead><tr><th>Materiał</th><th class="num">Powierzchnia</th><th class="num">Cena / m²</th><th class="num">Koszt</th><th></th></tr></thead>
                     <tbody id="kosztorys-materials-tbody"></tbody>
-                    <tfoot><tr><td colspan="5"><button type="button" id="kosztorys-add-front-material" class="btn btn-sm"><i class="ti ti-plus" aria-hidden="true"></i> Dodaj materiał frontu</button></td></tr></tfoot>
                 </table>
             </section>
             <section class="cost-section">
@@ -165,29 +163,17 @@ export function mountKosztorys(root) {
         set('#kosztorys-foot-total', formatPLN(cost.gross));
     }
 
-    // Fronty z pricing.frontMaterials dostają WŁASNY wiersz KAŻDY (nazwa do
-    // edycji, własna cena, usuwanie) - niezależnie od tego, czy akurat jakiś
-    // front już go używa (żeby dało się przygotować ceny materiałów, zanim
-    // przypiszesz je do frontów w Wnętrzu/Froncie). Pozostałe kategorie
-    // (Korpus/Szuflada/Plecy) bez zmian - jedna wspólna cena, wiersz tylko
-    // gdy realnie występują w projekcie.
+    // Materiały frontów dostają wiersz TYLKO gdy jakiś front faktycznie ich
+    // używa (zgłoszona uwaga - lista nie ma zaśmiecać się nieużywanymi
+    // pozycjami katalogu) - dokładnie ta sama zasada co już dla Korpus/
+    // Szuflada/Plecy. Nowy materiał powstaje więc NIE tutaj, tylko przy
+    // froncie (ui/properties.js: "+ Nowy materiał…" w wyborze per front) -
+    // dopiero gdy jest przypisany, ma tu sens pokazać mu wiersz do wyceny.
     function renderMaterialRows() {
         const cost = calculateProjectCost();
-        const otherRows = cost.materials.filter(m => m.category !== 'Front');
-        const korpusHtml = otherRows.filter(m => m.category === 'Korpus').map(otherRowHtml).join('');
-        const restHtml = otherRows.filter(m => m.category !== 'Korpus').map(otherRowHtml).join('');
-
-        const frontRows = Array.isArray(pricing.frontMaterials) ? pricing.frontMaterials : [];
-        const canDeleteFront = frontRows.length > 1;
-        const frontHtml = frontRows.map(mat => `
-            <tr>
-                <td><input type="text" class="input kosztorys-mat-name" data-material-id="${escapeHtml(mat.id)}" value="${escapeHtml(mat.name)}" placeholder="Nazwa materiału frontu"></td>
-                <td class="num kosztorys-front-mat-area" data-material-id="${escapeHtml(mat.id)}">0,00&nbsp;m²</td>
-                <td class="num"><span class="cost-input"><input type="number" class="input kosztorys-front-mat-price" data-material-id="${escapeHtml(mat.id)}" value="${mat.pricePerM2}" step="1" min="0"> zł</span></td>
-                <td class="num kosztorys-front-mat-cost" data-material-id="${escapeHtml(mat.id)}"><b>—</b></td>
-                <td>${canDeleteFront ? `<button type="button" class="icon-btn kosztorys-mat-del" data-material-id="${escapeHtml(mat.id)}" title="Usuń materiał"><i class="ti ti-trash" aria-hidden="true"></i></button>` : ''}</td>
-            </tr>
-        `).join('');
+        const korpusHtml = cost.materials.filter(m => m.category === 'Korpus').map(otherRowHtml).join('');
+        const frontHtml = cost.materials.filter(m => m.category === 'Front').map(frontRowHtml).join('');
+        const restHtml = cost.materials.filter(m => m.category !== 'Korpus' && m.category !== 'Front').map(otherRowHtml).join('');
 
         materialsTbody.innerHTML = (korpusHtml + frontHtml + restHtml) || `<tr><td colspan="5" class="empty-note">Projekt jest pusty</td></tr>`;
 
@@ -223,6 +209,18 @@ export function mountKosztorys(root) {
             </tr>`;
     }
 
+    function frontRowHtml(m) {
+        const canDelete = pricing.frontMaterials.length > 1;
+        return `
+            <tr>
+                <td><input type="text" class="input kosztorys-mat-name" data-material-id="${escapeHtml(m.materialId)}" value="${escapeHtml(m.materialName)}" placeholder="Nazwa materiału frontu"></td>
+                <td class="num kosztorys-front-mat-area" data-material-id="${escapeHtml(m.materialId)}">${m.areaM2.toFixed(2)}&nbsp;m²</td>
+                <td class="num"><span class="cost-input"><input type="number" class="input kosztorys-front-mat-price" data-material-id="${escapeHtml(m.materialId)}" value="${m.pricePerM2}" step="1" min="0"> zł</span></td>
+                <td class="num kosztorys-front-mat-cost" data-material-id="${escapeHtml(m.materialId)}"><b>${formatPLN(m.cost)}</b></td>
+                <td>${canDelete ? `<button type="button" class="icon-btn kosztorys-mat-del" data-material-id="${escapeHtml(m.materialId)}" title="Usuń materiał"><i class="ti ti-trash" aria-hidden="true"></i></button>` : ''}</td>
+            </tr>`;
+    }
+
     function renderHardwareRows() {
         const cost = calculateProjectCost();
         if (cost.hardware.length === 0) {
@@ -245,13 +243,6 @@ export function mountKosztorys(root) {
     renderMaterialRows();
     renderHardwareRows();
     recalc();
-
-    modal.querySelector('#kosztorys-add-front-material').addEventListener('click', () => {
-        pricing.frontMaterials.push({ id: newMaterialId(), name: 'Nowy materiał', pricePerM2: 0 });
-        renderMaterialRows();
-        recalc();
-        initPropertiesPanel(); // odśwież listę materiałów w wyborze per front (ui/properties.js), jeśli otwarta
-    });
     modal.querySelector('#kosztorys-margin').addEventListener('input', recalc);
     ['labor-hours','labor-rate','assembly-hours','assembly-rate','transport','discount','vat'].forEach(k => modal.querySelector('#kosztorys-' + k).addEventListener('input', recalc));
 }

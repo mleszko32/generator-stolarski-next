@@ -15,6 +15,7 @@ import { buildZoneTree, rescaleSubtree } from "../core/zoneTree.js";
 import { openCornerConfigModal } from "./cornerConfigModal.js";
 import { moduleInfoHtml } from "./moduleInfoPanel.js";
 import { generateCornerBlankSVG, generateCornerPartsDrawings } from "../render/viewer2d.js";
+import { showCustomDialog } from "../core/storage.js";
 
 function getSelectedMods() {
     if (state.selectedModules && state.selectedModules.size > 0) {
@@ -569,12 +570,13 @@ export function initPropertiesPanel() {
 
       ${allFrontsList.length ? `
         <h3>Materiał frontu (per front)</h3>
-        <div class="hint" style="margin-bottom: 8px;">Ceny materiałów edytujesz w Kosztorysie (Produkcja i raporty) — tu tylko wybierasz, którego materiału użyć dla tego frontu. Bez wyboru liczy się pierwszy materiał z listy.</div>
+        <div class="hint" style="margin-bottom: 8px;">Ceny edytujesz w Kosztorysie (Produkcja i raporty) — pokazuje tam tylko materiały faktycznie użyte przez jakiś front. Bez wyboru liczy się pierwszy materiał z listy. "+ Nowy materiał…" dopisuje pozycję do listy i od razu ją przypisuje tu.</div>
         ${allFrontsList.map(({ front, label }) => `
           <div class="property-group mb-8">
             <label class="fs-xs">${escapeHtml(label)} — materiał:</label>
             <select class="input-front-material" data-front-id="${front.id}">
               ${(state.project.pricing?.frontMaterials || []).map((mat, i) => `<option value="${escapeHtml(mat.id)}" ${(front.materialId ? front.materialId === mat.id : i === 0) ? 'selected' : ''}>${escapeHtml(mat.name)}</option>`).join('')}
+              <option value="__new__">+ Nowy materiał…</option>
             </select>
           </div>
         `).join('')}
@@ -1036,10 +1038,24 @@ function setupEventListeners() {
   wireFrontNumberOverride('input-front-axisgap-top', 'gapFromAxisTop');
   wireFrontNumberOverride('input-front-axisgap-bottom', 'gapFromAxisBottom');
   document.querySelectorAll('.input-front-material').forEach(sel => {
-    sel.addEventListener('change', (e) => {
+    sel.addEventListener('change', async (e) => {
       const front = findFront(sel.dataset.frontId);
-      if (front) front.materialId = e.target.value;
+      if (!front) return;
+      if (e.target.value === '__new__') {
+        // Nowy materiał powstaje TUTAJ (nie w Kosztorysie) - Kosztorys pokazuje
+        // tylko materiały faktycznie użyte (zgłoszona uwaga), więc pusty,
+        // jeszcze nieprzypisany wpis tam by się nie pojawił i nie dało by się
+        // go w ogóle stworzyć.
+        const name = await showCustomDialog('prompt', 'Nowy materiał frontu', 'Nazwa materiału (cenę ustawisz w Kosztorysie, gdy już będzie użyty):', '', 'Dodaj');
+        if (!name || !name.trim()) { sel.value = front.materialId || (state.project.pricing.frontMaterials[0]?.id ?? ''); return; }
+        const id = 'mat-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+        state.project.pricing.frontMaterials.push({ id, name: name.trim(), pricePerM2: 0 });
+        front.materialId = id;
+      } else {
+        front.materialId = e.target.value;
+      }
       updateAll();
+      initPropertiesPanel();
     });
   });
 
