@@ -928,7 +928,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     const obstacles = els.filter((o) =>
       (o.typ === "poziom" || o.subtype === "szuflada-wewnetrzna") && (!front.cornerArm || o.cornerArm === front.cornerArm));
     const side = front.cornerArm ? getCornerDoorHingeSide(mod, front) : hingeSideOf(front);
-    let hinges = [];
+    let hinges;
     try { hinges = calculateHinges(front, th, obstacles, side) || []; } catch (e) { hinges = []; }
     const fx = parseFloat(front.x), fw = parseFloat(front.w);
     if (!Number.isFinite(fx) || !Number.isFinite(fw)) return [];

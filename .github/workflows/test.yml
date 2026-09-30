@@ -1,7 +1,8 @@
 name: Testy
 
-# Testy jednostkowe (Vitest) przy każdym pushu i pull requeście - błąd w
-# obliczeniach formatek/okuć wychodzi zanim zmiana trafi na produkcję (Vercel).
+# Lint (ESLint) + testy jednostkowe (Vitest) przy każdym pushu i pull requeście
+# - błąd w obliczeniach formatek/okuć albo literówka w nazwie zmiennej
+# (eslint.config.js: no-undef) wychodzi zanim zmiana trafi na produkcję (Vercel).
 on:
   push:
     branches: [master]
@@ -17,5 +18,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run lint
       - run: npm run test:run
       - run: npm run build

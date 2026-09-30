@@ -22,8 +22,13 @@ user-facing text and comments Polish to match.
 
 Tests are co-located as `src/**/*.test.js` and cover the pure domain math
 (`core/drawerMath`, `core/hingeMath`, `core/shelfMath`, `core/layout`) and the cut-list /
-hardware engine (`engine/cabinet`). Shared fixtures: `src/test/fixtures.js`. There is no
-linter. CI (`.github/workflows/test.yml`) runs `npm run test:run` and `npm run build` on every push / PR.
+hardware engine (`engine/cabinet`). Shared fixtures: `src/test/fixtures.js`.
+
+`npm run lint` — ESLint (`eslint.config.js`), `js.configs.recommended` only (no style/formatting
+rules) — catches real bugs (undefined variables, empty blocks, useless assignments) without
+reformatting the existing codebase. `no-unused-vars` is a warning, not an error, so it doesn't
+fail CI; everything else is an error. CI (`.github/workflows/test.yml`) runs `npm run lint`,
+`npm run test:run` and `npm run build` on every push / PR.
 
 The `/api/gemini` endpoint only runs under Vercel's serverless runtime. Plain `npm run dev`
 does not serve `api/`, so AI sketch import fails locally unless you run `vercel dev` and set
@@ -141,6 +146,14 @@ window event (dispatched by 3D drag) to re-render the properties panel.
 `getSavedProjectsList`. Also exports `showCustomDialog(type, title, msg, ...)` — a
 promise-based modal used instead of native `confirm` / `prompt`. The Firebase web config is
 committed inline (it is public by design).
+
+`applyProjectData(data, projectId)` is the single choke point every loaded project passes
+through (cloud load, version-history restore, local-backup restore) before it becomes
+`state.project`. It validates `data` first via `core/projectSchema.js` (Zod, structural checks
+only — `modules` an array, each module has `id`/`type`/`dimensions`/`elements` array, everything
+else passes through untouched) and returns `false` without touching `state.project` if the data
+is malformed, instead of corrupting the live app with half-applied garbage. Callers must check
+the return value.
 
 **Openings (windows/doors/obstacles)**: `project.openings[]` (top-level, NOT inside `room`, because the room modal replaces
 `project.room` wholesale) - `core/openings.js` (wall + `u` from the wall's left end seen from inside the room, width,

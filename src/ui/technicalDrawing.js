@@ -6,6 +6,7 @@ import { generateSidePanelSVG } from "../render/viewer2d.js";
 import { state, getActiveModule } from "../core/state.js";
 import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel, openCornerBlankPrintView } from "./properties.js";
+import { updateSidebar } from "./sidebar.js";
 import { escapeHtml } from "../utils/dom.js";
 
 export function openTechnicalDrawing() {

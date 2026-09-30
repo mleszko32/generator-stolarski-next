@@ -41,7 +41,7 @@ export function getModuleSummary(mod, project) {
     .filter((f) => (f.subtype || "").includes("drzwi"))
     .map((f, i) => {
       const side = f.subtype === "drzwi-lp" ? (String(f.id).includes("-L-") ? "left" : "right") : (f.openingSide === "right" ? "right" : "left");
-      let hinges = 0;
+      let hinges;
       try { hinges = (calculateHinges(f, th, obstacles, side) || []).length; } catch (e) { hinges = 0; }
       return { label: `Drzwi ${i + 1}`, w: r1(num(f.w)), h: r1(num(f.h)), side, hinges };
     });
