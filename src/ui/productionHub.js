@@ -100,10 +100,10 @@ function renderFormatki(el) {
       // Prawdziwe zdjęcie z podglądu 3D (nie płaski rysunek, zgłoszona
       // uwaga) - captureModuleSnapshot chowa na chwilę resztę sceny, kadruje
       // kamerę na samą tę bryłę i oddaje canvas jako obrazek; klik na nie
-      // przełącza aktywną szafkę (ta sama "przejście", o które pytano, tylko
-      // bez osobnego okna rysunku - i tak jest już Wnętrze 2D / Rysunki 2D).
+      // przełącza aktywną szafkę i od razu otwiera jej rysunek 2D (to samo,
+      // co przycisk "Otwórz rysunek" w Rysunki 2D).
       const snapshot = mod ? captureModuleSnapshot(mod.id, 40) : null;
-      const thumb = snapshot ? `<img class="hub-group-thumb" src="${snapshot}" data-module-id="${escapeHtml(mod.id)}" title="Kliknij, żeby przełączyć na tę szafkę" alt="">` : '';
+      const thumb = snapshot ? `<img class="hub-group-thumb" src="${snapshot}" data-module-id="${escapeHtml(mod.id)}" title="Kliknij, żeby otworzyć rysunek 2D tej szafki" alt="">` : '';
       body += `<h4 class="hub-group${name === activeName ? ' active' : ''}">${thumb}${escapeHtml(name)} <span>${count} szt.${name === activeName ? ' · aktywna' : ''}</span></h4>${partsTable(aggregate(list), false)}`;
     });
   } else if (groupMode === 'material') {
@@ -149,6 +149,7 @@ function renderFormatki(el) {
       initPropertiesPanel();
       update3D();
       updateSidebar();
+      openTechnicalDrawing();
       renderFormatki(el); // odśwież podpis "aktywna" przy nowo wybranej grupie
     });
   });
