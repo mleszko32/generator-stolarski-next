@@ -12,7 +12,7 @@ import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE, getPartEdges, withEdges, 
 import { edgeIconSvg } from "./edgeBandingUi.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { getCornerDepths, getWorldFootprint } from "../core/layout.js";
-import { update3D, captureViewerSnapshot } from "../render/viewer3d.js";
+import { update3D, captureViewerSnapshot, captureModuleSnapshot } from "../render/viewer3d.js";
 import { buildOfferHtml, getOfferSettings } from "../core/offer.js";
 import { initPropertiesPanel } from "./properties.js";
 import { mountCutPlan } from "./cutPlanModal.js";
@@ -24,7 +24,6 @@ import { openCsvExport } from "./csvEditor.js";
 import { printHardwareList } from "./hardwareList.js";
 import { openTechnicalDrawing } from "./technicalDrawing.js";
 import { mountKosztorys } from "./kosztorysModal.js";
-import { generateModuleThumbnailSVG } from "../render/moduleThumbnail.js";
 
 const SECTIONS = [
   { id: 'formatki', label: 'Formatki', icon: 'ti-list-details' },
@@ -98,7 +97,13 @@ function renderFormatki(el) {
       // znaleziona jako pierwsza (ten sam, już istniejący kompromis co przy
       // łączeniu ich formatek w jedną grupę).
       const mod = state.project.modules.find((m) => m.name === name);
-      const thumb = mod ? `<span class="hub-group-thumb">${generateModuleThumbnailSVG(mod, 32)}</span>` : '';
+      // Prawdziwe zdjęcie z podglądu 3D (nie płaski rysunek, zgłoszona
+      // uwaga) - captureModuleSnapshot chowa na chwilę resztę sceny, kadruje
+      // kamerę na samą tę bryłę i oddaje canvas jako obrazek; klik na nie
+      // przełącza aktywną szafkę (ta sama "przejście", o które pytano, tylko
+      // bez osobnego okna rysunku - i tak jest już Wnętrze 2D / Rysunki 2D).
+      const snapshot = mod ? captureModuleSnapshot(mod.id, 40) : null;
+      const thumb = snapshot ? `<img class="hub-group-thumb" src="${snapshot}" data-module-id="${escapeHtml(mod.id)}" title="Kliknij, żeby przełączyć na tę szafkę" alt="">` : '';
       body += `<h4 class="hub-group${name === activeName ? ' active' : ''}">${thumb}${escapeHtml(name)} <span>${count} szt.${name === activeName ? ' · aktywna' : ''}</span></h4>${partsTable(aggregate(list), false)}`;
     });
   } else if (groupMode === 'material') {
@@ -135,6 +140,18 @@ function renderFormatki(el) {
     </div>
     ${body}`;
   el.querySelector('#hub-group').addEventListener('change', e => { groupMode = e.target.value; renderFormatki(el); });
+  el.querySelectorAll('.hub-group-thumb[data-module-id]').forEach(img => {
+    img.addEventListener('click', () => {
+      const id = img.getAttribute('data-module-id');
+      state.activeModuleId = id;
+      state.selectedModules = new Set([id]);
+      state.activeSidePanelId = null;
+      initPropertiesPanel();
+      update3D();
+      updateSidebar();
+      renderFormatki(el); // odśwież podpis "aktywna" przy nowo wybranej grupie
+    });
+  });
   // Okleina: klik w krawędź przełącza ją, klik w środek ikony - dookoła / brak.
   el.querySelectorAll('.eb-cell').forEach(cell => {
     const row = ebRows[+cell.dataset.r];

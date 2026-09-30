@@ -864,6 +864,72 @@ export function captureViewerSnapshot(maxWidth = 1400) {
   }
 }
 
+// Małe "zdjęcie" pojedynczej szafki (nie całej sceny) - do miniatur na
+// listach (ui/productionHub.js: Formatki grupowane wg szafki, zgłoszona
+// potrzeba "realne zdjęcie 3D", nie płaski rysunek). Chwilowo: chowa
+// wszystkie POZOSTAŁE szafki i ściany/podłogę, kadruje kamerę na samą
+// wybraną bryłę (Box3 z jej grupy - działa identycznie dla zwykłego modułu
+// i szafki narożnej, bo obie mają modGroup.userData.moduleId), renderuje
+// JEDNĄ klatkę w małej rozdzielczości, odczytuje canvas, po czym przywraca
+// WSZYSTKO dokładnie do stanu sprzed wywołania (widoczność, kamera,
+// rozmiar bufora) - całość synchronicznie, więc użytkownik nigdy nie widzi
+// pośrednich klatek ani pustego/skadrowanego widoku na żywym podglądzie.
+export function captureModuleSnapshot(moduleId, size = 160) {
+  if (!renderer || !scene || !camera || !controls || !cabinetGroup) return null;
+  const targetGroup = cabinetGroup.children.find((g) => g.userData && g.userData.moduleId === moduleId);
+  if (!targetGroup) return null;
+
+  const box = new THREE.Box3().setFromObject(targetGroup);
+  if (box.isEmpty()) return null;
+
+  const prevCamPos = camera.position.clone();
+  const prevTarget = controls.target.clone();
+  const prevAspect = camera.aspect;
+  // UWAGA: renderer.domElement.width/height to bufor rysowania (już razy
+  // devicePixelRatio) - setSize() przyjmuje piksele CSS, więc podanie mu z
+  // powrotem tamtych liczb mnożyłoby rozmiar przez DPR przy KAŻDYM
+  // przywróceniu (realny bug, złapany przy weryfikacji: bufor rósł z każdym
+  // kolejnym zdjęciem). container.clientWidth/Height to te same, poprawne
+  // jednostki, których używa reszta tego pliku (patrz resize listener niżej).
+  const prevW = container.clientWidth;
+  const prevH = container.clientHeight;
+  const prevRoomVisible = roomGroup ? roomGroup.visible : null;
+  const prevLabelsVisible = labelsGroup ? labelsGroup.visible : null;
+  const hidden = [];
+
+  try {
+    if (roomGroup) roomGroup.visible = false;
+    if (labelsGroup) labelsGroup.visible = false;
+    cabinetGroup.children.forEach((g) => {
+      if (g !== targetGroup && g.visible) { hidden.push(g); g.visible = false; }
+    });
+
+    const center = box.getCenter(new THREE.Vector3());
+    const diag = Math.max(box.getSize(new THREE.Vector3()).length(), 100);
+
+    renderer.setSize(size, size, false);
+    camera.aspect = 1;
+    camera.position.copy(center).add(new THREE.Vector3(0.85, 0.65, 1).normalize().multiplyScalar(diag * 1.5));
+    camera.lookAt(center);
+    camera.updateProjectionMatrix();
+
+    renderer.render(scene, camera);
+    return renderer.domElement.toDataURL('image/png');
+  } catch (e) {
+    return null;
+  } finally {
+    hidden.forEach((g) => { g.visible = true; });
+    if (roomGroup) roomGroup.visible = prevRoomVisible;
+    if (labelsGroup) labelsGroup.visible = prevLabelsVisible;
+    camera.position.copy(prevCamPos);
+    controls.target.copy(prevTarget);
+    camera.aspect = prevAspect;
+    camera.updateProjectionMatrix();
+    renderer.setSize(prevW, prevH, false);
+    renderer.render(scene, camera);
+  }
+}
+
 // Render na żądanie: scena jest statyczna, dopóki użytkownik czegoś nie ruszy, więc
 // nie ma sensu rysować 60-70 klatek na sekundę z cieniami w bezczynności (grzało
 // kartę i zabierało zasoby przeglądarce). Klatki lecą, gdy kamera się porusza, przy
