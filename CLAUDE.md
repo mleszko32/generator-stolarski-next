@@ -22,8 +22,13 @@ user-facing text and comments Polish to match.
 
 Tests are co-located as `src/**/*.test.js` and cover the pure domain math
 (`core/drawerMath`, `core/hingeMath`, `core/shelfMath`, `core/layout`) and the cut-list /
-hardware engine (`engine/cabinet`). Shared fixtures: `src/test/fixtures.js`. There is no
-linter. CI (`.github/workflows/test.yml`) runs `npm run test:run` and `npm run build` on every push / PR.
+hardware engine (`engine/cabinet`). Shared fixtures: `src/test/fixtures.js`.
+
+`npm run lint` — ESLint (`eslint.config.js`), `js.configs.recommended` only (no style/formatting
+rules) — catches real bugs (undefined variables, empty blocks, useless assignments) without
+reformatting the existing codebase. `no-unused-vars` is a warning, not an error, so it doesn't
+fail CI; everything else is an error. CI (`.github/workflows/test.yml`) runs `npm run lint`,
+`npm run test:run` and `npm run build` on every push / PR.
 
 The `/api/gemini` endpoint only runs under Vercel's serverless runtime. Plain `npm run dev`
 does not serve `api/`, so AI sketch import fails locally unless you run `vercel dev` and set

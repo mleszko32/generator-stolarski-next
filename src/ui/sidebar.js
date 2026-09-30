@@ -292,7 +292,7 @@ export function updateSidebar() {
                   
                   if (data.error) throw new Error(data.error.message || data.error);
                   
-                  const rawJson = data.candidates[0].content.parts[0].text.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
+                  const rawJson = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
                   const aiModules = JSON.parse(rawJson);
                   
                   let currentX = 0;

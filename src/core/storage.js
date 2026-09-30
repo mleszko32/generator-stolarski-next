@@ -306,7 +306,7 @@ export async function saveProjectToCloud(projectId = null) {
       }
     }
 
-    targetId = targetId.replace(/[\/\\]/g, "-"); 
+    targetId = targetId.replace(/[/\\]/g, "-");
 
     const projectRef = doc(db, "projects", targetId);
     const dataToSave = JSON.parse(JSON.stringify(state.project));
