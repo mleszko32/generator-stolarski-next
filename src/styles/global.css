@@ -488,6 +488,9 @@ button, input, select, textarea { font-family: inherit; }
 .cost-table th.num { text-align: right; }
 .cost-input { display: inline-flex; align-items: center; gap: 4px; }
 .cost-input .input { width: 76px; text-align: right; padding: 4px 6px; }
+.kosztorys-mat-bulk-row td { padding: 0 8px 8px 0; font-size: var(--fs-xs); color: var(--text-secondary); border-bottom: 1px solid #f1f5f9; }
+.kosztorys-mat-bulk { background: none; border: none; padding: 0; font-size: var(--fs-xs); color: var(--accent); cursor: pointer; text-decoration: underline; }
+.kosztorys-mat-bulk:hover { color: var(--accent-hover); }
 .cost-summary { background: var(--surface-subtle); border-radius: var(--radius-lg); padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; }
 .cost-line { display: flex; justify-content: space-between; font-size: var(--fs-md); color: var(--text-secondary); }
 .cost-line span:last-child { color: var(--text-primary); }

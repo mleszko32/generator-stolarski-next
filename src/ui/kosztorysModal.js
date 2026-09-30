@@ -5,6 +5,25 @@ import { state } from "../core/state.js";
 import { escapeHtml } from "../utils/dom.js";
 import { openModal } from "../utils/modal.js";
 import { initPropertiesPanel } from "./properties.js";
+import { update3D } from "../render/viewer3d.js";
+import { updateSidebar } from "./sidebar.js";
+
+// "Zastosuj do wszystkich dolnych/górnych" (zgłoszona potrzeba: w kuchni
+// fronty szafek dolnych i wiszących często mają inny materiał/kolor, ale
+// wewnątrz każdej grupy zwykle ten sam - bez tego trzeba by klikać front po
+// froncie w każdej szafce z osobna). Słupki/szafki narożne CELOWO pominięte -
+// fizycznie nie są ani jednoznacznie "dolne", ani "górne", więc zostają do
+// ręcznego przypisania per front (ui/properties.js).
+const BULK_ZONES = [
+    { type: 'base_cabinet', label: 'dolnych' },
+    { type: 'upper_cabinet', label: 'górnych' },
+];
+export function applyMaterialToZone(materialId, moduleType) {
+    (state.project.modules || []).forEach(mod => {
+        if (mod.type !== moduleType) return;
+        (mod.elements || []).forEach(el => { if (el.typ === 'front') el.materialId = materialId; });
+    });
+}
 
 function formatPLN(n) {
     return (Number(n) || 0).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' zł';
@@ -196,6 +215,16 @@ export function mountKosztorys(root) {
                 initPropertiesPanel(); // odśwież listę materiałów w wyborze per front (ui/properties.js), jeśli otwarta
             });
         });
+        materialsTbody.querySelectorAll('.kosztorys-mat-bulk').forEach(btn => {
+            btn.addEventListener('click', () => {
+                applyMaterialToZone(btn.getAttribute('data-material-id'), btn.getAttribute('data-zone-type'));
+                renderMaterialRows();
+                recalc();
+                initPropertiesPanel();
+                update3D();
+                updateSidebar();
+            });
+        });
     }
 
     function otherRowHtml(m) {
@@ -211,6 +240,9 @@ export function mountKosztorys(root) {
 
     function frontRowHtml(m) {
         const canDelete = pricing.frontMaterials.length > 1;
+        const bulkBtns = BULK_ZONES.map(z =>
+            `<button type="button" class="kosztorys-mat-bulk" data-material-id="${escapeHtml(m.materialId)}" data-zone-type="${escapeHtml(z.type)}">wszystkich ${escapeHtml(z.label)}</button>`
+        ).join(' · ');
         return `
             <tr>
                 <td><input type="text" class="input kosztorys-mat-name" data-material-id="${escapeHtml(m.materialId)}" value="${escapeHtml(m.materialName)}" placeholder="Nazwa materiału frontu"></td>
@@ -218,7 +250,8 @@ export function mountKosztorys(root) {
                 <td class="num"><span class="cost-input"><input type="number" class="input kosztorys-front-mat-price" data-material-id="${escapeHtml(m.materialId)}" value="${m.pricePerM2}" step="1" min="0"> zł</span></td>
                 <td class="num kosztorys-front-mat-cost" data-material-id="${escapeHtml(m.materialId)}"><b>${formatPLN(m.cost)}</b></td>
                 <td>${canDelete ? `<button type="button" class="icon-btn kosztorys-mat-del" data-material-id="${escapeHtml(m.materialId)}" title="Usuń materiał"><i class="ti ti-trash" aria-hidden="true"></i></button>` : ''}</td>
-            </tr>`;
+            </tr>
+            <tr class="kosztorys-mat-bulk-row"><td colspan="5">Zastosuj do: ${bulkBtns}</td></tr>`;
     }
 
     function renderHardwareRows() {
