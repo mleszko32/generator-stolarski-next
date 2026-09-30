@@ -24,6 +24,7 @@ import { openCsvExport } from "./csvEditor.js";
 import { printHardwareList } from "./hardwareList.js";
 import { openTechnicalDrawing } from "./technicalDrawing.js";
 import { mountKosztorys } from "./kosztorysModal.js";
+import { generateModuleThumbnailSVG } from "../render/moduleThumbnail.js";
 
 const SECTIONS = [
   { id: 'formatki', label: 'Formatki', icon: 'ti-list-details' },
@@ -92,7 +93,13 @@ function renderFormatki(el) {
     });
     byModule.forEach((list, name) => {
       const count = list.reduce((s, p) => s + (parseInt(p.qty, 10) || 1), 0);
-      body += `<h4 class="hub-group${name === activeName ? ' active' : ''}">${escapeHtml(name)} <span>${count} szt.${name === activeName ? ' · aktywna' : ''}</span></h4>${partsTable(aggregate(list), false)}`;
+      // Grupujemy po nazwie (tak samo jak reszta tej funkcji, patrz moduleName
+      // wyżej) - jeśli dwie szafki mają tę samą nazwę, podgląd dostaje ta
+      // znaleziona jako pierwsza (ten sam, już istniejący kompromis co przy
+      // łączeniu ich formatek w jedną grupę).
+      const mod = state.project.modules.find((m) => m.name === name);
+      const thumb = mod ? `<span class="hub-group-thumb">${generateModuleThumbnailSVG(mod, 32)}</span>` : '';
+      body += `<h4 class="hub-group${name === activeName ? ' active' : ''}">${thumb}${escapeHtml(name)} <span>${count} szt.${name === activeName ? ' · aktywna' : ''}</span></h4>${partsTable(aggregate(list), false)}`;
     });
   } else if (groupMode === 'material') {
     const byCat = new Map();
