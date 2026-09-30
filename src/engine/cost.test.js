@@ -115,11 +115,34 @@ describe('migracja pól kosztorysu', () => {
     ensurePricingDefaults(state.project);
     const p = state.project.pricing;
     expect(p.materials.Korpus).toBe(50);
-    expect(p.frontMaterials).toEqual([{ id: 'default', name: 'Standard', pricePerM2: 50 }]); // dziedziczy starą p.materials.Front
+    // dziedziczy starą p.materials.Front w "Standard", obok niej domyślne materiały (zgłoszona lista)
+    expect(p.frontMaterials).toEqual([
+      { id: 'default', name: 'Standard', pricePerM2: 50 },
+      { id: 'lakier', name: 'Lakier', pricePerM2: 0 },
+      { id: 'fornir', name: 'Fornir', pricePerM2: 0 },
+      { id: 'laminat', name: 'Laminat', pricePerM2: 0 },
+      { id: 'akryl', name: 'Akryl', pricePerM2: 0 },
+    ]);
     expect(p.marginPercent).toBe(15);
     expect(p.labor).toEqual({ hours: 0, rate: 0 });
     expect(p.assembly).toEqual({ hours: 0, rate: 0 });
     expect([p.transport, p.discountPercent, p.vatPercent]).toEqual([0, 0, 23]);
+  });
+
+  it('projekt z katalogiem "tylko Standard" (utworzony przed dodaniem presetów) dogrywa je jednorazowo, bez zmiany ceny Standard', () => {
+    setProject(freshProject({ modules: [] }));
+    state.project.pricing = { frontMaterials: [{ id: 'default', name: 'Standard', pricePerM2: 77 }] };
+    ensurePricingDefaults(state.project);
+    const names = state.project.pricing.frontMaterials.map(m => m.name);
+    expect(names).toEqual(['Standard', 'Lakier', 'Fornir', 'Laminat', 'Akryl']);
+    expect(state.project.pricing.frontMaterials[0].pricePerM2).toBe(77);
+  });
+
+  it('projekt, w którym użytkownik już dopisał/przemianował materiały, NIE dostaje dogranych presetów z powrotem', () => {
+    setProject(freshProject({ modules: [] }));
+    state.project.pricing = { frontMaterials: [{ id: 'default', name: 'Moja nazwa', pricePerM2: 77 }] };
+    ensurePricingDefaults(state.project);
+    expect(state.project.pricing.frontMaterials).toEqual([{ id: 'default', name: 'Moja nazwa', pricePerM2: 77 }]);
   });
 
   it('odrzuca ujemne i nieliczbowe wartości, rabat ograniczony do 100%', () => {

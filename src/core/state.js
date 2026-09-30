@@ -82,10 +82,25 @@ export function ensurePricingDefaults(project) {
   // jedną wspólną cenę jak dotąd p.materials.Front). front.materialId
   // (core/state.js: elementy typu 'front') wskazuje wpis w tej liście po id;
   // brak pola = pierwszy wpis (patrz engine/cabinet.js: calculateProjectCost).
-  // Migracja: pierwszy wpis "Standard" dziedziczy dotychczasową
-  // p.materials.Front, żeby nikt nie stracił ceny, którą już wpisał.
+  // "Standard" dziedziczy dotychczasową p.materials.Front, żeby nikt nie
+  // stracił ceny, którą już wpisał; obok niego od razu typowe materiały
+  // frontów meblowych (zgłoszona lista) z ceną 0 do uzupełnienia.
+  const buildDefaultFrontMaterials = (standardPrice) => [
+    { id: 'default', name: 'Standard', pricePerM2: standardPrice },
+    { id: 'lakier', name: 'Lakier', pricePerM2: 0 },
+    { id: 'fornir', name: 'Fornir', pricePerM2: 0 },
+    { id: 'laminat', name: 'Laminat', pricePerM2: 0 },
+    { id: 'akryl', name: 'Akryl', pricePerM2: 0 },
+  ];
   if (!Array.isArray(p.frontMaterials) || p.frontMaterials.length === 0) {
-    p.frontMaterials = [{ id: 'default', name: 'Standard', pricePerM2: p.materials.Front }];
+    p.frontMaterials = buildDefaultFrontMaterials(p.materials.Front);
+  } else if (p.frontMaterials.length === 1 && p.frontMaterials[0].id === 'default' && p.frontMaterials[0].name === 'Standard') {
+    // Katalog nietknięty od pierwszego wczytania (dokładnie jeden wpis
+    // "Standard", nic dopisanego/przemianowanego ręcznie) - dogrywamy nowe
+    // domyślne materiały jednorazowo, zachowując cenę "Standard" bez zmian.
+    // Projekt, w którym użytkownik już cokolwiek dopisał/usunął, zostaje
+    // nietknięty (nie wskrzeszamy świadomie skasowanych pozycji).
+    p.frontMaterials = buildDefaultFrontMaterials(p.frontMaterials[0].pricePerM2);
   }
 
   p.marginPercent = parseFloat(p.marginPercent) || 0;
