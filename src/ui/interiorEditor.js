@@ -1308,6 +1308,9 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       info.innerText = `${label} × ${selectedNode.fronts.length}`;
       Object.assign(info.style, { color: "#cbd5e1", fontSize: "11px", padding: "6px 4px", fontFamily: "sans-serif" });
       toolbar.appendChild(info);
+      if (subtype === "szuflada" || subtype === "szuflada-wewnetrzna") {
+        appendGapEditor(toolbar, selectedNode.fronts);
+      }
       if (subtype === "drzwi") {
         const door = selectedNode.fronts[0];
         const isLeft = door.openingSide === "left" || !door.openingSide;
@@ -1374,6 +1377,44 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     closeBtn.style.marginLeft = "auto";
 
     viewportRef.appendChild(toolbar);
+  }
+
+  // Odstęp MIĘDZY frontami tej samej grupy szuflad (core/layout.js: el.gap,
+  // wspólny dla wszystkich elementów o tym samym frontIndex-set - patrz
+  // core/zoneTree.js: assignFront, które nadaje go wszystkim naraz). Domyślne
+  // 3mm to zwykła szczelina technologiczna; podbicie np. do 30mm robi z niej
+  // wcięcie-uchwyt między szufladami bez klamek (zgłoszona potrzeba). Musi
+  // nadpisać WSZYSTKIE fronty grupy razem, bo recalculateLayout liczy pozycję
+  // każdego z nich z JEGO WŁASNEGO el.gap - gdyby się rozjechały, stos by się
+  // rozjechał geometrycznie.
+  function appendGapEditor(toolbar, fronts) {
+    const wrap = document.createElement("div");
+    Object.assign(wrap.style, { display: "flex", alignItems: "center", gap: "4px", background: "#334155", borderRadius: "5px", padding: "3px 3px 3px 9px" });
+
+    const lbl = document.createElement("span");
+    lbl.innerText = "↕ Przerwa (mm)";
+    Object.assign(lbl.style, { fontFamily: "sans-serif", fontSize: "11.5px", fontWeight: "bold", color: "#fff" });
+
+    const input = document.createElement("input");
+    input.type = "number";
+    input.step = "0.5";
+    input.min = "0";
+    input.value = fronts[0]?.gap ?? 3;
+    input.title = "Odstęp między tymi frontami, np. 30mm zamiast 3mm - robi wcięcie-uchwyt między szufladami bez klamek";
+    Object.assign(input.style, { width: "54px", padding: "5px 3px", border: "none", borderRadius: "4px", textAlign: "center", fontSize: "11px" });
+    input.addEventListener("click", (e) => e.stopPropagation());
+    input.addEventListener("keydown", (e) => e.stopPropagation());
+    input.addEventListener("change", (e) => {
+      e.stopPropagation();
+      const v = parseFloat(input.value);
+      if (isNaN(v) || v < 0) return;
+      fronts.forEach((f) => { f.gap = v; });
+      refreshAfterEdit();
+    });
+
+    wrap.appendChild(lbl);
+    wrap.appendChild(input);
+    toolbar.appendChild(wrap);
   }
 
   function appendDrawerPicker(toolbar, mod, subtype, label) {
