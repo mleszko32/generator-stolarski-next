@@ -81,6 +81,38 @@ const FRONT_COLORS = {
   "szuflada-wewnetrzna": { fill: "#fff7ed", border: "#c2410c" },
 };
 
+// Przycisk pływającego paska (klasy .zone-toolbar-* w styles/global.css).
+function toolbarButton(parent, label, title, onClick, danger = false) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "zone-toolbar-btn" + (danger ? " danger" : "");
+  b.innerText = label;
+  b.title = title;
+  b.addEventListener("click", (e) => { e.stopPropagation(); onClick(); });
+  parent.appendChild(b);
+  return b;
+}
+
+// Pole paska: etykieta + input (+ opcjonalnie przycisk "+" wołający onGo).
+function toolbarField(parent, labelText, input, onGo) {
+  const wrap = document.createElement("div");
+  wrap.className = "zone-toolbar-field";
+  const lbl = document.createElement("span");
+  lbl.className = "zone-toolbar-label";
+  lbl.innerText = labelText;
+  wrap.appendChild(lbl);
+  wrap.appendChild(input);
+  if (onGo) {
+    const go = document.createElement("button");
+    go.type = "button";
+    go.className = "zone-toolbar-go";
+    go.innerText = "+";
+    go.addEventListener("click", (e) => { e.stopPropagation(); onGo(); });
+    wrap.appendChild(go);
+  }
+  parent.appendChild(wrap);
+}
+
 const DIM_MARGIN = 7; // px od krawędzi wnęki, żeby strzałki nie nachodziły na jej ramkę
 
 export function createZoneEditor({ getContainer, getMod, cornerArm }) {
@@ -190,36 +222,16 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     if (!mergeSelection.length || mergeSelection[0].modId !== mod.id) return;
 
     const toolbar = document.createElement("div");
-    Object.assign(toolbar.style, {
-      position: "absolute", left: "16px", bottom: "50px", zIndex: "200",
-      background: "#1e293b", borderRadius: "8px", padding: "8px",
-      display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px",
-      boxShadow: "0 8px 20px -6px rgba(0,0,0,.4)", maxWidth: "440px",
-    });
+    toolbar.className = "zone-toolbar zone-toolbar-merge";
 
     const info = document.createElement("div");
     info.innerText = mergeSelection.length < 2
       ? "🔗 Zaznaczono 1 wnękę - Shift+klik sąsiedniej, żeby scalić"
       : `🔗 Scal ${mergeSelection.length} wnęki jednym frontem:`;
-    Object.assign(info.style, { fontFamily: "sans-serif", fontSize: "11.5px", fontWeight: "bold", color: "#fff" });
+    info.className = "zone-toolbar-label";
     toolbar.appendChild(info);
 
-    const addBtn = (label, title, onClick, danger = false) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.innerText = label;
-      b.title = title;
-      Object.assign(b.style, {
-        fontFamily: "sans-serif", fontSize: "11.5px", fontWeight: "bold", color: "#fff",
-        background: danger ? "#7f1d1d" : "#334155", border: "none", borderRadius: "5px",
-        padding: "7px 9px", cursor: "pointer", whiteSpace: "nowrap",
-      });
-      b.addEventListener("mouseenter", () => { b.style.background = danger ? "#991b1b" : "#475569"; });
-      b.addEventListener("mouseleave", () => { b.style.background = danger ? "#7f1d1d" : "#334155"; });
-      b.addEventListener("click", (e) => { e.stopPropagation(); onClick(); });
-      toolbar.appendChild(b);
-      return b;
-    };
+    const addBtn = (label, title, onClick, danger) => toolbarButton(toolbar, label, title, onClick, danger);
 
     if (mergeSelection.length >= 2) {
       const doMerge = (subtype, opts = {}) => {
@@ -1205,21 +1217,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
 
     const toolbar = document.createElement("div");
     toolbarEl = toolbar;
-    Object.assign(toolbar.style, {
-      position: "absolute",
-      // Wyżej niż uiOverlay (Przezroczysty/Ukryj fronty/Podgląd 3D, patrz
-      // render/viewer3d.js - z-index: 100) - inaczej na wąskim ekranie te
-      // przyciski, nachodzące na górę toolbara, zasłaniały go całkowicie.
-      zIndex: "200",
-      background: "#1e293b",
-      borderRadius: "8px",
-      padding: "6px",
-      display: "flex",
-      flexWrap: "wrap",
-      gap: "4px",
-      boxShadow: "0 8px 20px -6px rgba(0,0,0,.4)",
-      maxWidth: "260px",
-    });
+    toolbar.className = "zone-toolbar";
 
     // Pozycja liczona względem viewportRef (NIE stage/world) i tam też
     // dopinany pasek (niżej) - world ma transform pan/zoom, więc pozycjonowanie
@@ -1232,29 +1230,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     toolbar.style.left = Math.max(4, rect.left - stageRect.left + rect.width / 2 - 90) + "px";
     toolbar.style.top = Math.max(30, rect.top - stageRect.top - 42) + "px";
 
-    const addBtn = (label, title, onClick, danger = false) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.innerText = label;
-      b.title = title;
-      Object.assign(b.style, {
-        fontFamily: "sans-serif",
-        fontSize: "11.5px",
-        fontWeight: "bold",
-        color: "#fff",
-        background: danger ? "#7f1d1d" : "#334155",
-        border: "none",
-        borderRadius: "5px",
-        padding: "7px 9px",
-        cursor: "pointer",
-        whiteSpace: "nowrap",
-      });
-      b.addEventListener("mouseenter", () => { b.style.background = danger ? "#991b1b" : "#475569"; });
-      b.addEventListener("mouseleave", () => { b.style.background = danger ? "#7f1d1d" : "#334155"; });
-      b.addEventListener("click", (e) => { e.stopPropagation(); onClick(); });
-      toolbar.appendChild(b);
-      return b;
-    };
+    const addBtn = (label, title, onClick, danger) => toolbarButton(toolbar, label, title, onClick, danger);
 
     if (mode === "empty") {
       // Pozioma półka WEWNĄTRZ jednego ramienia byłaby prostym prostokątem
@@ -1294,7 +1270,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       const label = FRONT_LABELS[subtype] || subtype;
       const info = document.createElement("div");
       info.innerText = `${label} × ${selectedNode.fronts.length}`;
-      Object.assign(info.style, { color: "#cbd5e1", fontSize: "11px", padding: "6px 4px", fontFamily: "sans-serif" });
+      info.className = "zone-toolbar-info";
       toolbar.appendChild(info);
       if (subtype === "szuflada" || subtype === "szuflada-wewnetrzna") {
         appendGapEditor(toolbar, selectedNode.fronts);
@@ -1361,8 +1337,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     }
 
     const closeBtn = addBtn("✕", "Zamknij", () => closeToolbar());
-    closeBtn.style.background = "transparent";
-    closeBtn.style.marginLeft = "auto";
+    closeBtn.classList.add("ghost");
 
     viewportRef.appendChild(toolbar);
   }
@@ -1376,20 +1351,13 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
   // każdego z nich z JEGO WŁASNEGO el.gap - gdyby się rozjechały, stos by się
   // rozjechał geometrycznie.
   function appendGapEditor(toolbar, fronts) {
-    const wrap = document.createElement("div");
-    Object.assign(wrap.style, { display: "flex", alignItems: "center", gap: "4px", background: "#334155", borderRadius: "5px", padding: "3px 3px 3px 9px" });
-
-    const lbl = document.createElement("span");
-    lbl.innerText = "↕ Przerwa (mm)";
-    Object.assign(lbl.style, { fontFamily: "sans-serif", fontSize: "11.5px", fontWeight: "bold", color: "#fff" });
-
     const input = document.createElement("input");
     input.type = "number";
     input.step = "0.5";
     input.min = "0";
     input.value = fronts[0]?.gap ?? 3;
     input.title = "Odstęp między tymi frontami, np. 30mm zamiast 3mm - robi wcięcie-uchwyt między szufladami bez klamek";
-    Object.assign(input.style, { width: "54px", padding: "5px 3px", border: "none", borderRadius: "4px", textAlign: "center", fontSize: "11px" });
+    input.style.width = "54px";
     input.addEventListener("click", (e) => e.stopPropagation());
     input.addEventListener("keydown", (e) => e.stopPropagation());
     input.addEventListener("change", (e) => {
@@ -1399,20 +1367,10 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       fronts.forEach((f) => { f.gap = v; });
       refreshAfterEdit();
     });
-
-    wrap.appendChild(lbl);
-    wrap.appendChild(input);
-    toolbar.appendChild(wrap);
+    toolbarField(toolbar, "↕ Przerwa (mm)", input);
   }
 
   function appendDrawerPicker(toolbar, mod, subtype, label) {
-    const wrap = document.createElement("div");
-    Object.assign(wrap.style, { display: "flex", alignItems: "center", gap: "4px", background: "#334155", borderRadius: "5px", padding: "3px 3px 3px 9px" });
-
-    const lbl = document.createElement("span");
-    lbl.innerText = label;
-    Object.assign(lbl.style, { fontFamily: "sans-serif", fontSize: "11.5px", fontWeight: "bold", color: "#fff" });
-
     // Zwykła liczba (np. "3") = tyle samo w sobie równych frontów - ale to to
     // samo pole obsługuje też pełną składnię podziału z layoutu (core/layout.js:
     // wartości <=10 to wagi "fr" - proporcjonalny podział reszty miejsca, >10 to
@@ -1424,61 +1382,32 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     input.value = "1";
     input.title = "Podział, np. 3 (trzy równe) albo 1:1:141 (dwa równe + górny sztywno 141mm)";
     input.placeholder = "np. 1:1:141";
-    Object.assign(input.style, { width: "64px", padding: "5px 3px", border: "none", borderRadius: "4px", textAlign: "center", fontSize: "11px" });
+    input.style.width = "64px";
     input.addEventListener("click", (e) => e.stopPropagation());
     input.addEventListener("keydown", (e) => e.stopPropagation());
-
-    const go = document.createElement("button");
-    go.type = "button";
-    go.innerText = "+";
-    Object.assign(go.style, { width: "22px", height: "22px", border: "none", borderRadius: "4px", background: "#0284c7", color: "#fff", fontWeight: "bold", cursor: "pointer" });
-    go.addEventListener("click", (e) => {
-      e.stopPropagation();
+    toolbarField(toolbar, label, input, () => {
       const distribution = input.value.trim() || "1";
       assignFront(mod, selectedNode, subtype, { distribution, cornerArm });
       refreshAfterEdit();
     });
-
-    wrap.appendChild(lbl);
-    wrap.appendChild(input);
-    wrap.appendChild(go);
-    toolbar.appendChild(wrap);
   }
 
   // Rozmieszcza N półek równomiernie w wnęce (pustej albo już obsadzonej
   // frontem - patrz core/zoneTree.js: addEvenShelves) - odstępy liczone przez
   // core/shelfMath.js.
   function appendAutoShelvesPicker(toolbar, mod, node) {
-    const wrap = document.createElement("div");
-    Object.assign(wrap.style, { display: "flex", alignItems: "center", gap: "4px", background: "#334155", borderRadius: "5px", padding: "3px 3px 3px 9px" });
-
-    const lbl = document.createElement("span");
-    lbl.innerText = "📚 Półki równo";
-    Object.assign(lbl.style, { fontFamily: "sans-serif", fontSize: "11.5px", fontWeight: "bold", color: "#fff" });
-
     const input = document.createElement("input");
     input.type = "number";
     input.min = "1";
     input.value = "2";
     input.title = "Ile półek rozmieścić równomiernie w tej wnęce";
-    Object.assign(input.style, { width: "34px", padding: "5px 3px", border: "none", borderRadius: "4px", textAlign: "center", fontSize: "11px" });
+    input.style.width = "34px";
     input.addEventListener("click", (e) => e.stopPropagation());
-
-    const go = document.createElement("button");
-    go.type = "button";
-    go.innerText = "+";
-    Object.assign(go.style, { width: "22px", height: "22px", border: "none", borderRadius: "4px", background: "#0284c7", color: "#fff", fontWeight: "bold", cursor: "pointer" });
-    go.addEventListener("click", (e) => {
-      e.stopPropagation();
+    toolbarField(toolbar, "📚 Półki równo", input, () => {
       const count = Math.max(1, parseInt(input.value, 10) || 1);
       addEvenShelves(mod, node, count, cornerArm);
       refreshAfterEdit();
     });
-
-    wrap.appendChild(lbl);
-    wrap.appendChild(input);
-    wrap.appendChild(go);
-    toolbar.appendChild(wrap);
   }
 
   return { render, renderIfVisible, isVisible };
