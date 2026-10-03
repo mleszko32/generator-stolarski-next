@@ -1,0 +1,3 @@
+# Wszystkie pliki tekstowe z LF - niezależnie od core.autocrlf na danym komputerze.
+# (Wcześniej część plików w kopii roboczej miała CRLF, część LF, a jeden mieszane.)
+* text=auto eol=lf
