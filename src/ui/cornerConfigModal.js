@@ -17,7 +17,7 @@ import { update3D } from "../render/viewer3d.js";
 import { updateSidebar } from "./sidebar.js";
 import { initPropertiesPanel } from "./properties.js";
 import { createZoneEditor } from "./interiorEditor.js";
-import { generateCornerBlankSVG, generateCornerPartsDrawings } from "../render/viewer2d.js";
+import { generateCornerBlankSVG, generateCornerPartsDrawings } from "../render/cornerDrawing2d.js";
 import { autoDistributeShelves } from "../core/shelfMath.js";
 import { getCornerDepths } from "../core/layout.js";
 import { state } from "../core/state.js";

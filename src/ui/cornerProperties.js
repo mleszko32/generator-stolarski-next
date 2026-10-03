@@ -9,7 +9,7 @@ import { getCornerDepths } from "../core/layout.js";
 import { escapeHtml } from "../utils/dom.js";
 import { fmtMm } from "../utils/math.js";
 import { openCornerConfigModal } from "./cornerConfigModal.js";
-import { generateCornerBlankSVG, generateCornerPartsDrawings } from "../render/viewer2d.js";
+import { generateCornerBlankSVG, generateCornerPartsDrawings } from "../render/cornerDrawing2d.js";
 import { initPropertiesPanel } from "./properties.js";
 
 // Prosty, samodzielny widok do druku wykroju L-kształtnej formatki narożnej

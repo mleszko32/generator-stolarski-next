@@ -120,7 +120,8 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
   - `cornerCabinet3d.js` — `renderCornerCabinet(mod, isActive, th, parentGroup)`.
   - `measureTool.js` — miarka; scenę/kamerę/raycaster dostaje raz przez `initMeasureTool()`.
 - `src/render/viewer2d.js` — `generateSidePanelSVG(height, depth, mountingData)` buduje
-  rysunek techniczny SVG boku z wierceniami.
+  rysunek techniczny SVG boku z wierceniami. Rysunki szafki narożnej (formatki w kształcie
+  L, boki, fronty, wykrój) są w `cornerDrawing2d.js`.
 
 ### Panele UI (`src/ui/`)
 
