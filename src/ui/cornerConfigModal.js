@@ -43,10 +43,10 @@ export function openCornerConfigModal(mod) {
 
   modal.innerHTML = `
     <h2 class="modal-title" style="margin-bottom:4px"><i class="ti ti-ruler-2" aria-hidden="true"></i> Konfigurator szafki narożnej: <span style="color:#2563eb;">${escapeHtml(mod.name)}</span></h2>
-    <div style="font-size:11px; color:#64748b; margin-bottom:14px;">Kąt prosty 90°, dwa ramiona. Kliknij wnękę w ramieniu, żeby ją podzielić albo obsadzić frontem - tak samo jak w edytorze wnętrza zwykłej szafki.</div>
+    <div class="hint" style="margin-top:0; margin-bottom:14px;">Kąt prosty 90°, dwa ramiona. Kliknij wnękę w ramieniu, żeby ją podzielić albo obsadzić frontem - tak samo jak w edytorze wnętrza zwykłej szafki.</div>
 
     <div class="prop-box" style="padding:12px; margin-bottom:14px;">
-      <div style="font-size:11px; color:#64748b; margin-bottom:8px;">Wykrój wieńca/półki narożnej — konfigurujesz głębokość każdego ramienia i wycięcie w rogu, tak jak przy realnym docinaniu na miejscu. Ramię A/B (wielkość wieńca) wylicza się z tych czterech liczb.</div>
+      <div class="hint" style="margin-top:0; margin-bottom:8px;">Wykrój wieńca/półki narożnej — konfigurujesz głębokość każdego ramienia i wycięcie w rogu, tak jak przy realnym docinaniu na miejscu. Ramię A/B (wielkość wieńca) wylicza się z tych czterech liczb.</div>
       <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
         <div class="property-group" style="flex:1; min-width:150px;"><label>Głębokość ramienia A (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-depthA" value="${getCornerDepths(mod).depthA}" /></div>
         <div class="property-group" style="flex:1; min-width:150px;"><label>Głębokość ramienia B (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-corner-modal-depthB" value="${getCornerDepths(mod).depthB}" /></div>
@@ -61,14 +61,14 @@ export function openCornerConfigModal(mod) {
     <div style="margin-bottom:14px;">
       <h3 style="font-size:13px; margin:0 0 4px 0;">Fronty w rogu — zakładka</h3>
       <div class="property-group" style="max-width:420px;"><label>Rodzaj frontów narożnika:</label><select id="input-corner-front-mode"><option value="separate" ${mod.cornerFrontMode !== 'bifold' ? 'selected' : ''}>Dwa oddzielne fronty (każdy na własnych zawiasach)</option><option value="bifold" ${mod.cornerFrontMode === 'bifold' ? 'selected' : ''}>Front łamany (dwa skrzydła, zawias 60°)</option></select></div>
-      <div id="corner-front-mode-hint" style="font-size:11px; color:#64748b; margin-bottom:6px;"></div>
+      <div id="corner-front-mode-hint" class="hint" style="margin-top:0; margin-bottom:6px;"></div>
       <div id="corner-bifold-options" class="property-group" style="max-width:340px; display:${mod.cornerFrontMode === 'bifold' ? 'block' : 'none'};"><label>Luz w miejscu łamania (mm):</label><input type="number" step="0.5" id="input-corner-bifold-gap" value="${mod.cornerBifold?.breakGap ?? 2}" /><label style="margin-top:8px;">Luz od korpusu (mm):</label><input type="number" step="0.5" id="input-corner-front-clearance" value="${cornerClearanceNow}" /></div>
       <div class="property-group" style="max-width:340px;"><label id="corner-front-primary-label">Który front zamyka się jako pierwszy (sięga do rogu):</label><select id="input-corner-front-primary"><option value="A" ${(!mod.cornerFrontOverlap || mod.cornerFrontOverlap.primaryArm !== 'B') ? 'selected' : ''}>Ramię A</option><option value="B" ${(mod.cornerFrontOverlap && mod.cornerFrontOverlap.primaryArm === 'B') ? 'selected' : ''}>Ramię B</option></select></div>
     </div>
 
     <div style="margin-bottom:14px;">
       <h3 style="font-size:13px; margin:0 0 4px 0;">Plecy</h3>
-      <div style="font-size:11px; color:#64748b; margin-bottom:6px;">Te same zasady co w zwykłej szafce - dotychczas narożnik zawsze liczył jak "nakładane", ignorując ten wybór.</div>
+      <div class="hint" style="margin-top:0; margin-bottom:6px;">Te same zasady co w zwykłej szafce - dotychczas narożnik zawsze liczył jak "nakładane", ignorując ten wybór.</div>
       <div class="property-group" style="max-width:300px;"><label>Typ pleców:</label><select id="input-corner-back-type"><option value="nakladane" ${(!mod.backPanel || mod.backPanel.type !== 'nut') ? 'selected' : ''}>Nakładane</option><option value="nut" ${(mod.backPanel && mod.backPanel.type === 'nut') ? 'selected' : ''}>W nucie</option></select></div>
       <div class="prop-box" id="corner-nut-options" style="display:${(mod.backPanel && mod.backPanel.type === 'nut') ? 'block' : 'none'}; margin-top:6px; max-width:300px;">
         <div class="property-group" style="margin-bottom:8px;"><label style="font-size:11px; font-weight:bold;">Konstrukcja nutu:</label><select id="input-corner-nut-build"><option value="all" ${(!mod.backPanel?.nutBuild || mod.backPanel.nutBuild === 'all') ? 'selected' : ''}>Boki i wieńce nutowane</option><option value="sides" ${mod.backPanel?.nutBuild === 'sides' ? 'selected' : ''}>Boki nutowane, wieńce skracane</option><option value="top_bottom" ${mod.backPanel?.nutBuild === 'top_bottom' ? 'selected' : ''}>Wieńce nutowane, boki skracane</option></select></div>
@@ -78,11 +78,11 @@ export function openCornerConfigModal(mod) {
 
     <div style="margin-bottom:14px;">
       <h3 style="font-size:13px; margin:0 0 4px 0;">Półki narożne (kształt L, na całą głębokość obu ramion)</h3>
-      <div style="font-size:11px; color:#64748b; margin-bottom:6px;">W realnej szafce narożnej półka jest jedna, w kształcie L (jak wieniec górny/dolny) - nie dwie osobne, proste półki. Dlatego dodaje się je tutaj, wspólnie dla obu ramion, a nie osobno w każdym z nich.</div>
+      <div class="hint" style="margin-top:0; margin-bottom:6px;">W realnej szafce narożnej półka jest jedna, w kształcie L (jak wieniec górny/dolny) - nie dwie osobne, proste półki. Dlatego dodaje się je tutaj, wspólnie dla obu ramion, a nie osobno w każdym z nich.</div>
       <div id="corner-shelves-list"></div>
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:6px;">
         <button type="button" id="btn-corner-add-shelf" class="btn btn-neutral btn-sm">+ Dodaj półkę narożną</button>
-        <span style="font-size:11px; color:#475569;">lub rozmieść równo:</span>
+        <span style="font-size:var(--fs-xs); color:var(--text-secondary);">lub rozmieść równo:</span>
         <input type="number" id="input-corner-even-count" min="1" max="10" value="3" style="width:60px;" />
         <button type="button" id="btn-corner-even-shelves" class="btn btn-neutral btn-sm">Rozmieść równo</button>
       </div>
@@ -168,16 +168,16 @@ export function openCornerConfigModal(mod) {
       .sort((a, b) => (parseFloat(a.y) || 0) - (parseFloat(b.y) || 0));
 
     shelvesListEl.innerHTML = shelves.length === 0
-      ? `<div style="font-size:11px; color:#94a3b8; font-style:italic;">Brak półek narożnych.</div>`
+      ? `<div style="font-size:var(--fs-xs); color:var(--border-strong); font-style:italic;">Brak półek narożnych.</div>`
       : '';
 
     shelves.forEach(shelf => {
       const row = document.createElement('div');
       Object.assign(row.style, { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' });
       row.innerHTML = `
-        <span style="font-size:11px; color:#475569; min-width:70px;">Wysokość od dołu:</span>
+        <span style="font-size:var(--fs-xs); color:var(--text-secondary); min-width:70px;">Wysokość od dołu:</span>
         <input type="number" step="0.5" value="${fmtMm(parseFloat(shelf.y) || 0)}" style="width:90px;" />
-        <span style="font-size:11px; color:#94a3b8;">mm</span>
+        <span style="font-size:var(--fs-xs); color:var(--border-strong);">mm</span>
         <button type="button" class="btn btn-danger btn-sm" style="padding:2px 8px;"><i class="ti ti-trash" aria-hidden="true"></i></button>
       `;
       const input = row.querySelector('input');

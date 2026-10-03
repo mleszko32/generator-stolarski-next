@@ -6,9 +6,9 @@ import { escapeHtml } from "../utils/dom.js";
 import { validateProject } from "../core/validate.js";
 
 const ISSUE_STYLE = {
-  error: { label: "Błąd", bg: "#fee2e2", fg: "#991b1b" },
-  warn: { label: "Uwaga", bg: "#fef3c7", fg: "#92400e" },
-  info: { label: "Info", bg: "#e0f2fe", fg: "#075985" },
+  error: { label: "Błąd", badge: "badge-danger" },
+  warn: { label: "Uwaga", badge: "badge-warn" },
+  info: { label: "Info", badge: "badge-info" },
 };
 
 // onGoto(moduleId): wołane po kliknięciu "Pokaż szafkę" (zamyka okno i wybiera szafkę).
@@ -16,13 +16,13 @@ export function renderProjectCheck(el, onGoto) {
   const { issues, counts } = validateProject();
   const problems = counts.error + counts.warn;
   const summary = problems === 0
-    ? '<span style="color:#166534">✔ Nie znaleziono błędów ani ostrzeżeń.</span>'
+    ? '<span style="color:var(--success-fg)">✔ Nie znaleziono błędów ani ostrzeżeń.</span>'
     : `Błędy: <b>${counts.error}</b> · Ostrzeżenia: <b>${counts.warn}</b>${counts.info ? ` · Informacje: ${counts.info}` : ""}`;
 
   const rows = issues.map((i) => {
     const st = ISSUE_STYLE[i.level];
     return `<tr>
-      <td><span style="background:${st.bg};color:${st.fg};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">${st.label}</span></td>
+      <td><span class="badge ${st.badge}">${st.label}</span></td>
       <td>${escapeHtml(i.moduleName || "cały projekt")}</td>
       <td>${escapeHtml(i.message)}</td>
       <td class="num">${i.moduleId ? `<button type="button" class="btn btn-sm hub-goto" data-id="${escapeHtml(i.moduleId)}">Pokaż szafkę</button>` : ""}</td>
