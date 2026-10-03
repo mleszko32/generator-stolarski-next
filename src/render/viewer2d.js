@@ -38,6 +38,626 @@ function doorHingeSide(front) {
   return front.openingSide || 'left';
 }
 
+// Wymiary przestrzeni wewnątrz aktywnego korpusu (widok KORPUS). Część generateSidePanelSVG - wspólne wartości przychodzą w ctx.
+function drawSpaceDimensions(ctx) {
+  const { cabWidth, cabX, mod, partitions, sideH, th } = ctx;
+  let svg = '';
+
+  // ==== WYMIAROWANIE PRZESTRZENI KORPUSU (widok KORPUS) ====
+  // Wyłącznie wymiary WEWNĄTRZ zarysu AKTYWNEGO MODUŁU. Odtwarzamy tu TO SAMO
+  // drzewo BSP co core/zoneTree.js (przegroda pionowa liczy się jako podział
+  // TYLKO jeśli w pełni rozpina wysokość swojej wnęki - identyczny warunek
+  // jak tam), żeby kolumny nie "przeciekały" na wysokości, na których dana
+  // przegroda w ogóle nie istnieje (np. przegroda tylko w dolnej wnęce pod
+  // półką nie może dzielić też górnej wnęki nad tą półką na dwie kolumny -
+  // to był zgłoszony bug: "przestrzeń nie ma przegrody a wymiaruje się jakby
+  // była").
+  {
+    function partitionMM(rect) {
+      const pionCandidates = partitions.filter(p =>
+        p.x > rect.minX + 2 && p.x + p.w < rect.maxX - 2 &&
+        p.y <= rect.minY + 2 && p.y + p.h >= rect.maxY - 2
+      ).sort((a, b) => a.x - b.x);
+      if (pionCandidates.length) {
+        const p = pionCandidates[0];
+        return {
+          axis: 'v', divider: p, rect,
+          a: partitionMM({ ...rect, maxX: p.x }),
+          b: partitionMM({ ...rect, minX: p.x + p.w }),
+        };
+      }
+      const poziomCandidates = (mod.elements || []).filter(el =>
+        el.typ === 'poziom' &&
+        el.y > rect.minY + 2 && el.y + el.h < rect.maxY - 2 &&
+        el.x <= rect.minX + 2 && el.x + el.w >= rect.maxX - 2
+      ).sort((a, b) => a.y - b.y);
+      if (poziomCandidates.length) {
+        const p = poziomCandidates[0];
+        return {
+          axis: 'h', divider: p, rect,
+          a: partitionMM({ ...rect, maxY: p.y }),
+          b: partitionMM({ ...rect, minY: p.y + p.h }),
+        };
+      }
+      return { axis: null, rect };
+    }
+
+    svg += `<defs><marker id="korpus-dim-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${C.slate700}" /></marker></defs>`;
+    svg += `<g class="layer-dim-outline">`;
+
+    // Podział pionowy zawęża kolumnę (x) i rekurencyjnie oddaje obie strony
+    // do renderColumnChain - każda dostaje WŁASNY, niezależny łańcuch. Podział
+    // poziomy NIE zawęża x, więc kolejne piętra "h" zbieramy w JEDEN łańcuch
+    // (renderColumnChain -> descend), chyba że jedna ze stron sama okaże się
+    // podziałem pionowym - wtedy ta strona jest "nieprzezroczysta": ma swój
+    // WŁASNY, węższy łańcuch (osobne wywołanie renderRegion), a bieżący,
+    // szerszy łańcuch NIE rysuje przez nią światła (bo to już nie jedna,
+    // realna przestrzeń, tylko dwie węższe kolumny obok siebie).
+    function renderRegion(node) {
+      if (node.axis === 'v') {
+        renderRegion(node.a);
+        renderRegion(node.b);
+        return;
+      }
+      renderColumnChain(node);
+    }
+
+    function renderColumnChain(node) {
+      const { minX, maxX, minY, maxY } = node.rect;
+      const colWidthMM = maxX - minX;
+      if (colWidthMM < 8) return;
+      const colDimX = cabX + (minX + maxX) / 2;
+      const isNarrow = colWidthMM < 260;
+
+      const isBottomWieniec = Math.abs(minY - th) < 2;
+      const isTopWieniec = Math.abs(maxY - (sideH - th)) < 2;
+      // mmY = wysokość ŚRODKA płyty/dzielnika od podłogi (nie jej krawędzi) -
+      // rect.minY/maxY to WEWNĘTRZNE krawędzie (światło), więc płyta leżąca
+      // pod/nad tą krawędzią ma środek o th/2 dalej.
+      const dividers = [
+        { mmY: minY - th / 2, half: th / 2, kind: isBottomWieniec ? 'wieniec' : 'poziom', openBelow: false, openAbove: true },
+        { mmY: maxY + th / 2, half: th / 2, kind: isTopWieniec ? 'wieniec' : 'poziom', openBelow: true, openAbove: false },
+      ];
+
+      // Zbiera wewnętrzne dzielniki poziome TEGO łańcucha, rekurencyjnie
+      // schodząc przez kolejne "h", ale zatrzymując się (i oddając dalej do
+      // renderRegion) na każdej stronie, która okaże się podziałem "v".
+      function descend(n) {
+        if (!n || n.axis !== 'h') return;
+        const aOpaque = n.a.axis === 'v';
+        if (aOpaque) renderRegion(n.a); else descend(n.a);
+        const bOpaque = n.b.axis === 'v';
+        dividers.push({
+          mmY: n.divider.y + n.divider.h / 2, half: n.divider.h / 2, kind: 'poziom',
+          openBelow: !aOpaque, openAbove: !bOpaque,
+        });
+        if (bOpaque) renderRegion(n.b); else descend(n.b);
+      }
+      descend(node);
+      // Malejąco po mmY = rosnąco po współrzędnej SVG (góra rysunku -> dół),
+      // tak samo jak poprzednio sortowano bezpośrednio po współrzędnej SVG.
+      dividers.sort((a, b) => b.mmY - a.mmY);
+
+      const leaderLen = isNarrow ? Math.min(30, colWidthMM * 0.28) : Math.min(78, colWidthMM * 0.42);
+      const leaderStartX = colDimX - leaderLen;
+      const axisFontSize = isNarrow ? 8 : 10;
+      let bestGapTop = 0, bestGapBot = 0, bestGap = -1;
+
+      dividers.forEach((d, i) => {
+        const axisY = sideH - d.mmY;
+        const isW = d.kind === 'wieniec';
+        const label = formatVal(d.mmY);
+        const axisLabel = isNarrow ? `${label}` : `${isW ? 'Oś wieńca' : 'Oś'}: ${label}`;
+        svg += `<line x1="${leaderStartX}" y1="${axisY}" x2="${colDimX - 3}" y2="${axisY}" stroke="${C.slate400}" stroke-width="0.6" stroke-dasharray="3,2" />`;
+        svg += `<text x="${leaderStartX - 4}" y="${axisY + 3}" font-size="${axisFontSize}" fill="${C.blue900}" text-anchor="end" font-family="${FONT}" font-weight="${isW ? 'bold' : 'normal'}">${axisLabel}</text>`;
+
+        if (i < dividers.length - 1) {
+          const next = dividers[i + 1];
+          // d jest FIZYCZNIE WYŻEJ (większe mmY) niż next - światło między
+          // nimi jest realne tylko, gdy d ma otwartą stronę OD SPODU i next
+          // ma otwartą stronę OD GÓRY (żadne z nich nie jest "zaślepione"
+          // przez zagnieżdżony podział pionowy, patrz descend() wyżej).
+          if (!(d.openBelow && next.openAbove)) return;
+          const yTop = axisY + d.half;
+          const yBot = (sideH - next.mmY) - next.half;
+          const gap = yBot - yTop;
+          if (gap < 8) return;
+          const midY = (yTop + yBot) / 2;
+          if (gap > bestGap) { bestGap = gap; bestGapTop = yTop; bestGapBot = yBot; }
+          svg += `<line x1="${colDimX}" y1="${yTop}" x2="${colDimX}" y2="${yBot}" stroke="${C.slate700}" stroke-width="1" marker-start="url(#korpus-dim-arrow)" marker-end="url(#korpus-dim-arrow)" />`;
+          svg += `<rect x="${colDimX - 19}" y="${midY - 8}" width="38" height="15" fill="${C.slate50}" stroke="${C.slate300}" stroke-width="0.5" />`;
+          svg += `<text x="${colDimX}" y="${midY + 3}" font-size="11" font-weight="bold" fill="${C.teal700}" text-anchor="middle" font-family="${FONT}">${formatVal(gap)}</text>`;
+        }
+      });
+
+      // Poziome światło (wewnętrzna szerokość) TEJ kolumny - tylko jeśli ma
+      // choć jeden realny (nie "zaślepiony" przez zagnieżdżony podział "v")
+      // prześwit do pokazania; w jej własnym największym takim prześwicie,
+      // żeby nie wylądować na półce. Celowo NIE na środku tego prześwitu (tam
+      // pionowy łańcuch już rysuje swój box z wartością prześwitu -
+      // nałożyłyby się dokładnie na siebie), tylko przesunięte w górną część.
+      if (bestGap < 0) return;
+      const gapSize = Math.max(bestGapBot - bestGapTop, 1);
+      const widthDimY = bestGapTop + Math.max(4, Math.min(gapSize * 0.3, gapSize - 16));
+      const xL = cabX + minX, xR = cabX + maxX;
+      const w = formatVal(colWidthMM);
+      svg += `<line x1="${xL}" y1="${widthDimY}" x2="${xR}" y2="${widthDimY}" stroke="${C.slate700}" stroke-width="1" marker-start="url(#korpus-dim-arrow)" marker-end="url(#korpus-dim-arrow)" />`;
+      svg += `<rect x="${colDimX - 24}" y="${widthDimY - 8}" width="48" height="15" fill="${C.slate50}" stroke="${C.slate300}" stroke-width="0.5" />`;
+      svg += `<text x="${colDimX}" y="${widthDimY + 4}" font-size="11" font-weight="bold" fill="${C.teal700}" text-anchor="middle" font-family="${FONT}">${w}</text>`;
+    }
+
+    renderRegion(partitionMM({ minX: th, maxX: cabWidth - th, minY: th, maxY: sideH - th }));
+
+    svg += `</g>`;
+  }
+
+  return svg;
+}
+
+// Rzuty boków i przegród z nawiertami (detail-left/right/part-N). Część generateSidePanelSVG - wspólne wartości przychodzą w ctx.
+function drawSideDetails(ctx) {
+  const { cabWidth, depth, isTopBottomFullWidth, mod, mountingData, panels, partitions, sideH, svgTopY, th } = ctx;
+  let svg = '';
+
+  function getShelvesForFace(faceX, isRightFace) {
+      return (mod.elements || []).filter(el => {
+          if (el.typ !== 'poziom') return false;
+          if (isRightFace) return Math.abs(el.x - faceX) < 2;
+          else return Math.abs((el.x + el.w) - faceX) < 2;
+      });
+  }
+
+  function getDrawersForFace(faceX, isRightFace) {
+      return (mountingData || []).filter(d => {
+          if (d.type !== 'drawer') return false;
+          if (!d.slideSideHoles || d.slideSideHoles.length === 0) return false;
+
+          let front = null;
+          state.project.modules.forEach(m => {
+              if (m.elements) { const f = m.elements.find(e => e.id === d.frontId); if (f) front = f; }
+          });
+          if (!front) return false;
+
+          const fMinX = front.baseZone ? parseFloat(front.baseZone.minX) : th;
+          const fMaxX = front.baseZone ? parseFloat(front.baseZone.maxX) : (cabWidth - th);
+          if (isRightFace) return Math.abs(fMinX - faceX) < 2;
+          else return Math.abs(fMaxX - faceX) < 2;
+      });
+  }
+
+  function getHingesForFace(faceX, isRightFace) {
+      return (mountingData || []).filter(d => {
+          if (d.type !== 'door') return false;
+
+          let front = null;
+          state.project.modules.forEach(m => {
+              if (m.elements) {
+                  const f = m.elements.find(e => e.id === d.frontId);
+                  if (f) front = f;
+              }
+          });
+          if (!front) return false;
+
+          const fMinX = front.baseZone ? parseFloat(front.baseZone.minX) : th;
+          const fMaxX = front.baseZone ? parseFloat(front.baseZone.maxX) : (cabWidth - th);
+          if (isRightFace && d.side === 'left') return Math.abs(fMinX - faceX) < 2;
+          if (!isRightFace && d.side === 'right') return Math.abs(fMaxX - faceX) < 2;
+          return false;
+      });
+  }
+
+  const detailGroups = ['detail-left', 'detail-right'];
+  partitions.forEach((p, i) => detailGroups.push(`detail-part-${i}`));
+
+  detailGroups.forEach(groupId => {
+      svg += `<g id="${groupId}" class="detail-view" style="display:none;">`;
+      const groupPanels = panels.filter(p => p.detailGroupId === groupId);
+
+      groupPanels.forEach(panel => {
+          let panelH = sideH;
+          let panelCalcY = 0; 
+
+          if (!panel.isOuterLeft && !panel.isOuterRight) {
+              panelH = panel.h;
+              panelCalcY = isTopBottomFullWidth ? panel.y - th : panel.y;
+          }
+
+          const panelDrawY = sideH - panelCalcY - panelH;
+
+          svg += `<text x="${panel.svgX + depth/2}" y="${svgTopY - 25}" font-size="16" fill="${C.blue900}" font-weight="bold" text-anchor="middle">${panel.title}</text>`;
+          svg += `<rect x="${panel.svgX}" y="${panelDrawY}" width="${depth}" height="${panelH}" fill="${C.white}" stroke="${C.slate600}" stroke-width="1.5" />`;
+
+          const isReversed = panel.isReversedView; 
+          const frontTextX = isReversed ? panel.svgX + depth - 15 : panel.svgX + 15;
+          const backTextX = isReversed ? panel.svgX + 15 : panel.svgX + depth - 15;
+          const textMidY = panelDrawY + (panelH / 2);
+
+          svg += `<text x="${frontTextX}" y="${textMidY}" font-size="11" fill="${C.slate400}" font-weight="bold" transform="rotate(-90, ${frontTextX}, ${textMidY})" text-anchor="middle" letter-spacing="1">PRZÓD</text>`;
+          svg += `<text x="${backTextX}" y="${textMidY}" font-size="11" fill="${C.slate400}" font-weight="bold" transform="rotate(-90, ${backTextX}, ${textMidY})" text-anchor="middle" letter-spacing="1">TYŁ</text>`;
+
+          const getSvgX = (distFromFront) => isReversed ? panel.svgX + depth - distFromFront : panel.svgX + distFromFront;
+
+          let shelfYs = new Set();
+          let corpusYs = new Set();
+          let drawerYs = new Set();
+
+          const drawShelfHoles = (shelves) => {
+              shelves.forEach(el => {
+                  let calcY = isTopBottomFullWidth ? el.y - th : el.y;
+                  if (calcY < panelCalcY - 5 || calcY > panelCalcY + panelH + 5) return;
+
+                  const isStruct = el.isStructural;
+                  const baseColor = isStruct ? C.purple600 : C.orange600;
+                  const svgY = sideH - calcY;
+
+                  if (isStruct) {
+                      let rScrew = 1.5; 
+                      let rDowel = 4.0; 
+                      [37, depth - 37].forEach(hx => {
+                          svg += `<circle cx="${getSvgX(hx)}" cy="${svgY - el.h/2}" r="${rScrew}" fill="${baseColor}" />`;
+                          let dowelX = hx === 37 ? hx + 32 : hx - 32;
+                          svg += `<circle cx="${getSvgX(dowelX)}" cy="${svgY - el.h/2}" r="${rDowel}" fill="${baseColor}" />`;
+                          if (hx === 37) corpusYs.add(calcY + el.h/2);
+                      });
+                  } else {
+                      let rPin = 2.5; 
+                      [0, 32, -32].forEach(dy => {
+                          [37, depth - 37].forEach(hx => {
+                              svg += `<circle cx="${getSvgX(hx)}" cy="${svgY + SHELF_PIN_DROP - dy}" r="${rPin}" fill="${baseColor}" />`;
+                              if (dy === 0 && hx === 37) shelfYs.add(calcY - SHELF_PIN_DROP);
+                          });
+                      });
+                  }
+              });
+          };
+          drawShelfHoles(getShelvesForFace(panel.faceLeftX, false));
+          drawShelfHoles(getShelvesForFace(panel.faceRightX, true));
+
+          const drawDrawerHoles = (drawers) => {
+              drawers.forEach(d => {
+                  if (d.slideSideHoles && d.slideSideHoles.length > 0) {
+                      let calcY = isTopBottomFullWidth ? d.slideSideHoles[0].y - th : d.slideSideHoles[0].y;
+                      if (calcY < panelCalcY - 5 || calcY > panelCalcY + panelH + 5) return;
+
+                      drawerYs.add(calcY);
+                      const svgY = sideH - calcY;
+                      let rDrawer = 2.5; 
+
+                      d.slideSideHoles.forEach(hole => {
+                          svg += `<circle cx="${getSvgX(hole.x)}" cy="${svgY}" r="${rDrawer}" fill="${C.sky600}" />`;
+                      });
+                  }
+              });
+          };
+          drawDrawerHoles(getDrawersForFace(panel.faceLeftX, false));
+          drawDrawerHoles(getDrawersForFace(panel.faceRightX, true));
+
+          const drawHingeHoles = (hingeData) => {
+              hingeData.forEach(d => {
+                  d.hinges.forEach(hinge => {
+                      if (hinge.isLocal === false) return;
+                      let calcY = isTopBottomFullWidth ? hinge.y - th : hinge.y;
+                      if (calcY < panelCalcY - 5 || calcY > panelCalcY + panelH + 5) return;
+
+                      const svgY = sideH - calcY;
+                      let baseColor = hinge.isAdjusted ? C.orange600 : C.green600;
+                      let rHinge = 2.5; 
+
+                      svg += `<circle cx="${getSvgX(37)}" cy="${svgY - 16}" r="${rHinge}" fill="${baseColor}" />`;
+                      svg += `<circle cx="${getSvgX(37)}" cy="${svgY + 16}" r="${rHinge}" fill="${baseColor}" />`;
+
+                      let localHoleY = calcY - panelCalcY;
+                      let tspanHtml = getDimText(localHoleY, panelH, baseColor);
+                      let textX = isReversed ? getSvgX(37) - 8 : getSvgX(37) + 8;
+                      let anchor = isReversed ? 'end' : 'start';
+                      svg += `<text x="${textX}" y="${svgY + 4}" text-anchor="${anchor}" font-family="${FONT}">${tspanHtml}</text>`;
+                  });
+              });
+          };
+          drawHingeHoles(getHingesForFace(panel.faceLeftX, false));
+          drawHingeHoles(getHingesForFace(panel.faceRightX, true));
+
+          if (panel.isOuterLeft || panel.isOuterRight) {
+               const corpusHolesData = mountingData.find(d => d.type === 'corpus');
+               if (corpusHolesData && corpusHolesData.holes) {
+                   corpusHolesData.holes.forEach(h => {
+                       let calcY = isTopBottomFullWidth ? h.y - th : h.y;
+                       if (calcY < panelCalcY - 5 || calcY > panelCalcY + panelH + 5) return;
+
+                       if (h.holeType === 'screw') corpusYs.add(calcY);
+
+                       let r = h.holeType === 'screw' ? 1.5 : 4.0; 
+                       let holeX = panel.isOuterRight ? (depth - h.xFromFront) : h.xFromFront;
+
+                       svg += `<circle cx="${panel.svgX + holeX}" cy="${sideH - calcY}" r="${r}" fill="${C.purple600}" />`;
+                   });
+               }
+          }
+
+          const sortedDrawerYs = Array.from(drawerYs).sort((a,b) => a - b);
+          const sortedCorpusYs = Array.from(corpusYs).sort((a,b) => a - b);
+          const sortedShelfYs = Array.from(shelfYs).sort((a,b) => a - b);
+
+          // Opisy nawiertów stoją w kolumnach obok formatki. Boki skrajne mają wolną
+          // drugą stronę - szuflady (niebieskie) i kołki/wkręty konstrukcyjne (fiolet)
+          // opisujemy tam, a podpórki półek po stronie zewnętrznej, żeby napisy się
+          // nie nakładały i cały arkusz był wykorzystany. Przegrody (dwie formatki obok siebie) zostają
+          // z opisami po jednej stronie.
+          const sideCfg = (rev) => ({
+              edgeX: rev ? panel.svgX + depth : panel.svgX,
+              x: rev ? panel.svgX + depth + 40 : panel.svgX - 40,
+              step: rev ? 120 : -120,
+              anchor: rev ? 'start' : 'end',
+              off: rev ? 8 : -8
+          });
+          const outerCol = sideCfg(isReversed);
+          const oppCol = (panel.isOuterLeft || panel.isOuterRight) ? sideCfg(!isReversed) : outerCol;
+          const drawerCol = oppCol;
+          const corpusCol = oppCol;
+
+          if (sortedDrawerYs.length > 0) {
+              svg += `<g class="layer-holes-drawer">`;
+              sortedDrawerYs.forEach(calcY => {
+                  let holeSvgY = sideH - calcY;
+                  svg += `<line x1="${drawerCol.edgeX}" y1="${holeSvgY}" x2="${drawerCol.x}" y2="${holeSvgY}" stroke="${C.sky600}" stroke-width="0.5" stroke-dasharray="2,2" />`;
+
+                  let localHoleY = calcY - panelCalcY;
+                  let tspanHtml = getDimText(localHoleY, panelH, C.sky600);
+
+                  svg += `<text x="${drawerCol.x + drawerCol.off}" y="${holeSvgY + 4}" font-size="12" font-family="${FONT}" text-anchor="${drawerCol.anchor}">
+                            ${tspanHtml}
+                          </text>`;
+              });
+              drawerCol.x += drawerCol.step;
+              svg += `</g>`;
+          }
+
+          if (sortedCorpusYs.length > 0) {
+              svg += `<g class="layer-holes-corpus">`;
+              sortedCorpusYs.forEach(calcY => {
+                  let holeSvgY = sideH - calcY;
+                  svg += `<line x1="${corpusCol.edgeX}" y1="${holeSvgY}" x2="${corpusCol.x}" y2="${holeSvgY}" stroke="${C.purple600}" stroke-width="0.5" stroke-dasharray="2,2" />`;
+
+                  let localHoleY = calcY - panelCalcY;
+                  let tspanHtml = getDimText(localHoleY, panelH, C.purple600, true);
+
+                  svg += `<text x="${corpusCol.x + corpusCol.off}" y="${holeSvgY + 4}" font-size="12" font-family="${FONT}" text-anchor="${corpusCol.anchor}">
+                            ${tspanHtml}
+                          </text>`;
+              });
+              corpusCol.x += corpusCol.step;
+              svg += `</g>`;
+          }
+
+          if (sortedShelfYs.length > 0) {
+              svg += `<g class="layer-holes-shelf">`;
+              sortedShelfYs.forEach(calcY => {
+                  [32, 0, -32].forEach(dy => {
+                      let holeY = calcY + dy;
+                      let holeSvgY = sideH - holeY;
+                      let isCenter = dy === 0;
+                      svg += `<line x1="${outerCol.edgeX}" y1="${holeSvgY}" x2="${outerCol.x}" y2="${holeSvgY}" stroke="${C.orange600}" stroke-width="0.5" stroke-dasharray="2,2" />`;
+
+                      let localHoleY = holeY - panelCalcY;
+                      let tspanHtml = getDimText(localHoleY, panelH, C.orange600, true);
+
+                      svg += `<text x="${outerCol.x + outerCol.off}" y="${holeSvgY + 4}" font-family="${FONT}" text-anchor="${outerCol.anchor}" opacity="${isCenter ? '1' : '0.6'}">
+                                ${tspanHtml}
+                              </text>`;
+                  });
+              });
+
+              // Wymiar oś-w-oś między środkowymi otworami sąsiednich półek
+              // ruchomych (rozstaw półek). Rysowany tuż przy krawędzi panelu,
+              // w osobnym pionowym łańcuszku, żeby nie kolidował z opisami
+              // pojedynczych otworów.
+              if (sortedShelfYs.length > 1) {
+                  const shelfEdgeX = isReversed ? panel.svgX + depth : panel.svgX;
+                  const pitchX = shelfEdgeX + (isReversed ? 26 : -26);
+                  for (let i = 0; i < sortedShelfYs.length - 1; i++) {
+                      const yA = sideH - sortedShelfYs[i];
+                      const yB = sideH - sortedShelfYs[i + 1];
+                      const gap = formatVal(Math.abs(sortedShelfYs[i + 1] - sortedShelfYs[i]));
+                      svg += `<line x1="${pitchX}" y1="${yA}" x2="${pitchX}" y2="${yB}" stroke="${C.orange700}" stroke-width="1" />`;
+                      svg += `<line x1="${pitchX - 4}" y1="${yA}" x2="${pitchX + 4}" y2="${yA}" stroke="${C.orange700}" stroke-width="1.4" />`;
+                      svg += `<line x1="${pitchX - 4}" y1="${yB}" x2="${pitchX + 4}" y2="${yB}" stroke="${C.orange700}" stroke-width="1.4" />`;
+                      // Opis pionowo wzdłuż linii wymiarowej - nie wchodzi w opisy otworów obok.
+                      const pitchTx = pitchX + (isReversed ? 15 : -6);
+                      const pitchTy = (yA + yB) / 2;
+                      svg += `<text x="${pitchTx}" y="${pitchTy}" font-size="12" fill="${C.orange700}" text-anchor="middle" font-family="${FONT}" transform="rotate(-90 ${pitchTx} ${pitchTy})">${gap}<tspan font-size="9" fill="${C.orange800}"> oś-oś</tspan></text>`;
+                  }
+              }
+
+              outerCol.x += outerCol.step;
+              svg += `</g>`;
+          }
+      });
+      svg += `</g>`;
+  });
+
+  return svg;
+}
+
+// Widok frontów zewnętrznych całej grupy (detail-front). Część generateSidePanelSVG - wspólne wartości przychodzą w ctx.
+function drawOuterFronts(ctx) {
+  const { cabWidth, config, frontX, getDy, getLocalRelX, mod, mountingData, sideH, stackModules, svgTopY, th } = ctx;
+  let svg = '';
+
+  svg += `<g id="detail-front" style="display:none;">`;
+  svg += `<text x="${frontX + cabWidth/2}" y="${svgTopY - 25}" font-size="16" fill="${C.blue900}" font-weight="bold" text-anchor="middle">FRONT (Podział zewnętrzny)</text>`;
+
+  const allOuterFronts = [];
+  stackModules.forEach(sm => {
+      const smDy = getDy(sm);
+      const smRelX = getLocalRelX(sm);
+      const smCons = { joinType: 'boki_przelotowe', topType: 'pelny', ...config.construction, ...(sm.construction || {}) };
+      const smIsTBF = smCons.joinType === 'wience_przelotowe';
+      if (sm.elements) {
+          sm.elements.filter(el => el.typ === 'front' && el.subtype !== 'szuflada-wewnetrzna').forEach(f => {
+              allOuterFronts.push({ ...f, dy: smDy, relX: smRelX, sourceModId: sm.id, sourceModName: sm.name, isTBF: smIsTBF });
+          });
+      }
+  });
+
+  allOuterFronts.forEach(front => {
+      let drawY = front.isTBF ? front.y - th : front.y;
+      const elSvgY = sideH - (front.dy + drawY + front.h); 
+      const isDrawer = front.subtype === 'szuflada';
+      const isDoor = front.subtype.includes('drzwi');
+      const isForeign = front.sourceModId !== mod.id;
+      let fillColor = isForeign ? C.slate50 : (isDrawer ? C.blue50 : C.green50); 
+      let strokeColor = isForeign ? C.slate300 : (isDrawer ? C.blue500 : C.green500);
+      let strokeDash = isForeign ? 'stroke-dasharray="4,4"' : '';
+
+      const fWidth = front.w || cabWidth;
+      const fSvgX = frontX + front.relX + (front.x || 0);
+
+      svg += `<rect x="${fSvgX}" y="${elSvgY}" width="${fWidth}" height="${front.h}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5" ${strokeDash} />`;
+
+      const hingeSide = isDoor ? doorHingeSide(front) : null;
+      let labelText = isDrawer ? `Szuflada` : `Drzwi ${hingeSide === 'right' ? 'prawe' : 'lewe'}`;
+      if (isForeign) labelText += ` (z: ${escapeHtml(front.sourceModName)})`;
+      svg += `<text x="${fSvgX + fWidth/2}" y="${elSvgY + front.h/2}" font-size="12" fill="${isForeign ? C.slate400 : C.slate800}" font-weight="bold" text-anchor="middle">${labelText}</text>`;
+      if (isDoor) svg += `<text x="${fSvgX + fWidth/2}" y="${elSvgY + front.h/2 + 16}" font-size="10" fill="${isForeign ? C.slate400 : C.green700}" text-anchor="middle">zawiasy z ${hingeSide === 'right' ? 'prawej' : 'lewej'}</text>`;
+
+      if (isDoor && mountingData) {
+        svg += `<g class="layer-holes-hinge">`;
+        const doorData = mountingData.find(m => m.type === 'door' && m.frontId === front.id);
+        if (doorData && doorData.hinges) {
+          doorData.hinges.forEach((hinge) => {
+             const isLeft = doorData.side === 'left';
+             const cupX = isLeft ? fSvgX + hinge.cupXOffset : fSvgX + fWidth - hinge.cupXOffset;
+             let drawHoleY = front.isTBF ? front.y + hinge.relY - th : front.y + hinge.relY;
+             const holeSvgY = sideH - (front.dy + drawHoleY);
+
+             let mainColor = hinge.isLocal ? (hinge.isAdjusted ? C.orange600 : C.green600) : C.slate400;
+             let opacity = hinge.isLocal ? "1" : "0.5"; 
+
+             svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="17.5" fill="${C.cupFill}" stroke="${mainColor}" stroke-width="1.5" opacity="${opacity}" />`;
+             svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="2.5" fill="${mainColor}" opacity="${opacity}" />`;
+
+             let tspanHtml = getDimText(hinge.relY, front.h, mainColor);
+             let textX = isLeft ? cupX + 22 : cupX - 22;
+             let anchor = isLeft ? 'start' : 'end';
+             svg += `<text x="${textX}" y="${holeSvgY + 4}" text-anchor="${anchor}" font-family="${FONT}" opacity="${opacity}">${tspanHtml}</text>`;
+          });
+        }
+        svg += `</g>`;
+      }
+
+      if (isDrawer && mountingData) {
+        svg += `<g class="layer-front-holes">`;
+        const drawerData = mountingData.find(m => m.type === 'drawer' && m.frontId === front.id);
+        if (drawerData && drawerData.frontHoles) {
+          drawerData.frontHoles.forEach((hole, idx) => {
+             const xL = Number(hole.xOffsetLeft ?? hole.xOffset ?? 20.5);
+             const xR = Number(hole.xOffsetRight ?? hole.xOffset ?? 20.5);
+             const holeX_Left = fSvgX + xL;
+             const holeX_Right = fSvgX + fWidth - xR;
+
+             let drawHoleY = front.isTBF ? front.y + hole.y - th : front.y + hole.y;
+             const holeSvgY = sideH - (front.dy + drawHoleY);
+
+             svg += `<circle cx="${holeX_Left}" cy="${holeSvgY}" r="2.5" fill="${C.red600}" />`;
+             svg += `<circle cx="${holeX_Right}" cy="${holeSvgY}" r="2.5" fill="${C.red600}" />`;
+
+             const tspanHtml = getDimText(hole.y, front.h, C.red600);
+             svg += `<text x="${holeX_Left - 8}" y="${holeSvgY + 4}" text-anchor="end" font-family="${FONT}">${tspanHtml}</text>`;
+          });
+        }
+        svg += `</g>`;
+      }
+  });
+  svg += `</g>`;
+
+  return svg;
+}
+
+// Widok szuflad wewnętrznych (detail-front-inner). Część generateSidePanelSVG - wspólne wartości przychodzą w ctx.
+function drawInnerFronts(ctx) {
+  const { cabWidth, innerFrontX, isTopBottomFullWidth, mod, sideH, svgTopY, th } = ctx;
+  let svg = '';
+
+  svg += `<g id="detail-front-inner" style="display:none;">`;
+  svg += `<text x="${innerFrontX + cabWidth/2}" y="${svgTopY - 25}" font-size="16" fill="${C.blue900}" font-weight="bold" text-anchor="middle">FRONTY (Szuflady wewn.)</text>`;
+
+  if (mod && mod.elements) {
+    const innerFronts = mod.elements.filter(el => el.typ === 'front' && el.subtype === 'szuflada-wewnetrzna').sort((a, b) => a.y - b.y);
+    svg += `<rect x="${innerFrontX}" y="0" width="${cabWidth}" height="${sideH}" fill="none" stroke="${C.slate400}" stroke-dasharray="4,4" stroke-width="1" />`;
+
+    innerFronts.forEach(front => {
+      let drawY = isTopBottomFullWidth ? front.y - th : front.y;
+      const elSvgY = sideH - drawY - front.h; 
+      const fWidth = front.w || cabWidth;
+      const fSvgX = innerFrontX + (front.x || 0);
+
+      svg += `<rect x="${fSvgX}" y="${elSvgY}" width="${fWidth}" height="${front.h}" fill="${C.orange50}" stroke="${C.orange600}" stroke-width="1.5" />`;
+      svg += `<text x="${fSvgX + fWidth/2}" y="${elSvgY + front.h/2}" font-size="12" fill="${C.slate800}" font-weight="bold" text-anchor="middle">Szuflada Wewn.</text>`;
+    });
+  }
+  svg += `</g>`;
+
+  return svg;
+}
+
+// Rzuty z góry wieńców/półek z nawiertami od przegród (detail-<panelKey>). Część generateSidePanelSVG - wspólne wartości przychodzą w ctx.
+function drawPionMountViews(ctx) {
+  const { detailStartX, mountingData, sideH, svgTopY } = ctx;
+  let svg = '';
+
+  // Rzuty z góry wieńca/półki z nawiertami kołek+wkręt od przegrody pionowej
+  // (isStructural, patrz core/zoneTree.js: toggleStructural) - jeden osobny,
+  // klikalny widok PER PANEL (engine/carcaseParts.js: getPionMountHoles), otwierany
+  // z mapy korpusu wyżej (panelRect). Kolor/rozmiar otworów - taki sam jak
+  // istniejące nawierty kołek+wkręt półki konstrukcyjnej w bok (patrz
+  // drawShelfHoles wyżej), bo to dokładnie to samo połączenie. Rysowane w tym
+  // samym miejscu co boki/przegrody (detailStartX) - tylko jeden widok jest
+  // naraz widoczny (showDetail), więc nie potrzeba dla nich osobnej kolumny
+  // z boku rysunku.
+  const wieniecPanels = mountingData.filter(d => d.type === 'wieniec-mount');
+  const wieniecX = detailStartX;
+  wieniecPanels.forEach(panel => {
+    const w = panel.panelWidth;
+    const d = panel.panelDepth;
+    const detailId = `detail-${panel.panelKey}`;
+    const color = C.purple600;
+    // Dolna krawędź płyty wyrównana do sideH - dokładnie tam, gdzie domyślny
+    // viewBox (wyliczony z boków/frontów, patrz vBoxY/vBoxH wyżej) jest
+    // wycentrowany - inaczej ten widok, rysowany w lokalnym układzie 0..d
+    // niepowiązanym z wysokością szafki, wypadał poza domyślnie widocznym
+    // oknem i po kliknięciu "nic się nie działo" (trzeba było ręcznie
+    // odnaleźć go, przeciągając daleko w górę).
+    const topY = sideH - d;
+
+    svg += `<g id="${detailId}" class="detail-view" style="display:none;">`;
+    svg += `<text x="${wieniecX + w/2}" y="${svgTopY - 25}" font-size="16" fill="${C.blue900}" font-weight="bold" text-anchor="middle">${escapeHtml(panel.panelLabel.toUpperCase())} (WIDOK Z GÓRY)</text>`;
+    svg += `<rect x="${wieniecX}" y="${topY}" width="${w}" height="${d}" fill="${C.white}" stroke="${C.slate600}" stroke-width="1.5" />`;
+    svg += `<text x="${wieniecX + w/2}" y="${topY - 10}" font-size="11" fill="${C.slate400}" font-weight="bold" text-anchor="middle" letter-spacing="1">PRZÓD</text>`;
+    svg += `<text x="${wieniecX + w/2}" y="${topY + d + 20}" font-size="11" fill="${C.slate400}" font-weight="bold" text-anchor="middle" letter-spacing="1">TYŁ</text>`;
+
+    const xPositions = new Set();
+    panel.holes.forEach(h => {
+      const r = h.holeType === 'dowel' ? 4.0 : 1.5;
+      svg += `<circle cx="${wieniecX + h.x}" cy="${topY + h.zFromFront}" r="${r}" fill="${color}" />`;
+      if (h.holeType === 'screw') xPositions.add(round1(h.x));
+    });
+
+    // Wymiar X (od lewej krawędzi płyty do środka przegrody) - Z (odległość
+    // od przodu) widać wprost z rysunku w skali, tak jak przy innych widokach.
+    Array.from(xPositions).sort((a, b) => a - b).forEach(x => {
+      const lineX = wieniecX + x;
+      svg += `<line x1="${lineX}" y1="${topY + d}" x2="${lineX}" y2="${topY + d + 32}" stroke="${color}" stroke-width="0.75" stroke-dasharray="2,2" />`;
+      svg += `<line x1="${wieniecX}" y1="${topY + d + 32}" x2="${lineX}" y2="${topY + d + 32}" stroke="${color}" stroke-width="0.5" />`;
+      svg += `<circle cx="${wieniecX}" cy="${topY + d + 32}" r="2" fill="${color}" />`;
+      svg += `<text x="${lineX + 4}" y="${topY + d + 46}" font-size="10" fill="${color}" font-weight="bold">${fmtMm(x)} mm od lewej</text>`;
+    });
+
+    svg += `</g>`;
+  });
+
+  return svg;
+}
+
 export function generateSidePanelSVG(height, depth, mountingData = []) {
   const mod = state.project.modules.find(m => m.id === state.activeModuleId) || state.project.modules[0];
   if (!mod) return '<svg></svg>';
@@ -333,586 +953,12 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
     });
   }
 
-  // ==== WYMIAROWANIE PRZESTRZENI KORPUSU (widok KORPUS) ====
-  // Wyłącznie wymiary WEWNĄTRZ zarysu AKTYWNEGO MODUŁU. Odtwarzamy tu TO SAMO
-  // drzewo BSP co core/zoneTree.js (przegroda pionowa liczy się jako podział
-  // TYLKO jeśli w pełni rozpina wysokość swojej wnęki - identyczny warunek
-  // jak tam), żeby kolumny nie "przeciekały" na wysokości, na których dana
-  // przegroda w ogóle nie istnieje (np. przegroda tylko w dolnej wnęce pod
-  // półką nie może dzielić też górnej wnęki nad tą półką na dwie kolumny -
-  // to był zgłoszony bug: "przestrzeń nie ma przegrody a wymiaruje się jakby
-  // była").
-  {
-    function partitionMM(rect) {
-      const pionCandidates = partitions.filter(p =>
-        p.x > rect.minX + 2 && p.x + p.w < rect.maxX - 2 &&
-        p.y <= rect.minY + 2 && p.y + p.h >= rect.maxY - 2
-      ).sort((a, b) => a.x - b.x);
-      if (pionCandidates.length) {
-        const p = pionCandidates[0];
-        return {
-          axis: 'v', divider: p, rect,
-          a: partitionMM({ ...rect, maxX: p.x }),
-          b: partitionMM({ ...rect, minX: p.x + p.w }),
-        };
-      }
-      const poziomCandidates = (mod.elements || []).filter(el =>
-        el.typ === 'poziom' &&
-        el.y > rect.minY + 2 && el.y + el.h < rect.maxY - 2 &&
-        el.x <= rect.minX + 2 && el.x + el.w >= rect.maxX - 2
-      ).sort((a, b) => a.y - b.y);
-      if (poziomCandidates.length) {
-        const p = poziomCandidates[0];
-        return {
-          axis: 'h', divider: p, rect,
-          a: partitionMM({ ...rect, maxY: p.y }),
-          b: partitionMM({ ...rect, minY: p.y + p.h }),
-        };
-      }
-      return { axis: null, rect };
-    }
-
-    svg += `<defs><marker id="korpus-dim-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${C.slate700}" /></marker></defs>`;
-    svg += `<g class="layer-dim-outline">`;
-
-    // Podział pionowy zawęża kolumnę (x) i rekurencyjnie oddaje obie strony
-    // do renderColumnChain - każda dostaje WŁASNY, niezależny łańcuch. Podział
-    // poziomy NIE zawęża x, więc kolejne piętra "h" zbieramy w JEDEN łańcuch
-    // (renderColumnChain -> descend), chyba że jedna ze stron sama okaże się
-    // podziałem pionowym - wtedy ta strona jest "nieprzezroczysta": ma swój
-    // WŁASNY, węższy łańcuch (osobne wywołanie renderRegion), a bieżący,
-    // szerszy łańcuch NIE rysuje przez nią światła (bo to już nie jedna,
-    // realna przestrzeń, tylko dwie węższe kolumny obok siebie).
-    function renderRegion(node) {
-      if (node.axis === 'v') {
-        renderRegion(node.a);
-        renderRegion(node.b);
-        return;
-      }
-      renderColumnChain(node);
-    }
-
-    function renderColumnChain(node) {
-      const { minX, maxX, minY, maxY } = node.rect;
-      const colWidthMM = maxX - minX;
-      if (colWidthMM < 8) return;
-      const colDimX = cabX + (minX + maxX) / 2;
-      const isNarrow = colWidthMM < 260;
-
-      const isBottomWieniec = Math.abs(minY - th) < 2;
-      const isTopWieniec = Math.abs(maxY - (sideH - th)) < 2;
-      // mmY = wysokość ŚRODKA płyty/dzielnika od podłogi (nie jej krawędzi) -
-      // rect.minY/maxY to WEWNĘTRZNE krawędzie (światło), więc płyta leżąca
-      // pod/nad tą krawędzią ma środek o th/2 dalej.
-      const dividers = [
-        { mmY: minY - th / 2, half: th / 2, kind: isBottomWieniec ? 'wieniec' : 'poziom', openBelow: false, openAbove: true },
-        { mmY: maxY + th / 2, half: th / 2, kind: isTopWieniec ? 'wieniec' : 'poziom', openBelow: true, openAbove: false },
-      ];
-
-      // Zbiera wewnętrzne dzielniki poziome TEGO łańcucha, rekurencyjnie
-      // schodząc przez kolejne "h", ale zatrzymując się (i oddając dalej do
-      // renderRegion) na każdej stronie, która okaże się podziałem "v".
-      function descend(n) {
-        if (!n || n.axis !== 'h') return;
-        const aOpaque = n.a.axis === 'v';
-        if (aOpaque) renderRegion(n.a); else descend(n.a);
-        const bOpaque = n.b.axis === 'v';
-        dividers.push({
-          mmY: n.divider.y + n.divider.h / 2, half: n.divider.h / 2, kind: 'poziom',
-          openBelow: !aOpaque, openAbove: !bOpaque,
-        });
-        if (bOpaque) renderRegion(n.b); else descend(n.b);
-      }
-      descend(node);
-      // Malejąco po mmY = rosnąco po współrzędnej SVG (góra rysunku -> dół),
-      // tak samo jak poprzednio sortowano bezpośrednio po współrzędnej SVG.
-      dividers.sort((a, b) => b.mmY - a.mmY);
-
-      const leaderLen = isNarrow ? Math.min(30, colWidthMM * 0.28) : Math.min(78, colWidthMM * 0.42);
-      const leaderStartX = colDimX - leaderLen;
-      const axisFontSize = isNarrow ? 8 : 10;
-      let bestGapTop = 0, bestGapBot = 0, bestGap = -1;
-
-      dividers.forEach((d, i) => {
-        const axisY = sideH - d.mmY;
-        const isW = d.kind === 'wieniec';
-        const label = formatVal(d.mmY);
-        const axisLabel = isNarrow ? `${label}` : `${isW ? 'Oś wieńca' : 'Oś'}: ${label}`;
-        svg += `<line x1="${leaderStartX}" y1="${axisY}" x2="${colDimX - 3}" y2="${axisY}" stroke="${C.slate400}" stroke-width="0.6" stroke-dasharray="3,2" />`;
-        svg += `<text x="${leaderStartX - 4}" y="${axisY + 3}" font-size="${axisFontSize}" fill="${C.blue900}" text-anchor="end" font-family="${FONT}" font-weight="${isW ? 'bold' : 'normal'}">${axisLabel}</text>`;
-
-        if (i < dividers.length - 1) {
-          const next = dividers[i + 1];
-          // d jest FIZYCZNIE WYŻEJ (większe mmY) niż next - światło między
-          // nimi jest realne tylko, gdy d ma otwartą stronę OD SPODU i next
-          // ma otwartą stronę OD GÓRY (żadne z nich nie jest "zaślepione"
-          // przez zagnieżdżony podział pionowy, patrz descend() wyżej).
-          if (!(d.openBelow && next.openAbove)) return;
-          const yTop = axisY + d.half;
-          const yBot = (sideH - next.mmY) - next.half;
-          const gap = yBot - yTop;
-          if (gap < 8) return;
-          const midY = (yTop + yBot) / 2;
-          if (gap > bestGap) { bestGap = gap; bestGapTop = yTop; bestGapBot = yBot; }
-          svg += `<line x1="${colDimX}" y1="${yTop}" x2="${colDimX}" y2="${yBot}" stroke="${C.slate700}" stroke-width="1" marker-start="url(#korpus-dim-arrow)" marker-end="url(#korpus-dim-arrow)" />`;
-          svg += `<rect x="${colDimX - 19}" y="${midY - 8}" width="38" height="15" fill="${C.slate50}" stroke="${C.slate300}" stroke-width="0.5" />`;
-          svg += `<text x="${colDimX}" y="${midY + 3}" font-size="11" font-weight="bold" fill="${C.teal700}" text-anchor="middle" font-family="${FONT}">${formatVal(gap)}</text>`;
-        }
-      });
-
-      // Poziome światło (wewnętrzna szerokość) TEJ kolumny - tylko jeśli ma
-      // choć jeden realny (nie "zaślepiony" przez zagnieżdżony podział "v")
-      // prześwit do pokazania; w jej własnym największym takim prześwicie,
-      // żeby nie wylądować na półce. Celowo NIE na środku tego prześwitu (tam
-      // pionowy łańcuch już rysuje swój box z wartością prześwitu -
-      // nałożyłyby się dokładnie na siebie), tylko przesunięte w górną część.
-      if (bestGap < 0) return;
-      const gapSize = Math.max(bestGapBot - bestGapTop, 1);
-      const widthDimY = bestGapTop + Math.max(4, Math.min(gapSize * 0.3, gapSize - 16));
-      const xL = cabX + minX, xR = cabX + maxX;
-      const w = formatVal(colWidthMM);
-      svg += `<line x1="${xL}" y1="${widthDimY}" x2="${xR}" y2="${widthDimY}" stroke="${C.slate700}" stroke-width="1" marker-start="url(#korpus-dim-arrow)" marker-end="url(#korpus-dim-arrow)" />`;
-      svg += `<rect x="${colDimX - 24}" y="${widthDimY - 8}" width="48" height="15" fill="${C.slate50}" stroke="${C.slate300}" stroke-width="0.5" />`;
-      svg += `<text x="${colDimX}" y="${widthDimY + 4}" font-size="11" font-weight="bold" fill="${C.teal700}" text-anchor="middle" font-family="${FONT}">${w}</text>`;
-    }
-
-    renderRegion(partitionMM({ minX: th, maxX: cabWidth - th, minY: th, maxY: sideH - th }));
-
-    svg += `</g>`;
-  }
-
-  function getShelvesForFace(faceX, isRightFace) {
-      return (mod.elements || []).filter(el => {
-          if (el.typ !== 'poziom') return false;
-          if (isRightFace) return Math.abs(el.x - faceX) < 2;
-          else return Math.abs((el.x + el.w) - faceX) < 2;
-      });
-  }
-
-  function getDrawersForFace(faceX, isRightFace) {
-      return (mountingData || []).filter(d => {
-          if (d.type !== 'drawer') return false;
-          if (!d.slideSideHoles || d.slideSideHoles.length === 0) return false;
-
-          let front = null;
-          state.project.modules.forEach(m => {
-              if (m.elements) { const f = m.elements.find(e => e.id === d.frontId); if (f) front = f; }
-          });
-          if (!front) return false;
-
-          const fMinX = front.baseZone ? parseFloat(front.baseZone.minX) : th;
-          const fMaxX = front.baseZone ? parseFloat(front.baseZone.maxX) : (cabWidth - th);
-          if (isRightFace) return Math.abs(fMinX - faceX) < 2;
-          else return Math.abs(fMaxX - faceX) < 2;
-      });
-  }
-
-  function getHingesForFace(faceX, isRightFace) {
-      return (mountingData || []).filter(d => {
-          if (d.type !== 'door') return false;
-
-          let front = null;
-          state.project.modules.forEach(m => {
-              if (m.elements) {
-                  const f = m.elements.find(e => e.id === d.frontId);
-                  if (f) front = f;
-              }
-          });
-          if (!front) return false;
-
-          const fMinX = front.baseZone ? parseFloat(front.baseZone.minX) : th;
-          const fMaxX = front.baseZone ? parseFloat(front.baseZone.maxX) : (cabWidth - th);
-          if (isRightFace && d.side === 'left') return Math.abs(fMinX - faceX) < 2;
-          if (!isRightFace && d.side === 'right') return Math.abs(fMaxX - faceX) < 2;
-          return false;
-      });
-  }
-
-  const detailGroups = ['detail-left', 'detail-right'];
-  partitions.forEach((p, i) => detailGroups.push(`detail-part-${i}`));
-
-  detailGroups.forEach(groupId => {
-      svg += `<g id="${groupId}" class="detail-view" style="display:none;">`;
-      const groupPanels = panels.filter(p => p.detailGroupId === groupId);
-
-      groupPanels.forEach(panel => {
-          let panelH = sideH;
-          let panelCalcY = 0; 
-
-          if (!panel.isOuterLeft && !panel.isOuterRight) {
-              panelH = panel.h;
-              panelCalcY = isTopBottomFullWidth ? panel.y - th : panel.y;
-          }
-
-          const panelDrawY = sideH - panelCalcY - panelH;
-
-          svg += `<text x="${panel.svgX + depth/2}" y="${svgTopY - 25}" font-size="16" fill="${C.blue900}" font-weight="bold" text-anchor="middle">${panel.title}</text>`;
-          svg += `<rect x="${panel.svgX}" y="${panelDrawY}" width="${depth}" height="${panelH}" fill="${C.white}" stroke="${C.slate600}" stroke-width="1.5" />`;
-
-          const isReversed = panel.isReversedView; 
-          const frontTextX = isReversed ? panel.svgX + depth - 15 : panel.svgX + 15;
-          const backTextX = isReversed ? panel.svgX + 15 : panel.svgX + depth - 15;
-          const textMidY = panelDrawY + (panelH / 2);
-
-          svg += `<text x="${frontTextX}" y="${textMidY}" font-size="11" fill="${C.slate400}" font-weight="bold" transform="rotate(-90, ${frontTextX}, ${textMidY})" text-anchor="middle" letter-spacing="1">PRZÓD</text>`;
-          svg += `<text x="${backTextX}" y="${textMidY}" font-size="11" fill="${C.slate400}" font-weight="bold" transform="rotate(-90, ${backTextX}, ${textMidY})" text-anchor="middle" letter-spacing="1">TYŁ</text>`;
-
-          const getSvgX = (distFromFront) => isReversed ? panel.svgX + depth - distFromFront : panel.svgX + distFromFront;
-
-          let shelfYs = new Set();
-          let corpusYs = new Set();
-          let drawerYs = new Set();
-
-          const drawShelfHoles = (shelves) => {
-              shelves.forEach(el => {
-                  let calcY = isTopBottomFullWidth ? el.y - th : el.y;
-                  if (calcY < panelCalcY - 5 || calcY > panelCalcY + panelH + 5) return;
-
-                  const isStruct = el.isStructural;
-                  const baseColor = isStruct ? C.purple600 : C.orange600;
-                  const svgY = sideH - calcY;
-
-                  if (isStruct) {
-                      let rScrew = 1.5; 
-                      let rDowel = 4.0; 
-                      [37, depth - 37].forEach(hx => {
-                          svg += `<circle cx="${getSvgX(hx)}" cy="${svgY - el.h/2}" r="${rScrew}" fill="${baseColor}" />`;
-                          let dowelX = hx === 37 ? hx + 32 : hx - 32;
-                          svg += `<circle cx="${getSvgX(dowelX)}" cy="${svgY - el.h/2}" r="${rDowel}" fill="${baseColor}" />`;
-                          if (hx === 37) corpusYs.add(calcY + el.h/2);
-                      });
-                  } else {
-                      let rPin = 2.5; 
-                      [0, 32, -32].forEach(dy => {
-                          [37, depth - 37].forEach(hx => {
-                              svg += `<circle cx="${getSvgX(hx)}" cy="${svgY + SHELF_PIN_DROP - dy}" r="${rPin}" fill="${baseColor}" />`;
-                              if (dy === 0 && hx === 37) shelfYs.add(calcY - SHELF_PIN_DROP);
-                          });
-                      });
-                  }
-              });
-          };
-          drawShelfHoles(getShelvesForFace(panel.faceLeftX, false));
-          drawShelfHoles(getShelvesForFace(panel.faceRightX, true));
-
-          const drawDrawerHoles = (drawers) => {
-              drawers.forEach(d => {
-                  if (d.slideSideHoles && d.slideSideHoles.length > 0) {
-                      let calcY = isTopBottomFullWidth ? d.slideSideHoles[0].y - th : d.slideSideHoles[0].y;
-                      if (calcY < panelCalcY - 5 || calcY > panelCalcY + panelH + 5) return;
-
-                      drawerYs.add(calcY);
-                      const svgY = sideH - calcY;
-                      let rDrawer = 2.5; 
-
-                      d.slideSideHoles.forEach(hole => {
-                          svg += `<circle cx="${getSvgX(hole.x)}" cy="${svgY}" r="${rDrawer}" fill="${C.sky600}" />`;
-                      });
-                  }
-              });
-          };
-          drawDrawerHoles(getDrawersForFace(panel.faceLeftX, false));
-          drawDrawerHoles(getDrawersForFace(panel.faceRightX, true));
-
-          const drawHingeHoles = (hingeData) => {
-              hingeData.forEach(d => {
-                  d.hinges.forEach(hinge => {
-                      if (hinge.isLocal === false) return;
-                      let calcY = isTopBottomFullWidth ? hinge.y - th : hinge.y;
-                      if (calcY < panelCalcY - 5 || calcY > panelCalcY + panelH + 5) return;
-
-                      const svgY = sideH - calcY;
-                      let baseColor = hinge.isAdjusted ? C.orange600 : C.green600;
-                      let rHinge = 2.5; 
-
-                      svg += `<circle cx="${getSvgX(37)}" cy="${svgY - 16}" r="${rHinge}" fill="${baseColor}" />`;
-                      svg += `<circle cx="${getSvgX(37)}" cy="${svgY + 16}" r="${rHinge}" fill="${baseColor}" />`;
-
-                      let localHoleY = calcY - panelCalcY;
-                      let tspanHtml = getDimText(localHoleY, panelH, baseColor);
-                      let textX = isReversed ? getSvgX(37) - 8 : getSvgX(37) + 8;
-                      let anchor = isReversed ? 'end' : 'start';
-                      svg += `<text x="${textX}" y="${svgY + 4}" text-anchor="${anchor}" font-family="${FONT}">${tspanHtml}</text>`;
-                  });
-              });
-          };
-          drawHingeHoles(getHingesForFace(panel.faceLeftX, false));
-          drawHingeHoles(getHingesForFace(panel.faceRightX, true));
-
-          if (panel.isOuterLeft || panel.isOuterRight) {
-               const corpusHolesData = mountingData.find(d => d.type === 'corpus');
-               if (corpusHolesData && corpusHolesData.holes) {
-                   corpusHolesData.holes.forEach(h => {
-                       let calcY = isTopBottomFullWidth ? h.y - th : h.y;
-                       if (calcY < panelCalcY - 5 || calcY > panelCalcY + panelH + 5) return;
-
-                       if (h.holeType === 'screw') corpusYs.add(calcY);
-
-                       let r = h.holeType === 'screw' ? 1.5 : 4.0; 
-                       let holeX = panel.isOuterRight ? (depth - h.xFromFront) : h.xFromFront;
-
-                       svg += `<circle cx="${panel.svgX + holeX}" cy="${sideH - calcY}" r="${r}" fill="${C.purple600}" />`;
-                   });
-               }
-          }
-
-          const sortedDrawerYs = Array.from(drawerYs).sort((a,b) => a - b);
-          const sortedCorpusYs = Array.from(corpusYs).sort((a,b) => a - b);
-          const sortedShelfYs = Array.from(shelfYs).sort((a,b) => a - b);
-
-          // Opisy nawiertów stoją w kolumnach obok formatki. Boki skrajne mają wolną
-          // drugą stronę - szuflady (niebieskie) i kołki/wkręty konstrukcyjne (fiolet)
-          // opisujemy tam, a podpórki półek po stronie zewnętrznej, żeby napisy się
-          // nie nakładały i cały arkusz był wykorzystany. Przegrody (dwie formatki obok siebie) zostają
-          // z opisami po jednej stronie.
-          const sideCfg = (rev) => ({
-              edgeX: rev ? panel.svgX + depth : panel.svgX,
-              x: rev ? panel.svgX + depth + 40 : panel.svgX - 40,
-              step: rev ? 120 : -120,
-              anchor: rev ? 'start' : 'end',
-              off: rev ? 8 : -8
-          });
-          const outerCol = sideCfg(isReversed);
-          const oppCol = (panel.isOuterLeft || panel.isOuterRight) ? sideCfg(!isReversed) : outerCol;
-          const drawerCol = oppCol;
-          const corpusCol = oppCol;
-
-          if (sortedDrawerYs.length > 0) {
-              svg += `<g class="layer-holes-drawer">`;
-              sortedDrawerYs.forEach(calcY => {
-                  let holeSvgY = sideH - calcY;
-                  svg += `<line x1="${drawerCol.edgeX}" y1="${holeSvgY}" x2="${drawerCol.x}" y2="${holeSvgY}" stroke="${C.sky600}" stroke-width="0.5" stroke-dasharray="2,2" />`;
-
-                  let localHoleY = calcY - panelCalcY;
-                  let tspanHtml = getDimText(localHoleY, panelH, C.sky600);
-
-                  svg += `<text x="${drawerCol.x + drawerCol.off}" y="${holeSvgY + 4}" font-size="12" font-family="${FONT}" text-anchor="${drawerCol.anchor}">
-                            ${tspanHtml}
-                          </text>`;
-              });
-              drawerCol.x += drawerCol.step;
-              svg += `</g>`;
-          }
-
-          if (sortedCorpusYs.length > 0) {
-              svg += `<g class="layer-holes-corpus">`;
-              sortedCorpusYs.forEach(calcY => {
-                  let holeSvgY = sideH - calcY;
-                  svg += `<line x1="${corpusCol.edgeX}" y1="${holeSvgY}" x2="${corpusCol.x}" y2="${holeSvgY}" stroke="${C.purple600}" stroke-width="0.5" stroke-dasharray="2,2" />`;
-
-                  let localHoleY = calcY - panelCalcY;
-                  let tspanHtml = getDimText(localHoleY, panelH, C.purple600, true);
-
-                  svg += `<text x="${corpusCol.x + corpusCol.off}" y="${holeSvgY + 4}" font-size="12" font-family="${FONT}" text-anchor="${corpusCol.anchor}">
-                            ${tspanHtml}
-                          </text>`;
-              });
-              corpusCol.x += corpusCol.step;
-              svg += `</g>`;
-          }
-
-          if (sortedShelfYs.length > 0) {
-              svg += `<g class="layer-holes-shelf">`;
-              sortedShelfYs.forEach(calcY => {
-                  [32, 0, -32].forEach(dy => {
-                      let holeY = calcY + dy;
-                      let holeSvgY = sideH - holeY;
-                      let isCenter = dy === 0;
-                      svg += `<line x1="${outerCol.edgeX}" y1="${holeSvgY}" x2="${outerCol.x}" y2="${holeSvgY}" stroke="${C.orange600}" stroke-width="0.5" stroke-dasharray="2,2" />`;
-
-                      let localHoleY = holeY - panelCalcY;
-                      let tspanHtml = getDimText(localHoleY, panelH, C.orange600, true);
-
-                      svg += `<text x="${outerCol.x + outerCol.off}" y="${holeSvgY + 4}" font-family="${FONT}" text-anchor="${outerCol.anchor}" opacity="${isCenter ? '1' : '0.6'}">
-                                ${tspanHtml}
-                              </text>`;
-                  });
-              });
-
-              // Wymiar oś-w-oś między środkowymi otworami sąsiednich półek
-              // ruchomych (rozstaw półek). Rysowany tuż przy krawędzi panelu,
-              // w osobnym pionowym łańcuszku, żeby nie kolidował z opisami
-              // pojedynczych otworów.
-              if (sortedShelfYs.length > 1) {
-                  const shelfEdgeX = isReversed ? panel.svgX + depth : panel.svgX;
-                  const pitchX = shelfEdgeX + (isReversed ? 26 : -26);
-                  for (let i = 0; i < sortedShelfYs.length - 1; i++) {
-                      const yA = sideH - sortedShelfYs[i];
-                      const yB = sideH - sortedShelfYs[i + 1];
-                      const gap = formatVal(Math.abs(sortedShelfYs[i + 1] - sortedShelfYs[i]));
-                      svg += `<line x1="${pitchX}" y1="${yA}" x2="${pitchX}" y2="${yB}" stroke="${C.orange700}" stroke-width="1" />`;
-                      svg += `<line x1="${pitchX - 4}" y1="${yA}" x2="${pitchX + 4}" y2="${yA}" stroke="${C.orange700}" stroke-width="1.4" />`;
-                      svg += `<line x1="${pitchX - 4}" y1="${yB}" x2="${pitchX + 4}" y2="${yB}" stroke="${C.orange700}" stroke-width="1.4" />`;
-                      // Opis pionowo wzdłuż linii wymiarowej - nie wchodzi w opisy otworów obok.
-                      const pitchTx = pitchX + (isReversed ? 15 : -6);
-                      const pitchTy = (yA + yB) / 2;
-                      svg += `<text x="${pitchTx}" y="${pitchTy}" font-size="12" fill="${C.orange700}" text-anchor="middle" font-family="${FONT}" transform="rotate(-90 ${pitchTx} ${pitchTy})">${gap}<tspan font-size="9" fill="${C.orange800}"> oś-oś</tspan></text>`;
-                  }
-              }
-
-              outerCol.x += outerCol.step;
-              svg += `</g>`;
-          }
-      });
-      svg += `</g>`;
-  });
-
-  svg += `<g id="detail-front" style="display:none;">`;
-  svg += `<text x="${frontX + cabWidth/2}" y="${svgTopY - 25}" font-size="16" fill="${C.blue900}" font-weight="bold" text-anchor="middle">FRONT (Podział zewnętrzny)</text>`;
-
-  const allOuterFronts = [];
-  stackModules.forEach(sm => {
-      const smDy = getDy(sm);
-      const smRelX = getLocalRelX(sm);
-      const smCons = { joinType: 'boki_przelotowe', topType: 'pelny', ...config.construction, ...(sm.construction || {}) };
-      const smIsTBF = smCons.joinType === 'wience_przelotowe';
-      if (sm.elements) {
-          sm.elements.filter(el => el.typ === 'front' && el.subtype !== 'szuflada-wewnetrzna').forEach(f => {
-              allOuterFronts.push({ ...f, dy: smDy, relX: smRelX, sourceModId: sm.id, sourceModName: sm.name, isTBF: smIsTBF });
-          });
-      }
-  });
-
-  allOuterFronts.forEach(front => {
-      let drawY = front.isTBF ? front.y - th : front.y;
-      const elSvgY = sideH - (front.dy + drawY + front.h); 
-      const isDrawer = front.subtype === 'szuflada';
-      const isDoor = front.subtype.includes('drzwi');
-      const isForeign = front.sourceModId !== mod.id;
-      let fillColor = isForeign ? C.slate50 : (isDrawer ? C.blue50 : C.green50); 
-      let strokeColor = isForeign ? C.slate300 : (isDrawer ? C.blue500 : C.green500);
-      let strokeDash = isForeign ? 'stroke-dasharray="4,4"' : '';
-
-      const fWidth = front.w || cabWidth;
-      const fSvgX = frontX + front.relX + (front.x || 0);
-
-      svg += `<rect x="${fSvgX}" y="${elSvgY}" width="${fWidth}" height="${front.h}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5" ${strokeDash} />`;
-
-      const hingeSide = isDoor ? doorHingeSide(front) : null;
-      let labelText = isDrawer ? `Szuflada` : `Drzwi ${hingeSide === 'right' ? 'prawe' : 'lewe'}`;
-      if (isForeign) labelText += ` (z: ${escapeHtml(front.sourceModName)})`;
-      svg += `<text x="${fSvgX + fWidth/2}" y="${elSvgY + front.h/2}" font-size="12" fill="${isForeign ? C.slate400 : C.slate800}" font-weight="bold" text-anchor="middle">${labelText}</text>`;
-      if (isDoor) svg += `<text x="${fSvgX + fWidth/2}" y="${elSvgY + front.h/2 + 16}" font-size="10" fill="${isForeign ? C.slate400 : C.green700}" text-anchor="middle">zawiasy z ${hingeSide === 'right' ? 'prawej' : 'lewej'}</text>`;
-
-      if (isDoor && mountingData) {
-        svg += `<g class="layer-holes-hinge">`;
-        const doorData = mountingData.find(m => m.type === 'door' && m.frontId === front.id);
-        if (doorData && doorData.hinges) {
-          doorData.hinges.forEach((hinge) => {
-             const isLeft = doorData.side === 'left';
-             const cupX = isLeft ? fSvgX + hinge.cupXOffset : fSvgX + fWidth - hinge.cupXOffset;
-             let drawHoleY = front.isTBF ? front.y + hinge.relY - th : front.y + hinge.relY;
-             const holeSvgY = sideH - (front.dy + drawHoleY);
-
-             let mainColor = hinge.isLocal ? (hinge.isAdjusted ? C.orange600 : C.green600) : C.slate400;
-             let opacity = hinge.isLocal ? "1" : "0.5"; 
-
-             svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="17.5" fill="${C.cupFill}" stroke="${mainColor}" stroke-width="1.5" opacity="${opacity}" />`;
-             svg += `<circle cx="${cupX}" cy="${holeSvgY}" r="2.5" fill="${mainColor}" opacity="${opacity}" />`;
-
-             let tspanHtml = getDimText(hinge.relY, front.h, mainColor);
-             let textX = isLeft ? cupX + 22 : cupX - 22;
-             let anchor = isLeft ? 'start' : 'end';
-             svg += `<text x="${textX}" y="${holeSvgY + 4}" text-anchor="${anchor}" font-family="${FONT}" opacity="${opacity}">${tspanHtml}</text>`;
-          });
-        }
-        svg += `</g>`;
-      }
-
-      if (isDrawer && mountingData) {
-        svg += `<g class="layer-front-holes">`;
-        const drawerData = mountingData.find(m => m.type === 'drawer' && m.frontId === front.id);
-        if (drawerData && drawerData.frontHoles) {
-          drawerData.frontHoles.forEach((hole, idx) => {
-             const xL = Number(hole.xOffsetLeft ?? hole.xOffset ?? 20.5);
-             const xR = Number(hole.xOffsetRight ?? hole.xOffset ?? 20.5);
-             const holeX_Left = fSvgX + xL;
-             const holeX_Right = fSvgX + fWidth - xR;
-
-             let drawHoleY = front.isTBF ? front.y + hole.y - th : front.y + hole.y;
-             const holeSvgY = sideH - (front.dy + drawHoleY);
-
-             svg += `<circle cx="${holeX_Left}" cy="${holeSvgY}" r="2.5" fill="${C.red600}" />`;
-             svg += `<circle cx="${holeX_Right}" cy="${holeSvgY}" r="2.5" fill="${C.red600}" />`;
-
-             const tspanHtml = getDimText(hole.y, front.h, C.red600);
-             svg += `<text x="${holeX_Left - 8}" y="${holeSvgY + 4}" text-anchor="end" font-family="${FONT}">${tspanHtml}</text>`;
-          });
-        }
-        svg += `</g>`;
-      }
-  });
-  svg += `</g>`;
-
-  svg += `<g id="detail-front-inner" style="display:none;">`;
-  svg += `<text x="${innerFrontX + cabWidth/2}" y="${svgTopY - 25}" font-size="16" fill="${C.blue900}" font-weight="bold" text-anchor="middle">FRONTY (Szuflady wewn.)</text>`;
-
-  if (mod && mod.elements) {
-    const innerFronts = mod.elements.filter(el => el.typ === 'front' && el.subtype === 'szuflada-wewnetrzna').sort((a, b) => a.y - b.y);
-    svg += `<rect x="${innerFrontX}" y="0" width="${cabWidth}" height="${sideH}" fill="none" stroke="${C.slate400}" stroke-dasharray="4,4" stroke-width="1" />`;
-
-    innerFronts.forEach(front => {
-      let drawY = isTopBottomFullWidth ? front.y - th : front.y;
-      const elSvgY = sideH - drawY - front.h; 
-      const fWidth = front.w || cabWidth;
-      const fSvgX = innerFrontX + (front.x || 0);
-
-      svg += `<rect x="${fSvgX}" y="${elSvgY}" width="${fWidth}" height="${front.h}" fill="${C.orange50}" stroke="${C.orange600}" stroke-width="1.5" />`;
-      svg += `<text x="${fSvgX + fWidth/2}" y="${elSvgY + front.h/2}" font-size="12" fill="${C.slate800}" font-weight="bold" text-anchor="middle">Szuflada Wewn.</text>`;
-    });
-  }
-  svg += `</g>`;
-
-  // Rzuty z góry wieńca/półki z nawiertami kołek+wkręt od przegrody pionowej
-  // (isStructural, patrz core/zoneTree.js: toggleStructural) - jeden osobny,
-  // klikalny widok PER PANEL (engine/carcaseParts.js: getPionMountHoles), otwierany
-  // z mapy korpusu wyżej (panelRect). Kolor/rozmiar otworów - taki sam jak
-  // istniejące nawierty kołek+wkręt półki konstrukcyjnej w bok (patrz
-  // drawShelfHoles wyżej), bo to dokładnie to samo połączenie. Rysowane w tym
-  // samym miejscu co boki/przegrody (detailStartX) - tylko jeden widok jest
-  // naraz widoczny (showDetail), więc nie potrzeba dla nich osobnej kolumny
-  // z boku rysunku.
-  const wieniecPanels = mountingData.filter(d => d.type === 'wieniec-mount');
-  const wieniecX = detailStartX;
-  wieniecPanels.forEach(panel => {
-    const w = panel.panelWidth;
-    const d = panel.panelDepth;
-    const detailId = `detail-${panel.panelKey}`;
-    const color = C.purple600;
-    // Dolna krawędź płyty wyrównana do sideH - dokładnie tam, gdzie domyślny
-    // viewBox (wyliczony z boków/frontów, patrz vBoxY/vBoxH wyżej) jest
-    // wycentrowany - inaczej ten widok, rysowany w lokalnym układzie 0..d
-    // niepowiązanym z wysokością szafki, wypadał poza domyślnie widocznym
-    // oknem i po kliknięciu "nic się nie działo" (trzeba było ręcznie
-    // odnaleźć go, przeciągając daleko w górę).
-    const topY = sideH - d;
-
-    svg += `<g id="${detailId}" class="detail-view" style="display:none;">`;
-    svg += `<text x="${wieniecX + w/2}" y="${svgTopY - 25}" font-size="16" fill="${C.blue900}" font-weight="bold" text-anchor="middle">${escapeHtml(panel.panelLabel.toUpperCase())} (WIDOK Z GÓRY)</text>`;
-    svg += `<rect x="${wieniecX}" y="${topY}" width="${w}" height="${d}" fill="${C.white}" stroke="${C.slate600}" stroke-width="1.5" />`;
-    svg += `<text x="${wieniecX + w/2}" y="${topY - 10}" font-size="11" fill="${C.slate400}" font-weight="bold" text-anchor="middle" letter-spacing="1">PRZÓD</text>`;
-    svg += `<text x="${wieniecX + w/2}" y="${topY + d + 20}" font-size="11" fill="${C.slate400}" font-weight="bold" text-anchor="middle" letter-spacing="1">TYŁ</text>`;
-
-    const xPositions = new Set();
-    panel.holes.forEach(h => {
-      const r = h.holeType === 'dowel' ? 4.0 : 1.5;
-      svg += `<circle cx="${wieniecX + h.x}" cy="${topY + h.zFromFront}" r="${r}" fill="${color}" />`;
-      if (h.holeType === 'screw') xPositions.add(round1(h.x));
-    });
-
-    // Wymiar X (od lewej krawędzi płyty do środka przegrody) - Z (odległość
-    // od przodu) widać wprost z rysunku w skali, tak jak przy innych widokach.
-    Array.from(xPositions).sort((a, b) => a - b).forEach(x => {
-      const lineX = wieniecX + x;
-      svg += `<line x1="${lineX}" y1="${topY + d}" x2="${lineX}" y2="${topY + d + 32}" stroke="${color}" stroke-width="0.75" stroke-dasharray="2,2" />`;
-      svg += `<line x1="${wieniecX}" y1="${topY + d + 32}" x2="${lineX}" y2="${topY + d + 32}" stroke="${color}" stroke-width="0.5" />`;
-      svg += `<circle cx="${wieniecX}" cy="${topY + d + 32}" r="2" fill="${color}" />`;
-      svg += `<text x="${lineX + 4}" y="${topY + d + 46}" font-size="10" fill="${color}" font-weight="bold">${fmtMm(x)} mm od lewej</text>`;
-    });
-
-    svg += `</g>`;
-  });
-
+  const ctx = { cabWidth, cabX, config, depth, detailStartX, frontX, getDy, getLocalRelX, innerFrontX, isTopBottomFullWidth, mod, mountingData, panels, partitions, sideH, stackModules, svgTopY, th };
+  svg += drawSpaceDimensions(ctx);
+  svg += drawSideDetails(ctx);
+  svg += drawOuterFronts(ctx);
+  svg += drawInnerFronts(ctx);
+  svg += drawPionMountViews(ctx);
   svg += `</g></svg>`;
   return svg;
 }
