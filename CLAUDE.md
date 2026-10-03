@@ -121,7 +121,9 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
   - `measureTool.js` — miarka; scenę/kamerę/raycaster dostaje raz przez `initMeasureTool()`.
 - `src/render/viewer2d.js` — `generateSidePanelSVG(height, depth, mountingData)` buduje
   rysunek techniczny SVG boku z wierceniami. Rysunki szafki narożnej (formatki w kształcie
-  L, boki, fronty, wykrój) są w `cornerDrawing2d.js`.
+  L, boki, fronty, wykrój) są w `cornerDrawing2d.js`. Kolory i fonty rysunków 2D (też
+  `wallElevations.js`) biorą się z `drawingPalette.js` (`C.slate600`, `FONT`) — SVG są
+  samodzielne (osobne okno, druk), więc nie używają tokenów CSS, ale nie wpisuj w nich hexów.
 
 ### Panele UI (`src/ui/`)
 

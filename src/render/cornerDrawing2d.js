@@ -7,6 +7,7 @@ import { fmtMm, round1 } from '../utils/math.js';
 import { escapeHtml } from '../utils/dom.js';
 import { getCornerPartsGeometry, getCornerWieniecHoles, getCornerShelfHoles, getCornerDoorHinges } from '../engine/cornerParts.js';
 import { formatVal, getDimText } from './viewer2d.js';
+import { C, FONT, FONT_UI } from './drawingPalette.js';
 
 // Rysunki formatek szafki narożnej (boki + listwa) w stylu rysunku boku
 // zwykłej szafki (generateSidePanelSVG): biały panel, fioletowe otwory łączeń
@@ -20,22 +21,22 @@ function generateCornerSidesHolesSVG(sides) {
   const maxH = Math.max(...sides.map(s => (s.bottom || 0) + s.height));
   const totalW = sides.reduce((sum, s) => sum + s.depth + textW + gap, 0) + pad * 2 - gap;
   const totalH = maxH + pad * 2 + 50;
-  const PURPLE = '#9333ea', ORANGE = '#ea580c';
-  let svg = `<svg viewBox="0 0 ${totalW} ${totalH}" xmlns="http://www.w3.org/2000/svg" style="background:#f8fafc" font-family="'Segoe UI', sans-serif">`;
+  const PURPLE = C.purple600, ORANGE = C.orange600;
+  let svg = `<svg viewBox="0 0 ${totalW} ${totalH}" xmlns="http://www.w3.org/2000/svg" style="background:${C.slate50}" font-family="${FONT_UI}">`;
   let ox = pad;
   const top = pad + 30;
   const yOf = (y) => top + maxH - y;
   sides.forEach(s => {
     const bottom = s.bottom || 0;
-    svg += `<text x="${ox + s.depth / 2}" y="${pad + 10}" font-size="16" font-weight="bold" fill="#1e3a8a" text-anchor="middle">${escapeHtml(s.name.toUpperCase())}</text>`;
-    svg += `<text x="${ox + s.depth / 2}" y="${pad + 26}" font-size="11" fill="#64748b" text-anchor="middle">${fmtMm(s.height)} × ${fmtMm(s.depth)} mm</text>`;
-    svg += `<rect x="${ox}" y="${yOf(bottom + s.height)}" width="${s.depth}" height="${s.height}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+    svg += `<text x="${ox + s.depth / 2}" y="${pad + 10}" font-size="16" font-weight="bold" fill="${C.blue900}" text-anchor="middle">${escapeHtml(s.name.toUpperCase())}</text>`;
+    svg += `<text x="${ox + s.depth / 2}" y="${pad + 26}" font-size="11" fill="${C.slate500}" text-anchor="middle">${fmtMm(s.height)} × ${fmtMm(s.depth)} mm</text>`;
+    svg += `<rect x="${ox}" y="${yOf(bottom + s.height)}" width="${s.depth}" height="${s.height}" fill="${C.white}" stroke="${C.slate600}" stroke-width="1.5" />`;
     // Podpis na środku formatki (listwa wąska - pionowo).
     const scx = ox + s.depth / 2, scy = yOf(bottom + s.height / 2);
     const narrow = s.depth < 200;
-    svg += `<text x="${scx}" y="${scy}" font-size="${narrow ? 22 : 34}" fill="#0f172a" font-weight="bold" text-anchor="middle"${narrow ? ` transform="rotate(-90 ${scx} ${scy})"` : ''}>${escapeHtml(s.name.toUpperCase())}</text>`;
-    svg += `<text x="${ox}" y="${yOf(bottom + s.height) - 6}" font-size="10" fill="#94a3b8" font-weight="bold">PRZÓD</text>`;
-    svg += `<text x="${ox + s.depth}" y="${yOf(bottom + s.height) - 6}" font-size="10" fill="#94a3b8" font-weight="bold" text-anchor="end">TYŁ</text>`;
+    svg += `<text x="${scx}" y="${scy}" font-size="${narrow ? 22 : 34}" fill="${C.slate900}" font-weight="bold" text-anchor="middle"${narrow ? ` transform="rotate(-90 ${scx} ${scy})"` : ''}>${escapeHtml(s.name.toUpperCase())}</text>`;
+    svg += `<text x="${ox}" y="${yOf(bottom + s.height) - 6}" font-size="10" fill="${C.slate400}" font-weight="bold">PRZÓD</text>`;
+    svg += `<text x="${ox + s.depth}" y="${yOf(bottom + s.height) - 6}" font-size="10" fill="${C.slate400}" font-weight="bold" text-anchor="end">TYŁ</text>`;
 
     (s.joints || []).forEach(j => {
       svg += `<circle cx="${ox + j.x}" cy="${yOf(j.y)}" r="${j.type === 'dowel' ? 4 : 1.5}" fill="${PURPLE}" />`;
@@ -45,9 +46,9 @@ function generateCornerSidesHolesSVG(sides) {
     // dwa co 32 mm wokół wysokości zawiasu, opis wysokości obok.
     (s.hingePlates || []).forEach(hp => {
       [-16, 16].forEach(dy => {
-        svg += `<circle cx="${ox + hp.x}" cy="${yOf(hp.y + dy)}" r="2.5" fill="#16a34a" />`;
+        svg += `<circle cx="${ox + hp.x}" cy="${yOf(hp.y + dy)}" r="2.5" fill="${C.green600}" />`;
       });
-      svg += `<text x="${ox + hp.x + 12}" y="${yOf(hp.y) + 4}" font-family="sans-serif">${getDimText(hp.y - bottom, s.height, '#16a34a')}</text>`;
+      svg += `<text x="${ox + hp.x + 12}" y="${yOf(hp.y) + 4}" font-family="${FONT}">${getDimText(hp.y - bottom, s.height, C.green600)}</text>`;
     });
 
     const rightX = ox + s.depth;
@@ -56,7 +57,7 @@ function generateCornerSidesHolesSVG(sides) {
       svg += `<circle cx="${ox + h.x}" cy="${yOf(h.y)}" r="2.5" fill="${ORANGE}" opacity="${h.isCenter ? 1 : 0.6}" />`;
       if (h.x === maxX) {
         svg += `<line x1="${rightX}" y1="${yOf(h.y)}" x2="${rightX + 30}" y2="${yOf(h.y)}" stroke="${ORANGE}" stroke-width="0.5" stroke-dasharray="2,2" />`;
-        svg += `<text x="${rightX + 36}" y="${yOf(h.y) + 4}" font-family="sans-serif" opacity="${h.isCenter ? 1 : 0.6}">${getDimText(h.y - bottom, s.height, ORANGE, true)}</text>`;
+        svg += `<text x="${rightX + 36}" y="${yOf(h.y) + 4}" font-family="${FONT}" opacity="${h.isCenter ? 1 : 0.6}">${getDimText(h.y - bottom, s.height, ORANGE, true)}</text>`;
       }
     });
     ox += s.depth + textW + gap;
@@ -75,31 +76,31 @@ function generateCornerPartSVG({ blankA, blankB, depthA, depthB, notch = null, h
   const M = 130;
   const ox = M, oy = M;
   const vbW = blankA + M * 2, vbH = blankB + M * 2;
-  const PURPLE = '#9333ea', NAVY = '#1e3a8a', RED = '#dc2626';
+  const PURPLE = C.purple600, NAVY = C.blue900, RED = C.red600;
   const outline = notch
     ? [[0, notch.h], [notch.w, notch.h], [notch.w, 0], [blankA, 0], [blankA, depthA], [depthB, depthA], [depthB, blankB], [0, blankB]]
     : [[0, 0], [blankA, 0], [blankA, depthA], [depthB, depthA], [depthB, blankB], [0, blankB]];
   const pts = outline.map(([x, y]) => `${ox + x},${oy + y}`).join(' ');
 
-  let svg = `<svg viewBox="0 0 ${vbW} ${vbH}" xmlns="http://www.w3.org/2000/svg" style="background:#f8fafc" font-family="'Segoe UI', sans-serif">`;
+  let svg = `<svg viewBox="0 0 ${vbW} ${vbH}" xmlns="http://www.w3.org/2000/svg" style="background:${C.slate50}" font-family="${FONT_UI}">`;
   svg += `<text x="${ox + blankA / 2}" y="34" font-size="20" font-weight="bold" fill="${NAVY}" text-anchor="middle">${escapeHtml(title)} (WIDOK Z GÓRY)</text>`;
-  svg += `<text x="${ox + blankA / 2}" y="56" font-size="14" fill="#64748b" text-anchor="middle">${escapeHtml(subtitle)}</text>`;
-  svg += `<polygon points="${pts}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
+  svg += `<text x="${ox + blankA / 2}" y="56" font-size="14" fill="${C.slate500}" text-anchor="middle">${escapeHtml(subtitle)}</text>`;
+  svg += `<polygon points="${pts}" fill="${C.white}" stroke="${C.slate600}" stroke-width="1.5" />`;
 
   if (notch) {
-    svg += `<rect x="${ox}" y="${oy}" width="${notch.w}" height="${notch.h}" fill="#fee2e2" stroke="${RED}" stroke-width="1" stroke-dasharray="4,3" />`;
+    svg += `<rect x="${ox}" y="${oy}" width="${notch.w}" height="${notch.h}" fill="${C.red100}" stroke="${RED}" stroke-width="1" stroke-dasharray="4,3" />`;
     svg += `<text x="${ox + notch.w + 8}" y="${oy + notch.h + 14}" font-size="12" font-weight="bold" fill="${RED}">wycięcie na listwę ${fmtMm(notch.w)}×${fmtMm(notch.h)} mm</text>`;
   }
 
   // Podpis na środku (jak "RZUT SZAFKI Z GÓRY" w rzucie) - co to za formatka.
   const lcx = ox + blankA / 2, lcy = oy + depthA / 2;
-  svg += `<text x="${lcx}" y="${lcy}" font-size="44" fill="#0f172a" font-weight="bold" text-anchor="middle">${escapeHtml(title)}</text>`;
-  svg += `<text x="${lcx}" y="${lcy + 34}" font-size="22" fill="#334155" text-anchor="middle">${escapeHtml(subtitle.split(' · ')[0])}</text>`;
+  svg += `<text x="${lcx}" y="${lcy}" font-size="44" fill="${C.slate900}" font-weight="bold" text-anchor="middle">${escapeHtml(title)}</text>`;
+  svg += `<text x="${lcx}" y="${lcy + 34}" font-size="22" fill="${C.slate700}" text-anchor="middle">${escapeHtml(subtitle.split(' · ')[0])}</text>`;
 
   // PRZÓD = krawędzie wycięcia w rogu, TYŁ = ściany.
-  svg += `<text x="${ox + (depthB + blankA) / 2}" y="${oy + depthA + 16}" font-size="11" fill="#94a3b8" font-weight="bold" text-anchor="middle" letter-spacing="1">PRZÓD</text>`;
-  svg += `<text x="${ox + depthB + 16}" y="${oy + (depthA + blankB) / 2}" font-size="11" fill="#94a3b8" font-weight="bold" text-anchor="middle" letter-spacing="1" transform="rotate(-90 ${ox + depthB + 16} ${oy + (depthA + blankB) / 2})">PRZÓD</text>`;
-  svg += `<text x="${ox + blankA / 2}" y="${oy - 8}" font-size="11" fill="#94a3b8" font-weight="bold" text-anchor="middle" letter-spacing="1">TYŁ</text>`;
+  svg += `<text x="${ox + (depthB + blankA) / 2}" y="${oy + depthA + 16}" font-size="11" fill="${C.slate400}" font-weight="bold" text-anchor="middle" letter-spacing="1">PRZÓD</text>`;
+  svg += `<text x="${ox + depthB + 16}" y="${oy + (depthA + blankB) / 2}" font-size="11" fill="${C.slate400}" font-weight="bold" text-anchor="middle" letter-spacing="1" transform="rotate(-90 ${ox + depthB + 16} ${oy + (depthA + blankB) / 2})">PRZÓD</text>`;
+  svg += `<text x="${ox + blankA / 2}" y="${oy - 8}" font-size="11" fill="${C.slate400}" font-weight="bold" text-anchor="middle" letter-spacing="1">TYŁ</text>`;
 
   holes.forEach(h => {
     svg += `<circle cx="${ox + h.x}" cy="${oy + h.y}" r="${h.type === 'dowel' ? 4 : 1.5}" fill="${PURPLE}" />`;
@@ -142,8 +143,8 @@ function generateCornerPartSVG({ blankA, blankB, depthA, depthB, notch = null, h
   svg += dimV(oy, oy + depthA, ox + blankA + 110, `${fmtMm(depthA)} mm`);
   svg += dimH(ox, ox + depthB, oy + blankB + 84, `${fmtMm(depthB)} mm`);
   const cutW = blankA - depthB, cutH = blankB - depthA;
-  if (cutH > 0) svg += dimV(oy + depthA, oy + blankB, ox + blankA + 110, `wycięcie ${fmtMm(cutH)} mm`, '#16a34a');
-  if (cutW > 0) svg += dimH(ox + depthB, ox + blankA, oy + blankB + 84, `wycięcie ${fmtMm(cutW)} mm`, '#d97706');
+  if (cutH > 0) svg += dimV(oy + depthA, oy + blankB, ox + blankA + 110, `wycięcie ${fmtMm(cutH)} mm`, C.green600);
+  if (cutW > 0) svg += dimH(ox + depthB, ox + blankA, oy + blankB + 84, `wycięcie ${fmtMm(cutW)} mm`, C.amber600);
   if (notch) {
     svg += dimH(ox, ox + notch.w, oy + notch.h + 34, `${fmtMm(notch.w)}`, RED);
     svg += dimV(oy, oy + notch.h, ox + notch.w + 44, `${fmtMm(notch.h)}`, RED);
@@ -164,34 +165,34 @@ function generateCornerFrontSVG(door, doorName) {
   const w = parseFloat(f.w) || 0, h = parseFloat(f.h) || 0;
   const M = 150;
   const ox = M, oy = M;
-  const GREEN = '#16a34a', NAVY = '#1e3a8a';
+  const GREEN = C.green600, NAVY = C.blue900;
   const isLeft = door.side === 'left';
   const sub = door.bifoldSecondary
     ? 'skrzydło łączone zawiasem 60° (Blum 79T8500), bez zawiasów przy korpusie'
     : `zawiasy ${isLeft ? 'od strony narożnika' : 'od strony boku korpusu'}`;
-  let svg = `<svg viewBox="0 0 ${w + M * 2} ${h + M * 2}" xmlns="http://www.w3.org/2000/svg" style="background:#f8fafc" font-family="'Segoe UI', sans-serif">`;
+  let svg = `<svg viewBox="0 0 ${w + M * 2} ${h + M * 2}" xmlns="http://www.w3.org/2000/svg" style="background:${C.slate50}" font-family="${FONT_UI}">`;
   svg += `<text x="${ox + w / 2}" y="34" font-size="20" font-weight="bold" fill="${NAVY}" text-anchor="middle">${escapeHtml(doorName)} (WIDOK OD PRZODU)</text>`;
-  svg += `<text x="${ox + w / 2}" y="56" font-size="14" fill="#64748b" text-anchor="middle">${fmtMm(w)} × ${fmtMm(h)} mm · ${escapeHtml(sub)}</text>`;
-  svg += `<rect x="${ox}" y="${oy}" width="${w}" height="${h}" fill="#ffffff" stroke="#475569" stroke-width="1.5" />`;
-  svg += `<rect x="${isLeft ? ox : ox + w - 6}" y="${oy}" width="6" height="${h}" fill="#dc2626" opacity="0.7" />`;
-  svg += `<text x="${ox + w / 2}" y="${oy + h / 2}" font-size="36" font-weight="bold" fill="#0f172a" text-anchor="middle">${escapeHtml(doorName.split(' — ')[0].toUpperCase())}</text>`;
+  svg += `<text x="${ox + w / 2}" y="56" font-size="14" fill="${C.slate500}" text-anchor="middle">${fmtMm(w)} × ${fmtMm(h)} mm · ${escapeHtml(sub)}</text>`;
+  svg += `<rect x="${ox}" y="${oy}" width="${w}" height="${h}" fill="${C.white}" stroke="${C.slate600}" stroke-width="1.5" />`;
+  svg += `<rect x="${isLeft ? ox : ox + w - 6}" y="${oy}" width="6" height="${h}" fill="${C.red600}" opacity="0.7" />`;
+  svg += `<text x="${ox + w / 2}" y="${oy + h / 2}" font-size="36" font-weight="bold" fill="${C.slate900}" text-anchor="middle">${escapeHtml(doorName.split(' — ')[0].toUpperCase())}</text>`;
   door.hinges.forEach(hg => {
     const cx = isLeft ? ox + hg.cupXOffset : ox + w - hg.cupXOffset;
     const cy = oy + h - hg.relY;
-    const c = hg.isAdjusted ? '#ea580c' : GREEN;
-    svg += `<circle cx="${cx}" cy="${cy}" r="17.5" fill="#fcfdfd" stroke="${c}" stroke-width="1.5" />`;
+    const c = hg.isAdjusted ? C.orange600 : GREEN;
+    svg += `<circle cx="${cx}" cy="${cy}" r="17.5" fill="${C.cupFill}" stroke="${c}" stroke-width="1.5" />`;
     svg += `<circle cx="${cx}" cy="${cy}" r="2.5" fill="${c}" />`;
     const tx = isLeft ? cx + 26 : cx - 26;
-    svg += `<text x="${tx}" y="${cy + 4}" text-anchor="${isLeft ? 'start' : 'end'}" font-family="sans-serif">${getDimText(hg.relY, h, c)}</text>`;
+    svg += `<text x="${tx}" y="${cy + 4}" text-anchor="${isLeft ? 'start' : 'end'}" font-family="${FONT}">${getDimText(hg.relY, h, c)}</text>`;
   });
-  svg += `<text x="${isLeft ? ox + 12 : ox + w - 12}" y="${oy - 8}" font-size="11" font-weight="bold" fill="#dc2626" text-anchor="${isLeft ? 'start' : 'end'}">ZAWIASY</text>`;
+  svg += `<text x="${isLeft ? ox + 12 : ox + w - 12}" y="${oy - 8}" font-size="11" font-weight="bold" fill="${C.red600}" text-anchor="${isLeft ? 'start' : 'end'}">ZAWIASY</text>`;
   svg += `</svg>`;
   return svg;
 }
 
 export function generateCornerPartsDrawings(mod) {
   const g = getCornerPartsGeometry(mod);
-  const h2 = (t) => `<h3 style="font-size:14px; color:#1e3a8a; margin:18px 0 6px;">${t}</h3>`;
+  const h2 = (t) => `<h3 style="font-size:14px; color:${C.blue900}; margin:18px 0 6px;">${t}</h3>`;
   let html = h2('Wieniec narożny (dolny + górny)');
   html += generateCornerPartSVG({
     ...g.wieniec, holes: getCornerWieniecHoles(mod),
@@ -283,11 +284,11 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18, notc
   ).map(([x, y]) => `${ox + x},${oy + y}`).join(' ');
   const pts = outline(legA, legB);
 
-  let svg =`<svg viewBox="0 0 ${vbW} ${vbH}" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif">`;
+  let svg =`<svg viewBox="0 0 ${vbW} ${vbH}" xmlns="http://www.w3.org/2000/svg" font-family="${FONT}">`;
 
   // Pełny prostokątny blank (przerywany) - to jest to, co realnie zamawia
   // się/tnie z płyty jako pierwszy krok (patrz Lista formatek: legA×legB).
-  svg += `<rect x="${ox}" y="${oy}" width="${legA}" height="${legB}" fill="none" stroke="#94a3b8" stroke-width="${strokeThick}" stroke-dasharray="${strokeThick * 4},${strokeThick * 3}" />`;
+  svg += `<rect x="${ox}" y="${oy}" width="${legA}" height="${legB}" fill="none" stroke="${C.slate400}" stroke-width="${strokeThick}" stroke-dasharray="${strokeThick * 4},${strokeThick * 3}" />`;
 
   // Róg do odcięcia - zakreskowany, czerwona ramka, żeby jednoznacznie
   // pokazać co znika. Sam wymiar wycięcia (Wycięcie A/B) rysuje się NA
@@ -297,17 +298,17 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18, notc
   // wymiarami "WxH mm" wychodził poza czerwony prostokąt i nakładał się na
   // czarny obrys bryły, wyglądając jak przekreślenie).
   if (cutW > 0 && cutH > 0) {
-    svg += `<rect x="${ox + depthB}" y="${oy + depthA}" width="${cutW}" height="${cutH}" fill="#fee2e2" stroke="#dc2626" stroke-width="${strokeThick}" stroke-dasharray="${strokeThick * 2.5},${strokeThick * 2}" />`;
+    svg += `<rect x="${ox + depthB}" y="${oy + depthA}" width="${cutW}" height="${cutH}" fill="${C.red100}" stroke="${C.red600}" stroke-width="${strokeThick}" stroke-dasharray="${strokeThick * 2.5},${strokeThick * 2}" />`;
     if (cutW > fs * 3 && cutH > fs * 1.5) {
-      svg += `<text x="${ox + depthB + cutW / 2}" y="${oy + depthA + cutH / 2}" font-size="${fs}" fill="#b91c1c" font-weight="bold" text-anchor="middle" dominant-baseline="middle">ODCIĄĆ</text>`;
+      svg += `<text x="${ox + depthB + cutW / 2}" y="${oy + depthA + cutH / 2}" font-size="${fs}" fill="${C.red700}" font-weight="bold" text-anchor="middle" dominant-baseline="middle">ODCIĄĆ</text>`;
     }
   }
 
   // Realny obrys L po docięciu - wypełniony, na wierzchu.
-  svg += `<polygon points="${pts}" fill="#fef3c7" stroke="#334155" stroke-width="${strokeThick * 1.3}" />`;
+  svg += `<polygon points="${pts}" fill="${C.amber100}" stroke="${C.slate700}" stroke-width="${strokeThick * 1.3}" />`;
   if (notch) {
-    svg += `<rect x="${ox}" y="${oy}" width="${notch.w}" height="${notch.h}" fill="#fee2e2" stroke="#dc2626" stroke-width="${strokeThick}" stroke-dasharray="${strokeThick * 2.5},${strokeThick * 2}" />`;
-    svg += `<text x="${ox + notch.w + fsTiny * 0.6}" y="${oy + notch.h + fsTiny * 3.4}" font-size="${fsTiny}" fill="#b91c1c" font-weight="bold">wycięcie na listwę ${fmtMm(notch.w)}×${fmtMm(notch.h)} mm</text>`;
+    svg += `<rect x="${ox}" y="${oy}" width="${notch.w}" height="${notch.h}" fill="${C.red100}" stroke="${C.red600}" stroke-width="${strokeThick}" stroke-dasharray="${strokeThick * 2.5},${strokeThick * 2}" />`;
+    svg += `<text x="${ox + notch.w + fsTiny * 0.6}" y="${oy + notch.h + fsTiny * 3.4}" font-size="${fsTiny}" fill="${C.red700}" font-weight="bold">wycięcie na listwę ${fmtMm(notch.w)}×${fmtMm(notch.h)} mm</text>`;
   }
 
   // Boki (płyty boczne, ui/właściwe formatki "Bok (L/P)" w Liście formatek) -
@@ -316,9 +317,9 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18, notc
   // niżej) jest węższa niż cały korpus - to właśnie w to miejsce wchodzi
   // (boki przelotowe, wieniec między nimi), a nie osobny, niezależny
   // "ubytek". Tylko wizualny kontekst, nie osobna formatka do zamawiania tu.
-  const COLOR_BOK = '#78716c';
-  svg += `<rect x="${ox + legA - th}" y="${oy}" width="${th}" height="${depthA}" fill="#e7e5e4" stroke="${COLOR_BOK}" stroke-width="${strokeThin}" />`;
-  svg += `<rect x="${ox}" y="${oy + legB - th}" width="${depthB}" height="${th}" fill="#e7e5e4" stroke="${COLOR_BOK}" stroke-width="${strokeThin}" />`;
+  const COLOR_BOK = C.stone500;
+  svg += `<rect x="${ox + legA - th}" y="${oy}" width="${th}" height="${depthA}" fill="${C.stone200}" stroke="${COLOR_BOK}" stroke-width="${strokeThin}" />`;
+  svg += `<rect x="${ox}" y="${oy + legB - th}" width="${depthB}" height="${th}" fill="${C.stone200}" stroke="${COLOR_BOK}" stroke-width="${strokeThin}" />`;
   if (th > fsTiny * 2) {
     svg += `<text x="${ox + legA - th / 2}" y="${oy + depthA / 2}" font-size="${fsTiny}" fill="${COLOR_BOK}" text-anchor="middle" dominant-baseline="middle" transform="rotate(-90 ${ox + legA - th / 2} ${oy + depthA / 2})">bok</text>`;
     svg += `<text x="${ox + depthB / 2}" y="${oy + legB - th / 2}" font-size="${fsTiny}" fill="${COLOR_BOK}" text-anchor="middle" dominant-baseline="middle">bok</text>`;
@@ -332,8 +333,8 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18, notc
   // główne wymiary (Ramię/Głęb./Wycięcie) zostały 1:1 z konfiguratorem.
   if (!extra?.plain && blankA > depthB && blankB > depthA) {
     const blankPts = outline(blankA, blankB);
-    svg += `<polygon points="${blankPts}" fill="none" stroke="#7c3aed" stroke-width="${strokeThin * 1.5}" stroke-dasharray="${strokeThin * 3},${strokeThin * 2}" />`;
-    svg += `<text x="${ox + blankA - fsTiny * 0.6}" y="${oy + fsTiny * 1.4}" font-size="${fsTiny}" fill="#7c3aed" font-weight="bold" text-anchor="end">${notch ? 'Formatka półki' : 'Formatka wieńca'}:${fmtMm(blankA)}×${fmtMm(blankB)} mm (-${fmtMm(th)} mm bok)</text>`;
+    svg += `<polygon points="${blankPts}" fill="none" stroke="${C.violet600}" stroke-width="${strokeThin * 1.5}" stroke-dasharray="${strokeThin * 3},${strokeThin * 2}" />`;
+    svg += `<text x="${ox + blankA - fsTiny * 0.6}" y="${oy + fsTiny * 1.4}" font-size="${fsTiny}" fill="${C.violet600}" font-weight="bold" text-anchor="end">${notch ? 'Formatka półki' : 'Formatka wieńca'}:${fmtMm(blankA)}×${fmtMm(blankB)} mm (-${fmtMm(th)} mm bok)</text>`;
   }
 
   if (extra?.holes?.length) {
@@ -341,16 +342,16 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18, notc
     const rDowel = Math.max(4, unit * 0.016);
     extra.holes.forEach(h => {
       const isDowel = h.type === 'dowel';
-      svg += `<circle cx="${ox + h.x}" cy="${oy + h.y}" r="${isDowel ? rDowel : rScrew}" fill="${isDowel ? '#bbf7d0' : '#94a3b8'}" stroke="${isDowel ? '#16a34a' : '#475569'}" stroke-width="${strokeThin}" />`;
+      svg += `<circle cx="${ox + h.x}" cy="${oy + h.y}" r="${isDowel ? rDowel : rScrew}" fill="${isDowel ? C.green200 : C.slate400}" stroke="${isDowel ? C.green600 : C.slate600}" stroke-width="${strokeThin}" />`;
     });
     const lx = ox + depthB / 2, lyy = oy + depthA / 2 + fs * 3.2;
-    svg += `<circle cx="${lx - fs * 3}" cy="${lyy - fsTiny * 0.3}" r="${rScrew}" fill="#94a3b8" stroke="#475569" stroke-width="${strokeThin}" /><text x="${lx - fs * 2.4}" y="${lyy}" font-size="${fsTiny}" fill="#475569">wkręt</text>`;
-    svg += `<circle cx="${lx + fs * 0.6}" cy="${lyy - fsTiny * 0.3}" r="${rDowel}" fill="#bbf7d0" stroke="#16a34a" stroke-width="${strokeThin}" /><text x="${lx + fs * 1.4}" y="${lyy}" font-size="${fsTiny}" fill="#475569">kołek</text>`;
+    svg += `<circle cx="${lx - fs * 3}" cy="${lyy - fsTiny * 0.3}" r="${rScrew}" fill="${C.slate400}" stroke="${C.slate600}" stroke-width="${strokeThin}" /><text x="${lx - fs * 2.4}" y="${lyy}" font-size="${fsTiny}" fill="${C.slate600}">wkręt</text>`;
+    svg += `<circle cx="${lx + fs * 0.6}" cy="${lyy - fsTiny * 0.3}" r="${rDowel}" fill="${C.green200}" stroke="${C.green600}" stroke-width="${strokeThin}" /><text x="${lx + fs * 1.4}" y="${lyy}" font-size="${fsTiny}" fill="${C.slate600}">kołek</text>`;
   }
   if (extra?.title) {
     const cx = extra.plain ? ox + legA / 2 : ox + depthB / 2, cy = oy + depthA / 2;
-    svg += `<text x="${cx}" y="${cy - fs * 0.2}" font-size="${extra.plain ? fs * 1.05 : fs * 1.5}" fill="#0f172a" font-weight="bold" text-anchor="middle">${escapeHtml(extra.title)}</text>`;
-    if (extra.subtitle) svg += `<text x="${cx}" y="${cy + fs * 1.2}" font-size="${fs}" fill="#334155" text-anchor="middle">${escapeHtml(extra.subtitle)}</text>`;
+    svg += `<text x="${cx}" y="${cy - fs * 0.2}" font-size="${extra.plain ? fs * 1.05 : fs * 1.5}" fill="${C.slate900}" font-weight="bold" text-anchor="middle">${escapeHtml(extra.title)}</text>`;
+    if (extra.subtitle) svg += `<text x="${cx}" y="${cy + fs * 1.2}" font-size="${fs}" fill="${C.slate700}" text-anchor="middle">${escapeHtml(extra.subtitle)}</text>`;
   }
 
   // Wymiary - proste kolorowe linie TUŻ PRZY odpowiadającym im fragmencie
@@ -384,10 +385,10 @@ export function generateCornerBlankSVG(legA, legB, depthA, depthB, th = 18, notc
     return s;
   };
 
-  const COLOR_LEG = '#1e3a8a';
-  const COLOR_DEPTH = '#dc2626';
-  const COLOR_CUT_A = '#d97706';
-  const COLOR_CUT_B = '#16a34a';
+  const COLOR_LEG = C.blue900;
+  const COLOR_DEPTH = C.red600;
+  const COLOR_CUT_A = C.amber600;
+  const COLOR_CUT_B = C.green600;
 
   // Góra: Ramię A (cały korpus, 1:1 z konfiguratorem)
   svg += dimH(ox, ox + legA, oy - laneGap, `Ramię A: ${fmtMm(legA)} mm`, COLOR_LEG);

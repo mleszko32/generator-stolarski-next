@@ -9,10 +9,11 @@ import { escapeHtml } from '../utils/dom.js';
 import { fmtMm } from '../utils/math.js';
 import { computeWallLayouts } from '../core/walls.js';
 import { computeWorktops } from '../core/worktops.js';
+import { C, FONT_UI } from './drawingPalette.js';
 
-const NAVY = '#1e3a8a';
-const ORANGE = '#d97706';
-const GRAY = '#64748b';
+const NAVY = C.blue900;
+const ORANGE = C.amber600;
+const GRAY = C.slate500;
 
 const TYPE_PREFIX = { base_cabinet: 'D', upper_cabinet: 'W', tall_cabinet: 'S', corner_cabinet: 'N' };
 
@@ -33,17 +34,17 @@ const WALL_EDGE = { tyl: 'top', prawa: 'right', przednia: 'bottom', lewa: 'left'
 function planInset(wallId, room, plan, x0, y0, size, fs) {
   const k = size / Math.max(room.width, room.depth);
   const pw = room.width * k, ph = room.depth * k;
-  let s = `<rect x="${x0}" y="${y0}" width="${pw}" height="${ph}" fill="#f8fafc" stroke="#94a3b8" stroke-width="${fs * 0.1}" />`;
+  let s = `<rect x="${x0}" y="${y0}" width="${pw}" height="${ph}" fill="${C.slate50}" stroke="${C.slate400}" stroke-width="${fs * 0.1}" />`;
   plan.forEach(p => {
-    s += `<rect x="${x0 + p.x * k}" y="${y0 + p.z * k}" width="${p.w * k}" height="${p.d * k}" fill="#cbd5e1" stroke="#64748b" stroke-width="${fs * 0.06}" />`;
+    s += `<rect x="${x0 + p.x * k}" y="${y0 + p.z * k}" width="${p.w * k}" height="${p.d * k}" fill="${C.slate300}" stroke="${C.slate500}" stroke-width="${fs * 0.06}" />`;
   });
   const e = WALL_EDGE[wallId];
   const t = fs * 0.35;
   const cx = x0 + pw / 2, cy = y0 + ph / 2;
-  if (e === 'top') s += `<line x1="${x0}" y1="${y0}" x2="${x0 + pw}" y2="${y0}" stroke="#dc2626" stroke-width="${t}" /><path d="M${cx - fs * 0.6} ${y0 + fs * 2.2} L${cx} ${y0 + fs * 0.9} L${cx + fs * 0.6} ${y0 + fs * 2.2}" fill="none" stroke="#dc2626" stroke-width="${fs * 0.15}" />`;
-  if (e === 'bottom') s += `<line x1="${x0}" y1="${y0 + ph}" x2="${x0 + pw}" y2="${y0 + ph}" stroke="#dc2626" stroke-width="${t}" /><path d="M${cx - fs * 0.6} ${y0 + ph - fs * 2.2} L${cx} ${y0 + ph - fs * 0.9} L${cx + fs * 0.6} ${y0 + ph - fs * 2.2}" fill="none" stroke="#dc2626" stroke-width="${fs * 0.15}" />`;
-  if (e === 'left') s += `<line x1="${x0}" y1="${y0}" x2="${x0}" y2="${y0 + ph}" stroke="#dc2626" stroke-width="${t}" /><path d="M${x0 + fs * 2.2} ${cy - fs * 0.6} L${x0 + fs * 0.9} ${cy} L${x0 + fs * 2.2} ${cy + fs * 0.6}" fill="none" stroke="#dc2626" stroke-width="${fs * 0.15}" />`;
-  if (e === 'right') s += `<line x1="${x0 + pw}" y1="${y0}" x2="${x0 + pw}" y2="${y0 + ph}" stroke="#dc2626" stroke-width="${t}" /><path d="M${x0 + pw - fs * 2.2} ${cy - fs * 0.6} L${x0 + pw - fs * 0.9} ${cy} L${x0 + pw - fs * 2.2} ${cy + fs * 0.6}" fill="none" stroke="#dc2626" stroke-width="${fs * 0.15}" />`;
+  if (e === 'top') s += `<line x1="${x0}" y1="${y0}" x2="${x0 + pw}" y2="${y0}" stroke="${C.red600}" stroke-width="${t}" /><path d="M${cx - fs * 0.6} ${y0 + fs * 2.2} L${cx} ${y0 + fs * 0.9} L${cx + fs * 0.6} ${y0 + fs * 2.2}" fill="none" stroke="${C.red600}" stroke-width="${fs * 0.15}" />`;
+  if (e === 'bottom') s += `<line x1="${x0}" y1="${y0 + ph}" x2="${x0 + pw}" y2="${y0 + ph}" stroke="${C.red600}" stroke-width="${t}" /><path d="M${cx - fs * 0.6} ${y0 + ph - fs * 2.2} L${cx} ${y0 + ph - fs * 0.9} L${cx + fs * 0.6} ${y0 + ph - fs * 2.2}" fill="none" stroke="${C.red600}" stroke-width="${fs * 0.15}" />`;
+  if (e === 'left') s += `<line x1="${x0}" y1="${y0}" x2="${x0}" y2="${y0 + ph}" stroke="${C.red600}" stroke-width="${t}" /><path d="M${x0 + fs * 2.2} ${cy - fs * 0.6} L${x0 + fs * 0.9} ${cy} L${x0 + fs * 2.2} ${cy + fs * 0.6}" fill="none" stroke="${C.red600}" stroke-width="${fs * 0.15}" />`;
+  if (e === 'right') s += `<line x1="${x0 + pw}" y1="${y0}" x2="${x0 + pw}" y2="${y0 + ph}" stroke="${C.red600}" stroke-width="${t}" /><path d="M${x0 + pw - fs * 2.2} ${cy - fs * 0.6} L${x0 + pw - fs * 0.9} ${cy} L${x0 + pw - fs * 2.2} ${cy + fs * 0.6}" fill="none" stroke="${C.red600}" stroke-width="${fs * 0.15}" />`;
   return s;
 }
 
@@ -88,27 +89,27 @@ function generateWallSVG(wall, room, meta = {}) {
   const Y = (h) => yTop + (Hroom - h);      // wysokość nad podłogą -> SVG y
   const X = (u) => ox + u;
 
-  let svg = `<svg viewBox="0 0 ${vbW} ${vbH}" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto; background:#fff;" font-family="'Segoe UI', sans-serif">`;
+  let svg = `<svg viewBox="0 0 ${vbW} ${vbH}" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto; background:${C.white};" font-family="${FONT_UI}">`;
 
   // miniplan z zaznaczoną ścianą (prawy górny róg)
   if (meta.plan) svg += planInset(wall.id, room, meta.plan, ox + L - fs * 13, fs * 1.2, fs * 13, fs);
 
   // tytuł
-  svg += `<text x="${ox}" y="${fs * 1.6}" font-size="${fs * 1.3}" font-weight="bold" fill="#0f172a">${escapeHtml(wall.label.toUpperCase())} <tspan font-weight="normal" font-size="${fs}" fill="${GRAY}">(widok od środka pokoju) · ${fmtMm(L)} × ${fmtMm(Hroom)} mm</tspan></text>`;
+  svg += `<text x="${ox}" y="${fs * 1.6}" font-size="${fs * 1.3}" font-weight="bold" fill="${C.slate900}">${escapeHtml(wall.label.toUpperCase())} <tspan font-weight="normal" font-size="${fs}" fill="${GRAY}">(widok od środka pokoju) · ${fmtMm(L)} × ${fmtMm(Hroom)} mm</tspan></text>`;
 
   // ściana
-  svg += `<rect x="${X(0)}" y="${Y(Hroom)}" width="${L}" height="${Hroom}" fill="#f8fafc" stroke="#94a3b8" stroke-width="${fs * 0.12}" />`;
-  svg += `<line x1="${X(0) - fs}" y1="${Y(0)}" x2="${X(L) + fs}" y2="${Y(0)}" stroke="#334155" stroke-width="${fs * 0.22}" />`;
+  svg += `<rect x="${X(0)}" y="${Y(Hroom)}" width="${L}" height="${Hroom}" fill="${C.slate50}" stroke="${C.slate400}" stroke-width="${fs * 0.12}" />`;
+  svg += `<line x1="${X(0) - fs}" y1="${Y(0)}" x2="${X(L) + fs}" y2="${Y(0)}" stroke="${C.slate700}" stroke-width="${fs * 0.22}" />`;
 
   // okna, drzwi i przeszkody (pod szafkami, żeby kolizje było widać)
   (wall.openings || []).forEach(op => {
-    const style = op.kind === 'drzwi' ? { fill: '#fef3c7', stroke: '#b45309' } : op.kind === 'inne' ? { fill: '#e5e7eb', stroke: '#6b7280' } : { fill: '#dbeafe', stroke: '#2563eb' };
+    const style = op.kind === 'drzwi' ? { fill: C.amber100, stroke: C.amber700 } : op.kind === 'inne' ? { fill: C.gray200, stroke: C.gray500 } : { fill: C.blue100, stroke: C.blue600 };
     svg += `<rect x="${X(op.u)}" y="${Y(op.sill + op.height)}" width="${op.width}" height="${op.height}" fill="${style.fill}" stroke="${style.stroke}" stroke-width="${fs * 0.14}" stroke-dasharray="${fs * 0.6},${fs * 0.3}" />`;
     svg += `<text x="${X(op.u + op.width / 2)}" y="${Y(op.sill + op.height) + fs * 1.3}" font-size="${fs * 0.95}" fill="${style.stroke}" text-anchor="middle">${op.kind === 'drzwi' ? 'drzwi' : op.kind === 'inne' ? 'przeszkoda' : 'okno'} ${fmtMm(op.width)} × ${fmtMm(op.height)}${op.sill > 0 ? ', parapet ' + fmtMm(op.sill) : ''}</text>`;
   });
 
   if (wall.items.length === 0) {
-    svg += `<text x="${X(L / 2)}" y="${Y(Hroom / 2)}" font-size="${fs * 1.4}" fill="#94a3b8" text-anchor="middle">brak szafek przy tej ścianie</text>`;
+    svg += `<text x="${X(L / 2)}" y="${Y(Hroom / 2)}" font-size="${fs * 1.4}" fill="${C.slate400}" text-anchor="middle">brak szafek przy tej ścianie</text>`;
   }
 
   // szafki
@@ -116,21 +117,21 @@ function generateWallSVG(wall, room, meta = {}) {
     const w = it.u1 - it.u0;
     // nóżki/cokół (od podłogi do spodu korpusu)
     if (it.y0 > it.floorY) {
-      svg += `<rect x="${X(it.u0)}" y="${Y(it.y0)}" width="${w}" height="${it.y0 - it.floorY}" fill="#e2e8f0" stroke="#94a3b8" stroke-width="${fs * 0.08}" />`;
+      svg += `<rect x="${X(it.u0)}" y="${Y(it.y0)}" width="${w}" height="${it.y0 - it.floorY}" fill="${C.slate200}" stroke="${C.slate400}" stroke-width="${fs * 0.08}" />`;
     }
-    svg += `<rect x="${X(it.u0)}" y="${Y(it.y1)}" width="${w}" height="${it.y1 - it.y0}" fill="#ffffff" stroke="#334155" stroke-width="${fs * 0.14}" />`;
+    svg += `<rect x="${X(it.u0)}" y="${Y(it.y1)}" width="${w}" height="${it.y1 - it.y0}" fill="${C.white}" stroke="${C.slate700}" stroke-width="${fs * 0.14}" />`;
 
     if (dimMode === 'fronts') {
       it.fronts.forEach(f => {
         const isDrawer = (f.subtype || '').includes('szuflada');
-        svg += `<rect x="${X(f.u0)}" y="${Y(f.y1)}" width="${f.u1 - f.u0}" height="${f.y1 - f.y0}" fill="${isDrawer ? '#eff6ff' : '#f0fdf4'}" stroke="${isDrawer ? '#3b82f6' : '#22c55e'}" stroke-width="${fs * 0.08}" />`;
+        svg += `<rect x="${X(f.u0)}" y="${Y(f.y1)}" width="${f.u1 - f.u0}" height="${f.y1 - f.y0}" fill="${isDrawer ? C.blue50 : C.green50}" stroke="${isDrawer ? C.blue500 : C.green500}" stroke-width="${fs * 0.08}" />`;
         // wymiar pojedynczego frontu (szer.×wys.) na środku jego prostokąta -
         // tylko gdy się realnie mieści, inaczej nachodziłby na sąsiednie fronty.
         const fw = f.u1 - f.u0, fh = f.y1 - f.y0;
         const dimText = `${fmtMm(fw)}×${fmtMm(fh)}`;
         const dimFs = fs * 0.72;
         if (fw > dimText.length * dimFs * 0.52 && fh > dimFs * 1.8) {
-          svg += `<text x="${X((f.u0 + f.u1) / 2)}" y="${Y((f.y0 + f.y1) / 2) + dimFs * 0.32}" font-size="${dimFs}" fill="${isDrawer ? '#1d4ed8' : '#15803d'}" text-anchor="middle">${dimText}</text>`;
+          svg += `<text x="${X((f.u0 + f.u1) / 2)}" y="${Y((f.y0 + f.y1) / 2) + dimFs * 0.32}" font-size="${dimFs}" fill="${isDrawer ? C.blue700 : C.green700}" text-anchor="middle">${dimText}</text>`;
         }
       });
     } else {
@@ -151,7 +152,7 @@ function generateWallSVG(wall, room, meta = {}) {
       groups.forEach(g => {
         g.boards.sort((a, b) => a.y0 - b.y0);
         g.boards.forEach(s => {
-          svg += `<rect x="${X(s.u0)}" y="${Y(s.y1)}" width="${s.u1 - s.u0}" height="${s.y1 - s.y0}" fill="#e2e8f0" stroke="#94a3b8" stroke-width="${fs * 0.08}" />`;
+          svg += `<rect x="${X(s.u0)}" y="${Y(s.y1)}" width="${s.u1 - s.u0}" height="${s.y1 - s.y0}" fill="${C.slate200}" stroke="${C.slate400}" stroke-width="${fs * 0.08}" />`;
         });
         let cursor = it.y0;
         const gaps = [];
@@ -166,22 +167,22 @@ function generateWallSVG(wall, room, meta = {}) {
     }
 
     const fit = (t) => escapeHtml(t.length * fs * 0.55 > w ? t.slice(0, Math.max(3, Math.floor(w / (fs * 0.55)) - 1)) + '…' : t);
-    svg += `<text x="${X((it.u0 + it.u1) / 2)}" y="${Y(it.y1) + fs * 1.5}" font-size="${fs * 1.05}" font-weight="bold" fill="#0f172a" text-anchor="middle">${moduleCode(it)}</text>`;
+    svg += `<text x="${X((it.u0 + it.u1) / 2)}" y="${Y(it.y1) + fs * 1.5}" font-size="${fs * 1.05}" font-weight="bold" fill="${C.slate900}" text-anchor="middle">${moduleCode(it)}</text>`;
     const label = moduleLabel(it);
-    if (label) svg += `<text x="${X((it.u0 + it.u1) / 2)}" y="${Y(it.y1) + fs * 2.7}" font-size="${fs * 0.8}" fill="#475569" text-anchor="middle">${fit(label)}</text>`;
+    if (label) svg += `<text x="${X((it.u0 + it.u1) / 2)}" y="${Y(it.y1) + fs * 2.7}" font-size="${fs * 0.8}" fill="${C.slate600}" text-anchor="middle">${fit(label)}</text>`;
   });
 
   // blaty (core/worktops.js): przekrój blatu nad szafkami, z opisem długości
   (meta.worktops || []).filter(t => t.wallId === wall.id).forEach(t => {
-    svg += `<rect x="${X(t.u0)}" y="${Y(t.y + t.thickness)}" width="${t.length}" height="${t.thickness}" fill="#d6b48a" stroke="#7c5a34" stroke-width="${fs * 0.12}" />`;
-    svg += `<text x="${X((t.u0 + t.u1) / 2)}" y="${Y(t.y + t.thickness) - fs * 0.5}" font-size="${fs * 0.85}" fill="#7c5a34" text-anchor="middle">blat ${fmtMm(t.length)} × ${fmtMm(t.depth)} × ${t.thickness}</text>`;
+    svg += `<rect x="${X(t.u0)}" y="${Y(t.y + t.thickness)}" width="${t.length}" height="${t.thickness}" fill="${C.wood}" stroke="${C.woodDark}" stroke-width="${fs * 0.12}" />`;
+    svg += `<text x="${X((t.u0 + t.u1) / 2)}" y="${Y(t.y + t.thickness) - fs * 0.5}" font-size="${fs * 0.85}" fill="${C.woodDark}" text-anchor="middle">blat ${fmtMm(t.length)} × ${fmtMm(t.depth)} × ${t.thickness}</text>`;
   });
 
   // poziomy wysokości (linie pomocnicze po lewej) - góry szafek i spód korpusów
   const levels = new Set();
   wall.items.forEach(it => { levels.add(Math.round(it.y1)); if (it.y0 > 0) levels.add(Math.round(it.y0)); });
   [...levels].sort((a, b) => a - b).forEach(h => {
-    svg += `<line x1="${X(0) - fs * 2.2}" y1="${Y(h)}" x2="${X(L)}" y2="${Y(h)}" stroke="#94a3b8" stroke-width="${fs * 0.05}" stroke-dasharray="${fs * 0.6},${fs * 0.4}" />`;
+    svg += `<line x1="${X(0) - fs * 2.2}" y1="${Y(h)}" x2="${X(L)}" y2="${Y(h)}" stroke="${C.slate400}" stroke-width="${fs * 0.05}" stroke-dasharray="${fs * 0.6},${fs * 0.4}" />`;
     svg += `<text x="${X(0) - fs * 2.5}" y="${Y(h) + fs * 0.35}" font-size="${fs * 0.9}" fill="${NAVY}" text-anchor="end">+${h}</text>`;
   });
 
@@ -218,7 +219,7 @@ function generateWallSVG(wall, room, meta = {}) {
     svg += chain(row, y) + rowLabel('dolne', y);
   });
   const yOverall = yFloor0 + Math.max(1, floorRows.length) * rowGap;
-  svg += dimH(0, L, yOverall, `${fmtMm(L)} mm`, '#0f172a');
+  svg += dimH(0, L, yOverall, `${fmtMm(L)} mm`, C.slate900);
 
   // górne: nad ścianą (nad sufitem), od najbliższego ściany rzędu w górę
   hangRows.forEach((row, i) => {
@@ -276,13 +277,13 @@ function generateWallSVG(wall, room, meta = {}) {
     if (tallest.y0 > tallest.floorY) svg += dimV(tallest.floorY, tallest.y0, `${fmtMm(tallest.y0 - tallest.floorY)}`, GRAY);
     svg += dimV(tallest.y0, tallest.y1, `${fmtMm(tallest.y1 - tallest.y0)}`, NAVY);
     if (Hroom - tallest.y1 > 0.5) svg += dimV(tallest.y1, Hroom, `${fmtMm(Hroom - tallest.y1)}`, ORANGE);
-    svg += dimV(0, Hroom, `${fmtMm(Hroom)}`, '#0f172a', fs * 5.2);
+    svg += dimV(0, Hroom, `${fmtMm(Hroom)}`, C.slate900, fs * 5.2);
   }
 
   // kartusz (tabelka rysunkowa) na dole
   const yT = vbH - fs * 4.2;
-  svg += `<line x1="${ox}" y1="${yT}" x2="${ox + L}" y2="${yT}" stroke="#334155" stroke-width="${fs * 0.12}" />`;
-  const cell = (x, label, value) => `<text x="${x}" y="${yT + fs * 1.3}" font-size="${fs * 0.75}" fill="${GRAY}">${label}</text><text x="${x}" y="${yT + fs * 2.7}" font-size="${fs * 1.05}" font-weight="bold" fill="#0f172a">${escapeHtml(value)}</text>`;
+  svg += `<line x1="${ox}" y1="${yT}" x2="${ox + L}" y2="${yT}" stroke="${C.slate700}" stroke-width="${fs * 0.12}" />`;
+  const cell = (x, label, value) => `<text x="${x}" y="${yT + fs * 1.3}" font-size="${fs * 0.75}" fill="${GRAY}">${label}</text><text x="${x}" y="${yT + fs * 2.7}" font-size="${fs * 1.05}" font-weight="bold" fill="${C.slate900}">${escapeHtml(value)}</text>`;
   svg += cell(ox, 'PROJEKT', meta.projectName || 'bez nazwy');
   svg += cell(ox + L * 0.34, 'RZUT', `${wall.label} (od środka pokoju)`);
   svg += cell(ox + L * 0.62, 'JEDNOSTKI', 'mm, rysunek w skali dopasowanej do strony');
