@@ -187,7 +187,7 @@ function ensureMeasureBanner() {
       position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)',
       background: '#f59e0b', color: 'white', padding: '12px 24px', borderRadius: '8px',
       fontWeight: 'bold', zIndex: '2000', boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-      display: 'flex', alignItems: 'center', gap: '15px', fontFamily: 'sans-serif', fontSize: '14px'
+      display: 'flex', alignItems: 'center', gap: '15px', fontFamily: 'var(--font)', fontSize: '14px'
   });
   const textSpan = document.createElement('span');
   const closeBtn = document.createElement('button');

@@ -280,7 +280,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
 
     const mod = getMod();
     if (!mod) {
-      container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-family:sans-serif;">Wybierz szafkę, żeby edytować jej wnętrze</div>`;
+      container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);">Wybierz szafkę, żeby edytować jej wnętrze</div>`;
       return;
     }
 
@@ -376,7 +376,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     // ANI JEDNEJ linijki logiki rysowania niżej (renderNode i cała reszta
     // liczy pozycje tak jak dawniej, w "dopasowanych do okna" px).
     const viewport = document.createElement("div");
-    Object.assign(viewport.style, { position: "absolute", inset: "0", overflow: "hidden", fontFamily: "sans-serif", userSelect: "none", cursor: "grab" });
+    Object.assign(viewport.style, { position: "absolute", inset: "0", overflow: "hidden", fontFamily: "var(--font)", userSelect: "none", cursor: "grab" });
     viewportRef = viewport;
 
     const world = document.createElement("div");
@@ -438,7 +438,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
           position: "absolute",
           left: px.toPxX(it.outer.minX) + "px",
           top: (px.toPxY(it.outer.maxY) - 18) + "px",
-          fontSize: "11px", fontWeight: "bold", color: "#1e293b", fontFamily: "sans-serif",
+          fontSize: "11px", fontWeight: "bold", color: "var(--text-primary)",
           pointerEvents: "none",
         });
         world.appendChild(lbl);
