@@ -21,8 +21,6 @@ import { openModal, showAlert } from "./utils/modal.js";
 import { readLocalBackup, clearLocalBackup, startLocalBackup } from "./core/localBackup.js";
 import { applyProjectData } from "./core/storage.js";
 
-console.log("Generator Stolarski Next uruchomiony");
-
 const navIcon = (name, text) => `<i class="ti ti-${name}" aria-hidden="true"></i> ${text}`;
 
 ensureRoomDefaults(state.project);
