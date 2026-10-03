@@ -3,11 +3,12 @@
 import { calculateProjectHardware } from "../engine/hardware.js";
 import { state } from "../core/state.js";
 import { escapeHtml } from "../utils/dom.js";
+import { showAlert } from "../utils/modal.js";
 
 export function printHardwareList() {
   const projectHardware = calculateProjectHardware();
     if (projectHardware.length === 0) {
-        alert("Lista zakupów jest pusta.");
+        showAlert("Lista zakupów jest pusta.");
         return;
     }
     

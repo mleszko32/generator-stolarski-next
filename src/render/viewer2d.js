@@ -921,7 +921,7 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
 // side = { name, depth, height, bottom, holes (podpórki), joints (łączenia) }
 // - wysokości otworów liczone od dołu KORPUSU (bottom = dół elementu), żeby
 // otwory boków i listwy się zgrywały.
-export function generateCornerSidesHolesSVG(sides) {
+function generateCornerSidesHolesSVG(sides) {
   const gap = 40, pad = 40, textW = 200;
   const maxH = Math.max(...sides.map(s => (s.bottom || 0) + s.height));
   const totalW = sides.reduce((sum, s) => sum + s.depth + textW + gap, 0) + pad * 2 - gap;
@@ -977,7 +977,7 @@ export function generateCornerSidesHolesSVG(sides) {
 // formatki: 0,0 = tylny róg, X wzdłuż ramienia A, Y wzdłuż ramienia B, przód
 // to krawędzie wycięcia w rogu (depthA/depthB).
 // notch = {w, h} - wycięcie na listwę w tylnym rogu (tylko półka).
-export function generateCornerPartSVG({ blankA, blankB, depthA, depthB, notch = null, holes = [], title, subtitle }) {
+function generateCornerPartSVG({ blankA, blankB, depthA, depthB, notch = null, holes = [], title, subtitle }) {
   const M = 130;
   const ox = M, oy = M;
   const vbW = blankA + M * 2, vbH = blankB + M * 2;
@@ -1065,7 +1065,7 @@ export function generateCornerPartSVG({ blankA, blankB, depthA, depthB, notch = 
 // Rysunek frontu narożnika z otworami pod puszki zawiasów (fi 35, 22,5 mm od
 // krawędzi zawiasów) - układ jak w rysunku frontów zwykłej szafki.
 // door = element z getCornerDoorHinges: { front, arm, side, atBok, bifoldSecondary, hinges }.
-export function generateCornerFrontSVG(door, doorName) {
+function generateCornerFrontSVG(door, doorName) {
   const f = door.front;
   const w = parseFloat(f.w) || 0, h = parseFloat(f.h) || 0;
   const M = 150;

@@ -8,6 +8,7 @@ import { update3D } from "../render/viewer3d.js";
 import { updateSidebar } from "./sidebar.js";
 import { showCustomDialog } from "../core/storage.js";
 import { loadPriceDefaults, savePriceDefaults, applyPriceDefaults, exportPriceDefaultsJson, importPriceDefaultsJson } from "../core/priceLibrary.js";
+import { showAlert } from "../utils/modal.js";
 
 // "Zastosuj do wszystkich dolnych/górnych" (zgłoszona potrzeba: w kuchni
 // fronty szafek dolnych i wiszących często mają inny materiał/kolor, ale
@@ -290,7 +291,7 @@ export function mountKosztorys(root) {
     modal.querySelector('#kosztorys-price-load').addEventListener('click', async () => {
         const snapshot = loadPriceDefaults();
         if (!snapshot) {
-            alert('Baza cen jest pusta - najpierw zapisz ceny z jakiegoś projektu jako domyślne (albo zaimportuj plik).');
+            showAlert('Baza cen jest pusta - najpierw zapisz ceny z jakiegoś projektu jako domyślne (albo zaimportuj plik).');
             return;
         }
         const savedDate = new Date(snapshot.savedAt).toLocaleDateString('pl-PL');
@@ -304,7 +305,7 @@ export function mountKosztorys(root) {
     });
     modal.querySelector('#kosztorys-price-export').addEventListener('click', () => {
         if (!loadPriceDefaults()) {
-            alert('Baza cen jest pusta - najpierw zapisz ceny jako domyślne.');
+            showAlert('Baza cen jest pusta - najpierw zapisz ceny jako domyślne.');
             return;
         }
         const blob = new Blob([exportPriceDefaultsJson()], { type: 'application/json' });
@@ -323,7 +324,7 @@ export function mountKosztorys(root) {
         if (!file) return;
         const ok = importPriceDefaultsJson(await file.text());
         priceFileInput.value = '';
-        alert(ok ? 'Baza cen zaimportowana. Użyj „Wczytaj z bazy cen", żeby nałożyć ją na ten projekt.' : '❌ To nie jest poprawny plik bazy cen.');
+        showAlert(ok ? 'Baza cen zaimportowana. Użyj „Wczytaj z bazy cen", żeby nałożyć ją na ten projekt.' : '❌ To nie jest poprawny plik bazy cen.');
     });
 
     renderMaterialRows();

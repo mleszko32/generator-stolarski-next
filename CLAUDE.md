@@ -146,8 +146,8 @@ Wszystkie panele renderują się przez przypisanie szablonów tekstowych do `inn
 - **Przyciski**: `.btn` (drugorzędny), `.btn-primary` (jedna główna akcja na widok), `.btn-danger`,
   `.btn-sm`, `.icon-btn`.
 - **Okna dialogowe**: zawsze `openModal()` z `src/utils/modal.js` (klasy `.modal-*`; Esc /
-  kliknięcie w tło zamyka najwyższe). `showCustomDialog` (core/storage.js) jest na nim
-  zbudowany. Nie buduj nakładek ręcznie.
+  kliknięcie w tło zamyka najwyższe). `showCustomDialog` (core/storage.js) i `showAlert`
+  (utils/modal.js, zamiast natywnego `alert()`) są na nim zbudowane. Nie buduj nakładek ręcznie.
 - **Listy**: `.list-item` (panele boczne), `.list-row` (w oknach); **pola**: `.field` + `.input`;
   **komunikaty**: `.notice-*`, `.badge-*`, `.empty-note`; tabele: `.hub-table` / `.cost-table`.
 - **Jedno wejście na funkcję**: listy formatek, rysunki wierceń, lista zakupów, plan

@@ -3,7 +3,7 @@
 import { calculateAllProjectParts } from "../engine/cabinet.js";
 import { state } from "../core/state.js";
 import { escapeHtml } from "../utils/dom.js";
-import { openModal } from "../utils/modal.js";
+import { openModal, showAlert } from "../utils/modal.js";
 import { getPartEdges, describeEdges } from "../engine/edgeBanding.js";
 
 const DISPLAY_FILTERS = [
@@ -166,7 +166,7 @@ function openCsvEditorModal(partsList) {
 export function openCsvExport() {
   const allParts = calculateAllProjectParts();
   if (allParts.length === 0) {
-    alert("Twój projekt jest pusty. Dodaj szafkę, aby wygenerować formatki.");
+    showAlert("Twój projekt jest pusty. Dodaj szafkę, aby wygenerować formatki.");
     return;
   }
   openCsvEditorModal(allParts);

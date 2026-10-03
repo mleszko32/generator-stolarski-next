@@ -11,7 +11,7 @@ import {
 import { state, ensureRoomDefaults, ensurePricingDefaults, ensureSidePanelsDefaults } from "./state.js";
 import { migrateLegacyRoom, clampModuleToRoom } from "./layout.js";
 import { resetHistory } from "./history.js";
-import { openModal } from "../utils/modal.js";
+import { openModal, showAlert } from "../utils/modal.js";
 import { validateProjectData } from "./projectSchema.js";
 
 // Konfiguracja klienta Firebase jest z założenia publiczna (leci do przeglądarki)
@@ -56,7 +56,7 @@ export async function signInWithGoogle() {
     const { user } = await signInWithPopup(auth, provider);
     if (!isAllowedEmail(user.email)) {
       await signOut(auth);
-      alert(`Zalogowano jako ${user.email}, ale konto nie ma dostępu. Wylogowano.`);
+      showAlert(`Zalogowano jako ${user.email}, ale konto nie ma dostępu. Wylogowano.`);
       return null;
     }
     return user;
@@ -65,7 +65,7 @@ export async function signInWithGoogle() {
       return null;
     }
     console.error("Błąd logowania:", err);
-    alert("❌ Nie udało się zalogować:\n" + (err?.message || err));
+    showAlert("❌ Nie udało się zalogować:\n" + (err?.message || err));
     return null;
   }
 }
@@ -82,11 +82,11 @@ export async function signOutUser() {
 // Firestore) — daje tylko od razu zrozumiały komunikat.
 function requireOwner() {
   if (!auth.currentUser) {
-    alert("🔒 Zaloguj się (przycisk w prawym górnym rogu), aby korzystać z chmury.");
+    showAlert("🔒 Zaloguj się (przycisk w prawym górnym rogu), aby korzystać z chmury.");
     return false;
   }
   if (!isOwner()) {
-    alert(`🔒 To konto (${auth.currentUser.email}) nie ma dostępu do chmury.`);
+    showAlert(`🔒 To konto (${auth.currentUser.email}) nie ma dostępu do chmury.`);
     return false;
   }
   return true;
@@ -244,7 +244,7 @@ export async function deleteProjectVersion(projectId, versionId) {
     return true;
   } catch (error) {
     console.error("Błąd usuwania wersji:", error);
-    alert("❌ Nie udało się usunąć wersji:\n" + error.message);
+    showAlert("❌ Nie udało się usunąć wersji:\n" + error.message);
     return false;
   }
 }
@@ -256,7 +256,7 @@ export async function restoreProjectVersion(projectId, versionId) {
   try {
     const snap = await getDoc(doc(db, "projects", projectId, "versionData", versionId));
     if (!snap.exists()) {
-      alert("⚠️ Nie znaleziono tej wersji (mogła zostać usunięta).");
+      showAlert("⚠️ Nie znaleziono tej wersji (mogła zostać usunięta).");
       return false;
     }
     const data = JSON.parse(snap.data().json);
@@ -270,7 +270,7 @@ export async function restoreProjectVersion(projectId, versionId) {
     return true;
   } catch (error) {
     console.error("Błąd przywracania wersji:", error);
-    alert("❌ Nie udało się przywrócić wersji:\n" + (error.message || "Brak szczegółów."));
+    showAlert("❌ Nie udało się przywrócić wersji:\n" + (error.message || "Brak szczegółów."));
     return false;
   }
 }
@@ -327,10 +327,10 @@ export async function saveProjectToCloud(projectId = null) {
     markSaved();
     await archiveVersion(targetId, dataToSave, "Zapis ręczny", { force: true });
 
-    alert(`✅ Projekt "${targetId}" został zapisany pomyślnie!`);
+    showAlert(`✅ Projekt "${targetId}" został zapisany pomyślnie!`);
   } catch (error) {
     console.error("Szczegóły błędu Firebase:", error);
-    alert("❌ Wystąpił błąd podczas zapisywania projektu:\n" + (error.message || "Brak szczegółów."));
+    showAlert("❌ Wystąpił błąd podczas zapisywania projektu:\n" + (error.message || "Brak szczegółów."));
   }
 }
 
@@ -345,7 +345,7 @@ export function applyProjectData(data, projectId) {
   const validated = validateProjectData(data);
   if (!validated.success) {
     console.error("Odrzucono wczytanie projektu - nieprawidłowy kształt danych:", validated.issues);
-    alert("❌ Nie udało się wczytać projektu - uszkodzone dane:\n" + validated.issues.join("\n"));
+    showAlert("❌ Nie udało się wczytać projektu - uszkodzone dane:\n" + validated.issues.join("\n"));
     return false;
   }
   state.project = validated.data;
@@ -381,12 +381,12 @@ export async function loadProjectFromCloud(projectId) {
       markSaved();
       return true;
     } else {
-      alert("⚠️ Nie znaleziono takiego projektu w bazie.");
+      showAlert("⚠️ Nie znaleziono takiego projektu w bazie.");
       return false;
     }
   } catch (error) {
     console.error("Błąd podczas wczytywania z Firebase:", error);
-    alert("❌ Wystąpił błąd podczas wczytywania projektu.");
+    showAlert("❌ Wystąpił błąd podczas wczytywania projektu.");
     return false;
   }
 }
@@ -413,7 +413,7 @@ export async function deleteProjectFromCloud(projectId) {
     return true;
   } catch (error) {
     console.error("Błąd podczas usuwania projektu:", error);
-    alert("❌ Nie udało się usunąć projektu:\n" + error.message);
+    showAlert("❌ Nie udało się usunąć projektu:\n" + error.message);
     return false;
   }
 }
@@ -431,7 +431,7 @@ export async function getSavedProjectsList() {
     return projects;
   } catch (error) {
     console.error("Błąd podczas pobierania listy projektów:", error);
-    alert("❌ Nie udało się pobrać listy projektów z chmury.");
+    showAlert("❌ Nie udało się pobrać listy projektów z chmury.");
     return [];
   }
 }

@@ -5,7 +5,7 @@ import { getActiveModule, addModuleFromTemplate } from "../core/state.js";
 import { listTemplates, saveTemplate, deleteTemplate, exportLibraryJson, importLibraryJson } from "../core/moduleLibrary.js";
 import { showCustomDialog } from "../core/storage.js";
 import { escapeHtml } from "../utils/dom.js";
-import { openModal } from "../utils/modal.js";
+import { openModal, showAlert } from "../utils/modal.js";
 
 const TYPE_LABELS = {
   base_cabinet: "Szafka dolna",
@@ -87,14 +87,14 @@ export function openModuleLibrary(onChange) {
     const name = await showCustomDialog("prompt", "Zapisz szablon", "Nazwa szablonu:", active.name, "Zapisz", "Anuluj");
     if (!name || !String(name).trim()) return;
     if (!saveTemplate(active, String(name))) {
-      alert("❌ Nie udało się zapisać szablonu (brak miejsca w przeglądarce?).");
+      showAlert("❌ Nie udało się zapisać szablonu (brak miejsca w przeglądarce?).");
       return;
     }
     renderList();
   };
 
   box.querySelector("#lib-export").onclick = () => {
-    if (listTemplates().length === 0) { alert("Biblioteka jest pusta - nie ma czego eksportować."); return; }
+    if (listTemplates().length === 0) { showAlert("Biblioteka jest pusta - nie ma czego eksportować."); return; }
     const blob = new Blob([exportLibraryJson()], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -112,8 +112,8 @@ export function openModuleLibrary(onChange) {
     if (!file) return;
     const count = importLibraryJson(await file.text());
     fileInput.value = "";
-    if (count < 0) alert("❌ To nie jest poprawny plik biblioteki szafek.");
-    else if (count === 0) alert("W pliku nie znaleziono szafek do zaimportowania.");
+    if (count < 0) showAlert("❌ To nie jest poprawny plik biblioteki szafek.");
+    else if (count === 0) showAlert("W pliku nie znaleziono szafek do zaimportowania.");
     else renderList();
   };
 

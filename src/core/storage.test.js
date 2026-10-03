@@ -9,6 +9,8 @@ const h = vi.hoisted(() => {
   return { store, clone, auth };
 });
 
+// showAlert buduje okno w DOM, którego tu nie ma - komunikaty nie są tematem tych testów.
+vi.mock("../utils/modal.js", async (importOriginal) => ({ ...(await importOriginal()), showAlert: vi.fn() }));
 vi.mock("firebase/app", () => ({ initializeApp: () => ({}) }));
 vi.mock("firebase/auth", () => ({
   getAuth: () => h.auth,
@@ -57,7 +59,6 @@ beforeEach(() => {
   h.store.clear();
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-01-01T10:00:00Z"));
-  vi.stubGlobal("alert", vi.fn());
   vi.spyOn(console, "warn").mockImplementation(() => {});
   state.project.modules = [];
   state.project.marker = 0;

@@ -47,7 +47,7 @@ function planInset(wallId, room, plan, x0, y0, size, fs) {
   return s;
 }
 
-export function generateWallSVG(wall, room, meta = {}) {
+function generateWallSVG(wall, room, meta = {}) {
   // Tryb wymiarowania (przełącznik w ui/productionHub.js, globalny dla
   // całego wydruku - patrz uzasadnienie tam): 'fronts' (domyślny, jak dotąd)
   // pokazuje fronty z wymiarem szer.×wys. na każdym z nich; 'shelves' chowa

@@ -5,7 +5,7 @@
 import { state } from "../core/state.js";
 import { listProjectVersions, restoreProjectVersion, deleteProjectVersion, showCustomDialog } from "../core/storage.js";
 import { escapeHtml } from "../utils/dom.js";
-import { openModal } from "../utils/modal.js";
+import { openModal, showAlert } from "../utils/modal.js";
 
 function formatWhen(ts) {
   const d = new Date(ts);
@@ -27,7 +27,7 @@ function formatAgo(ts) {
 export async function openVersionHistory(onRestored) {
   const projectId = state.loadedProjectId;
   if (!projectId) {
-    alert("Historia wersji jest dostępna dla projektu zapisanego w chmurze. Najpierw zapisz albo wczytaj projekt.");
+    showAlert("Historia wersji jest dostępna dla projektu zapisanego w chmurze. Najpierw zapisz albo wczytaj projekt.");
     return;
   }
 

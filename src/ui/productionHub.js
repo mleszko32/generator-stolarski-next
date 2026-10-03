@@ -5,7 +5,7 @@
 // okleina, Kosztorys), zawartość po prawej. Akcje (wydruki, CSV, kosztorys)
 // to te same funkcje co dotąd (ui/sidebar.js), tylko w jednym miejscu.
 import { escapeHtml } from "../utils/dom.js";
-import { fmtMm } from "../utils/math.js";
+import { fmtMm, num, round1 } from "../utils/math.js";
 import { state, getActiveModule } from "../core/state.js";
 import { collectProjectParts, calculateAllProjectParts } from "../engine/cabinet.js";
 import { calculateProjectHardware } from "../engine/hardware.js";
@@ -42,7 +42,7 @@ let groupMode = 'module';
 
 const CATEGORY_ORDER = ['Korpus', 'Front', 'Szuflada', 'Plecy', 'Blat'];
 
-function fmt(n) { return Math.round((parseFloat(n) || 0) * 10) / 10; }
+const fmt = (n) => round1(num(n));
 
 // Wiersze tabel formatek zarejestrowane do edycji okleiny (indeks w data-r).
 let ebRows = [];

@@ -17,7 +17,7 @@ import { saveProjectToCloud, loadProjectFromCloud, getSavedProjectsList, deleteP
 import { onAuthChange, signInWithGoogle, signOutUser, getCurrentUser, saveProjectSilently } from "./core/storage.js";
 import { undo, redo, onHistoryChange, resetHistory } from "./core/history.js";
 import { openVersionHistory } from "./ui/versionHistory.js";
-import { openModal } from "./utils/modal.js";
+import { openModal, showAlert } from "./utils/modal.js";
 import { readLocalBackup, clearLocalBackup, startLocalBackup } from "./core/localBackup.js";
 import { applyProjectData } from "./core/storage.js";
 
@@ -197,7 +197,7 @@ if (btnLoad) {
     btnLoad.innerHTML = navIcon('folder-open', 'Wczytaj projekt');
 
     if (projects.length === 0) {
-      alert("Brak zapisanych projektów w chmurze.");
+      showAlert("Brak zapisanych projektów w chmurze.");
       return;
     }
 

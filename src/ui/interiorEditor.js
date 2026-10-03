@@ -22,12 +22,13 @@
 //
 // Główny edytor wnętrza aplikacji (kontener #editor-interior-container,
 // zawsze aktywny moduł, bez cornerArm) to jedna, stała instancja tej fabryki
-// - eksportowane niżej `toggleInteriorEditor`/`renderInteriorEditor`/
-// `renderInteriorEditorIfVisible`/`isInteriorEditorVisible` są cienkimi
+// - eksportowane niżej `toggleInteriorEditor`/`renderInteriorEditorIfVisible`
+// są cienkimi
 // wrapperami wokół niej, więc zachowanie dla istniejących wywołań (main.js,
 // ui/properties.js, ui/sidebar.js, render/viewer3d.js) jest identyczne jak
 // przed wprowadzeniem fabryki.
 import { fmtMm } from "../utils/math.js";
+import { escapeHtml } from "../utils/dom.js";
 import { state, getActiveModule } from "../core/state.js";
 import {
   buildZoneTree,
@@ -79,10 +80,6 @@ const FRONT_COLORS = {
   szuflada: { fill: "#fff7ed", border: "#d97706" },
   "szuflada-wewnetrzna": { fill: "#fff7ed", border: "#c2410c" },
 };
-
-function escapeHtml(v) {
-  return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
 
 const DIM_MARGIN = 7; // px od krawędzi wnęki, żeby strzałki nie nachodziły na jej ramkę
 
@@ -444,7 +441,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     // przybliżeniem i został czytelny w rogu niezależnie od poziomu zoomu
     const title = document.createElement("div");
     const titleSuffix = cornerArm ? ` — ramię ${cornerArm}` : "";
-    const titleName = items.length > 1 ? `grupa (${items.length} szafki: ${items.map((it) => it.mod.name).join(", ")})` : escapeHtml(mod.name);
+    const titleName = items.length > 1 ? `grupa (${items.length} szafki: ${items.map((it) => escapeHtml(it.mod.name)).join(", ")})` : escapeHtml(mod.name);
     title.innerHTML = `🗂️ Wnętrze: <b>${titleName}${titleSuffix}</b> <span style="color:#94a3b8; font-weight:normal;">— klik w wnękę: podziel / obsadź · Shift+klik: zaznacz kilka wnęk do scalenia jednym frontem · klik w dzielnik: przesuń / usuń · przeciągnij tło: przesuń · scroll: przybliż</span>`;
     Object.assign(title.style, { position: "absolute", top: "10px", left: "16px", fontSize: "13px", color: "#1e3a8a", pointerEvents: "none" });
 
@@ -1495,10 +1492,6 @@ const mainEditor = createZoneEditor({
   cornerArm: undefined,
 });
 
-export function isInteriorEditorVisible() {
-  return mainEditor.isVisible();
-}
-
 export function toggleInteriorEditor() {
   const interior = document.getElementById("editor-interior-container");
   const viewer3d = document.getElementById("editor-3d-container");
@@ -1511,11 +1504,7 @@ export function toggleInteriorEditor() {
 
 // Wołane z update3D()/updateSidebar()/initPropertiesPanel() — czyli tam,
 // gdzie cała reszta aplikacji już dziś odświeża swoje panele po zmianie
-// stanu (patrz CLAUDE.md: "Update flow"). Tanie, gdy panel jest ukryty.
+// stanu (patrz CLAUDE.md: „Przepływ aktualizacji”). Tanie, gdy panel jest ukryty.
 export function renderInteriorEditorIfVisible() {
   mainEditor.renderIfVisible();
-}
-
-export function renderInteriorEditor() {
-  mainEditor.render();
 }

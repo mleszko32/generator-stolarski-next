@@ -33,11 +33,6 @@ export function getWorktopSettings(project = state.project) {
   return { ...WORKTOP_DEFAULTS, ...(project.worktop || {}), overrides: { ...(project.worktop?.overrides || {}) }, corners: { ...(project.worktop?.corners || {}) } };
 }
 
-export function ensureWorktopDefaults(project) {
-  project.worktop = getWorktopSettings(project);
-  return project.worktop;
-}
-
 const BASE_TYPES = ['base_cabinet', 'corner_cabinet'];
 const HANG_MIN = 600;
 

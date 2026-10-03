@@ -7,7 +7,7 @@ import { state, DEFAULT_ROOM } from "../core/state.js";
 import { getWorldFootprint } from "../core/layout.js";
 import { getOpenings, newOpening, OPENING_KINDS, OPENING_WALLS } from "../core/openings.js";
 import { escapeHtml } from "../utils/dom.js";
-import { openModal } from "../utils/modal.js";
+import { openModal, showAlert } from "../utils/modal.js";
 import { update3D, updateRoom } from "../render/viewer3d.js";
 import { updateSidebar } from "./sidebar.js";
 
@@ -102,7 +102,7 @@ export function openRoomSettingsModal() {
     const depth = parseFloat(inpDepth.value);
     const height = parseFloat(inpHeight.value);
     if (!(width > 0) || !(depth > 0) || !(height > 0)) {
-      alert("Wszystkie wymiary muszą być liczbami większymi od 0.");
+      showAlert("Wszystkie wymiary muszą być liczbami większymi od 0.");
       return;
     }
     state.project.room = { width, depth, height };

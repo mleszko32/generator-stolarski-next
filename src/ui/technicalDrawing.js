@@ -9,11 +9,12 @@ import { initPropertiesPanel } from "./properties.js";
 import { openCornerBlankPrintView } from "./cornerProperties.js";
 import { updateSidebar } from "./sidebar.js";
 import { escapeHtml } from "../utils/dom.js";
+import { showAlert } from "../utils/modal.js";
 
 export function openTechnicalDrawing() {
   const activeMod = getActiveModule();
   if (!activeMod) {
-    alert("Wybierz szafkę, aby wygenerować rysunek.");
+    showAlert("Wybierz szafkę, aby wygenerować rysunek.");
     return;
   }
   const { parts, mountingData } = calculateParts();
@@ -467,6 +468,6 @@ export function openTechnicalDrawing() {
         window.open(URL.createObjectURL(blob), '_blank');
     } catch (err) {
         console.error("Błąd generowania rysunku:", err);
-        alert("Wystąpił błąd podczas generowania SVG: " + err.message);
+        showAlert("Wystąpił błąd podczas generowania SVG: " + err.message);
     }
 }

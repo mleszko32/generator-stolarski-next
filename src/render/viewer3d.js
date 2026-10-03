@@ -21,6 +21,7 @@ import { initPropertiesPanel } from '../ui/properties.js';
 import { mats, worktopMat, disposeObject, createLabelSprite, addBox, addHole, addHardware, isXrayMode, setXrayMode } from './meshBuilders.js';
 import { renderCornerCabinet } from './cornerCabinet3d.js';
 import { initMeasureTool, isMeasureActive, setMeasureButton, toggleMeasureMode, updateMeasureHover, handleMeasureClick, measureHoverMouse } from './measureTool.js';
+import { showAlert } from "../utils/modal.js";
 
 let alignMode = { active: false, sourceMod: null, sourceEl: null, banner: null };
 let isFrontsVisible = true;
@@ -896,7 +897,7 @@ export function captureModuleSnapshot(moduleId, size = 160) {
 // bezczynności zostaje rzadki "oddech" (co ~0,5 s) na wypadek zmian bez zgłoszenia.
 let renderActiveUntil = 0;
 let lastIdleRender = 0;
-export function requestRender(ms = 1500) {
+function requestRender(ms = 1500) {
   renderActiveUntil = Math.max(renderActiveUntil, performance.now() + ms);
 }
 const IDLE_RENDER_MS = 500;
@@ -1029,7 +1030,7 @@ function handle3DClick(event) {
           const objHeight = validHit.object.geometry.parameters.height;
           
           if (objHeight > 50) {
-              alert("Kliknij w element poziomy (wieniec lub półkę), a nie w pionowy bok!");
+              showAlert("Kliknij w element poziomy (wieniec lub półkę), a nie w pionowy bok!");
               return;
           }
 
@@ -1061,7 +1062,7 @@ function handle3DClick(event) {
               update3D();
               updateSidebar();
           } else {
-              alert("Wybrany punkt znajduje się poza zakresem wysokości tej szafki!");
+              showAlert("Wybrany punkt znajduje się poza zakresem wysokości tej szafki!");
           }
       }
       exitAlignMode();

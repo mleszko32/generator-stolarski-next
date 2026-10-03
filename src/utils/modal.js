@@ -75,3 +75,21 @@ export function openModal(opts = {}) {
   document.body.appendChild(overlay);
   return { overlay, modal, bodyEl, footEl, close };
 }
+
+// Komunikat z jednym przyciskiem OK - zamiast natywnego alert() (spójny wygląd,
+// tekst z \n łamany na linie). Nie blokuje jak alert(): zwraca promise
+// rozwiązywany po zamknięciu, więc kod, który ma ruszyć dopiero po OK, robi await.
+export function showAlert(message, title = "Informacja") {
+  return new Promise((resolve) => {
+    const p = document.createElement("p");
+    p.innerText = message;
+    p.style.fontSize = "var(--fs-md)";
+    p.style.whiteSpace = "pre-line";
+    p.style.margin = "0";
+    openModal({
+      title, width: 400, body: p, closeButton: false,
+      onClose: resolve,
+      footer: [{ label: "OK", kind: "primary", onClick: (close) => close() }],
+    });
+  });
+}

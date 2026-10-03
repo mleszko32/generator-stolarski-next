@@ -16,6 +16,7 @@ import { moduleInfoHtml } from "./moduleInfoPanel.js";
 import { showCustomDialog } from "../core/storage.js";
 import { renderSidePanelProperties } from "./sidePanelProperties.js";
 import { renderCornerModuleProperties } from "./cornerProperties.js";
+import { showAlert } from "../utils/modal.js";
 
 function getSelectedMods() {
     if (state.selectedModules && state.selectedModules.size > 0) {
@@ -845,7 +846,7 @@ function setupEventListeners() {
       const newInnerTopY = front.y + front.h;
 
       if (newInnerBottomY + 40 > newInnerTopY) {
-        alert("Za mało miejsca nad pudłem! Zmniejsz wariant boku tej szuflady (np. na M lub K) i zapisz, aby zrobić miejsce.");
+        showAlert("Za mało miejsca nad pudłem! Zmniejsz wariant boku tej szuflady (np. na M lub K) i zapisz, aby zrobić miejsce.");
         return;
       }
 

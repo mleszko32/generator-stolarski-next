@@ -7,6 +7,7 @@ import { openModuleLibrary } from "./moduleLibraryModal.js";
 import { snapSidePanel } from "../core/sidePanelSnap.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
+import { showAlert } from "../utils/modal.js";
 
 function showLoading(msg) {
     let l = document.getElementById('ai-loader');
@@ -381,7 +382,7 @@ export function updateSidebar() {
                   
               } catch(err) {
                   hideLoading();
-                  alert("⚠️ Sztuczna Inteligencja napotkała problem: " + err.message);
+                  showAlert("⚠️ Sztuczna Inteligencja napotkała problem: " + err.message);
               }
               inputAi.value = "";
           };
