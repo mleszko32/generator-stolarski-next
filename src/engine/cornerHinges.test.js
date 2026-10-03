@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { state, addCornerModule } from '../core/state.js';
-import { getCornerDoorHinges, getCornerDoorHingeSide } from './cabinet.js';
+import { getCornerDoorHinges, getCornerDoorHingeSide } from './cornerParts.js';
 import { freshProject, setProject } from '../test/fixtures.js';
 
 describe('zawiasy drzwi szafki narożnej', () => {

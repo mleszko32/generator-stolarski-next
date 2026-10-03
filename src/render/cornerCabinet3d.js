@@ -4,7 +4,7 @@
 // renderCornerCabinet zamiast zwykłej ścieżki prostokątnego modułu).
 import * as THREE from 'three';
 import { state } from '../core/state.js';
-import { getCornerDoorHinges } from '../engine/cabinet.js';
+import { getCornerDoorHinges } from '../engine/cornerParts.js';
 import { getWorldFootprint, getCornerDepths } from '../core/layout.js';
 import { addBox, addHole, addCornerPanel } from './meshBuilders.js';
 
@@ -100,7 +100,7 @@ export function renderCornerCabinet(mod, isActive, th, parentGroup) {
   // Ten sam obrys L co wieniec wyżej (addCornerPanel/shape) - w realnej
   // stolarce półka w szafce narożnej jest w kształcie L, wspólna dla obu
   // ramion na danej wysokości, NIE dwiema niezależnymi prostymi półkami
-  // (zgłoszona korekta - patrz engine/cabinet.js: getCornerCorpusParts).
+  // (zgłoszona korekta - patrz engine/cornerParts.js: getCornerCorpusParts).
   // Listwa narożna (niżej) stoi WEWNĄTRZ korpusu między wieńcami, więc półka
   // ma w tylnym rogu wycięcie battenW×th na tę listwę (zgłoszona korekta).
   const battenW = 100;

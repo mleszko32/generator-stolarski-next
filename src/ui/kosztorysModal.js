@@ -1,6 +1,6 @@
 // src/ui/kosztorysModal.js
 // Okno kosztorysu projektu (ceny materiałów i okuć, robocizna, montaż, marża, rabat, VAT).
-import { calculateProjectCost } from "../engine/cabinet.js";
+import { calculateProjectCost } from "../engine/cost.js";
 import { state } from "../core/state.js";
 import { escapeHtml } from "../utils/dom.js";
 import { initPropertiesPanel } from "./properties.js";
@@ -50,7 +50,7 @@ const numField = (id, value, unit, extra = '') =>
 // zapisywane bezpośrednio w state.project.pricing (patrz core/state.js:
 // ensurePricingDefaults), więc lecą do chmury razem z resztą projektu przy
 // zwykłym "Zapisz projekt" - nie ma tu osobnego przycisku zapisu. Lista
-// okuć jest dynamiczna (patrz engine/cabinet.js: calculateProjectHardware),
+// okuć jest dynamiczna (patrz engine/hardware.js: calculateProjectHardware),
 // więc ceny okuć trzymane są w słowniku nazwa->cena, uzupełnianym o nowe
 // pozycje w miarę jak pojawiają się w projekcie.
 // root: element, w którym budujemy edytor (sekcja "Kosztorys" okna Produkcja albo treść okna).

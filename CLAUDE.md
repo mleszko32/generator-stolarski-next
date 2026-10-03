@@ -87,7 +87,12 @@ bez Three.js.
   2D z wierceniami).
 - `calculateAllProjectParts()` — cały projekt, zagregowana lista formatek, w tym scalone
   odcinki cokołu przez sąsiednie szafki dolne.
-- `calculateProjectHardware()` — liczby okuć (nóżki, złącza, komplety szuflad, zawiasy).
+
+Obok, w `src/engine/`: `carcaseParts.js` (formatki i wiercenia korpusu prostokątnego),
+`cornerParts.js` (wszystko o szafce narożnej, też dla rysunków 2D i 3D), `hardware.js`
+(`calculateProjectHardware()` — okucia: nóżki, złącza, komplety szuflad, zawiasy, okleina) i
+`cost.js` (`calculateProjectCost()` — kosztorys). Zależności idą w jedną stronę: `hardware`/`cost`
+czytają wynik `cabinet.js`, a `cabinet.js` korzysta z `carcaseParts`/`cornerParts`.
 
 Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
 
@@ -235,7 +240,7 @@ ensurePricingDefaults`, zmigrowane ze starej pojedynczej wartości `pricing.mate
 jako pozycja „Standard”, żeby nikt nie stracił wpisanej ceny). Każdy front może mieć
 `front.materialId` (wybierany per front w zakładce Front w `ui/properties.js`); brak albo
 wskazanie na usuniętą pozycję po cichu przechodzi na pierwszą pozycję cennika
-(`engine/cabinet.js: calculateProjectCost` — celowo bez wiersza „nieznany materiał”). Ten sam
+(`engine/cost.js: calculateProjectCost` — celowo bez wiersza „nieznany materiał”). Ten sam
 cennik i ta sama zasada dotyczą samodzielnych „boków dokładanych” i blend —
 `sidePanels[].materialId`, wybierane przez wspólne `materialSelectHtml()`/`bindSidePanelInputs()`
 w `ui/properties.js` (ich formatka też ma kategorię `"Front"`, patrz

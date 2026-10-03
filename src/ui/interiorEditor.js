@@ -46,7 +46,7 @@ import { update3D, enterAlignMode, areFrontsVisible } from "../render/viewer3d.j
 import { updateSidebar } from "./sidebar.js";
 import { initPropertiesPanel } from "./properties.js";
 import { calculateHinges } from "../core/hingeMath.js";
-import { getCornerDoorHingeSide } from "../engine/cabinet.js";
+import { getCornerDoorHingeSide } from "../engine/cornerParts.js";
 import { findInteriorCollisions } from "../core/validate.js";
 import { getDrawerBoxRect } from "../core/drawerBoxes.js";
 

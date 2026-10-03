@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import {
-  calculateParts,
-  calculateAllProjectParts,
-  calculateProjectHardware,
-} from "./cabinet.js";
+import { calculateParts, calculateAllProjectParts } from "./cabinet.js";
+import { calculateProjectHardware } from "./hardware.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
 import { drawerSystems } from "../core/drawerSystems.js";
 

@@ -7,7 +7,9 @@
 import { escapeHtml } from "../utils/dom.js";
 import { fmtMm } from "../utils/math.js";
 import { state, getActiveModule } from "../core/state.js";
-import { collectProjectParts, calculateAllProjectParts, calculateProjectHardware, calculateProjectCost } from "../engine/cabinet.js";
+import { collectProjectParts, calculateAllProjectParts } from "../engine/cabinet.js";
+import { calculateProjectHardware } from "../engine/hardware.js";
+import { calculateProjectCost } from "../engine/cost.js";
 import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE, getPartEdges, withEdges, describeEdges } from "../engine/edgeBanding.js";
 import { edgeIconSvg } from "./edgeBandingUi.js";
 import { scheduleCheckpoint } from "../core/history.js";

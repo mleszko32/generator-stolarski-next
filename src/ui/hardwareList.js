@@ -1,6 +1,6 @@
 // src/ui/hardwareList.js
 // Wydruk listy zakupów (okucia) całego projektu.
-import { calculateProjectHardware } from "../engine/cabinet.js";
+import { calculateProjectHardware } from "../engine/hardware.js";
 import { state } from "../core/state.js";
 import { escapeHtml } from "../utils/dom.js";
 

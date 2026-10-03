@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { state, ensurePricingDefaults, migratePricingExtras } from '../core/state.js';
-import { calculateProjectCost, calculateAllProjectParts } from './cabinet.js';
+import { calculateAllProjectParts } from './cabinet.js';
+import { calculateProjectCost } from './cost.js';
 import { freshProject, baseModule, fullZoneFront, setProject } from '../test/fixtures.js';
 
 // Pusty projekt (bez szafek) - koszt materiałów i okuć = 0, więc liczby zależą

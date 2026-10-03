@@ -267,7 +267,7 @@ function bindSidePanelInputs(rightSidebar, panel) {
 }
 
 // Prosty, samodzielny widok do druku wykroju L-kształtnej formatki narożnej
-// (Wieniec narożny / Półka narożna, engine/cabinet.js: getCornerCorpusParts) -
+// (Wieniec narożny / Półka narożna, engine/cornerParts.js: getCornerCorpusParts) -
 // zgłoszony brak: cut-lista odsyłała do "rysunku 3D", którego jako
 // drukowalnego dokumentu nie było (patrz render/viewer2d.js:
 // generateCornerBlankSVG). Wzorowany na prostszym (nieinteraktywnym) wydruku

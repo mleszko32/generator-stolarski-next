@@ -1518,7 +1518,7 @@ export function update3D() {
           // Ręczna korekta wysokości pojedynczej nóżki (patrz ui/properties.js, zakładka
           // "Nóżki / Blendy" — lista "Nóżka N" z edytowalną wysokością). Indeksy 0-3 =
           // Tył-L, Tył-P, Przód-L, Przód-P, w tej samej kolejności co addBox() niżej —
-          // ta sama kolejność jest też w engine/cabinet.js (calculateProjectHardware).
+          // ta sama kolejność jest też w engine/hardware.js (calculateProjectHardware).
           const legOverrides = mod.legs.heightOverrides || {};
           const legHeightFor = (i) => {
               const ov = legOverrides[i];

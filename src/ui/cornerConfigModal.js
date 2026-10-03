@@ -351,7 +351,7 @@ export function openCornerConfigModal(mod) {
   // pole steruje wyłącznie pozycją Z płyty w podglądzie 3D zwykłego modułu
   // (render/viewer3d.js), a szafka narożna na razie zawsze rysuje plecy
   // płasko/nakładane w 3D niezależnie od tego wyboru (dotyczy tylko
-  // wymiarów formatki na liście, patrz engine/cabinet.js: getCornerCorpusParts).
+  // wymiarów formatki na liście, patrz engine/cornerParts.js: getCornerCorpusParts).
   if (!mod.backPanel) mod.backPanel = { type: 'nakladane', grooveDepth: 6, clearance: 2, nutBuild: 'all' };
   const backTypeEl = modal.querySelector('#input-corner-back-type');
   const nutOptionsEl = modal.querySelector('#corner-nut-options');

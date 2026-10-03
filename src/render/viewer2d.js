@@ -2,7 +2,7 @@ import { fmtMm, round1 } from '../utils/math.js';
 // src/render/viewer2d.js
 import { state } from '../core/state.js';
 import { escapeHtml } from '../utils/dom.js';
-import { getCornerPartsGeometry, getCornerWieniecHoles, getCornerShelfHoles, getCornerDoorHinges } from '../engine/cabinet.js';
+import { getCornerPartsGeometry, getCornerWieniecHoles, getCornerShelfHoles, getCornerDoorHinges } from '../engine/cornerParts.js';
 
 const formatVal = (val) => Number(Number(val).toFixed(1));
 
@@ -276,7 +276,7 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   const bgFill = "#f1f5f9";
 
   // Rysuje płytę wieńca/półki - jeśli ma nawierty od przegrody pionowej
-  // (pionMountByKey, patrz engine/cabinet.js: getPionMountHoles), robi ją
+  // (pionMountByKey, patrz engine/carcaseParts.js: getPionMountHoles), robi ją
   // klikalną i otwierającą osobny rzut z góry tej płyty z zaznaczonymi
   // nawiertami (detail-<detailId>, patrz sekcja niżej) - dokładnie tak samo
   // jak dziś działa klik w bok (detail-left/right).
@@ -862,7 +862,7 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
 
   // Rzuty z góry wieńca/półki z nawiertami kołek+wkręt od przegrody pionowej
   // (isStructural, patrz core/zoneTree.js: toggleStructural) - jeden osobny,
-  // klikalny widok PER PANEL (engine/cabinet.js: getPionMountHoles), otwierany
+  // klikalny widok PER PANEL (engine/carcaseParts.js: getPionMountHoles), otwierany
   // z mapy korpusu wyżej (panelRect). Kolor/rozmiar otworów - taki sam jak
   // istniejące nawierty kołek+wkręt półki konstrukcyjnej w bok (patrz
   // drawShelfHoles wyżej), bo to dokładnie to samo połączenie. Rysowane w tym
@@ -1124,7 +1124,7 @@ export function generateCornerPartsDrawings(mod) {
 }
 
 // Wykrój formatki narożnej w kształcie L (Wieniec narożny / Półka narożna,
-// engine/cabinet.js: getCornerCorpusParts) - do tej pory ich cut-listowy
+// engine/cornerParts.js: getCornerCorpusParts) - do tej pory ich cut-listowy
 // opis "naroże do wycięcia - patrz rysunek 3D" nie odsyłał do żadnego
 // realnego, drukowalnego rysunku (tylko do interaktywnej sceny 3D) -
 // zgłoszony brak. Pokazuje pełny prostokątny blank legA×legB (linia

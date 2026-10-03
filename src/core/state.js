@@ -81,7 +81,7 @@ export function ensurePricingDefaults(project) {
   // projekcie mogą mieć różną cenę/m² - lakier, fornir, okleina - nie tylko
   // jedną wspólną cenę jak dotąd p.materials.Front). front.materialId
   // (core/state.js: elementy typu 'front') wskazuje wpis w tej liście po id;
-  // brak pola = pierwszy wpis (patrz engine/cabinet.js: calculateProjectCost).
+  // brak pola = pierwszy wpis (patrz engine/cost.js: calculateProjectCost).
   // "Standard" dziedziczy dotychczasową p.materials.Front, żeby nikt nie
   // stracił ceny, którą już wpisał; obok niego od razu typowe materiały
   // frontów meblowych (zgłoszona lista) z ceną 0 do uzupełnienia.
