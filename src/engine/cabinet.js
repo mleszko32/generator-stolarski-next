@@ -36,7 +36,6 @@ export function calculateParts() {
       mountingData.push(...getCorpusHoles(mod, config));
   }
   rawParts.push(...getInteriorParts(mod, config));
-  rawParts.push(...getFillerParts(mod, config));
 
   const frontsAndDrawers = getFrontsAndDrawers(mod, config);
   rawParts.push(...frontsAndDrawers.parts);
@@ -155,7 +154,6 @@ export function collectProjectParts() {
         modParts.push(...getBackPanelParts(mod, config));
     }
     modParts.push(...getInteriorParts(mod, config));
-    modParts.push(...getFillerParts(mod, config));
 
     const frontsAndDrawers = getFrontsAndDrawers(mod, config);
     modParts.push(...frontsAndDrawers.parts);
@@ -1110,43 +1108,6 @@ function getFrontsAndDrawers(mod, config) {
   });
 
   return { parts, mountingData };
-}
-
-function getFillerParts(mod, config) {
-  const parts = [];
-  if (!mod.fillers) return parts;
-  
-  const th = config.materials.boardThickness || 18;
-  const modH = parseFloat(mod.dimensions.height);
-  const modW = parseFloat(mod.dimensions.width);
-
-  const parseVal = (val, fallback) => (val !== null && val !== undefined && val !== '') ? parseFloat(val) : fallback;
-
-  if (mod.fillers.left && mod.fillers.left.active) {
-      const h = parseVal(mod.fillers.left.height, modH);
-      parts.push({ name: `Blenda Lewa (Czoło)`, length: h, width: parseFloat(mod.fillers.left.width) || 50, qty: 1, category: "Front" });
-      parts.push({ name: `Blenda Lewa (Mocowanie wewn.)`, length: h, width: (parseFloat(mod.fillers.left.depth) || 80) - th, qty: 1, category: "Korpus" });
-  }
-  
-  if (mod.fillers.right && mod.fillers.right.active) {
-      const h = parseVal(mod.fillers.right.height, modH);
-      parts.push({ name: `Blenda Prawa (Czoło)`, length: h, width: parseFloat(mod.fillers.right.width) || 50, qty: 1, category: "Front" });
-      parts.push({ name: `Blenda Prawa (Mocowanie wewn.)`, length: h, width: (parseFloat(mod.fillers.right.depth) || 80) - th, qty: 1, category: "Korpus" });
-  }
-  
-  if (mod.fillers.top && mod.fillers.top.active) {
-      let autoW = modW;
-      if (mod.fillers.left && mod.fillers.left.active) autoW += parseFloat(mod.fillers.left.width) || 50;
-      if (mod.fillers.right && mod.fillers.right.active) autoW += parseFloat(mod.fillers.right.width) || 50;
-      
-      const w = parseVal(mod.fillers.top.width, autoW);
-      const h = parseVal(mod.fillers.top.height, 50);
-
-      parts.push({ name: `Blenda Górna (Czoło)`, length: w, width: h, qty: 1, category: "Front" });
-      parts.push({ name: `Blenda Górna (Mocowanie wewn.)`, length: w, width: (parseFloat(mod.fillers.top.depth) || 80) - th, qty: 1, category: "Korpus" });
-  }
-
-  return parts;
 }
 
 // Blenda (core/state.js: addBlenda): czoło (dekor frontów) + kołnierz mocujący (płyta

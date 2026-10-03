@@ -110,8 +110,8 @@ export function ensurePricingDefaults(project) {
   return p;
 }
 
-// Boki dokładane (dekoracyjne panele boczne w dekorze frontów) - w
-// przeciwieństwie do blendy (mod.fillers), NIE należą do jednego modułu:
+// Boki dokładane (dekoracyjne panele boczne w dekorze frontów) - NIE należą do
+// jednego modułu (tak jak blendy, które też tu mieszkają, kind: 'blenda'):
 // mają objąć np. cały słup dolna+górna szafka naraz, a domyślnie sięgają od
 // podłogi do sufitu niezależnie od wysokości modułów za nimi (zgłoszona
 // potrzeba). To pierwszy samodzielny obiekt projektu obok `modules` - stare
@@ -422,6 +422,9 @@ export function addModuleFromTemplate(templateModule, { suffix = '' } = {}) {
   }
   newMod.position = { ...(newMod.position || { y: 0, z: 0 }), x: nextX };
   state.project.modules.push(newMod);
+  // Szablon z biblioteki (localStorage / plik JSON) mógł zostać zapisany, gdy blendy
+  // były jeszcze w mod.fillers - przenosimy je na osobne blendy obok wstawionej szafki.
+  ensureSidePanelsDefaults(state.project);
   state.activeModuleId = newMod.id;
   return newMod;
 }

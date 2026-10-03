@@ -53,42 +53,12 @@ export function getWorldFootprint(mod) {
 export function clampModuleToRoom(mod) {
   const room = state.project.room || DEFAULT_ROOM;
   const { worldW, worldD } = getWorldFootprint(mod);
-  // Blendy L-kształtne (mod.fillers.left/right, patrz render/viewer3d.js)
-  // dostawiają się PO BOKACH modułu, poszerzając jego realny odcisk w
-  // pokoju - bez tego przy szafce dosuniętej do ściany sama blenda
-  // przenikała przez tę ścianę (zgłoszony bug), mimo że sam korpus mieścił
-  // się w środku.
-  //
-  // Kierunek "lewa/prawa" jest zdefiniowany w LOKALNYM układzie modułu, a
-  // obrót co 90° (modGroup.rotation.y w render/viewer3d.js) obraca ten
-  // lokalny układ względem pokoju - "lewa" blenda nie zawsze poszerza odcisk
-  // w stronę -X świata. Zweryfikowane wprost z transformacji modGroup
-  // (innerGroup.position = -W/2,.., -D/2, potem obrót o mod.rotation):
-  //   rotation   0°: lewa -> -X (bliższa ściana X=0),   prawa -> +X (daleka)
-  //   rotation 180°: lewa -> +X (daleka),                prawa -> -X (bliższa)
-  //   rotation  90°: lewa -> -Z (bliższa ściana Z=0),   prawa -> +Z (daleka)
-  //   rotation 270°: lewa -> +Z (daleka),                prawa -> -Z (bliższa)
-  // Bez tego (poprzednia wersja zakładała zawsze "lewa = -X, prawa = +X",
-  // czyli tylko przypadek rotation=0) blenda modułu obróconego o 180°/90°/270°
-  // nadal przenikała przez ścianę, mimo że ta funkcja "wiedziała" już
-  // ogólnie o blendach - zgłoszony bug w konkretnym zapisanym projekcie.
-  const leftW = (mod.fillers && mod.fillers.left && mod.fillers.left.active) ? (parseFloat(mod.fillers.left.width) || 50) : 0;
-  const rightW = (mod.fillers && mod.fillers.right && mod.fillers.right.active) ? (parseFloat(mod.fillers.right.width) || 50) : 0;
-  const rot = ((parseFloat(mod.rotation) || 0) % 360 + 360) % 360;
-  const nearIsLeft = rot === 0 || rot === 90;
-  const nearW = nearIsLeft ? leftW : rightW;
-  const farW = nearIsLeft ? rightW : leftW;
-  const onXAxis = rot === 0 || rot === 180;
-
-  const nearFillerX = onXAxis ? nearW : 0;
-  const farFillerX = onXAxis ? farW : 0;
-  const nearFillerZ = onXAxis ? 0 : nearW;
-  const farFillerZ = onXAxis ? 0 : farW;
-
-  const maxX = Math.max(nearFillerX, room.width - worldW - farFillerX);
-  const maxZ = Math.max(nearFillerZ, room.depth - worldD - farFillerZ);
-  mod.position.x = Math.min(Math.max(parseFloat(mod.position.x) || 0, nearFillerX), maxX);
-  mod.position.z = Math.min(Math.max(parseFloat(mod.position.z) || 0, nearFillerZ), maxZ);
+  // Blendy to osobne elementy (project.sidePanels) z własnym obrysem - odcisk
+  // szafki to już tylko jej korpus.
+  const maxX = Math.max(0, room.width - worldW);
+  const maxZ = Math.max(0, room.depth - worldD);
+  mod.position.x = Math.min(Math.max(parseFloat(mod.position.x) || 0, 0), maxX);
+  mod.position.z = Math.min(Math.max(parseFloat(mod.position.z) || 0, 0), maxZ);
 }
 
 // Prostokątny odcisk modułu w przestrzeni pokoju (X/Y/Z), z uwzględnieniem

@@ -200,9 +200,10 @@ końca ściany patrząc z wnętrza pokoju, szerokość, wysokość, parapet). Ed
 `kind: 'blenda'` (`addBlenda` w `core/state.js`; `dimensions` = widoczna szerokość × wysokość ×
 całkowita głębokość, `flange` = która krawędź listwy frontowej ma kołnierz montażowy). Używają
 kodu przeciągania/przyciągania/listy/właściwości boków dokładanych i dają dwie formatki
-(listwa frontowa, montaż wewnętrzny). Stare `mod.fillers` na module jest przy wczytaniu
-migrowane przez `migrateLegacyFillers` (wołane z `ensureSidePanelsDefaults`) i usuwane; stare
-ścieżki odczytu w layout/viewer to tylko zabezpieczenie.
+(listwa frontowa, montaż wewnętrzny). Stare `mod.fillers` na module jest migrowane przez
+`migrateLegacyFillers` (wołane z `ensureSidePanelsDefaults`: przy starcie, wczytaniu projektu,
+cofaniu i wstawieniu szablonu z biblioteki) i usuwane — reszta kodu nie czyta już `mod.fillers`.
+Nowa droga wprowadzania modułów do projektu musi też przejść przez `ensureSidePanelsDefaults`.
 Stronę zawiasów pojedynczych drzwi wybiera się w edytorze wnętrza („Drzwi - zawias z
 lewej/prawej”), nie w zakładce Front.
 

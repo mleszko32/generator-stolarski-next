@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { snapSidePanel, getModuleBoxWithFillers } from "./sidePanelSnap.js";
+import { snapSidePanel } from "./sidePanelSnap.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
 
 const panel = (over = {}) => ({
@@ -32,7 +32,8 @@ describe("snapSidePanel", () => {
   });
 
   it("uwzględnia blendę: bok staje przy blendzie, nie przy korpusie", () => {
-    project.modules[0].fillers = { right: { active: true, width: 50 } };
+    // blenda przy prawym boku szafki (x 1000..1600), na całą głębokość boku
+    project.sidePanels.push({ id: "bl1", kind: "blenda", position: { x: 1600, y: 0, z: 0 }, rotation: 0, dimensions: { width: 50, height: 720, depth: 600 } });
     const p = panel();
     project.sidePanels.push(p);
     const r = snapSidePanel(p, 1600 + 60, 0);
@@ -79,17 +80,6 @@ describe("snapSidePanel", () => {
     project.sidePanels.push(p);
     const r = snapSidePanel(p, 1600 + 25, 0);
     expect(r.x).toBe(1625);
-  });
-});
-
-describe("getModuleBoxWithFillers", () => {
-  it("blenda prawa poszerza obrys w +X przy obrocie 0, a w -X przy 180", () => {
-    const m = cab({ fillers: { right: { active: true, width: 50 } } });
-    expect(getModuleBoxWithFillers(m).x1).toBe(1650);
-    m.rotation = 180;
-    const b = getModuleBoxWithFillers(m);
-    expect(b.x0).toBe(950);
-    expect(b.x1).toBe(1600);
   });
 });
 

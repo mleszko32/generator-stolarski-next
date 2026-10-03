@@ -3,34 +3,16 @@
 // Przyciąganie boku dokładanego (state.project.sidePanels) do szafek i innych
 // boków przy przeciąganiu w 3D. Bok jest cienki (grubość płyty) i ma stać
 // DOKŁADNIE przy boku szafki: bez szczeliny i bez wchodzenia w korpus. Wcześniej
-// przyciągał się tylko krawędziami "koniec do końca" (i to bez blend), więc przy
-// szafce z blendą zostawała szczelina, a upuszczony nad szafką bok po prostu w nią
-// wchodził. Czysta logika bez Three.js - wołana z render/viewer3d.js i testowana
-// w core/sidePanelSnap.test.js.
+// przyciągał się tylko krawędziami "koniec do końca", a upuszczony nad szafką bok
+// po prostu w nią wchodził. Blendy to też wpisy w sidePanels, więc bok przyciąga
+// się do nich jak do każdego innego boku. Czysta logika bez Three.js - wołana z
+// render/viewer3d.js i testowana w core/sidePanelSnap.test.js.
 import { state, DEFAULT_ROOM } from "./state.js";
 import { getWorldFootprint, getModuleBox } from "./layout.js";
 import { num } from "../utils/math.js";
 
 const EPS = 0.5;
 const overlap1d = (a0, a1, b0, b1) => Math.min(a1, b1) - Math.max(a0, b0);
-
-// Obrys szafki w pokoju RAZEM z blendami (mod.fillers.left/right). Kierunek
-// "lewa/prawa" jest w lokalnym układzie modułu, więc zależy od obrotu (patrz
-// komentarz przy clampModuleToRoom w core/layout.js): 0° lewa -> -X, 180° lewa -> +X,
-// 90° lewa -> -Z, 270° lewa -> +Z (prawa - odwrotnie).
-export function getModuleBoxWithFillers(mod) {
-  const b = getModuleBox(mod);
-  const f = mod.fillers || {};
-  const leftW = f.left && f.left.active ? num(f.left.width, 50) : 0;
-  const rightW = f.right && f.right.active ? num(f.right.width, 50) : 0;
-  const rot = ((num(mod.rotation) % 360) + 360) % 360;
-  const box = { x0: b.x0, x1: b.x1, z0: b.z0, z1: b.z1, y0: num(mod.position && mod.position.y), y1: b.y1 };
-  if (rot === 0) { box.x0 -= leftW; box.x1 += rightW; }
-  else if (rot === 180) { box.x0 -= rightW; box.x1 += leftW; }
-  else if (rot === 90) { box.z0 -= leftW; box.z1 += rightW; }
-  else if (rot === 270) { box.z0 -= rightW; box.z1 += leftW; }
-  return box;
-}
 
 // Zwraca { x, z } - położenie lewego-tylnego rogu boku po przyciągnięciu.
 // x, z: proponowane położenie (np. z myszy). snapDist: zasięg przyciągania w mm.
@@ -44,7 +26,8 @@ export function snapSidePanel(panel, x, z, project = state.project, snapDist = 4
 
   const boxes = [];
   (project.modules || []).forEach((m) => {
-    boxes.push({ ...getModuleBoxWithFillers(m), corner: m.type === "corner_cabinet" });
+    // y0 od samego dołu szafki (razem z nóżkami), nie od korpusu.
+    boxes.push({ ...getModuleBox(m), y0: num(m.position && m.position.y), corner: m.type === "corner_cabinet" });
   });
   (project.sidePanels || []).forEach((p) => {
     if (p.id === panel.id) return;

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { migrateLegacyFillers, addBlenda, addSidePanel, addModule, ensureSidePanelsDefaults, state } from "./state.js";
+import { migrateLegacyFillers, addBlenda, addSidePanel, addModule, addModuleFromTemplate, ensureSidePanelsDefaults, state } from "./state.js";
 import { calculateAllProjectParts } from "../engine/cabinet.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
 
@@ -109,5 +109,16 @@ describe("domyślne ustawienia nutu nowej szafki", () => {
     setProject(freshProject({ modules: [], sidePanels: [] }));
     const mod = addModule("base_cabinet");
     expect(mod.backPanel).toMatchObject({ nutBuild: "sides", grooveDepth: 13, offset: 20 });
+  });
+});
+
+describe("addModuleFromTemplate - stary szablon z mod.fillers", () => {
+  it("wstawia szafkę bez fillers, a jej blendę jako osobny element obok", () => {
+    setProject(freshProject({ modules: [], sidePanels: [] }));
+    const mod = addModuleFromTemplate(legacy({ position: { x: 0, y: 0, z: 0 } }));
+    expect(mod.fillers).toBeUndefined();
+    expect(state.project.sidePanels).toHaveLength(1);
+    expect(state.project.sidePanels[0].kind).toBe("blenda");
+    expect(state.project.sidePanels[0].position.x).toBe(-50); // blenda lewa tuż przy lewym boku
   });
 });

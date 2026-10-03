@@ -562,9 +562,6 @@ export function init3DViewer() {
           const { worldW, worldD } = getWorldFootprint(dragModule);
           let baseOffsetY = (dragModule.legs && dragModule.legs.active) ? (parseFloat(dragModule.legs.height) || 100) : 0;
 
-          const dragLeftW = (dragModule.fillers && dragModule.fillers.left && dragModule.fillers.left.active) ? (parseFloat(dragModule.fillers.left.width) || 50) : 0;
-          const dragRightW = (dragModule.fillers && dragModule.fillers.right && dragModule.fillers.right.active) ? (parseFloat(dragModule.fillers.right.width) || 50) : 0;
-
           const orig = dragSelectionOrigins.get(dragModule.id);
 
           // Tryb pionowy (Alt): X/Z zostają PRZYPIĘTE do pozycji sprzed
@@ -580,13 +577,10 @@ export function init3DViewer() {
           if (Math.abs(snapY) < SNAP_DIST) snapY = 0;
 
           if (!verticalDrag) {
-              if (Math.abs(snapX - dragLeftW) < SNAP_DIST) snapX = dragLeftW;
+              if (Math.abs(snapX) < SNAP_DIST) snapX = 0;
               if (Math.abs(snapZ) < SNAP_DIST) snapZ = 0;
               // Przyciąganie do dalszych ścian pokoju (bliższe x=0/z=0 obsługują linie wyżej).
-              // Uwzględnia blendę prawą (dragRightW) tak samo jak lewa ściana wyżej
-              // uwzględnia dragLeftW - inaczej blenda prawa przy dosunięciu do
-              // ściany przenikała przez nią (zgłoszony bug).
-              if (Math.abs((snapX + worldW + dragRightW) - room.width) < SNAP_DIST) snapX = room.width - worldW - dragRightW;
+              if (Math.abs((snapX + worldW) - room.width) < SNAP_DIST) snapX = room.width - worldW;
               if (Math.abs((snapZ + worldD) - room.depth) < SNAP_DIST) snapZ = room.depth - worldD;
           }
 
@@ -600,18 +594,9 @@ export function init3DViewer() {
               const oZ = parseFloat(other.position.z);
 
               if (!verticalDrag) {
-                  const otherLeftW = (other.fillers && other.fillers.left && other.fillers.left.active) ? (parseFloat(other.fillers.left.width) || 50) : 0;
-                  const otherRightW = (other.fillers && other.fillers.right && other.fillers.right.active) ? (parseFloat(other.fillers.right.width) || 50) : 0;
-
-                  const effOX = oX - otherLeftW;
-                  const effOW = oW + otherLeftW + otherRightW;
-
-                  let dragStartX = snapX - dragLeftW;
-                  let dragEndX = snapX + worldW + dragRightW;
-
-                  if (Math.abs(dragStartX - (effOX + effOW)) < SNAP_DIST) snapX = effOX + effOW + dragLeftW;
-                  else if (Math.abs(dragEndX - effOX) < SNAP_DIST) snapX = effOX - worldW - dragRightW;
-                  else if (Math.abs(dragStartX - effOX) < SNAP_DIST) snapX = effOX + dragLeftW;
+                  if (Math.abs(snapX - (oX + oW)) < SNAP_DIST) snapX = oX + oW;
+                  else if (Math.abs((snapX + worldW) - oX) < SNAP_DIST) snapX = oX - worldW;
+                  else if (Math.abs(snapX - oX) < SNAP_DIST) snapX = oX;
 
                   if (Math.abs(snapZ - (oZ + oD)) < SNAP_DIST) snapZ = oZ + oD;
                   else if (Math.abs((snapZ + worldD) - oZ) < SNAP_DIST) snapZ = oZ - worldD;
@@ -624,8 +609,8 @@ export function init3DViewer() {
           });
 
           if (!verticalDrag) {
-              snapX = Math.max(dragLeftW, snapX);
-              snapX = Math.min(room.width - worldW - dragRightW, snapX);
+              snapX = Math.max(0, snapX);
+              snapX = Math.min(room.width - worldW, snapX);
               snapZ = Math.max(0, snapZ);
           }
           snapY = Math.max(0, snapY);
@@ -646,14 +631,8 @@ export function init3DViewer() {
                   const mOrig = dragSelectionOrigins.get(id);
                   if (!m || !mOrig) return;
                   const { worldW: mW, worldD: mD } = getWorldFootprint(m);
-                  // Każdy człon grupy ma WŁASNE blendy - rezerwujemy dla nich
-                  // miejsce tak samo jak dla dragModule wyżej, inaczej blenda
-                  // innego niż przeciągany modułu członka grupy mogła przeniknąć
-                  // przez ścianę, mimo że sam moduł się w niej mieścił.
-                  const mLeftW = (m.fillers && m.fillers.left && m.fillers.left.active) ? (parseFloat(m.fillers.left.width) || 50) : 0;
-                  const mRightW = (m.fillers && m.fillers.right && m.fillers.right.active) ? (parseFloat(m.fillers.right.width) || 50) : 0;
-                  const minDeltaX = mLeftW - mOrig.x;
-                  const maxDeltaX = Math.max(0, room.width - mW - mRightW) - mOrig.x;
+                  const minDeltaX = -mOrig.x;
+                  const maxDeltaX = Math.max(0, room.width - mW) - mOrig.x;
                   const maxDeltaZ = Math.max(0, room.depth - mD) - mOrig.z;
                   deltaX = Math.min(Math.max(deltaX, minDeltaX), maxDeltaX);
                   deltaZ = Math.min(Math.max(deltaZ, -mOrig.z), maxDeltaZ);
@@ -2201,49 +2180,6 @@ export function update3D() {
 
           if (mod.legs.plinth) {
               addBox(W, legH, plinthThick, posX, rootY, frontFaceZ - offset - plinthThick, 'plinth', isActive, udPlinth, innerGroup);
-          }
-      }
-
-      if (mod.fillers && isFrontsVisible) {
-          const frontType = (mod.front && mod.front.type) ? mod.front.type : (state.project.front?.type || 'nakladane');
-          const zForFiller = frontType === 'wpuszczane' ? posZ + D - th : posZ + D + 2;
-
-          let leftW = 0;
-          let rightW = 0;
-
-          const parseVal = (val, fallback) => (val !== null && val !== undefined && val !== '') ? parseFloat(val) : fallback;
-
-          if (mod.fillers.left && mod.fillers.left.active) {
-              leftW = parseFloat(mod.fillers.left.width) || 50;
-              const fH = parseVal(mod.fillers.left.height, H);
-              const fD = parseFloat(mod.fillers.left.depth) || 80;
-              const fY = parseVal(mod.fillers.left.offsetY, 0);
-
-              addBox(leftW, fH, th, posX - leftW, posY + fY, zForFiller, 'front', isActive, null, innerGroup);
-              addBox(th, fH, fD - th, posX - th, posY + fY, zForFiller - (fD - th), 'corpus', isActive, null, innerGroup);
-          }
-
-          if (mod.fillers.right && mod.fillers.right.active) {
-              rightW = parseFloat(mod.fillers.right.width) || 50;
-              const fH = parseVal(mod.fillers.right.height, H);
-              const fD = parseFloat(mod.fillers.right.depth) || 80;
-              const fY = parseVal(mod.fillers.right.offsetY, 0);
-
-              addBox(rightW, fH, th, posX + W, posY + fY, zForFiller, 'front', isActive, null, innerGroup);
-              addBox(th, fH, fD - th, posX + W, posY + fY, zForFiller - (fD - th), 'corpus', isActive, null, innerGroup);
-          }
-
-          if (mod.fillers.top && mod.fillers.top.active) {
-              const fH = parseVal(mod.fillers.top.height, 50);
-              const autoW = W + leftW + rightW;
-              const topW = parseVal(mod.fillers.top.width, autoW);
-              const fD = parseFloat(mod.fillers.top.depth) || 80;
-              const fY = parseVal(mod.fillers.top.offsetY, 0);
-
-              const startX = posX - leftW + (autoW - topW) / 2;
-
-              addBox(topW, fH, th, startX, posY + H + fY, zForFiller, 'front', isActive, null, innerGroup);
-              addBox(topW, th, fD - th, startX, posY + H + fY, zForFiller - (fD - th), 'corpus', isActive, null, innerGroup);
           }
       }
 
