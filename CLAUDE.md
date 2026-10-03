@@ -107,10 +107,13 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
 
 ### Renderowanie
 
-- `src/render/viewer3d.js` (~2300 linii) — scena Three.js, OrbitControls + TransformControls,
-  przeciąganie modułów z przyciąganiem co 40 mm, edycja kliknięciem / menu kontekstowym,
-  przełączniki prześwietlenia (x-ray) i widoczności frontów, „tryb wyrównywania”. Właściciel
-  `update3D()`.
+- `src/render/viewer3d.js` (~1600 linii) — scena Three.js, OrbitControls, przeciąganie modułów
+  z przyciąganiem co 40 mm, edycja kliknięciem / menu kontekstowym, przełączniki widoczności
+  frontów, „tryb wyrównywania”. Właściciel sceny i `update3D()`. Wydzielone z niego:
+  - `meshBuilders.js` — materiały i budowanie brył (`addBox`, `addHole`, `addHardware`,
+    `createLabelSprite`, `disposeObject`); trzyma flagę x-ray (`isXrayMode` / `setXrayMode`).
+  - `cornerCabinet3d.js` — `renderCornerCabinet(mod, isActive, th, parentGroup)`.
+  - `measureTool.js` — miarka; scenę/kamerę/raycaster dostaje raz przez `initMeasureTool()`.
 - `src/render/viewer2d.js` — `generateSidePanelSVG(height, depth, mountingData)` buduje
   rysunek techniczny SVG boku z wierceniami.
 

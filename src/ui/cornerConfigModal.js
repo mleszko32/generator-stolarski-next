@@ -155,7 +155,7 @@ export function openCornerConfigModal(mod) {
 
   // Półki narożne (typ:'poziom-narozny') - lista wysokości, wspólna dla obu
   // ramion (patrz komentarz w markupie wyżej i engine/cabinet.js:
-  // getCornerCorpusParts / render/viewer3d.js: renderCornerCabinet). Nie
+  // getCornerCorpusParts / render/cornerCabinet3d.js: renderCornerCabinet). Nie
   // dotykają drzew BSP ramion (core/zoneTree.js filtruje po typ:'pion'/
   // 'poziom', więc ten typ jest dla nich niewidoczny) - dlatego zmiana tej
   // listy NIE wymaga odświeżenia armAEditor/armBEditor, tylko update3D().

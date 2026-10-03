@@ -1141,7 +1141,7 @@ export function generateCornerPartsDrawings(mod) {
 // rysunku jest 482"). Sam wieniec/półka siedzi MIĘDZY bokami (boki
 // przelotowe), więc realna formatka jest mniejsza o grubość boku (th) na
 // dalszej krawędzi każdego ramienia (patrz engine/cabinet.js:
-// getCornerCorpusParts, render/viewer3d.js: renderCornerCabinet `shape`) -
+// getCornerCorpusParts, render/cornerCabinet3d.js: renderCornerCabinet `shape`) -
 // pokazana tu jako DODATKOWY, cieńszy obrys wewnątrz + boki narysowane na
 // swoim realnym miejscu, żeby było widać skąd bierze się różnica, bez
 // zmiany głównych wymiarów.

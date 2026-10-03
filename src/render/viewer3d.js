@@ -7,8 +7,7 @@ import { state, DEFAULT_ROOM } from '../core/state.js';
 import { getDrawerComponents, calculateDrawerHoles } from '../core/drawerMath.js';
 import { drawerSystems } from '../core/drawerSystems.js';
 import { calculateHinges } from '../core/hingeMath.js';
-import { getCornerDoorHinges } from '../engine/cabinet.js';
-import { recalculateLayout, getTraverseConfig, getWorldFootprint, clampModuleToRoom, getModuleBox, getCornerDepths } from '../core/layout.js';
+import { recalculateLayout, getTraverseConfig, getWorldFootprint, clampModuleToRoom, getModuleBox } from '../core/layout.js';
 import { buildZoneTree, moveSplit } from '../core/zoneTree.js';
 import { scheduleCheckpoint } from '../core/history.js';
 import { toggleInteriorEditor, renderInteriorEditorIfVisible } from '../ui/interiorEditor.js';
@@ -19,22 +18,11 @@ import { getOpenings, openingBox } from '../core/openings.js';
 import { snapSidePanel } from '../core/sidePanelSnap.js';
 import { refreshModuleInfoCard } from '../ui/moduleInfoPanel.js';
 import { initPropertiesPanel } from '../ui/properties.js';
+import { mats, worktopMat, disposeObject, createLabelSprite, addBox, addHole, addHardware, isXrayMode, setXrayMode } from './meshBuilders.js';
+import { renderCornerCabinet } from './cornerCabinet3d.js';
+import { initMeasureTool, isMeasureActive, setMeasureButton, toggleMeasureMode, updateMeasureHover, handleMeasureClick, measureHoverMouse } from './measureTool.js';
 
 let alignMode = { active: false, sourceMod: null, sourceEl: null, banner: null };
-// Miarka - tryb "klik pierwszy punkt, klik drugi punkt" w scenie 3D, do
-// szybkiego sprawdzania dowolnego odstępu bez liczenia ręcznie (zgłoszona
-// prośba). Punkty łapane raycasterem z DOWOLNEJ widocznej powierzchni
-// (szafki, ściany, podłoga) - nie tylko elementów modułu jak handle3DClick.
-let measureMode = { active: false, pointA: null, banner: null, btn: null };
-let measureGroup;
-// Punkt pod kursorem (dokładnie ten, który zatwierdza klik - WYSIWYG),
-// przyciągany do najbliższego rogu bryły w promieniu SNAP_PX pikseli
-// ekranu, jeśli taki się znajdzie w zasięgu (zgłoszona prośba o precyzję).
-const measureHoverMouse = new THREE.Vector2();
-let measureHoverPoint = null;
-let measureHoverMarker = null;
-const MEASURE_SNAP_PX = 20;
-let isXrayMode = true;
 let isFrontsVisible = true;
 // Etykiety z nazwami szafek unoszące się nad każdą z nich w 3D (zgłoszona
 // potrzeba: przy wielu modułach nie dało się z widoku poznać, która szafka to
@@ -375,15 +363,10 @@ export function init3DViewer() {
   cabinetGroup = new THREE.Group();
   scene.add(cabinetGroup);
 
-  // Miarka (measureMode niżej) - osobna grupa DOTAJĘTA WPROST DO SCENE, nie
-  // do cabinetGroup, bo update3D() czyści cabinetGroup przy KAŻDYM
-  // przeliczeniu (np. przy zwykłym wpisywaniu w polach) - markery/linia
-  // pomiaru musiałyby znikać przy każdej niepowiązanej zmianie.
-  measureGroup = new THREE.Group();
-  scene.add(measureGroup);
+  initMeasureTool({ scene, camera, renderer, container, raycaster, getTargets: () => [cabinetGroup, roomGroup] });
 
   // Etykiety nazw szafek - osobna grupa DOTAJĘTA WPROST DO SCENE (nie do
-  // cabinetGroup), z tego samego powodu co measureGroup: żeby samo
+  // cabinetGroup), z tego samego powodu co grupa miarki (render/measureTool.js): żeby samo
   // pokazanie/ukrycie etykiet (toggleLabelsBtn niżej) mogło przełączyć tylko
   // .visible bez pełnego update3D(). Zawartość i tak jest przebudowywana przy
   // każdym update3D() razem z cabinetGroup (patrz tam), bo pozycje/nazwy mogły
@@ -396,7 +379,7 @@ export function init3DViewer() {
 
   renderer.domElement.addEventListener('pointerdown', (e) => {
       pointerDownPos.set(e.clientX, e.clientY);
-      if (alignMode.active || measureMode.active) return;
+      if (alignMode.active || isMeasureActive()) return;
 
       const rect = renderer.domElement.getBoundingClientRect();
       mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -716,7 +699,7 @@ export function init3DViewer() {
   // (updateMeasureHover) liczy się raz na klatkę w animate(), nie na każdy
   // mousemove (który potrafi odpalać się kilkaset razy/s).
   renderer.domElement.addEventListener('mousemove', (e) => {
-      if (!measureMode.active) return;
+      if (!isMeasureActive()) return;
       const r = renderer.domElement.getBoundingClientRect();
       measureHoverMouse.x = ((e.clientX - r.left) / r.width) * 2 - 1;
       measureHoverMouse.y = -((e.clientY - r.top) / r.height) * 2 + 1;
@@ -735,7 +718,7 @@ export function init3DViewer() {
   toggleBtn.className = 'btn view-btn active';
   
   toggleBtn.onclick = () => {
-      isXrayMode = !isXrayMode;
+      setXrayMode(!isXrayMode);
       toggleBtn.innerHTML = isXrayMode ? '<i class="ti ti-refresh" aria-hidden="true"></i> Przezroczysty (Szkic)' : '<i class="ti ti-refresh" aria-hidden="true"></i> Realistyczny (Bryły)';
       toggleBtn.classList.toggle('active', isXrayMode);
       update3D();
@@ -777,7 +760,7 @@ export function init3DViewer() {
   toggleMeasureBtn.title = 'Kliknij dwa punkty na scenie, żeby zmierzyć odległość między nimi';
   toggleMeasureBtn.className = 'btn view-btn';
   toggleMeasureBtn.onclick = () => toggleMeasureMode();
-  measureMode.btn = toggleMeasureBtn;
+  setMeasureButton(toggleMeasureBtn);
 
   const labelsBtnHtml = (on) => `<i class="ti ti-tag" aria-hidden="true"></i> ${on ? 'Ukryj nazwy' : 'Pokaż nazwy'}`;
   const toggleLabelsBtn = document.createElement('button');
@@ -922,201 +905,11 @@ function animate() {
   requestAnimationFrame(animate);
   const now = performance.now();
   if (controls.update()) requestRender(600); // kamera jeszcze dojeżdża (damping)
-  if (now > renderActiveUntil && now - lastIdleRender < IDLE_RENDER_MS && !measureMode.active) return;
+  if (now > renderActiveUntil && now - lastIdleRender < IDLE_RENDER_MS && !isMeasureActive()) return;
   lastIdleRender = now;
   updateWallVisibility();
-  if (measureMode.active) updateMeasureHover();
+  if (isMeasureActive()) updateMeasureHover();
   renderer.render(scene, camera);
-}
-
-// Miarka - "klik pierwszy punkt, klik drugi punkt", odległość w mm (jednostki
-// sceny Three.js SĄ milimetrami w całej appce, patrz CLAUDE.md). Markery/
-// linia to zwykłe siatki w measureGroup (dodanej wprost do scene, nie do
-// cabinetGroup - przeżywają update3D()), depthTest:false żeby zawsze były
-// widoczne na wierzchu, niezależnie co akurat zasłania dany punkt.
-export function toggleMeasureMode() {
-  if (measureMode.active) exitMeasureMode(); else enterMeasureMode();
-}
-
-function enterMeasureMode() {
-  measureMode.active = true;
-  measureMode.pointA = null;
-  clearMeasureVisuals();
-  ensureHoverMarker();
-  ensureMeasureBanner();
-  setMeasureBannerText('Kliknij pierwszy punkt do zmierzenia...');
-  if (measureMode.btn) {
-      measureMode.btn.innerHTML = '<i class="ti ti-ruler-measure" aria-hidden="true"></i> Wyłącz miarkę';
-      measureMode.btn.classList.add('active');
-  }
-}
-
-function exitMeasureMode() {
-  measureMode.active = false;
-  measureMode.pointA = null;
-  measureHoverPoint = null;
-  clearMeasureVisuals();
-  if (measureHoverMarker) measureHoverMarker.visible = false;
-  if (measureMode.banner) { measureMode.banner.remove(); measureMode.banner = null; }
-  if (measureMode.btn) {
-      measureMode.btn.innerHTML = '<i class="ti ti-ruler-measure" aria-hidden="true"></i> Miarka';
-      measureMode.btn.classList.remove('active');
-  }
-}
-
-function clearMeasureVisuals() {
-  if (!measureGroup) return;
-  while (measureGroup.children.length > 0) measureGroup.remove(measureGroup.children[0]);
-}
-
-function addMeasurePoint(point) {
-  const geo = new THREE.SphereGeometry(6, 12, 12);
-  const mat = new THREE.MeshBasicMaterial({ color: 0xf59e0b, depthTest: false });
-  const sphere = new THREE.Mesh(geo, mat);
-  sphere.position.copy(point);
-  sphere.renderOrder = 999;
-  measureGroup.add(sphere);
-}
-
-function addMeasureLine(a, b) {
-  const geo = new THREE.BufferGeometry().setFromPoints([a, b]);
-  const mat = new THREE.LineBasicMaterial({ color: 0xf59e0b, depthTest: false });
-  const line = new THREE.Line(geo, mat);
-  line.renderOrder = 999;
-  measureGroup.add(line);
-}
-
-// Punkt pod kursorem - osobna, TRWAŁA siatka poza measureGroup (nie znika przy
-// clearMeasureVisuals, tylko się chowa/pokazuje i przesuwa) - inaczej
-// migałaby przy każdym kliknięciu, które czyści measureGroup. Dwa style: biały
-// pierścień = przyciągnięty do rogu formatki (precyzyjnie), mniejsza szara
-// kropka = swobodny punkt na powierzchni (zgłoszona prośba o widoczny
-// "punkcik pod myszką" i przyciąganie do punktów w modułach).
-function ensureHoverMarker() {
-  if (measureHoverMarker) return measureHoverMarker;
-  const group = new THREE.Group();
-  const dot = new THREE.Mesh(
-      new THREE.SphereGeometry(4, 10, 10),
-      new THREE.MeshBasicMaterial({ color: 0x94a3b8, depthTest: false })
-  );
-  const ring = new THREE.Mesh(
-      new THREE.RingGeometry(9, 12, 20),
-      new THREE.MeshBasicMaterial({ color: 0x22d3ee, depthTest: false, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
-  );
-  ring.name = 'snapRing';
-  dot.name = 'freeDot';
-  group.add(dot, ring);
-  group.renderOrder = 1000;
-  group.visible = false;
-  scene.add(group);
-  measureHoverMarker = group;
-  return group;
-}
-
-// Raz na klatkę (patrz animate()): łapie raycastem punkt pod kursorem i - jeśli
-// trafiony obiekt to prostopadłościenna formatka (wszystkie w tej appce są,
-// patrz addBox) - sprawdza, czy któryś z jej 8 rogów w przestrzeni świata
-// wypada bliżej niż MEASURE_SNAP_PX pikseli ekranu od kursora; jeśli tak,
-// PRZYCIĄGA do tego rogu zamiast do surowego punktu na powierzchni. To
-// dokładnie ten punkt, który zatwierdza klik (handleMeasureClick) - podgląd i
-// realny wynik są zawsze tym samym punktem (WYSIWYG, zgłoszona prośba o
-// precyzję).
-function updateMeasureHover() {
-  const marker = ensureHoverMarker();
-  raycaster.setFromCamera(measureHoverMouse, camera);
-  const targets = [cabinetGroup, roomGroup].filter(Boolean);
-  const hits = targets.length ? raycaster.intersectObjects(targets, true).filter(h => !h.object.userData?.isMeasureTool) : [];
-
-  if (hits.length === 0) {
-      measureHoverPoint = null;
-      marker.visible = false;
-      return;
-  }
-
-  const hit = hits[0];
-  let point = hit.point.clone();
-  let snapped = false;
-
-  if (hit.object.isMesh && hit.object.geometry) {
-      const box = new THREE.Box3().setFromObject(hit.object);
-      if (isFinite(box.min.x)) {
-          const corners = [
-              [box.min.x, box.min.y, box.min.z], [box.min.x, box.min.y, box.max.z],
-              [box.min.x, box.max.y, box.min.z], [box.min.x, box.max.y, box.max.z],
-              [box.max.x, box.min.y, box.min.z], [box.max.x, box.min.y, box.max.z],
-              [box.max.x, box.max.y, box.min.z], [box.max.x, box.max.y, box.max.z],
-          ];
-          const rect = renderer.domElement.getBoundingClientRect();
-          const mousePx = (measureHoverMouse.x * 0.5 + 0.5) * rect.width;
-          const mousePy = (-measureHoverMouse.y * 0.5 + 0.5) * rect.height;
-          let bestDist = MEASURE_SNAP_PX;
-          let best = null;
-          corners.forEach(([x, y, z]) => {
-              const v = new THREE.Vector3(x, y, z).project(camera);
-              const px = (v.x * 0.5 + 0.5) * rect.width;
-              const py = (-v.y * 0.5 + 0.5) * rect.height;
-              const d = Math.hypot(px - mousePx, py - mousePy);
-              if (d < bestDist) { bestDist = d; best = new THREE.Vector3(x, y, z); }
-          });
-          if (best) { point = best; snapped = true; }
-      }
-  }
-
-  measureHoverPoint = point;
-  marker.position.copy(point);
-  marker.getObjectByName('freeDot').visible = !snapped;
-  const ring = marker.getObjectByName('snapRing');
-  ring.visible = snapped;
-  if (snapped) ring.lookAt(camera.position); // pierścień płaski w swojej płaszczyźnie - obróć do kamery jak billboard
-  marker.visible = true;
-}
-
-function ensureMeasureBanner() {
-  if (measureMode.banner) return measureMode.banner;
-  const banner = document.createElement('div');
-  Object.assign(banner.style, {
-      position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)',
-      background: '#f59e0b', color: 'white', padding: '12px 24px', borderRadius: '8px',
-      fontWeight: 'bold', zIndex: '2000', boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-      display: 'flex', alignItems: 'center', gap: '15px', fontFamily: 'sans-serif', fontSize: '14px'
-  });
-  const textSpan = document.createElement('span');
-  const closeBtn = document.createElement('button');
-  closeBtn.innerText = 'Zamknij miarkę';
-  Object.assign(closeBtn.style, { background: 'white', color: '#b45309', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' });
-  closeBtn.onclick = (e) => { e.stopPropagation(); exitMeasureMode(); };
-  banner.appendChild(textSpan);
-  banner.appendChild(closeBtn);
-  banner._textSpan = textSpan;
-  (container || document.body).appendChild(banner);
-  measureMode.banner = banner;
-  return banner;
-}
-
-function setMeasureBannerText(text) {
-  const banner = ensureMeasureBanner();
-  banner._textSpan.innerText = text;
-}
-
-// Zatwierdza DOKŁADNIE ten punkt, który w danej chwili pokazuje marker pod
-// kursorem (measureHoverPoint, liczony co klatkę w updateMeasureHover) - nie
-// osobny raycast na klik, żeby podgląd i realny wynik nigdy się nie rozjechały.
-function handleMeasureClick() {
-  if (!measureHoverPoint) return;
-  const point = measureHoverPoint.clone();
-
-  if (!measureMode.pointA) {
-      clearMeasureVisuals();
-      measureMode.pointA = point;
-      addMeasurePoint(point);
-      setMeasureBannerText('Kliknij drugi punkt...');
-  } else {
-      addMeasurePoint(point);
-      addMeasureLine(measureMode.pointA, point);
-      const distMm = Math.round(measureMode.pointA.distanceTo(point) * 10) / 10;
-      setMeasureBannerText(`Odległość: ${distMm} mm — kliknij, żeby zmierzyć od nowa`);
-      measureMode.pointA = null;
-  }
 }
 
 export function enterAlignMode(mod, el) {
@@ -1180,7 +973,7 @@ function handle3DClick(event) {
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-  if (measureMode.active) {
+  if (isMeasureActive()) {
       // Przelicz punkt/snap DOKŁADNIE z współrzędnych tego kliknięcia zamiast
       // polegać na ostatnim zdarzeniu mousemove (mogło nie zdążyć się odpalić
       // tuż przed kliknięciem - dawało nieprecyzyjny/nieaktualny punkt,
@@ -1299,437 +1092,6 @@ function handle3DClick(event) {
   }
 }
 
-const mats = {
-  solid: {
-      // Metalness w okolicach 0 — to płyta meblowa, nie blacha; przy metalness
-      // >0 environment map dawała nieprzyjemny, plastikowo-metaliczny połysk.
-      // Kolory lekko ocieplone (surowa płyta biała ma podtón kremowy, nie czysty biel).
-      corpus: new THREE.MeshStandardMaterial({ color: 0xfaf8f4, roughness: 0.62, metalness: 0.0 }),
-      front: new THREE.MeshStandardMaterial({ color: 0x9aa5b1, roughness: 0.42, metalness: 0.0 }),
-      shelf: new THREE.MeshStandardMaterial({ color: 0xfbfaf7, roughness: 0.7, metalness: 0.0 }),
-      drawerBox: new THREE.MeshStandardMaterial({ color: 0xd8c39a, roughness: 0.78, metalness: 0.0 }), // ciemniejsza, drewniana skrzynka - odcina się od białego korpusu po ukryciu frontów
-      hdf: new THREE.MeshStandardMaterial({ color: 0xf4f2ed, roughness: 0.9, metalness: 0.0 }),
-      plinth: new THREE.MeshStandardMaterial({ color: 0x3a3532, roughness: 0.8, metalness: 0.0 })
-  },
-  xray: {
-      corpus: new THREE.MeshStandardMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.15, depthWrite: false }),
-      front: new THREE.MeshStandardMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.15, depthWrite: false }),
-      shelf: new THREE.MeshStandardMaterial({ color: 0x64748b, transparent: true, opacity: 0.3, depthWrite: false }),
-      drawerBox: new THREE.MeshStandardMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.6, depthWrite: false }),
-      hdf: new THREE.MeshStandardMaterial({ color: 0x475569, transparent: true, opacity: 0.3, depthWrite: false }),
-      plinth: new THREE.MeshStandardMaterial({ color: 0x1c1917, transparent: true, opacity: 0.7, depthWrite: true })
-  }
-};
-const worktopMat = new THREE.MeshStandardMaterial({ color: 0x8a6a4a, roughness: 0.55, metalness: 0.0 });
-const holeMat = new THREE.MeshBasicMaterial({ color: 0xdc2626 });
-
-// Materiały współdzielone między klatkami przebudowy (nie wolno ich zwalniać
-// razem z siatką, bo używa ich następna wersja sceny).
-[...Object.values(mats.xray), ...Object.values(mats.solid), worktopMat, holeMat].forEach(m => { m.userData.shared = true; });
-
-// Kolory krawędzi mają po jednym wspólnym materiale (wcześniej każdy prostopadłościan
-// tworzył własny, co przy kilkunastu szafkach dawało tysiące materiałów).
-const lineMatCache = new Map();
-function getLineMat(color) {
-  let m = lineMatCache.get(color);
-  if (!m) { m = new THREE.LineBasicMaterial({ color }); m.userData.shared = true; lineMatCache.set(color, m); }
-  return m;
-}
-
-// Zwalnia geometrie i materiały (pamięć GPU) usuniętej ze sceny gałęzi. Bez tego
-// każde update3D() zostawiało po sobie setki geometrii, aż widok zaczynał zwalniać.
-function disposeObject(root) {
-  root.traverse(o => {
-    if (o.geometry) o.geometry.dispose();
-    const m = o.material;
-    if (m) (Array.isArray(m) ? m : [m]).forEach(x => {
-      if (!x.userData.shared) {
-        if (x.map) x.map.dispose(); // etykiety (createLabelSprite) mają własną, jednorazową teksturę canvas
-        x.dispose();
-      }
-    });
-  });
-}
-
-// Rysuje zaokrąglony prostokąt (tło etykiety) na canvasie 2D.
-function roundRectPath(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
-}
-
-// Etykieta z nazwą szafki - canvas 2D wypalony na teksturze THREE.Sprite (nie
-// CSS2DRenderer: sprite jest zwykłym obiektem sceny, więc rysuje się razem z
-// resztą w tym samym renderer.render(scene, camera) bez osobnej pętli
-// renderowania/synchronizacji). depthTest:false -> zawsze czytelna na wierzchu,
-// nawet zza innej szafki albo ściany - to ma pomagać ZNALEŹĆ szafkę, więc
-// nie powinna dać się niechcący zasłonić.
-function createLabelSprite(text) {
-  const fontPx = 44;
-  const padX = 22, padY = 14;
-  const measCanvas = document.createElement('canvas');
-  const measCtx = measCanvas.getContext('2d');
-  measCtx.font = `600 ${fontPx}px sans-serif`;
-  const textW = Math.max(1, Math.ceil(measCtx.measureText(text).width));
-
-  const canvas = document.createElement('canvas');
-  canvas.width = textW + padX * 2;
-  canvas.height = fontPx + padY * 2;
-  const ctx = canvas.getContext('2d');
-  ctx.font = `600 ${fontPx}px sans-serif`; // reset po zmianie canvas.width/height (czyści stan kontekstu)
-  ctx.fillStyle = 'rgba(30,41,59,0.82)';
-  roundRectPath(ctx, 0, 0, canvas.width, canvas.height, 12);
-  ctx.fill();
-  ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, canvas.width / 2, canvas.height / 2 + 2);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false });
-  const sprite = new THREE.Sprite(material);
-  sprite.renderOrder = 999;
-  const worldH = 130; // mm - wysokość etykiety w scenie (skalowana z zoomem jak reszta bryły)
-  sprite.scale.set(worldH * (canvas.width / canvas.height), worldH, 1);
-  return sprite;
-}
-
-
-function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, parentGroup, rotationY = 0) {
-  const geo = new THREE.BoxGeometry(w, h, d);
-  let matObj = isXrayMode ? mats.xray : mats.solid;
-  let mat = matObj.corpus;
-  if (type === 'front') mat = matObj.front;
-  if (type === 'shelf') mat = matObj.shelf;
-  if (type === 'drawerBox') mat = matObj.drawerBox;
-  if (type === 'hdf') mat = matObj.hdf;
-  if (type === 'plinth') mat = matObj.plinth;
-
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(x + w/2, y + h/2, z + d/2);
-  // Front skośny narożnika (render/viewer3d.js: renderCornerCabinet) to
-  // jedyny element, który nie leży płasko na ścianie modułu - obracamy go
-  // wokół WŁASNEGO środka (już ustawionego wyżej), reszta wywołań nie
-  // podaje rotationY (domyślnie 0) i zachowuje się identycznie jak dotąd.
-  if (rotationY) mesh.rotation.y = rotationY;
-
-  if (userData) mesh.userData = userData;
-  mesh.castShadow = !isXrayMode; mesh.receiveShadow = !isXrayMode;
-
-  const edges = new THREE.EdgesGeometry(geo);
-  const isSelected = isActiveModule || (userData && state.selectedModules && state.selectedModules.has(userData.moduleId));
-  let edgeColor = isXrayMode ? (type === 'drawerBox' ? 0xd97706 : 0x64748b) : 0x334155; 
-  if (isSelected && type !== 'drawerBox') edgeColor = 0x2563eb; // skrzynki szuflad zostają w swoim kolorze także w zaznaczonej szafce
-  
-  const line = new THREE.LineSegments(edges, getLineMat(edgeColor));
-  if (userData) line.userData = userData; 
-
-  mesh.add(line);
-  parentGroup.add(mesh);
-}
-
-function addHole(radius, depth, x, y, z, rotationAxis, parentGroup) {
-  if (!isXrayMode) return; 
-  const geo = new THREE.CylinderGeometry(radius, radius, depth, 16);
-  const mesh = new THREE.Mesh(geo, holeMat);
-  if (rotationAxis === 'x') mesh.rotation.z = Math.PI / 2; 
-  if (rotationAxis === 'y') mesh.rotation.x = 0;           
-  if (rotationAxis === 'z') mesh.rotation.x = Math.PI / 2; 
-  mesh.position.set(x, y, z);
-  parentGroup.add(mesh);
-}
-
-function addHardware(type, x, y, z, axis, parentGroup) {
-  if (!isXrayMode) return; 
-  let geo, mat;
-  if (type === 'support') {
-      geo = new THREE.CylinderGeometry(2.5, 2.5, 12, 16);
-      mat = new THREE.MeshStandardMaterial({color: 0x94a3b8, metalness: 0.9, roughness: 0.2}); 
-  } else if (type === 'dowel') {
-      geo = new THREE.CylinderGeometry(4.0, 4.0, 30, 16);
-      mat = new THREE.MeshStandardMaterial({color: 0xb45309, roughness: 0.9}); 
-  } else if (type === 'screw') {
-      geo = new THREE.CylinderGeometry(1.5, 1.5, 45, 16);
-      mat = new THREE.MeshStandardMaterial({color: 0x334155, metalness: 0.6, roughness: 0.4}); 
-  }
-  const mesh = new THREE.Mesh(geo, mat);
-  if (axis === 'x') mesh.rotation.z = Math.PI / 2;
-  else if (axis === 'z') mesh.rotation.x = Math.PI / 2;
-  mesh.position.set(x, y, z);
-  parentGroup.add(mesh);
-}
-
-// Panel wieńca narożnika (obrys L ze ściętym rogiem) - jedyna geometria w
-// całej aplikacji, która nie jest zwykłym prostopadłościanem (patrz
-// render/viewer3d.js: renderCornerCabinet). `shape` to THREE.Shape w
-// płaszczyźnie XY (x=lokalny X modułu, y=lokalny Z modułu) - obracamy
-// wytłoczoną geometrię o -90° wokół X, żeby leżała płasko (grubość w Y),
-// zamiast stać pionowo jak domyślna ekstruzja.
-function addCornerPanel(shape, thickness, y, isActiveModule, userData, parentGroup) {
-  const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
-  geo.rotateX(-Math.PI / 2);
-
-  const matObj = isXrayMode ? mats.xray : mats.solid;
-  const mesh = new THREE.Mesh(geo, matObj.corpus);
-  mesh.position.set(0, y, 0);
-  if (userData) mesh.userData = userData;
-  mesh.castShadow = !isXrayMode; mesh.receiveShadow = !isXrayMode;
-
-  const edges = new THREE.EdgesGeometry(geo);
-  let edgeColor = isXrayMode ? 0x64748b : 0x334155;
-  if (isActiveModule) edgeColor = 0x2563eb;
-  const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: edgeColor, linewidth: isActiveModule ? 2 : 1 }));
-  if (userData) line.userData = userData;
-  mesh.add(line);
-  parentGroup.add(mesh);
-}
-
-// Szafka narożna, kąt prosty (mod.type === 'corner_cabinet', patrz core/
-// state.js: addCornerModule) - PIERWSZY nieprostokątny moduł w aplikacji.
-// Zgłoszona korekta: pierwsza wersja miała ścięty, skośny narożnik/front -
-// docelowo ma to być ostry kąt 90° (typowy "narożnik ślepy") z dwoma
-// zwykłymi, prostymi frontami, po jednym na ramię, bez żadnego skosu.
-// Lokalny układ (przed position/rotation, jak w generycznej ścieżce
-// modułu wyżej): origin w wewnętrznym rogu (styk dwóch ścian), +X wzdłuż
-// ramienia A (dimensions.width=legA), +Z wzdłuż ramienia B
-// (dimensions.legB). Fronty (mod.elements, rozróżnione przez
-// front.cornerArm - dziś dowolnie wiele na ramię, patrz core/zoneTree.js:
-// assignFront z opts.cornerArm) przechodzą przez ZWYKŁY recalculateLayout/
-// calculateHinges bez żadnych zmian (patrz core/layout.js:
-// getCornerArmRect) - są fizycznie płaskimi prostokątami, tylko inaczej
-// tu pozycjonowanymi niż w prostokątnym module.
-function renderCornerCabinet(mod, isActive, th) {
-  const legA = parseFloat(mod.dimensions.width) || 860;
-  const legB = parseFloat(mod.dimensions.legB) || 860;
-  // Każde ramię ma WŁASNĄ głębokość (core/layout.js: getCornerDepths) -
-  // zgłoszona korekta, wcześniej jedna wspólna "depth" dla obu ramion.
-  // depthA mierzona wzdłuż Z (głębokość ramienia A, biegnącego wzdłuż X),
-  // depthB wzdłuż X (głębokość ramienia B, biegnącego wzdłuż Z).
-  const { depthA, depthB } = getCornerDepths(mod);
-  const H = parseFloat(mod.dimensions.height) || 720;
-
-  let baseOffsetY = 0;
-  if (mod.legs && mod.legs.active) baseOffsetY = parseFloat(mod.legs.height) || 100;
-
-  const { worldW, worldD } = getWorldFootprint(mod);
-
-  const modGroup = new THREE.Group();
-  modGroup.userData = { moduleId: mod.id };
-  modGroup.position.set(
-      (parseFloat(mod.position.x) || 0) + worldW / 2,
-      (parseFloat(mod.position.y) || 0) + baseOffsetY + H / 2,
-      (parseFloat(mod.position.z) || 0) + worldD / 2
-  );
-  modGroup.rotation.y = -((parseFloat(mod.rotation) || 0) * Math.PI / 180);
-
-  const innerGroup = new THREE.Group();
-  innerGroup.position.set(-legA / 2, -H / 2 - baseOffsetY, -legB / 2);
-  modGroup.add(innerGroup);
-
-  const posY = baseOffsetY;
-  const udCorp = { moduleId: mod.id, type: 'corpus' };
-  const udBack = { moduleId: mod.id, type: 'corpus', part: 'back' };
-
-  // --- Boki (2, na zewnętrznym końcu każdego ramienia) ---
-  // Skrócone od tyłu o backThick (jak w zwykłym module przy plecach
-  // "nakładane" - core/layout.js/viewer3d.js: sideD = D - backThick) - inaczej
-  // płyta plecy siedziałaby WEWNĄTRZ pełnego zasięgu boków (wyglądałoby jak
-  // wpuszczane), a nie jako osobna płyta przykładana na zamkniętą od tyłu
-  // krawędź boków.
-  const backThick = 3;
-  addBox(th, H, depthA - backThick, legA - th, posY, backThick, 'corpus', isActive, udCorp, innerGroup);
-  addBox(depthB - backThick, H, th, backThick, posY, legB - th, 'corpus', isActive, udCorp, innerGroup);
-
-  // --- Wieniec dolny/górny: obrys L, ostry kąt 90° (bez ścięcia) ---
-  // THREE.Shape rysuje w płaszczyźnie XY, a addCornerPanel obraca wytłoczoną
-  // geometrię o -90° wokół X, żeby leżała płasko - ten obrót mapuje lokalny
-  // Y kształtu na ŚWIATOWE -Z, więc podajemy tu od razu -Z (drugi argument
-  // lineTo), żeby po obrocie wylądować na +Z, zgodnie z resztą lokalnego
-  // układu (boki/plecy liczone są dla Z rosnącego w stronę pokoju).
-  // Narożny "kwadrat" (a od teraz prostokąt, gdy depthA≠depthB) ma rogi
-  // (depthB, depthA) - X-owa krawędź wcięcia wyznaczona jest przez głębokość
-  // DRUGIEGO ramienia (B), bo to ono fizycznie sięga aż tam wzdłuż X (i
-  // odwrotnie dla Z/depthA) - patrz core/layout.js: getCornerArmRect,
-  // komentarz przy otherDepth.
-  // Zewnętrzne krawędzie (X=legA, Z=legB) pomniejszone o th - wieniec/półka
-  // siedzi MIĘDZY bokami (boki przelotowe, jak addBox wyżej: bok A kończy
-  // się na X=legA-th, bok B na Z=legB-th), a nie na całej szerokości
-  // korpusu (zgłoszona korekta - patrz engine/cabinet.js:
-  // getCornerCorpusParts, wieniecA/wieniecB).
-  const wieniecA = legA - th;
-  const wieniecB = legB - th;
-  const shape = new THREE.Shape();
-  // Tył wieńca/półki (obie ściany) cofnięty o grubość pleców (backThick) -
-  // wymiar głębokości (np. 513) liczy się Z plecami, sama formatka jest o
-  // grubość pleców krótsza (510), jak wieniec zwykłej szafki: depth - backThick.
-  shape.moveTo(backThick, -backThick);
-  shape.lineTo(wieniecA, -backThick);
-  shape.lineTo(wieniecA, -depthA);
-  shape.lineTo(depthB, -depthA);
-  shape.lineTo(depthB, -wieniecB);
-  shape.lineTo(backThick, -wieniecB);
-  shape.closePath();
-  addCornerPanel(shape, th, posY, isActive, udCorp, innerGroup);
-  addCornerPanel(shape, th, posY + H - th, isActive, udCorp, innerGroup);
-
-  // --- Półki narożne (typ:'poziom-narozny', ui/cornerConfigModal.js) ---
-  // Ten sam obrys L co wieniec wyżej (addCornerPanel/shape) - w realnej
-  // stolarce półka w szafce narożnej jest w kształcie L, wspólna dla obu
-  // ramion na danej wysokości, NIE dwiema niezależnymi prostymi półkami
-  // (zgłoszona korekta - patrz engine/cabinet.js: getCornerCorpusParts).
-  // Listwa narożna (niżej) stoi WEWNĄTRZ korpusu między wieńcami, więc półka
-  // ma w tylnym rogu wycięcie battenW×th na tę listwę (zgłoszona korekta).
-  const battenW = 100;
-  const shelfShape = new THREE.Shape();
-  // Listwa stoi ZA plecami (plecy przybijane do niej od zewnątrz): zajmuje
-  // X:[backThick, backThick+battenW], Z:[backThick, backThick+th] - wycięcie w
-  // półce to dokładnie battenW×th.
-  shelfShape.moveTo(backThick, -(backThick + th));
-  shelfShape.lineTo(backThick + battenW, -(backThick + th));
-  shelfShape.lineTo(backThick + battenW, -backThick);
-  shelfShape.lineTo(wieniecA, -backThick);
-  // Przód półki cofnięty o 5 mm względem wieńca - tak samo jak zwykła półka
-  // ruchoma (engine/cabinet.js: getInteriorParts, innerPartDepth - 5).
-  const shelfSetback = 5;
-  shelfShape.lineTo(wieniecA, -(depthA - shelfSetback));
-  shelfShape.lineTo(depthB - shelfSetback, -(depthA - shelfSetback));
-  shelfShape.lineTo(depthB - shelfSetback, -wieniecB);
-  shelfShape.lineTo(backThick, -wieniecB);
-  shelfShape.closePath();
-  (mod.elements || []).forEach(el => {
-      if (el.typ !== 'poziom-narozny') return;
-      const udShelf = { moduleId: mod.id, type: 'shelf', elementId: el.id };
-      addCornerPanel(shelfShape, th, posY + (parseFloat(el.y) || 0), isActive, udShelf, innerGroup);
-  });
-
-  // --- Listwa narożna pionowa (w tylnym, wewnętrznym rogu) ---
-  // Zgłoszona korekta: dwie płyty plecy (HDF) osobno nie mają się do czego
-  // przykleić w rogu, gdzie się stykają - płaska listwa 18(gr.)×100(szer.),
-  // przykręcona płasko do ściany ramienia A (Z=0), do której mocują się obie
-  // płyty plecy. Wysokość H-2*th: siedzi MIĘDZY wieńcami (nie przechodzi
-  // przez nie), a półki opierają się na podpórkach wierconych w niej.
-  addBox(battenW, H - th * 2, th, backThick, posY + th, backThick, 'corpus', isActive, udCorp, innerGroup);
-
-  // --- Plecy (2, cienkie płyty HDF "nakładane" - przykręcone płasko na
-  // skróconą od tyłu krawędź boków, patrz boki wyżej) ---
-  addBox(legA - th - backThick, H, backThick, backThick, posY, 0, 'hdf', isActive, udBack, innerGroup);
-  addBox(backThick, H, legB - th - backThick, 0, posY, backThick, 'hdf', isActive, udBack, innerGroup);
-
-  // --- Fronty: zwykłe, płaskie drzwi/szuflady, dowolnie wiele na ramię ---
-  // (od wprowadzenia edytora wnętrza per ramię, ui/cornerConfigModal.js,
-  // ramię może mieć więcej niż jeden front - core/zoneTree.js: assignFront
-  // z opts.cornerArm).
-  //
-  // Te same zasady co front zwykłego modułu (generyczna ścieżka niżej w tym
-  // pliku, zmienna zForFront) - zgłoszona korekta, wcześniej front narożnika
-  // siedział sztywno w linii z licem korpusu (Z=depthA/X=depthB), bez
-  // zapasu montażowego i bez rozróżnienia nakładane/wpuszczane:
-  //   nakładane (domyślne) - front 2mm PRZED licem korpusu (miejsce na
-  //     domykanie się drzwi na zawiasach bez ocierania o bok).
-  //   wpuszczane - front cofnięty o własną grubość (th), w linii z bokami.
-  const frontCfg = { ...(state.project.front || {}), ...(mod.front || {}) };
-  const isInsetFront = frontCfg.type === 'wpuszczane';
-  const frontZA = isInsetFront ? depthA - th : depthA + 2; // czoło ramienia A (Z)
-  const frontZB = isInsetFront ? depthB - th : depthB + 2; // czoło ramienia B (X)
-
-  const cornerDoorHinges = new Map(getCornerDoorHinges(mod).map(d => [d.front.id, d]));
-
-  (mod.elements || []).forEach(front => {
-      if (front.typ !== 'front') return;
-      const fw = parseFloat(front.w) || 0;
-      const fh = parseFloat(front.h) || 0;
-      const fx = parseFloat(front.x) || 0;
-      const fy = parseFloat(front.y) || 0;
-      const udFront = { moduleId: mod.id, type: 'front', frontId: front.id };
-
-      if (front.cornerArm === 'A') {
-          // Ramię A biegnie wzdłuż +X, front na jego czole: lokalny front.x
-          // (0..widthA) mapuje się na X = depthB + front.x (bieg ramienia A
-          // zaczyna się dopiero za narożnym prostokątem, którego szerokość w
-          // X wyznacza głębokość DRUGIEGO ramienia - depthB).
-          addBox(fw, fh, th, depthB + fx, posY + fy, frontZA, 'front', isActive, udFront, innerGroup);
-      } else {
-          // Ramię B biegnie wzdłuż +Z, front na jego czole: lokalny front.x
-          // (0..widthB) mapuje się na Z = depthA + front.x.
-          addBox(th, fh, fw, frontZB, posY + fy, depthA + fx, 'front', isActive, udFront, innerGroup);
-      }
-
-      // Zawiasy drzwi narożnika (widoczne w trybie przezroczystym, jak w zwykłych
-      // szafkach): puszka fi 35 w tylnej stronie frontu, a przy zawiasie na
-      // zewnętrznej krawędzi - dwa otwory płytki w boku korpusu.
-      const dh = cornerDoorHinges.get(front.id);
-      if (dh) {
-          dh.hinges.forEach(h => {
-              const cupOff = dh.side === 'left' ? h.cupXOffset : fw - h.cupXOffset;
-              const cy = posY + fy + h.relY;
-              if (front.cornerArm === 'A') {
-                  addHole(17.5, 13, depthB + fx + cupOff, cy, frontZA + 6.5, 'z', innerGroup);
-                  if (dh.atBok) {
-                      addHole(2.5, th, legA - th / 2, cy - 16, depthA - 37, 'x', innerGroup);
-                      addHole(2.5, th, legA - th / 2, cy + 16, depthA - 37, 'x', innerGroup);
-                  }
-              } else {
-                  addHole(17.5, 13, frontZB + 6.5, cy, depthA + fx + cupOff, 'x', innerGroup);
-                  if (dh.atBok) {
-                      addHole(2.5, th, depthB - 37, cy - 16, legB - th / 2, 'z', innerGroup);
-                      addHole(2.5, th, depthB - 37, cy + 16, legB - th / 2, 'z', innerGroup);
-                  }
-              }
-          });
-      }
-  });
-
-  // --- Półki/przegrody wewnątrz ramion (poziom/pion z cornerArm) ---
-  // Ten sam lokalny układ 2D (x wzdłuż ramienia, y = wysokość) co fronty
-  // wyżej, tylko rozciągnięte na całą głębokość WŁASNEGO ramienia (jak
-  // shelfDepth w generycznej ścieżce renderowania niżej w tym pliku), a nie
-  // tylko o grubość th jak front. Głębokość liczona od płyty pleców
-  // (backThick) do tuż przed czołem frontu (-2mm), żeby nie kolidować z
-  // drzwiami - osobno dla każdego ramienia (depthA/depthB).
-  const armInnerDepthA = Math.max(10, depthA - 2 - backThick);
-  const armInnerDepthB = Math.max(10, depthB - 2 - backThick);
-  (mod.elements || []).forEach(el => {
-      if (el.typ !== 'poziom' && el.typ !== 'pion') return;
-      if (el.cornerArm !== 'A' && el.cornerArm !== 'B') return;
-      const ex = parseFloat(el.x) || 0;
-      const ey = parseFloat(el.y) || 0;
-      const ew = parseFloat(el.w) || 0;
-      const eh = parseFloat(el.h) || 0;
-      const udShelf = { moduleId: mod.id, type: 'shelf', elementId: el.id };
-
-      if (el.cornerArm === 'A') {
-          addBox(ew, eh, armInnerDepthA, depthB + ex, posY + ey, backThick, 'shelf', isActive, udShelf, innerGroup);
-      } else {
-          addBox(armInnerDepthB, eh, ew, backThick, posY + ey, depthA + ex, 'shelf', isActive, udShelf, innerGroup);
-      }
-  });
-
-  // --- Nóżki (5 - jedna wspólna w tylnym rogu + po dwie na końcach każdego
-  // ramienia) ---
-  // Obrys L ma 5 wypukłych (nie wklęsłych) narożników podłogi - dokładnie
-  // tyle, ile nóżek widać na zdjęciu referencyjnym (core/state.js:
-  // addCornerModule). Wklęsły róg przy froncie (X=depth,Z=depth) nóżki nie
-  // dostaje - nie ma tam żadnego materiału korpusu nad podłogą. Rozstaw 30×30,
-  // wcięcie 50mm od krawędzi - identycznie jak przy zwykłym module niżej.
-  if (mod.legs && mod.legs.active) {
-      const legH = parseFloat(mod.legs.height) || 100;
-      const rootY = 0.5;
-      const udLeg = { moduleId: mod.id, type: 'plinth' };
-      addBox(30, legH, 30, 50, rootY, 50, 'corpus', false, udLeg, innerGroup);
-      addBox(30, legH, 30, legA - 80, rootY, 50, 'corpus', false, udLeg, innerGroup);
-      addBox(30, legH, 30, legA - 80, rootY, depthA - 80, 'corpus', false, udLeg, innerGroup);
-      addBox(30, legH, 30, 50, rootY, legB - 80, 'corpus', false, udLeg, innerGroup);
-      addBox(30, legH, 30, depthB - 80, rootY, legB - 80, 'corpus', false, udLeg, innerGroup);
-  }
-
-  cabinetGroup.add(modGroup);
-}
-
 export function update3D() {
   scheduleCheckpoint(); // patrz core/history.js — debounce'owany checkpoint historii cofnij/wprzód
   renderInteriorEditorIfVisible(); // patrz ui/interiorEditor.js — odświeża się tylko, gdy jest widoczny
@@ -1761,7 +1123,7 @@ export function update3D() {
       // generycznego W/H/D/innerGroup poniżej, które zakłada jeden
       // prostokątny korpus).
       if (mod.type === 'corner_cabinet') {
-          renderCornerCabinet(mod, mod.id === state.activeModuleId, th);
+          renderCornerCabinet(mod, mod.id === state.activeModuleId, th, cabinetGroup);
           return;
       }
 

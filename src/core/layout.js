@@ -382,7 +382,7 @@ export function recalculateLayout(mod) {
 // liczy je już poprawnie zwykły przebieg wyżej (forceOuterRight). Tu
 // nadpisujemy WYŁĄCZNIE krawędź przy rogu (lokalne x=0 w obu ramionach to
 // ten sam punkt - miejsce, gdzie się stykają, patrz core/layout.js:
-// getCornerArmRect / render/viewer3d.js: renderCornerCabinet).
+// getCornerArmRect / render/cornerCabinet3d.js: renderCornerCabinet).
 // Działa też na grupy sąsiadujących frontów (np. szuflady) współdzielące tę
 // samą strefę (ten sam baseZone.boundLeft) - wszystkie dostają identyczne
 // x/w, bo w poziomie (X) mają tę samą szerokość niezależnie od podziału w
@@ -496,7 +496,7 @@ export function getCornerArmRect(mod, arm) {
   // Reszta danego ramienia poza strefą wspólnego narożnika (otherDepth), pomniejszona
   // dodatkowo o grubość frontu SĄSIEDNIEGO ramienia (cornerGap) - oba fronty mają
   // swój płat grubości `th` sięgający dokładnie do linii `otherDepth` w OSI DRUGIEGO
-  // ramienia (patrz render/viewer3d.js: renderCornerCabinet), więc bez tego
+  // ramienia (patrz render/cornerCabinet3d.js: renderCornerCabinet), więc bez tego
   // odsunięcia ich bliższe naroża fizycznie by się przenikały w rogu (zgłoszone
   // jako "fronty jakoś wystają"). minX/maxX są przesunięte o cornerGap, żeby
   // dalsza (zewnętrzna, przy boku) krawędź frontu została DOKŁADNIE tam, gdzie

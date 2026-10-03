@@ -297,7 +297,7 @@ export function calculateProjectHardware() {
       // ui/properties.js "Nóżki — wysokości ręczne" — żeby lista zakupów odzwierciedlała
       // realny komplet (np. 3x H-100 + 1x H-90), a nie zawsze 4x ten sam model.
       // Szafka narożna ma 5 nóżek (kształt L ma 5 wypukłych rogów podłogi,
-      // patrz render/viewer3d.js: renderCornerCabinet) - bez nadpisań per-nóżka.
+      // patrz render/cornerCabinet3d.js: renderCornerCabinet) - bez nadpisań per-nóżka.
       const legCount = mod.type === 'corner_cabinet' ? 5 : 4;
       for (let i = 0; i < legCount; i++) {
         const ov = legOverrides[i];
@@ -747,7 +747,7 @@ function getCornerCorpusParts(mod, config) {
   const wieniecName = `Wieniec narożny ${fmtMm(wieniecA)}x${fmtMm(wieniecB)} (naroże do wycięcia - patrz rysunek 3D)`;
   parts.push({ name: wieniecName, length: parseFloat(wieniecA.toFixed(1)), width: parseFloat(wieniecB.toFixed(1)), qty: 2, category: "Korpus" });
 
-  // Listwa narożna pionowa (render/viewer3d.js: renderCornerCabinet) - płaska
+  // Listwa narożna pionowa (render/cornerCabinet3d.js: renderCornerCabinet) - płaska
   // listwa 18(gr.)x100(szer.), do której mocują się obie płyty plecy. Stoi
   // między wieńcami (height - 2*th), nie na pełną wysokość.
   parts.push({ name: "Listwa narożna pionowa", length: parseFloat((height - th * 2).toFixed(1)), width: battenW, qty: 1, category: "Korpus" });
@@ -859,7 +859,7 @@ export function getCornerWieniecHoles(mod, config = state.project) {
 // Wymiary formatek wieńca i półki narożnej w układzie rysunku (0,0 = tylny
 // róg): blank pomniejszony o grubość boku, przód półki cofnięty o 5 mm, a
 // wycięcie na listwę tylko w półce - te same liczby co w getCornerCorpusParts
-// i render/viewer3d.js: renderCornerCabinet.
+// i render/cornerCabinet3d.js: renderCornerCabinet.
 export function getCornerPartsGeometry(mod, config = state.project) {
   const th = parseFloat(config.materials?.boardThickness) || 18;
   const backThick = parseFloat(config.materials?.backThickness) || 3;

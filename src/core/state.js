@@ -272,7 +272,7 @@ export function addModule(type = "base_cabinet") {
 // 90° jak w typowym "narożniku ślepym" z dwoma zwykłymi, prostymi
 // frontami, po jednym na ramię). PIERWSZY nieprostokątny moduł w aplikacji
 // - bryła to dwa ramiona (legA=dimensions.width, legB) spotykające się pod
-// kątem prostym (patrz render/viewer3d.js: renderCornerCabinet, engine/
+// kątem prostym (patrz render/cornerCabinet3d.js: renderCornerCabinet, engine/
 // cabinet.js: getCornerCorpusParts). Oba fronty są tworzone od razu tutaj
 // - w przeciwieństwie do zwykłego modułu użytkownik NIE dokłada ich
 // ręcznie przez generyczny mechanizm stref - zamiast tego dostają od razu
