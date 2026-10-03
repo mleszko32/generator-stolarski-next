@@ -6,6 +6,8 @@
 // wysokość i `sill` = wysokość dolnej krawędzi nad podłogą. Czysta logika bez
 // DOM/Three.js: rysują ją render/wallElevations.js i render/viewer3d.js,
 // a kolizje z szafkami sprawdza core/validate.js.
+import { num } from "../utils/math.js";
+
 export const OPENING_KINDS = {
   okno: { label: "Okno", width: 1200, height: 1400, sill: 900 },
   drzwi: { label: "Drzwi", width: 900, height: 2050, sill: 0 },
@@ -20,10 +22,6 @@ export const OPENING_WALLS = [
 ];
 
 const WALL_IDS = OPENING_WALLS.map((w) => w.id);
-const num = (v, fallback = 0) => {
-  const n = parseFloat(v);
-  return Number.isFinite(n) ? n : fallback;
-};
 
 export function newOpening(kind = "okno", wall = "tyl") {
   const k = OPENING_KINDS[kind] || OPENING_KINDS.okno;

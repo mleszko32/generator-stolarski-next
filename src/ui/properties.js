@@ -280,7 +280,6 @@ export function openCornerBlankPrintView(mod) {
   const { depthA, depthB } = getCornerDepths(mod);
   const shelfCount = (mod.elements || []).filter(el => el.typ === 'poziom-narozny').length;
   const th = parseFloat(state.project.materials?.boardThickness) || 18;
-  const backThick = parseFloat(state.project.materials?.backThickness) || 3;
 
   const svgContent = generateCornerBlankSVG(legA, legB, depthA, depthB, th, null, {
     title: 'RZUT SZAFKI Z GÓRY', plain: true,

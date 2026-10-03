@@ -86,3 +86,10 @@ export function fmtMm(v) {
 
 // Zaokrąglenie wartości liczbowej do 0,1 mm (obliczenia, nie tekst).
 export const round1 = (v) => Math.round(v * 10) / 10;
+
+// Liczba z pola formularza / danych projektu (napis albo liczba); gdy się nie da
+// sparsować - wartość domyślna.
+export const num = (v, fallback = 0) => {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : fallback;
+};

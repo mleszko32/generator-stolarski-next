@@ -30,8 +30,8 @@ kod trzyma się tego podziału.
 
 `npm run lint` — ESLint (`eslint.config.js`), wyłącznie `js.configs.recommended` (bez reguł
 stylu/formatowania) — łapie prawdziwe błędy (niezdefiniowane zmienne, puste bloki, zbędne
-przypisania) bez przeformatowywania istniejącego kodu. `no-unused-vars` to ostrzeżenie, nie
-błąd, więc nie wywala CI; wszystko inne to błąd. CI (`.github/workflows/test.yml`) uruchamia
+przypisania) bez przeformatowywania istniejącego kodu. Lint jest czysty i wszystkie reguły,
+łącznie z `no-unused-vars` (nieużywane parametry i `catch (e)` są dozwolone), to błędy. CI (`.github/workflows/test.yml`) uruchamia
 `npm run lint`, `npm run test:run` i `npm run build` przy każdym pushu / PR.
 
 Endpoint `/api/gemini` działa tylko w środowisku serverless Vercela. Zwykłe `npm run dev` nie
@@ -299,6 +299,8 @@ Dodanie/usunięcie użytkownika = edycja `ALLOWED_EMAILS` w `storage.js` **i** l
   od użytkownika (nazwa modułu, nazwa projektu wczytana z Firestore) musi przejść przez
   `escapeHtml()` z `src/utils/dom.js` przed wstawieniem.
 - **Jednostki**: wszystkie wymiary w milimetrach.
+- **Helpery liczbowe** (`num` — liczba z pola albo wartość domyślna, `round1`, `fmtMm`,
+  `evalDimensionExpr`) są w `src/utils/math.js` — importuj je, nie kopiuj do kolejnych plików.
 - **Scalanie domyślnych**: lokalne pola `mod.front` / `mod.construction` / `mod.backPanel`
   nadpisują domyślne wartości projektu przez rozłożenie obiektu — zawsze czytaj je scalone.
 - Tylko ESM (`"type": "module"` w package.json); brak `vite.config.*` — domyślne ustawienia Vite.

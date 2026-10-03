@@ -517,7 +517,7 @@ export function calculateProjectCost() {
 }
 
 function getCorpusHoles(mod, config) {
-  const { width, height, depth } = mod.dimensions;
+  const { height, depth } = mod.dimensions;
   const th = config.materials.boardThickness || 18;
   const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(config.construction || {}), ...(mod.construction || {}) };
   const trav = getTraverseConfig(cons);

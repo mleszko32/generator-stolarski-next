@@ -23,13 +23,12 @@ export default [
       },
     },
     rules: {
-      // Parametry funkcji nieużywane celowo (np. zgodność sygnatury callbacku)
-      // są w tym kodzie częste i nieszkodliwe - łapiemy tylko zapomniane
-      // zmienne LOKALNE, nie każdy nieużywany argument.
       // Parametry funkcji i `catch (e)` gdzie `e` nie jest odczytywane są w tym
-      // kodzie częste i nieszkodliwe (fallback bez potrzeby szczegółu błędu) -
-      // łapiemy tylko zapomniane zmienne LOKALNE.
-      "no-unused-vars": ["warn", { args: "none", caughtErrors: "none", varsIgnorePattern: "^_" }],
+      // kodzie częste i nieszkodliwe (zgodność sygnatury callbacku, fallback bez
+      // potrzeby szczegółu błędu) - łapiemy tylko zapomniane zmienne LOKALNE.
+      // Błąd, nie ostrzeżenie: lint jest czysty, więc nowe martwe zmienne mają
+      // wywalać CI zamiast się zbierać.
+      "no-unused-vars": ["error", { args: "none", caughtErrors: "none", varsIgnorePattern: "^_" }],
       // Ten kodebase celowo używa `catch (e) {}` do wyciszania opcjonalnych,
       // niekrytycznych błędów (np. localStorage niedostępny w trybie prywatnym)
       // - to nie jest bug, tylko świadomy no-op.

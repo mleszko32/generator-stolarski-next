@@ -9,12 +9,9 @@
 // w core/sidePanelSnap.test.js.
 import { state, DEFAULT_ROOM } from "./state.js";
 import { getWorldFootprint, getModuleBox } from "./layout.js";
+import { num } from "../utils/math.js";
 
 const EPS = 0.5;
-const num = (v, fallback = 0) => {
-  const n = parseFloat(v);
-  return Number.isFinite(n) ? n : fallback;
-};
 const overlap1d = (a0, a1, b0, b1) => Math.min(a1, b1) - Math.max(a0, b0);
 
 // Obrys szafki w pokoju RAZEM z blendami (mod.fillers.left/right). Kierunek

@@ -7,11 +7,7 @@
 // przez edytor wnętrza 2D, gdy fronty są ukryte. Wymaga aktualnego layoutu
 // (el.y/el.h po recalculateLayout).
 import { getDrawerComponents } from "./drawerMath.js";
-
-const num = (v, d = 0) => {
-  const n = parseFloat(v);
-  return Number.isFinite(n) ? n : d;
-};
+import { num } from "../utils/math.js";
 
 const SIDE_T = 16;   // grubość boku i dna szuflady
 

@@ -6,12 +6,7 @@
 import { recalculateLayout } from "./layout.js";
 import { calculateHinges } from "./hingeMath.js";
 import { getDrawerBoxInfo } from "./drawerBoxes.js";
-
-const num = (v, d = 0) => {
-  const n = parseFloat(v);
-  return Number.isFinite(n) ? n : d;
-};
-const r1 = (v) => Math.round(v * 10) / 10;
+import { num, round1 } from "../utils/math.js";
 
 const TYPE_LABELS = {
   base_cabinet: "Szafka dolna",
@@ -43,7 +38,7 @@ export function getModuleSummary(mod, project) {
       const side = f.subtype === "drzwi-lp" ? (String(f.id).includes("-L-") ? "left" : "right") : (f.openingSide === "right" ? "right" : "left");
       let hinges;
       try { hinges = (calculateHinges(f, th, obstacles, side) || []).length; } catch (e) { hinges = 0; }
-      return { label: `Drzwi ${i + 1}`, w: r1(num(f.w)), h: r1(num(f.h)), side, hinges };
+      return { label: `Drzwi ${i + 1}`, w: round1(num(f.w)), h: round1(num(f.h)), side, hinges };
     });
 
   const drawers = fronts
@@ -51,26 +46,26 @@ export function getModuleSummary(mod, project) {
     .map((f, i) => {
       const info = getDrawerBoxInfo(mod, f, project);
       const box = info ? {
-        length: r1(info.comps.nominalLength),
-        width: r1(info.rect.x1 - info.rect.x0),
-        height: r1(info.rect.y1 - info.rect.y0),
+        length: round1(info.comps.nominalLength),
+        width: round1(info.rect.x1 - info.rect.x0),
+        height: round1(info.rect.y1 - info.rect.y0),
         system: info.comps.systemName,
         variant: info.comps.back.variantType,
-        openingW: r1(info.openingW),
-        openingH: r1(info.openingH),
+        openingW: round1(info.openingW),
+        openingH: round1(info.openingH),
       } : null;
-      return { label: `Szuflada ${i + 1}${f.subtype === "szuflada-wewnetrzna" ? " (wewn.)" : ""}`, w: r1(num(f.w)), h: r1(num(f.h)), box };
+      return { label: `Szuflada ${i + 1}${f.subtype === "szuflada-wewnetrzna" ? " (wewn.)" : ""}`, w: round1(num(f.w)), h: round1(num(f.h)), box };
     });
 
   const shelves = els
     .filter((e) => e.typ === "poziom")
     .sort((a, b) => num(a.y) - num(b.y))
-    .map((e) => ({ y: r1(num(e.y)), fixed: !!e.isStructural }));
+    .map((e) => ({ y: round1(num(e.y)), fixed: !!e.isStructural }));
 
   return {
     type: TYPE_LABELS[mod.type] || "Szafka",
-    dims: { w: r1(W), h: r1(H), d: r1(D) },
-    inner: { w: r1(W - 2 * th), h: r1(H - 2 * th), d: r1(innerD) },
+    dims: { w: round1(W), h: round1(H), d: round1(D) },
+    inner: { w: round1(W - 2 * th), h: round1(H - 2 * th), d: round1(innerD) },
     legs,
     doors,
     drawers,

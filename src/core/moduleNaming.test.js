@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { addModule, addCornerModule, state } from "./state.js";
+import { addModule, addCornerModule } from "./state.js";
 import { freshProject, setProject } from "../test/fixtures.js";
 
 describe("domyślna nazwa nowej szafki numeruje się tylko wśród szafek TEGO SAMEGO typu", () => {

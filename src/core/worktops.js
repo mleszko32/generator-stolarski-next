@@ -41,15 +41,6 @@ export function ensureWorktopDefaults(project) {
 const BASE_TYPES = ['base_cabinet', 'corner_cabinet'];
 const HANG_MIN = 600;
 
-// [ściana1, koniec1, ściana2, koniec2] - narożniki pokoju, gdzie stykają się ściany
-// (patrz core/walls.js: u ściany tylnej=x, prawej=z, przedniej=W-x, lewej=D-z).
-const CORNERS = [
-  ['tyl', 'low', 'lewa', 'high'],
-  ['tyl', 'high', 'prawa', 'low'],
-  ['przednia', 'low', 'prawa', 'high'],
-  ['przednia', 'high', 'lewa', 'low'],
-];
-
 const WALL_LABEL = { tyl: 'tylna', prawa: 'prawa', przednia: 'przednia', lewa: 'lewa' };
 
 // Boki dokładane (state.project.sidePanels) stojące przy ścianie: blat ma je przykrywać

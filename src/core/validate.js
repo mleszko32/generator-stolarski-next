@@ -12,17 +12,13 @@ import { getCabinetInnerRect } from "./zoneTree.js";
 import { collectProjectParts } from "../engine/cabinet.js";
 import { computeWallLayouts } from "./walls.js";
 import { openingInstrumental, WALL_LOCATIVE } from "./openings.js";
+import { num } from "../utils/math.js";
 
 export const MAX_DOOR_WIDTH = 600;   // szersze drzwi się wichrują / zawiasy nie dają rady
 export const MAX_SHELF_SPAN = 800;   // dłuższa półka ugina się pod obciążeniem
 const MIN_FRONT_SIZE = 40;
 const OVERLAP_TOL = 2;               // mm - dopuszczalne "zejście się" krawędzi
 const STACK_TOL = 20;                // mm - nakładanie w pionie mniejsze od tego to zwykłe piętrowanie
-
-const num = (v, fallback = 0) => {
-  const n = parseFloat(v);
-  return Number.isFinite(n) ? n : fallback;
-};
 
 function nameOf(mod) {
   return (mod.name || "").trim() || "Szafka bez nazwy";

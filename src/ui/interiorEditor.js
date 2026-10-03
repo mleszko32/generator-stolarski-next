@@ -16,7 +16,7 @@
 // 'A'/'B' dla ramienia narożnika) przechodzi dalej do core/zoneTree.js
 // (buildZoneTree/splitZoneHorizontal/splitZoneVertical/addEvenShelves/
 // assignFront), które filtrują/znakują elementy po tym polu. Stan pływającego
-// paska narzędzi (selectedNode/toolbarMode/toolbarEl) żyje W ZAMKNIĘCIU danej
+// paska narzędzi (selectedNode/toolbarEl) żyje W ZAMKNIĘCIU danej
 // instancji, nie na poziomie modułu - dwie otwarte naraz instancje (dwa
 // ramiona w modalu) mają całkowicie niezależne paski narzędzi.
 //
@@ -88,7 +88,6 @@ const DIM_MARGIN = 7; // px od krawędzi wnęki, żeby strzałki nie nachodziły
 
 export function createZoneEditor({ getContainer, getMod, cornerArm }) {
   let selectedNode = null; // węzeł drzewa aktualnie pod pływającym paskiem
-  let toolbarMode = null; // null | 'empty' | 'occupied' | 'divider'
   let toolbarEl = null; // pływający pasek TEJ instancji (nie document.getElementById - patrz komentarz na górze pliku)
   let treesByModId = {}; // korzenie ostatnio zbudowanych drzew (render()), po id modułu - potrzebne appendDimLine, żeby znaleźć łańcuch dzielników do resizeAlongAxis (grupa modułów ma po jednym drzewie na moduł, patrz render())
   let viewportRef = null; // stały (nieskalowany) kontener zdarzeń pan/zoom TEJ instancji - tu (nie do `stage`) trafia pływający pasek, żeby nie skalował się z przybliżeniem
@@ -257,7 +256,6 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
 
   function refreshAfterEdit() {
     selectedNode = null;
-    toolbarMode = null;
     clearMergeSelection();
     update3D();
     updateSidebar();
@@ -970,11 +968,6 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
   function renderFrontOverlay(node, stage, px, mod, parentH = null, parentV = null, hidden = false) {
     const { minX, maxX, minY, maxY } = node.rect;
     const isMultiFront = node.fronts.length > 1;
-    // Węzeł 'split' ma zagnieżdżoną, klikalną zawartość (dzielniki, puste
-    // pod-wnęki) rysowaną NA WIERZCHU tego overlayu (patrz renderNode) - duża
-    // wyśrodkowana etykieta kolidowałaby wtedy wizualnie z ich własnymi "+
-    // pusta wnęka", więc dla takich węzłów etykieta frontu idzie do rogu.
-    const hasNestedContent = node.type === "split";
     const colors = FRONT_COLORS[node.fronts[0].subtype] || { fill: "#f1f5f9", border: "#94a3b8" };
     const badgeStyle = hidden;
 
@@ -1207,13 +1200,11 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     if (toolbarEl) toolbarEl.remove();
     toolbarEl = null;
     selectedNode = null;
-    toolbarMode = null;
   }
 
   function selectNode(node, anchorEl, stage, px, mod, mode) {
     closeToolbar();
     selectedNode = node;
-    toolbarMode = mode;
 
     const toolbar = document.createElement("div");
     toolbarEl = toolbar;

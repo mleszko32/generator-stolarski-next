@@ -1,9 +1,8 @@
 // src/ui/kosztorysModal.js
 // Okno kosztorysu projektu (ceny materiałów i okuć, robocizna, montaż, marża, rabat, VAT).
-import { calculateProjectHardware, calculateProjectCost } from "../engine/cabinet.js";
+import { calculateProjectCost } from "../engine/cabinet.js";
 import { state } from "../core/state.js";
 import { escapeHtml } from "../utils/dom.js";
-import { openModal } from "../utils/modal.js";
 import { initPropertiesPanel } from "./properties.js";
 import { update3D } from "../render/viewer3d.js";
 import { updateSidebar } from "./sidebar.js";
@@ -332,14 +331,4 @@ export function mountKosztorys(root) {
     recalc();
     modal.querySelector('#kosztorys-margin').addEventListener('input', recalc);
     ['labor-hours','labor-rate','assembly-hours','assembly-rate','transport','discount','vat'].forEach(k => modal.querySelector('#kosztorys-' + k).addEventListener('input', recalc));
-}
-
-export function openKosztorysModal() {
-    const dlg = openModal({
-        title: 'Kosztorys projektu',
-        subtitle: `${state.project.name || 'bez nazwy'} · ceny edytowalne, liczone na żywo. Zapisują się razem z projektem.`,
-        width: 680,
-        footer: [{ label: 'Zamknij' }],
-    });
-    mountKosztorys(dlg.bodyEl);
 }

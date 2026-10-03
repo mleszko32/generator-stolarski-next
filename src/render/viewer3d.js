@@ -1,7 +1,6 @@
 // src/render/viewer3d.js
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { state, DEFAULT_ROOM } from '../core/state.js';
 
@@ -33,7 +32,6 @@ let measureGroup;
 // ekranu, jeśli taki się znajdzie w zasięgu (zgłoszona prośba o precyzję).
 const measureHoverMouse = new THREE.Vector2();
 let measureHoverPoint = null;
-let measureHoverSnapped = false;
 let measureHoverMarker = null;
 const MEASURE_SNAP_PX = 20;
 let isXrayMode = true;
@@ -527,7 +525,6 @@ export function init3DViewer() {
 
           const newGroupPos = intersect.clone().add(dragOffset);
           const { worldW, worldD } = getWorldFootprint(dragSidePanel);
-          const room = getRoom();
 
           // Przyciąganie do szafek (z blendami), innych boków i ścian oraz wypchnięcie
           // z korpusu - patrz core/sidePanelSnap.js.
@@ -962,10 +959,6 @@ export function toggleMeasureMode() {
   if (measureMode.active) exitMeasureMode(); else enterMeasureMode();
 }
 
-export function isMeasureModeActive() {
-  return measureMode.active;
-}
-
 function enterMeasureMode() {
   measureMode.active = true;
   measureMode.pointA = null;
@@ -1091,7 +1084,6 @@ function updateMeasureHover() {
   }
 
   measureHoverPoint = point;
-  measureHoverSnapped = snapped;
   marker.position.copy(point);
   marker.getObjectByName('freeDot').visible = !snapped;
   const ring = marker.getObjectByName('snapRing');
@@ -2074,7 +2066,6 @@ export function update3D() {
                           if (drawerComps) {
                               const NL = drawerComps.nominalLength;
                               const dw = drawerComps.bottom.width;
-                              const dl = drawerComps.bottom.length;
                               const dh = drawerComps.back.height;
 
                               // NAPRAWA: analogicznie do innerWidth wyżej - el.x to lewa krawędź

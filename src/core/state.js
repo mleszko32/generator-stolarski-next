@@ -312,10 +312,6 @@ export function addCornerModule() {
   return newModule;
 }
 
-export function getActiveSidePanel() {
-  return state.project.sidePanels.find(p => p.id === state.activeSidePanelId) || null;
-}
-
 // kind: 'bok' (domyślnie) albo 'blenda' - obie to samodzielne płyty w project.sidePanels,
 // różnią się kształtem (blenda to listwa z czołem i kołnierzem mocującym) i formatkami.
 export function addSidePanel(kind = 'bok') {
