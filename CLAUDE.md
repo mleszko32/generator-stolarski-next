@@ -134,7 +134,9 @@ Wszystkie panele renderują się przez przypisanie szablonów tekstowych do `inn
   rysunku 2D z wierceniami + wydruk pojedynczej formatki na A4).
 - `properties.js` — prawy panel: formularze właściwości modułu i globalnych.
   `updateAll = () => { update3D(); updateSidebar(); }` to standardowe odświeżenie „coś się
-  zmieniło”; pola tekstowe mają debounce 50 ms.
+  zmieniło”; pola tekstowe mają debounce 50 ms. Boki dokładane i blendy mają własny panel w
+  `sidePanelProperties.js`, szafka narożna w `cornerProperties.js` (`initPropertiesPanel()`
+  wybiera właściwy).
 
 ### Konwencje UI (spójny interfejs)
 
@@ -243,7 +245,7 @@ wskazanie na usuniętą pozycję po cichu przechodzi na pierwszą pozycję cenni
 (`engine/cost.js: calculateProjectCost` — celowo bez wiersza „nieznany materiał”). Ten sam
 cennik i ta sama zasada dotyczą samodzielnych „boków dokładanych” i blend —
 `sidePanels[].materialId`, wybierane przez wspólne `materialSelectHtml()`/`bindSidePanelInputs()`
-w `ui/properties.js` (ich formatka też ma kategorię `"Front"`, patrz
+w `ui/sidePanelProperties.js` (ich formatka też ma kategorię `"Front"`, patrz
 `getSidePanelParts`/`getBlendaParts` w `engine/cabinet.js`). Klucze tożsamości formatek w
 `calculateParts`/`calculateAllProjectParts` zawierają `materialId`, więc dwa fronty o tych
 samych wymiarach w różnych materiałach nigdy nie zleją się w jeden wiersz listy.

@@ -5,7 +5,8 @@ import { calculateParts } from "../engine/cabinet.js";
 import { generateSidePanelSVG } from "../render/viewer2d.js";
 import { state, getActiveModule } from "../core/state.js";
 import { update3D } from "../render/viewer3d.js";
-import { initPropertiesPanel, openCornerBlankPrintView } from "./properties.js";
+import { initPropertiesPanel } from "./properties.js";
+import { openCornerBlankPrintView } from "./cornerProperties.js";
 import { updateSidebar } from "./sidebar.js";
 import { escapeHtml } from "../utils/dom.js";
 
