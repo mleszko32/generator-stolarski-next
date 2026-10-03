@@ -29,6 +29,7 @@ export const C = {
   red100: '#fee2e2',
   red600: '#dc2626',
   red700: '#b91c1c',
+  red800: '#991b1b',
   orange50: '#fff7ed',
   orange600: '#ea580c',
   orange700: '#c2410c',
@@ -56,7 +57,10 @@ export const C = {
   violet600: '#7c3aed',
   purple600: '#9333ea',
 
-  wood: '#d6b48a', // blat w rzucie ściany
+  wood: '#d6b48a', // blat w rzucie ściany; w schemacie blatów - blat przy ścianie tylnej
+  worktopFront: '#c9d6a3', // schemat blatów (hub): blat przy ścianie przedniej
+  worktopLeft: '#a9c7d9', // ... lewej
+  worktopRight: '#d9a9c2', // ... prawej
   woodDark: '#7c5a34',
 };
 

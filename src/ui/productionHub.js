@@ -21,6 +21,7 @@ import { mountCutPlan } from "./cutPlanModal.js";
 import { generateAllWallSVGs } from "../render/wallElevations.js";
 import { computeWorktops, getWorktopSettings, rectOf } from "../core/worktops.js";
 import { renderProjectCheck } from './projectCheck.js';
+import { C } from "../render/drawingPalette.js";
 import { updateSidebar } from "./sidebar.js";
 import { openCsvExport } from "./csvEditor.js";
 import { printHardwareList } from "./hardwareList.js";
@@ -214,27 +215,27 @@ function worktopSchemeSVG(p, wt) {
   const { room, pieces, corners } = wt;
   const W = room.width, D = room.depth, pad = 260;
   const fs = Math.max(W, D) / 55;
-  const colors = { tyl: '#d6b48a', przednia: '#c9d6a3', lewa: '#a9c7d9', prawa: '#d9a9c2' };
-  let svg = `<svg viewBox="${-pad} ${-pad} ${W + pad * 2} ${D + pad * 2}" style="width:100%;max-width:640px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px">`;
-  svg += `<rect x="0" y="0" width="${W}" height="${D}" fill="#fff" stroke="#334155" stroke-width="${fs * 0.3}"/>`;
+  const colors = { tyl: C.wood, przednia: C.worktopFront, lewa: C.worktopLeft, prawa: C.worktopRight };
+  let svg = `<svg viewBox="${-pad} ${-pad} ${W + pad * 2} ${D + pad * 2}" style="width:100%;max-width:640px;background:${C.slate50};border:1px solid ${C.slate200};border-radius:6px">`;
+  svg += `<rect x="0" y="0" width="${W}" height="${D}" fill="${C.white}" stroke="${C.slate700}" stroke-width="${fs * 0.3}"/>`;
   (p.modules || []).forEach(m => {
     const fp = getWorldFootprint(m);
-    svg += `<rect x="${parseFloat(m.position?.x) || 0}" y="${parseFloat(m.position?.z) || 0}" width="${fp.worldW}" height="${fp.worldD}" fill="#e2e8f0" stroke="#94a3b8" stroke-width="${fs * 0.15}"/>`;
+    svg += `<rect x="${parseFloat(m.position?.x) || 0}" y="${parseFloat(m.position?.z) || 0}" width="${fp.worldW}" height="${fp.worldD}" fill="${C.slate200}" stroke="${C.slate400}" stroke-width="${fs * 0.15}"/>`;
   });
   (p.sidePanels || []).forEach(sp => {
     const fp = getWorldFootprint(sp);
-    svg += `<rect x="${parseFloat(sp.position?.x) || 0}" y="${parseFloat(sp.position?.z) || 0}" width="${fp.worldW}" height="${fp.worldD}" fill="#94a3b8"/>`;
+    svg += `<rect x="${parseFloat(sp.position?.x) || 0}" y="${parseFloat(sp.position?.z) || 0}" width="${fp.worldW}" height="${fp.worldD}" fill="${C.slate400}"/>`;
   });
   pieces.forEach(pc => {
     const r = rectOf(pc, room);
-    svg += `<rect class="wt-drag" data-key="${pc.key}" data-wall="${pc.wallId}" data-base0="${pc.base.u0}" data-base1="${pc.base.u1}" style="cursor:grab" x="${r.x0}" y="${r.z0}" width="${r.x1 - r.x0}" height="${r.z1 - r.z0}" fill="${colors[pc.wallId]}" fill-opacity="0.55" stroke="#7c5a34" stroke-width="${fs * 0.15}"/>`;
-    svg += `<text x="${(r.x0 + r.x1) / 2}" y="${(r.z0 + r.z1) / 2}" font-size="${fs}" text-anchor="middle" fill="#1e293b">${Math.round(pc.length)}</text>`;
+    svg += `<rect class="wt-drag" data-key="${pc.key}" data-wall="${pc.wallId}" data-base0="${pc.base.u0}" data-base1="${pc.base.u1}" style="cursor:grab" x="${r.x0}" y="${r.z0}" width="${r.x1 - r.x0}" height="${r.z1 - r.z0}" fill="${colors[pc.wallId]}" fill-opacity="0.55" stroke="${C.woodDark}" stroke-width="${fs * 0.15}"/>`;
+    svg += `<text x="${(r.x0 + r.x1) / 2}" y="${(r.z0 + r.z1) / 2}" font-size="${fs}" text-anchor="middle" fill="${C.slate800}">${Math.round(pc.length)}</text>`;
   });
   corners.forEach(c => {
     const sm = c.seam;
-    svg += `<g class="wt-seam" data-key="${c.key}" data-through="${c.through}" data-walls="${c.walls.join(',')}" style="cursor:pointer"><line x1="${sm.x0}" y1="${sm.z0}" x2="${sm.x1}" y2="${sm.z1}" stroke="#dc2626" stroke-width="${fs * 0.5}"/><line x1="${sm.x0}" y1="${sm.z0}" x2="${sm.x1}" y2="${sm.z1}" stroke="transparent" stroke-width="${fs * 3}"/><circle cx="${(sm.x0 + sm.x1) / 2}" cy="${(sm.z0 + sm.z1) / 2}" r="${fs * 1.3}" fill="#dc2626"/><text x="${(sm.x0 + sm.x1) / 2}" y="${(sm.z0 + sm.z1) / 2 + fs * 0.4}" font-size="${fs * 1.2}" fill="#fff" text-anchor="middle">⇄</text><text x="${(sm.x0 + sm.x1) / 2 + fs * 2}" y="${(sm.z0 + sm.z1) / 2 - fs * 1.6}" font-size="${fs * 0.9}" fill="#991b1b">${c.joint === 'lyzwa' ? 'łyżwa' : 'styk'}</text></g>`;
+    svg += `<g class="wt-seam" data-key="${c.key}" data-through="${c.through}" data-walls="${c.walls.join(',')}" style="cursor:pointer"><line x1="${sm.x0}" y1="${sm.z0}" x2="${sm.x1}" y2="${sm.z1}" stroke="${C.red600}" stroke-width="${fs * 0.5}"/><line x1="${sm.x0}" y1="${sm.z0}" x2="${sm.x1}" y2="${sm.z1}" stroke="transparent" stroke-width="${fs * 3}"/><circle cx="${(sm.x0 + sm.x1) / 2}" cy="${(sm.z0 + sm.z1) / 2}" r="${fs * 1.3}" fill="${C.red600}"/><text x="${(sm.x0 + sm.x1) / 2}" y="${(sm.z0 + sm.z1) / 2 + fs * 0.4}" font-size="${fs * 1.2}" fill="${C.white}" text-anchor="middle">⇄</text><text x="${(sm.x0 + sm.x1) / 2 + fs * 2}" y="${(sm.z0 + sm.z1) / 2 - fs * 1.6}" font-size="${fs * 0.9}" fill="${C.red800}">${c.joint === 'lyzwa' ? 'łyżwa' : 'styk'}</text></g>`;
   });
-  svg += `<text x="${W / 2}" y="${-pad / 2}" font-size="${fs}" text-anchor="middle" fill="#64748b">ściana tylna</text>`;
+  svg += `<text x="${W / 2}" y="${-pad / 2}" font-size="${fs}" text-anchor="middle" fill="${C.slate500}">ściana tylna</text>`;
   svg += '</svg>';
   return svg;
 }
