@@ -119,6 +119,9 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
     `createLabelSprite`, `disposeObject`); trzyma flagę x-ray (`isXrayMode` / `setXrayMode`).
   - `cornerCabinet3d.js` — `renderCornerCabinet(mod, isActive, th, parentGroup)`.
   - `measureTool.js` — miarka; scenę/kamerę/raycaster dostaje raz przez `initMeasureTool()`.
+  - Przyciąganie i kolizje przy przeciąganiu szafek są w `core/moduleDrag.js` (czyste, z
+    testami): najbliższy kandydat (w tym fronty równo), a przeciągana szafka zatrzymuje się
+    na sąsiadach — sąsiedzi nigdy nie są odpychani. Shift w trakcie ruchu blokuje jedną oś.
 - `src/render/viewer2d.js` — `generateSidePanelSVG(height, depth, mountingData)` buduje
   rysunek techniczny SVG boku z wierceniami. Rysunki szafki narożnej (formatki w kształcie
   L, boki, fronty, wykrój) są w `cornerDrawing2d.js`. Kolory i fonty rysunków 2D (też

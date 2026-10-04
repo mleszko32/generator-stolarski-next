@@ -63,7 +63,7 @@ export function clampModuleToRoom(mod) {
 
 // Prostokątny odcisk modułu w przestrzeni pokoju (X/Y/Z), z uwzględnieniem
 // obrotu (getWorldFootprint) i wysokości nóżek. Używane przez
-// restModuleOnNeighbors() niżej oraz przez pushOverlappingModules()
+// restModuleOnNeighbors() niżej oraz przez kolizje przy przeciąganiu
 // w render/viewer3d.js (ta sama definicja - stąd eksport, żeby nie liczyć
 // tego samego dwa razy w dwóch miejscach).
 export function getModuleBox(mod) {
@@ -82,10 +82,8 @@ export function getModuleBox(mod) {
 // więc niedokładna wartość (np. o kilka mm za mało) zostawiała moduł
 // "zatopiony" w tym pod/nad nim spodem - zgłoszony bug ("wnika w głąb").
 // Dosuwa PRZESUNIĘTY właśnie moduł (mod) do oparcia się dokładnie o sąsiada,
-// z którym akurat nachodzi w pionie, zamiast ruszać sąsiada - w przeciwieństwie
-// do kolizji bok-w-bok (pushOverlappingModules w render/viewer3d.js), gdzie to
-// sąsiad jest odsuwany, bo tu nie ma odpowiednika "łańcucha" - dwa moduły w tym
-// samym miejscu w planie mogą się stykać tylko piętrowo. Działa tylko gdy X I Z
+// z którym akurat nachodzi w pionie, zamiast ruszać sąsiada (tak samo jak
+// przeciąganie w 3D - core/moduleDrag.js: resolveDragCollisions). Działa tylko gdy X I Z
 // faktycznie się nakładają (inaczej to zwykłe sąsiedztwo w rzędzie, nie
 // piętrowanie) ORAZ nakładanie w Y jest MNIEJSZE niż w X/Z (ten sam warunek
 // "minimum translation vector" co przy przeciąganiu w 3D).

@@ -16,6 +16,7 @@ import { updateSidebar } from '../ui/sidebar.js';
 import { worktopBoxes } from '../core/worktops.js';
 import { getOpenings, openingBox } from '../core/openings.js';
 import { snapSidePanel } from '../core/sidePanelSnap.js';
+import { snapModulePosition, sweepSelection, boxesOverlap } from '../core/moduleDrag.js';
 import { refreshModuleInfoCard } from '../ui/moduleInfoPanel.js';
 import { initPropertiesPanel } from '../ui/properties.js';
 import { mats, worktopMat, disposeObject, createLabelSprite, addBox, addHole, addHardware, isXrayMode, setXrayMode } from './meshBuilders.js';
@@ -48,6 +49,7 @@ const dragPlane = new THREE.Plane();
 const sidePanelNdcShift = new THREE.Vector2(); // przesunięcie kursora względem podstawy boku (patrz pointerdown)
 const SNAP_DIST = 40;
 let dragSelectionOrigins = new Map();
+let dragStartOverlaps = new Set(); // szafki, na które zaznaczenie nachodziło już przed przeciąganiem
 let wasSelectedOnDown = false;
 // Przeciąganie boku dokładanego (core/state.js: addSidePanel) - osobny,
 // prostszy tor niż moduły (bez grup, bez blend, bez trybu pionowego Alt),
@@ -77,89 +79,6 @@ let pointerDownPos = new THREE.Vector2();
 
 function getRoom() {
   return state.project.room || DEFAULT_ROOM;
-}
-
-// Odświeża transform bryły modułu w scenie na podstawie aktualnego
-// mod.position/rotation - używane po ręcznej korekcie pozycji poza normalnym
-// update3D() (pushOverlappingModules niżej), żeby widok od razu nadążał za
-// zmianą, klatka po klatce przeciągania.
-function syncModuleMesh(mod) {
-  const target = cabinetGroup && cabinetGroup.children.find(g => g.userData.moduleId === mod.id);
-  if (!target) return;
-  const { worldW, worldD } = getWorldFootprint(mod);
-  const H = parseFloat(mod.dimensions.height) || 720;
-  const baseY = (mod.legs && mod.legs.active) ? (parseFloat(mod.legs.height) || 100) : 0;
-  target.position.set(
-      (parseFloat(mod.position.x) || 0) + worldW/2,
-      (parseFloat(mod.position.y) || 0) + baseY + H/2,
-      (parseFloat(mod.position.z) || 0) + worldD/2
-  );
-}
-
-// Dotąd przeciąganie tylko PRZYCIĄGAŁO (magnetycznie) do krawędzi sąsiadów,
-// ale nic nie stało na przeszkodzie, żeby wjechać w sąsiedni moduł na wylot -
-// zmiana szerokości/wysokości modułu (patrz ui/properties.js) już dawno
-// odsuwa dalsze moduły w łańcuchu, przeciąganie robiło to tylko dla ściany,
-// nie dla innych szafek (zgłoszony bug). Woła się co klatkę przeciągania
-// (pointermove niżej) dla aktualnie przesuwanego zaznaczenia (draggedIds) -
-// każdy napotkany, kolidujący moduł jest odsuwany o dokładnie tyle, ile
-// trzeba, żeby znów stykał się krawędzią, wzdłuż osi (X albo Z) z MNIEJSZYM
-// nakładaniem ("minimum translation vector" przy rozwiązywaniu kolizji AABB)
-// - dzięki temu odsunięcie idzie w stronę, z której faktycznie nadjechał
-// przeciągany moduł. Efekt łańcuchowy: odsunięty moduł sam trafia z powrotem
-// do kolejki i jest sprawdzany przeciw reszcie, więc pchnięcie propaguje się
-// dalej, tak jak przy zmianie wymiaru.
-//
-// WAŻNE: minimum translation vector liczymy PO WSZYSTKICH TRZECH osiach
-// (X/Y/Z), nie tylko X/Z. Budowanie szafy z dwóch modułów jeden NA DRUGIM
-// (np. dolny + górny, ten sam odcisk X/Z) też przechodzi przez chwilową
-// kolizję w trakcie przeciągania - ale tam naturalnym rozwiązaniem jest
-// dosunięcie w pionie (Y), NIE odepchnięcie stacjonarnego modułu w bok
-// (zgłoszony bug: odsuwało dolny moduł). Gdy to oś Y ma najmniejsze
-// nałożenie, dosuwamy więc PRZECIĄGANY moduł (m), a nie stacjonarny (other) -
-// dokładnie to samo robi core/layout.js:restModuleOnNeighbors() dla pozycji
-// Y wpisanej ręcznie w polu w panelu bocznym (ui/properties.js), więc oba
-// wejścia (drag i pole liczbowe) dają ten sam, spójny wynik.
-function pushOverlappingModules(draggedIds) {
-  const EPS = 0.5;
-  const queue = Array.from(draggedIds);
-  let guard = 0;
-  while (queue.length && guard < 100) {
-    guard++;
-    const id = queue.shift();
-    const m = state.project.modules.find(mm => mm.id === id);
-    if (!m) continue;
-    const boxM = getModuleBox(m);
-
-    state.project.modules.forEach(other => {
-      if (other.id === id || draggedIds.has(other.id)) return;
-      const boxO = getModuleBox(other);
-      const overlapX = Math.min(boxM.x1, boxO.x1) - Math.max(boxM.x0, boxO.x0);
-      const overlapY = Math.min(boxM.y1, boxO.y1) - Math.max(boxM.y0, boxO.y0);
-      const overlapZ = Math.min(boxM.z1, boxO.z1) - Math.max(boxM.z0, boxO.z0);
-      if (overlapX <= EPS || overlapY <= EPS || overlapZ <= EPS) return;
-
-      if (overlapY <= overlapX && overlapY <= overlapZ) {
-        const dir = (boxM.y0 + boxM.y1) >= (boxO.y0 + boxO.y1) ? 1 : -1;
-        m.position.y = Math.round(((parseFloat(m.position.y) || 0) + dir * overlapY) * 100) / 100;
-        boxM.y0 += dir * overlapY;
-        boxM.y1 += dir * overlapY;
-        syncModuleMesh(m);
-        return;
-      }
-
-      if (overlapX <= overlapZ) {
-        const dir = (boxO.x0 + boxO.x1) >= (boxM.x0 + boxM.x1) ? 1 : -1;
-        other.position.x = (parseFloat(other.position.x) || 0) + dir * overlapX;
-      } else {
-        const dir = (boxO.z0 + boxO.z1) >= (boxM.z0 + boxM.z1) ? 1 : -1;
-        other.position.z = (parseFloat(other.position.z) || 0) + dir * overlapZ;
-      }
-      clampModuleToRoom(other);
-      syncModuleMesh(other);
-      queue.push(other.id);
-    });
-  }
 }
 
 // Czyści i odbudowuje geometrię pokoju (podłoga + 4 ściany) na podstawie
@@ -452,6 +371,13 @@ export function init3DViewer() {
                   const m = state.project.modules.find(mod => mod.id === id);
                   if (m) dragSelectionOrigins.set(id, { x: m.position.x || 0, y: m.position.y || 0, z: m.position.z || 0 });
               });
+              dragStartOverlaps = new Set();
+              const selBoxes = state.project.modules.filter(m => state.selectedModules.has(m.id)).map(getModuleBox);
+              state.project.modules.forEach(o => {
+                  if (state.selectedModules.has(o.id)) return;
+                  const ob = getModuleBox(o);
+                  if (selBoxes.some(sb => boxesOverlap(sb, ob))) dragStartOverlaps.add(o.id);
+              });
 
               dragTarget = cabinetGroup.children.find(g => g.userData.moduleId === dragModule.id);
           } else if (group.userData && group.userData.sidePanelId) {
@@ -556,41 +482,32 @@ export function init3DViewer() {
           let snapY = newGroupPos.y - H/2 - baseOffsetY;
           let snapZ = (verticalDrag && orig) ? orig.z : newGroupPos.z - worldD/2;
 
-          const room = getRoom();
-
-          if (Math.abs(snapY) < SNAP_DIST) snapY = 0;
-
-          if (!verticalDrag) {
-              if (Math.abs(snapX) < SNAP_DIST) snapX = 0;
-              if (Math.abs(snapZ) < SNAP_DIST) snapZ = 0;
-              // Przyciąganie do dalszych ścian pokoju (bliższe x=0/z=0 obsługują linie wyżej).
-              if (Math.abs((snapX + worldW) - room.width) < SNAP_DIST) snapX = room.width - worldW;
-              if (Math.abs((snapZ + worldD) - room.depth) < SNAP_DIST) snapZ = room.depth - worldD;
+          // Shift w trakcie przeciągania = ruch tylko wzdłuż jednej osi (tej, w
+          // którą mysz odjechała dalej) - przesuwanie szafki wzdłuż rzędu bez
+          // wypadania przed/za linię.
+          let lockX = verticalDrag, lockZ = verticalDrag;
+          if (!verticalDrag && e.shiftKey && orig) {
+              if (Math.abs(snapX - orig.x) >= Math.abs(snapZ - orig.z)) { snapZ = orig.z; lockZ = true; }
+              else { snapX = orig.x; lockX = true; }
           }
 
-          state.project.modules.forEach(other => {
-              if (state.selectedModules && state.selectedModules.has(other.id)) return;
+          const room = getRoom();
 
-              const oH = parseFloat(other.dimensions.height);
-              const { worldW: oW, worldD: oD } = getWorldFootprint(other);
-              const oX = parseFloat(other.position.x);
-              const oY = parseFloat(other.position.y);
-              const oZ = parseFloat(other.position.z);
-
-              if (!verticalDrag) {
-                  if (Math.abs(snapX - (oX + oW)) < SNAP_DIST) snapX = oX + oW;
-                  else if (Math.abs((snapX + worldW) - oX) < SNAP_DIST) snapX = oX - worldW;
-                  else if (Math.abs(snapX - oX) < SNAP_DIST) snapX = oX;
-
-                  if (Math.abs(snapZ - (oZ + oD)) < SNAP_DIST) snapZ = oZ + oD;
-                  else if (Math.abs((snapZ + worldD) - oZ) < SNAP_DIST) snapZ = oZ - worldD;
-                  else if (Math.abs(snapZ - oZ) < SNAP_DIST) snapZ = oZ;
-              }
-
-              if (Math.abs(snapY - (oY + oH)) < SNAP_DIST) snapY = oY + oH;
-              else if (Math.abs((snapY + H) - oY) < SNAP_DIST) snapY = oY - H;
-              else if (Math.abs(snapY - oY) < SNAP_DIST) snapY = oY;
-          });
+          // Przyciąganie do ścian i krawędzi sąsiadów (najbliższy kandydat,
+          // w tym fronty równo) - core/moduleDrag.js.
+          const others = state.project.modules
+              .filter(o => !(state.selectedModules && state.selectedModules.has(o.id)))
+              .map(o => {
+                  const { worldW: oW, worldD: oD } = getWorldFootprint(o);
+                  return {
+                      x: parseFloat(o.position.x) || 0, y: parseFloat(o.position.y) || 0, z: parseFloat(o.position.z) || 0,
+                      w: oW, d: oD, h: parseFloat(o.dimensions.height) || 720,
+                  };
+              });
+          const snapped = snapModulePosition({ x: snapX, y: snapY, z: snapZ }, { w: worldW, d: worldD, h: H }, others, room, SNAP_DIST, { lockX, lockZ });
+          snapX = snapped.x;
+          snapY = snapped.y;
+          snapZ = snapped.z;
 
           if (!verticalDrag) {
               snapX = Math.max(0, snapX);
@@ -601,7 +518,7 @@ export function init3DViewer() {
 
           if (orig) {
               let deltaX = snapX - orig.x;
-              const deltaY = snapY - orig.y;
+              let deltaY = snapY - orig.y;
               let deltaZ = snapZ - orig.z;
 
               // Twardy limit do wnętrza pokoju - liczony na WSPÓLNEJ delcie całego
@@ -621,6 +538,28 @@ export function init3DViewer() {
                   deltaX = Math.min(Math.max(deltaX, minDeltaX), maxDeltaX);
                   deltaZ = Math.min(Math.max(deltaZ, -mOrig.z), maxDeltaZ);
               });
+
+              // Kolizje: przeciągane zaznaczenie jedzie od ostatniej pozycji
+              // i zatrzymuje się na sąsiadach, a sąsiedzi stoją w miejscu
+              // (core/moduleDrag.js) - wcześniej byli odpychani łańcuchowo i
+              // przypadkowe szturchnięcie środkowej szafki rozjeżdżało cały rząd.
+              // Pomijamy szafki, na które zaznaczenie nachodziło już przed
+              // przeciąganiem, żeby stare nałożenie nie blokowało ruchu.
+              const prev = {
+                  x: (parseFloat(dragModule.position.x) || 0) - orig.x,
+                  y: (parseFloat(dragModule.position.y) || 0) - orig.y,
+                  z: (parseFloat(dragModule.position.z) || 0) - orig.z,
+              };
+              const selectedBoxes = state.project.modules
+                  .filter(m => state.selectedModules.has(m.id))
+                  .map(getModuleBox);
+              const otherBoxes = state.project.modules
+                  .filter(o => !state.selectedModules.has(o.id) && !dragStartOverlaps.has(o.id))
+                  .map(getModuleBox);
+              const swept = sweepSelection(selectedBoxes, { dx: deltaX - prev.x, dy: deltaY - prev.y, dz: deltaZ - prev.z }, otherBoxes);
+              deltaX = prev.x + swept.dx;
+              deltaY = prev.y + swept.dy;
+              deltaZ = prev.z + swept.dz;
 
               state.selectedModules.forEach(id => {
                   const m = state.project.modules.find(mod => mod.id === id);
@@ -644,10 +583,6 @@ export function init3DViewer() {
                       }
                   }
               });
-
-              // Odsuń każdy inny moduł, w który właśnie wjechaliśmy - patrz
-              // pushOverlappingModules() wyżej.
-              pushOverlappingModules(state.selectedModules);
           }
 
           const inpX = document.getElementById('input-pos-x');
