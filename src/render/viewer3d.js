@@ -16,7 +16,7 @@ import { updateSidebar } from '../ui/sidebar.js';
 import { worktopBoxes } from '../core/worktops.js';
 import { getOpenings, openingBox } from '../core/openings.js';
 import { snapSidePanel } from '../core/sidePanelSnap.js';
-import { snapModulePosition, sweepSelection, boxesOverlap } from '../core/moduleDrag.js';
+import { snapModulePosition, sweepSelection, boxesOverlap, getSidePanelBox } from '../core/moduleDrag.js';
 import { refreshModuleInfoCard } from '../ui/moduleInfoPanel.js';
 import { initPropertiesPanel } from '../ui/properties.js';
 import { mats, worktopMat, disposeObject, createLabelSprite, addBox, addHole, addHardware, isXrayMode, setXrayMode } from './meshBuilders.js';
@@ -79,6 +79,16 @@ let pointerDownPos = new THREE.Vector2();
 
 function getRoom() {
   return state.project.room || DEFAULT_ROOM;
+}
+
+// Wszystko, na czym zatrzymuje się przeciągane zaznaczenie szafek: pozostałe
+// szafki oraz boki dokładane i blendy (project.sidePanels) - [{ id, box }].
+function getDragObstacles() {
+  const sel = state.selectedModules || new Set();
+  return [
+    ...state.project.modules.filter(m => !sel.has(m.id)).map(m => ({ id: m.id, box: getModuleBox(m) })),
+    ...(state.project.sidePanels || []).map(p => ({ id: p.id, box: getSidePanelBox(p) })),
+  ];
 }
 
 // Czyści i odbudowuje geometrię pokoju (podłoga + 4 ściany) na podstawie
@@ -373,10 +383,8 @@ export function init3DViewer() {
               });
               dragStartOverlaps = new Set();
               const selBoxes = state.project.modules.filter(m => state.selectedModules.has(m.id)).map(getModuleBox);
-              state.project.modules.forEach(o => {
-                  if (state.selectedModules.has(o.id)) return;
-                  const ob = getModuleBox(o);
-                  if (selBoxes.some(sb => boxesOverlap(sb, ob))) dragStartOverlaps.add(o.id);
+              getDragObstacles().forEach(o => {
+                  if (selBoxes.some(sb => boxesOverlap(sb, o.box))) dragStartOverlaps.add(o.id);
               });
 
               dragTarget = cabinetGroup.children.find(g => g.userData.moduleId === dragModule.id);
@@ -504,6 +512,11 @@ export function init3DViewer() {
                       w: oW, d: oD, h: parseFloat(o.dimensions.height) || 720,
                   };
               });
+          // Boki dokładane i blendy też przyciągają (tylko X/Z).
+          (state.project.sidePanels || []).forEach(p => {
+              const b = getSidePanelBox(p);
+              others.push({ x: b.x0, y: b.y0, z: b.z0, w: b.x1 - b.x0, d: b.z1 - b.z0, h: b.y1 - b.y0, noY: true });
+          });
           const snapped = snapModulePosition({ x: snapX, y: snapY, z: snapZ }, { w: worldW, d: worldD, h: H }, others, room, SNAP_DIST, { lockX, lockZ });
           snapX = snapped.x;
           snapY = snapped.y;
@@ -543,6 +556,7 @@ export function init3DViewer() {
               // i zatrzymuje się na sąsiadach, a sąsiedzi stoją w miejscu
               // (core/moduleDrag.js) - wcześniej byli odpychani łańcuchowo i
               // przypadkowe szturchnięcie środkowej szafki rozjeżdżało cały rząd.
+              // Przeszkodami są też boki dokładane i blendy (getDragObstacles).
               // Pomijamy szafki, na które zaznaczenie nachodziło już przed
               // przeciąganiem, żeby stare nałożenie nie blokowało ruchu.
               const prev = {
@@ -553,9 +567,9 @@ export function init3DViewer() {
               const selectedBoxes = state.project.modules
                   .filter(m => state.selectedModules.has(m.id))
                   .map(getModuleBox);
-              const otherBoxes = state.project.modules
-                  .filter(o => !state.selectedModules.has(o.id) && !dragStartOverlaps.has(o.id))
-                  .map(getModuleBox);
+              const otherBoxes = getDragObstacles()
+                  .filter(o => !dragStartOverlaps.has(o.id))
+                  .map(o => o.box);
               const swept = sweepSelection(selectedBoxes, { dx: deltaX - prev.x, dy: deltaY - prev.y, dz: deltaZ - prev.z }, otherBoxes);
               deltaX = prev.x + swept.dx;
               deltaY = prev.y + swept.dy;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nearestSnap, snapModulePosition, sweepSelection } from './moduleDrag.js';
+import { nearestSnap, snapModulePosition, sweepSelection, getSidePanelBox } from './moduleDrag.js';
 
 const room = { width: 4000, depth: 3000 };
 const box = (x, z, w = 600, d = 560, y = 0, h = 720) => ({ x0: x, x1: x + w, y0: y, y1: y + h, z0: z, z1: z + d });
@@ -67,5 +67,26 @@ describe('sweepSelection', () => {
   it('wolna droga = pełny ruch', () => {
     const r = sweepSelection([box(600, 0)], { dx: 300, dy: 0, dz: 0 }, [box(0, 0)]);
     expect(r).toEqual({ dx: 300, dy: 0, dz: 0 });
+  });
+});
+
+describe('bok dokładany przy przeciąganiu szafki', () => {
+  const panel = { position: { x: 600, y: 0, z: 0 }, dimensions: { width: 18, height: 820, depth: 560 } };
+
+  it('getSidePanelBox liczy prostopadłościan od podłogi', () => {
+    expect(getSidePanelBox(panel)).toEqual({ x0: 600, x1: 618, y0: 0, y1: 820, z0: 0, z1: 560 });
+  });
+
+  it('szafka zatrzymuje się na boku zamiast przez niego przenikać', () => {
+    const cab = box(1000, 0, 600, 560, 100, 720); // korpus na nóżkach 100 mm
+    const r = sweepSelection([cab], { dx: -500, dy: 0, dz: 0 }, [getSidePanelBox(panel)]);
+    expect(r.dx).toBe(-382); // lewy bok szafki dokładnie na x = 618
+  });
+
+  it('szafka przyciąga się do boku, ale nie w pionie', () => {
+    const others = [{ x: 600, y: 0, z: 0, w: 18, d: 560, h: 820, noY: true }];
+    const r = snapModulePosition({ x: 630, y: 25, z: 0 }, { w: 600, d: 560, h: 720 }, others, room, 40);
+    expect(r.x).toBe(618);
+    expect(r.y).toBe(0); // tylko podłoga, nie spód/góra boku
   });
 });

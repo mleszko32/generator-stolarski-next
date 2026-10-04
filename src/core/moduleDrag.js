@@ -2,6 +2,19 @@
 // Czysta logika: dostaje proponowaną pozycję i prostokąty sąsiadów, zwraca
 // poprawioną pozycję - bez Three.js i bez ruszania state.
 
+import { getWorldFootprint } from './layout.js';
+import { num } from '../utils/math.js';
+
+// Prostopadłościan boku dokładanego / blendy (project.sidePanels) w tym samym
+// formacie co getModuleBox. position.y boku to jego spód (od podłogi).
+export function getSidePanelBox(p) {
+  const { worldW, worldD } = getWorldFootprint(p);
+  const x0 = num(p.position && p.position.x);
+  const y0 = num(p.position && p.position.y);
+  const z0 = num(p.position && p.position.z);
+  return { x0, x1: x0 + worldW, y0, y1: y0 + num(p.dimensions && p.dimensions.height), z0, z1: z0 + worldD };
+}
+
 // Z kilku kandydatów (pozycja rogu, przy której krawędź przeciąganej szafki
 // zrównuje się z czymś) wybiera NAJBLIŻSZEGO w promieniu snapDist. Wcześniej
 // wygrywał pierwszy/ostatni pasujący z pętli po modułach, więc daleka szafka
@@ -22,6 +35,9 @@ export function nearestSnap(value, candidates, snapDist) {
 // pos = proponowany róg {x,y,z}; size = {w,d,h} odcisku przeciąganej szafki;
 // others = [{x,y,z,w,d,h}] pozostałych szafek (position + getWorldFootprint);
 // lockX/lockZ = oś nie przyciąga się (zablokowana przez Alt / Shift).
+// Obiekt z noY: true (bok dokładany, blenda) przyciąga tylko w X/Z - jego
+// position.y liczy się od podłogi, a szafki od spodu nóżek, więc w pionie
+// nie ma czego zrównywać.
 export function snapModulePosition(pos, size, others, room, snapDist, { lockX = false, lockZ = false } = {}) {
   const xs = [0, room.width - size.w];
   const zs = [0, room.depth - size.d];
@@ -37,7 +53,7 @@ export function snapModulePosition(pos, size, others, room, snapDist, { lockX = 
     // Tyły równo (o.z), fronty równo (o.z + o.d - size.d) - to drugie
     // pozwala wyrównać fronty szafek o różnej głębokości.
     if (nearX) zs.push(o.z, o.z + o.d - size.d, o.z + o.d, o.z - size.d);
-    ys.push(o.y + o.h, o.y - size.h, o.y);
+    if (!o.noY) ys.push(o.y + o.h, o.y - size.h, o.y);
   }
 
   return {
