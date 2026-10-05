@@ -257,8 +257,11 @@ function slopeDrawer(cell, ctx, sideHeight) {
   const comps = getDrawerComponents(sys, innerW, depth, spaceLow, 'auto', sideHeight);
   const boxB = wantB && !!system.woodenBox;
 
-  const lo = boxB ? getWoodenDrawerHeights(system, spaceLow) : null;
-  const hi = boxB ? getWoodenDrawerHeights(system, spaceHigh) : null;
+  // Wysokość boku wpisana ręcznie (jak w zwykłej szafce, tylko szuflady drewniane):
+  // ogranicza oba boki; bok, pod którym skos jest niżej, i tak nie wyjdzie wyżej
+  // niż pozwala miejsce. maxSide - największy bok, jaki się mieści (podpowiedź "Auto").
+  const lo = boxB ? getWoodenDrawerHeights(system, spaceLow, sideHeight) : null;
+  const hi = boxB ? getWoodenDrawerHeights(system, spaceHigh, sideHeight) : null;
   // Skrzynka B tylko wtedy, gdy skos faktycznie obniża jeden bok - przy równych
   // bokach to zwykła skrzynka prostokątna (A).
   if (boxB && hi.sideHeight > lo.sideHeight) {
@@ -266,6 +269,7 @@ function slopeDrawer(cell, ctx, sideHeight) {
     const backHigh = hi.sideHeight - system.bottomRecess - t;
     return {
       comps, boxType: 'B', fits: lo.fits, ox0, ox1, t,
+      maxSide: getWoodenDrawerHeights(system, spaceHigh).sideHeight, clamped: hi.clamped,
       box: { sideLow: lo.sideHeight, sideHigh: hi.sideHeight, backLow, backHigh, yBase: cell.y0 + system.bottomClearance, recess: system.bottomRecess },
     };
   }
@@ -273,7 +277,8 @@ function slopeDrawer(cell, ctx, sideHeight) {
     ? comps.fits
     : spaceLow >= Math.min(...Object.values(system.variants).map((v) => v.minSpace));
   const yBase = cell.y0 + (system.woodenBox ? system.bottomClearance : 0);
-  return { comps, boxType: 'A', fits, ox0, ox1, t, yBase };
+  const maxSide = system.woodenBox ? getWoodenDrawerHeights(system, spaceLow).sideHeight : null;
+  return { comps, boxType: 'A', fits, ox0, ox1, t, yBase, maxSide, clamped: !!comps.clamped };
 }
 
 // Ustawienia frontów - luzy jak w zwykłej szafce liczy core/layout.js; tu tylko

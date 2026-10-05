@@ -56,9 +56,10 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
           <option value="auto" ${!fr.el.slopeBlenda ? 'selected' : ''}>Auto (${TYPE_LABELS[fr.auto]})</option>
           <option value="blenda" ${fr.el.slopeBlenda ? 'selected' : ''}>Blenda (stała maskownica)</option>
         </select>
-        ${system && system.woodenBox && (fr.subtype || '').includes('szuflada') ? `
+        ${system && system.woodenBox && fr.type === 'szuflada' && fr.drawer ? `
         <div class="property-group mt-8"><label class="fs-xs">Wysokość boku szuflady [mm]:</label>
-          <input type="number" class="input-slope-side-height" data-front-id="${fr.el.id}" placeholder="Auto" value="${fr.el.drawerSideHeight || ''}" />
+          <input type="number" class="input-slope-side-height" data-front-id="${fr.el.id}" placeholder="Auto (maks. ${fr.drawer.maxSide})" value="${fr.el.drawerSideHeight || ''}" />
+          ${fr.drawer.clamped ? `<div class="notice-warn fs-xs">Wpisana wysokość się nie mieści — użyto ${fr.drawer.boxType === 'B' ? fr.drawer.box.sideHigh : fr.drawer.comps.sideHeight} mm.</div>` : ''}
         </div>` : ''}
         ${drawerInfo(fr)}
       </div>`).join('');

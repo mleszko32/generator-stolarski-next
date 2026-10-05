@@ -308,3 +308,30 @@ describe("szafka pod skos - skrzynki w edytorze Wnętrze 2D", () => {
     expect(r.y1 - r.y0).toBe(drawer.drawer.comps.sideHeight);
   });
 });
+
+describe("szafka pod skos - wysokość boku szuflady MOVENTO wpisana ręcznie", () => {
+  const fusion = (opts = {}) => slopeMod({ width: 2000, height: 1500, dividers: [646, 1314], shelves: [500, 1000], ...opts });
+  // Szuflada ze ściętym rogiem w środkowej kolumnie na dole (bok niski 438, wysoki 459).
+  const drawerAt = (m) => getSlopeFronts(m, cfg()).find((f) => f.el.x <= 1000 && 1000 <= f.el.x + f.el.w && f.el.y < 200);
+  const withSide = (m, h) => { drawerAt(m).el.drawerSideHeight = h; return drawerAt(m).drawer; };
+
+  it("skrzynka A: wpisana wysokość, podpowiedź maksimum, przycięcie gdy się nie mieści", () => {
+    const m = fusion();
+    expect(drawerAt(m).drawer).toMatchObject({ maxSide: 438, clamped: false });
+    expect(withSide(m, 300).comps.sideHeight).toBe(300);
+    const d = withSide(m, 600);
+    expect(d.comps.sideHeight).toBe(438);
+    expect(d.clamped).toBe(true);
+  });
+
+  it("skrzynka B: wpisana wysokość ogranicza oba boki; niższa od niskiego boku daje zwykłą skrzynkę", () => {
+    const m = fusion({ drawerBox: "B" });
+    const b = withSide(m, 450);
+    expect(b.boxType).toBe("B");
+    expect(b.box).toMatchObject({ sideLow: 438, sideHigh: 450 });
+    expect(b.clamped).toBe(false);
+    const a = withSide(m, 300);
+    expect(a.boxType).toBe("A");
+    expect(a.comps.sideHeight).toBe(300);
+  });
+});
