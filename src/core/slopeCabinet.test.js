@@ -356,20 +356,24 @@ describe("szafka pod skos - nawierty jak w zwykłej szafce", () => {
 
   it("bok wysoki: prowadnice dwóch szuflad i podpórki dwóch półek", () => {
     const fc = face(drill(), "Bok wysoki", "wewnętrzna");
-    expect(count(fc, "drawer")).toBe(6);
+    // NL 580 -> prowadnica 766H: wkręty 37, 69, 261, 293, 357 od frontu (karta katalogu Blum).
+    expect(count(fc, "drawer")).toBe(10);
     expect(count(fc, "shelf")).toBe(12);
-    // Prowadnice 37 / 69 / 261 od frontu, jak w zwykłej szafce.
-    expect([...new Set(fc.holes.filter((h) => h.type === "drawer").map((h) => h.x))].sort((a, b) => a - b)).toEqual([37, 69, 261]);
+    expect([...new Set(fc.holes.filter((h) => h.type === "drawer").map((h) => h.x))].sort((a, b) => a - b)).toEqual([37, 69, 261, 293, 357]);
+    // Wkręty 38 mm nad dnem wnęki (dolna szuflada: bok stoi na dnie -> 38 od dołu boku).
+    expect(Math.min(...fc.holes.filter((h) => h.type === "drawer").map((h) => h.y))).toBe(38);
+    // Szuflada na półce 500 (wierzch 518): wkręty 518 + 38 = 556 nad podłogą = 538 od dołu boku.
+    expect([...new Set(fc.holes.filter((h) => h.type === "drawer").map((h) => h.y))].sort((x, y) => x - y)).toEqual([38, 538]);
   });
 
   it("przegrody: każda strona wiercona pod to, co jest po jej stronie", () => {
     const d = drill();
     expect(count(face(d, "Przegroda 1", "lewa"), "drawer")).toBe(0);      // obok blenda
-    expect(count(face(d, "Przegroda 1", "prawa"), "drawer")).toBe(3);
+    expect(count(face(d, "Przegroda 1", "prawa"), "drawer")).toBe(5);
     expect(count(face(d, "Przegroda 1", "prawa"), "shelf")).toBe(0);      // półka nie sięga - skos
-    expect(count(face(d, "Przegroda 2", "lewa"), "drawer")).toBe(3);
+    expect(count(face(d, "Przegroda 2", "lewa"), "drawer")).toBe(5);
     expect(count(face(d, "Przegroda 2", "lewa"), "shelf")).toBe(6);
-    expect(count(face(d, "Przegroda 2", "prawa"), "drawer")).toBe(6);
+    expect(count(face(d, "Przegroda 2", "prawa"), "drawer")).toBe(10);
   });
 
   it("łączniki: dno pod bokiem i przegrodami, wkręty w skośnej płycie", () => {

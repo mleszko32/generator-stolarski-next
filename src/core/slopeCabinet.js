@@ -642,7 +642,7 @@ export function getSlopeDrillings(mod, config) {
     const el = fr.el, bz = el.baseZone || {};
     if (fr.type === 'szuflada') {
       const isBottomOuter = (parseFloat(bz.minY) || 0) <= th + 0.5;
-      const holes = calculateDrawerHoles(sys, el.y, el.h, th, el.frontIndex, el.frontIndex === 0 && isBottomOuter && !isInset);
+      const holes = calculateDrawerHoles(sys, el.y, el.h, th, el.frontIndex, el.frontIndex === 0 && isBottomOuter && !isInset, fr.drawer && fr.drawer.comps.nominalLength, (parseFloat(bz.minY) || 0) + (parseFloat(bz.offsetBottom) || 0));
       const shift = el.subtype === 'szuflada-wewnetrzna' ? parseFloat(el.innerFrontThickness ?? 18) + parseFloat(el.innerSetback ?? 2) : 0;
       [['R', parseFloat(bz.minX)], ['L', parseFloat(bz.maxX)]].forEach(([dir, x]) => {
         const fc = faceAt(x, dir);
@@ -653,10 +653,8 @@ export function getSlopeDrillings(mod, config) {
       const side = fr.subtype === 'drzwi-lp' ? (String(el.id).includes('-L-') ? 'left' : 'right') : (el.openingSide || 'left');
       const fc = side === 'left' ? faceAt(parseFloat(bz.minX), 'R') : faceAt(parseFloat(bz.maxX), 'L');
       if (!fc) { notes.push(`${frontName(fr)}: brak boku na zawiasy po stronie ${side === 'left' ? 'lewej' : 'prawej'}.`); return; }
-      calculateHinges(el, th, [], side).forEach((h) => {
-        put(fc, { x: 37, y: h.y - 16, type: 'hinge' });
-        put(fc, { x: 37, y: h.y + 16, type: 'hinge' });
-      });
+      // Puszka zawiasu: jeden wpis na oś, rysunek dokłada otwory ±16 mm (jak zwykły rysunek boku).
+      calculateHinges(el, th, [], side).forEach((h) => put(fc, { x: 37, y: h.y, type: 'hinge' }));
     }
   });
 
@@ -673,7 +671,7 @@ export function getSlopeDrillings(mod, config) {
           put(fc, { x: hx === 37 ? 69 : depth - 69, y: y + th / 2, type: 'dowel' });
         });
       } else {
-        [-32, 0, 32].forEach((dy) => [37, depth - 37].forEach((hx) => put(fc, { x: hx, y: y - SHELF_PIN_DROP + dy, type: 'shelf' })));
+        [-32, 0, 32].forEach((dy) => [37, depth - 37].forEach((hx) => put(fc, { x: hx, y: y - SHELF_PIN_DROP + dy, type: 'shelf', center: dy === 0 })));
       }
     });
   });

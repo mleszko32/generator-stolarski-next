@@ -153,8 +153,11 @@ export const drawerSystems = {
   // sprawdzenie wymiarów" - przy boku 18 mm odjąć 46 zamiast 42 (frezowanie boku
   // pod prowadnicę "wchodzi" w szerokość), wcięcie 12 mm. To porada z forum, nie
   // dane katalogowe.
-  // DO POTWIERDZENIA: luzy pionowe (bottomClearance/topClearance) i railOffset są
-  // z instrukcji US (korpus z ramką), w katalogu PL te liczby są tylko na rysunkach.
+  // Luzy pionowe i wiercenie prowadnic (sprawdzone z rysunkami Blum: instrukcja
+  // MOVENTO US 2019 str. 9 i karta katalogu EU 760H/766H): spód boku 16 mm nad dnem
+  // szafki (dno szuflady min. 28,5 mm), min. 7 mm nad szufladą; wkręty prowadnicy
+  // 38 mm nad dnem szafki (rząd otworów 38 mm od spodu prowadnicy), w poziomie
+  // 37 i 69 mm od frontu, a tylne zależnie od długości NL - moventoRunnerHoles niżej.
   'movento_katalog': {
     name: 'Blum MOVENTO (katalog, bok 16 mm)',
     woodenBox: true,
@@ -169,7 +172,7 @@ export const drawerSystems = {
     // NL dostępne w wersji 40 kg (760H); pozostałe tylko 60 kg (766H)
     nl760H: [250, 270, 300, 320, 350, 380, 400, 420, 450, 480, 500, 520, 550, 600],
     variants: {},
-    mounting: { railOffset: 9, frontHolesBase: 0, frontHolesXBase: 0 }
+    mounting: { railOffset: 38, frontHolesBase: 0, frontHolesXBase: 0 }
   },
   'movento_forum': {
     name: 'Blum MOVENTO (forum, bok 18 mm)',
@@ -184,9 +187,20 @@ export const drawerSystems = {
     nlSeries: [250, 270, 300, 320, 350, 380, 400, 420, 450, 480, 500, 520, 550, 580, 600, 650, 700, 750],
     nl760H: [250, 270, 300, 320, 350, 380, 400, 420, 450, 480, 500, 520, 550, 600],
     variants: {},
-    mounting: { railOffset: 9, frontHolesBase: 0, frontHolesXBase: 0 }
+    mounting: { railOffset: 38, frontHolesBase: 0, frontHolesXBase: 0 }
   }
 };
+
+// Otwory prowadnicy MOVENTO w boku szafki (mm od frontu) wg karty katalogu Blum
+// "Hole spacing - runners": 37 i 37+32, tylne mierzone od otworu 37 o 160 / 224 /
+// 256 (760H) albo 224 / 256 / 320 / 416 (766H) - zależnie od długości NL.
+export function moventoRunnerHoles(system, nl) {
+  const is760 = (system.nl760H || []).includes(nl);
+  const rear = is760
+    ? (nl <= 270 ? [160] : nl <= 350 ? [224] : [224, 256])
+    : (nl <= 450 ? [224, 256] : nl <= 600 ? [224, 256, 320] : [224, 256, 320, 416]);
+  return [37, 69, ...rear.map((d) => 37 + d)];
+}
 
 // Nazwa kompletu prowadnic MOVENTO dla listy okuć: 760H (40 kg), gdy ta długość
 // jest w tej wersji, inaczej 766H (60 kg). Para sprzęgieł T51.7601 na szufladę.

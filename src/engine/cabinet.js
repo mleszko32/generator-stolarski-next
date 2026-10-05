@@ -1,6 +1,6 @@
 // src/engine/cabinet.js
 import { state } from "../core/state.js";
-import { calculateDrawerHoles, getDrawerComponents, drawerComponentsToParts } from "../core/drawerMath.js";
+import { calculateDrawerHoles, getDrawerComponents, drawerComponentsToParts, calculateNominalLength } from "../core/drawerMath.js";
 import { drawerSystems } from "../core/drawerSystems.js";
 import { calculateHinges } from "../core/hingeMath.js";
 import { fmtMm } from "../utils/math.js";
@@ -388,6 +388,21 @@ function getFrontsAndDrawers(mod, config) {
           if (variantData) simulatedSpace = Math.min(variantData.height, availableSpace);
       }
 
+      // Głębokość dla doboru długości prowadnicy (NL) - wspólna dla nawiertów
+      // (MOVENTO: tylne otwory zależą od NL) i dla formatek szuflady niżej.
+      let availableDepth = topBottomDepth;
+      if (front.subtype === 'szuflada-wewnetrzna') {
+          availableDepth -= (innerThick + innerSetback);
+      } else if (isInset) {
+          // Front wpuszczany wjeżdża w głąb korpusu o swoją grubość (patrz też
+          // getInteriorParts() wyżej) — o tyle mniej miejsca zostaje na prowadnice i dno szuflady.
+          availableDepth -= board;
+      }
+      if (front.forceNL && !isNaN(parseFloat(front.forceNL))) {
+          availableDepth = parseFloat(front.forceNL) + 10;
+      }
+      const drawerNL = calculateNominalLength(availableDepth, sysName);
+
       if (typeof calculateDrawerHoles === 'function') {
         // NAPRAWA: korekta "dolnego frontu" w calculateDrawerHoles (core/drawerMath.js)
         // zakłada, że front na dole stosu ZJEŻDŻA na wieniec dolny (styl nakładany) -
@@ -399,7 +414,8 @@ function getFrontsAndDrawers(mod, config) {
         // poleganie tylko na nim wyłączyłoby korektę też dla zwykłych, nakładanych
         // frontów w tych projektach.
         const isBottomOuter = front.baseZone && parseFloat(front.baseZone.minY) <= board + 0.5;
-        const drawerHoles = calculateDrawerHoles(sysName, front.y, simulatedSpace, board, front.frontIndex, isBottomInZone && isBottomOuter && !isInset);
+        const zoneBottom = front.baseZone ? (parseFloat(front.baseZone.minY) || 0) + (parseFloat(front.baseZone.offsetBottom) || 0) : null;
+        const drawerHoles = calculateDrawerHoles(sysName, front.y, simulatedSpace, board, front.frontIndex, isBottomInZone && isBottomOuter && !isInset, drawerNL, zoneBottom);
         if (drawerHoles) { 
           const adjustedHoles = JSON.parse(JSON.stringify(drawerHoles));
           
@@ -431,19 +447,6 @@ function getFrontsAndDrawers(mod, config) {
       }
 
       if (typeof getDrawerComponents === 'function') {
-        let availableDepth = topBottomDepth;
-        if (front.subtype === 'szuflada-wewnetrzna') {
-            availableDepth -= (innerThick + innerSetback);
-        } else if (isInset) {
-            // Front wpuszczany wjeżdża w głąb korpusu o swoją grubość (patrz też
-            // getInteriorParts() wyżej) — o tyle mniej miejsca zostaje na prowadnice i dno szuflady.
-            availableDepth -= board;
-        }
-
-        if (front.forceNL && !isNaN(parseFloat(front.forceNL))) {
-            availableDepth = parseFloat(front.forceNL) + 10;
-        }
-
         const userForcedVariant = front.forceVariant || 'auto';
         // Uwaga: tu celowo pełne availableSpace, nie simulatedSpace (przycięte do
         // wysokości wymuszonego wariantu) — getDrawerComponents/getDrawerVariant

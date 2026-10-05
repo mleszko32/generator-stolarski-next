@@ -1,5 +1,5 @@
 // src/core/drawerMath.js
-import { drawerSystems, moventoRunnerName } from './drawerSystems.js';
+import { drawerSystems, moventoRunnerName, moventoRunnerHoles } from './drawerSystems.js';
 import { state } from './state.js';
 
 // Domyślna, "Blumowa" seria NL — używana gdy system nie podaje własnej
@@ -139,7 +139,9 @@ export function getDrawerComponents(systemId, internalWidth, internalDepth, avai
   };
 }
 
-export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick, index, isBottom) {
+// nl - długość nominalna prowadnicy; dla MOVENTO decyduje o tylnych otworach.
+// zoneBottom - spód wnęki (wierzch wieńca albo półki, na której stoi szuflada).
+export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick, index, isBottom, nl = null, zoneBottom = null) {
   const config = state.project;
   const bottomGap = Number(config.front.clearance.bottom ?? 0);
   
@@ -153,7 +155,12 @@ export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick
   const systemParams = systemEntry.mounting;
 
   let slideY;
-  if (isBottom) {
+  if (systemEntry.woodenBox && index === 0 && zoneBottom !== null && Number.isFinite(zoneBottom)) {
+    // MOVENTO: prowadnica leży na wieńcu albo półce pod szufladą, wkręty 38 mm nad
+    // nią (karta Blum). Dolna krawędź frontu zachodzi na pół półki, więc liczenie
+    // od niej dawało otwory za nisko przy szufladach stojących na półce.
+    slideY = zoneBottom + systemParams.railOffset;
+  } else if (isBottom) {
     // NAPRAWA BŁĘDU: Dodano currentY! Wcześniej szuflada lądowała na 0.
     slideY = currentY + boardThick + systemParams.railOffset;
   } else {
@@ -187,11 +194,7 @@ export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick
   }
 
   return {
-    slideSideHoles: [
-      { x: 37, y: slideY },
-      { x: 69, y: slideY },
-      { x: 261, y: slideY }
-    ],
+    slideSideHoles: (systemEntry.woodenBox && nl ? moventoRunnerHoles(systemEntry, nl) : [37, 69, 261]).map((x) => ({ x, y: slideY })),
     frontHoles: frontHoles
   };
 }

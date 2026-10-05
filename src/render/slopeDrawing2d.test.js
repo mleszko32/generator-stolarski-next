@@ -29,8 +29,13 @@ describe("rysunki nawiertów szafki pod skos", () => {
       { x: 37, y: 55, type: "drawer" }, { x: 69, y: 55, type: "drawer" }, { x: 261, y: 55, type: "drawer" },
       { x: 37, y: 497.5, type: "shelf" },
     ] });
-    expect(svg).toContain("Bok wysoki — strona wewnętrzna");
-    expect(svg).toContain("55 od dołu");
+    expect(svg).toContain("BOK WYSOKI — STRONA WEWNĘTRZNA");
+    // Opis wysokości jak na rysunku boku zwykłej szafki: bliższa krawędź + druga w nawiasie.
+    expect(svg).toContain(">55</tspan>");
+    expect(svg).toContain("DÓŁ");
+    expect(svg).toContain("(1045 GÓRA)");
+    // Otwory w prawdziwej średnicy (prowadnica fi 5 -> r 2.5).
+    expect(svg).toContain('r="2.5"');
     expect(svg).toContain("prowadnica szuflady");
     expect(svg).toContain("podpórka półki");
     expect((svg.match(/<circle/g) || []).length).toBeGreaterThanOrEqual(4);
@@ -41,7 +46,7 @@ describe("rysunki nawiertów szafki pod skos", () => {
     const svg = slopePlanSVG({ name: "Dno (wieniec dolny)", length: 2000, width: 597, fromLabel: "od lewej krawędzi", holes: [
       { x: 1991, z: 37, type: "screw" }, { x: 1991, z: 69, type: "dowel" },
     ] });
-    expect(svg).toContain("Dno (wieniec dolny) — łączniki");
+    expect(svg).toContain("DNO (WIENIEC DOLNY) (WIDOK Z GÓRY)");
     expect(svg).toContain("1991");
     expect(svg).toContain("konfirmat");
     expect(svg).toContain("kołek");

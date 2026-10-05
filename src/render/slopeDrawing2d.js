@@ -7,6 +7,7 @@
 // Samodzielne SVG (osobne okno, druk) - kolory i font z drawingPalette.js.
 import { C, FONT } from './drawingPalette.js';
 import { escapeHtml } from '../utils/dom.js';
+import { getDimText } from './viewer2d.js';
 
 const r1 = (v) => Math.round(v * 10) / 10;
 const fmt = (v) => String(r1(v)).replace('.', ',');
@@ -112,93 +113,137 @@ export function slopeShapeSVG(shape) {
 }
 
 // ---------------------------------------------------------------------------
-// Nawierty szafki pod skos (dane: core/slopeCabinet.js: getSlopeDrillings).
-// Kolory jak na rysunku boku zwykłej szafki (render/viewer2d.js).
+// Nawierty szafki pod skos (dane: core/slopeCabinet.js: getSlopeDrillings) -
+// rysowane tak samo jak bok zwykłej szafki (render/viewer2d.js: drawSideDetails):
+// skala 1 jednostka = 1 mm, otwory w prawdziwej średnicy, wysokości opisane
+// w kolumnach obok płyty (getDimText: bliższa krawędź + druga w nawiasie, [Rc]),
+// rozstaw półek oś-oś; rzuty dna i skosu jak rzut wieńca z łącznikami.
 // ---------------------------------------------------------------------------
 
-const HOLE_STYLE = {
-  drawer: { color: C.sky600, r: 3.5, label: 'prowadnica szuflady' },
-  shelf: { color: C.orange600, r: 3, label: 'podpórka półki' },
-  screw: { color: C.purple600, r: 2.5, label: 'konfirmat' },
-  dowel: { color: C.purple600, r: 5, label: 'kołek' },
-  hinge: { color: C.green600, r: 3.5, label: 'puszka zawiasu (osie mocowania)' },
+const HOLE = {
+  drawer: { color: C.sky600, r: 2.5, label: 'prowadnica szuflady' },
+  shelf: { color: C.orange600, r: 2.5, label: 'podpórka półki' },
+  screw: { color: C.purple600, r: 1.5, label: 'konfirmat' },
+  dowel: { color: C.purple600, r: 4, label: 'kołek' },
+  hinge: { color: C.green600, r: 2.5, label: 'zawias' },
 };
 
-function legendFor(holes, y, W) {
-  const kinds = [...new Set(holes.map((h) => h.type))];
-  let x = 20, svg = '';
-  kinds.forEach((k) => {
-    const st = HOLE_STYLE[k];
-    svg += `<circle cx="${x + 5}" cy="${y - 4}" r="${Math.min(st.r, 5)}" fill="${st.color}"/>`;
-    svg += text(x + 14, y, st.label, { anchor: 'start', size: 11, color: C.slate600 });
-    x += 30 + st.label.length * 6;
-    if (x > W - 120) x = 20;
+const svgWrap = (minX, minY, w, h, body) =>
+  `<svg viewBox="${r1(minX)} ${r1(minY)} ${r1(w)} ${r1(h)}" xmlns="http://www.w3.org/2000/svg" font-family="${FONT}" style="width:100%;height:auto;max-width:760px">`
+  + `<rect x="${r1(minX)}" y="${r1(minY)}" width="${r1(w)}" height="${r1(h)}" fill="${C.white}"/>${body}</svg>`;
+
+function legendSvg(types, x, y) {
+  let out = '';
+  [...new Set(types)].forEach((t) => {
+    const st = HOLE[t];
+    out += `<circle cx="${x + 4}" cy="${y - 4}" r="${Math.max(st.r, 2.5)}" fill="${st.color}"/>`;
+    out += `<text x="${x + 12}" y="${y}" font-size="11" fill="${C.slate600}">${st.label}</text>`;
+    x += 22 + st.label.length * 6.5;
   });
-  return svg;
+  return out;
 }
 
-// Ściana płyty pionowej: front po lewej, dół płyty na dole. Pod rysunkiem
-// wysokości otworów od dołu płyty, nad nim odległości od frontu.
+// Ściana płyty pionowej, front po lewej (jak "BOK LEWY" zwykłej szafki).
 export function slopeFaceSVG(face) {
-  const W = 760, padL = 50, padT = 95;
-  const s = Math.min((W - padL - 230) / face.width, 380 / Math.max(face.height, 1));
-  const w = face.width * s, h = face.height * s;
-  const H = padT + h + 60;
-  const X = (x) => padL + x * s, Y = (y) => padT + h - y * s;
-  let svg = `<svg viewBox="0 0 ${W} ${r1(H)}" xmlns="http://www.w3.org/2000/svg" style="max-width:${W}px">`;
-  svg += `<rect width="${W}" height="${r1(H)}" fill="${C.white}"/>`;
-  svg += text(20, 22, `${face.name} — strona ${face.side}`, { anchor: 'start', size: 14, weight: 'bold', color: C.slate900 });
-  svg += text(20, 40, `Ściana ${fmt(face.width)} × ${fmt(face.height)} mm (głęb. × wys.), widok na tę stronę, front po lewej`, { anchor: 'start', size: 12, color: C.slate600 });
-  svg += `<rect x="${padL}" y="${padT}" width="${r1(w)}" height="${r1(h)}" fill="${C.slate50}" stroke="${C.slate800}" stroke-width="1.5"/>`;
-  svg += text(padL + 4, padT + h - 6, 'PRZÓD', { anchor: 'start', size: 10, color: C.slate400, weight: 'bold' });
-  svg += text(padL + w - 4, padT + h - 6, 'TYŁ', { anchor: 'end', size: 10, color: C.slate400, weight: 'bold' });
-  face.holes.forEach((hl) => {
-    const st = HOLE_STYLE[hl.type];
-    svg += `<circle cx="${r1(X(hl.x))}" cy="${r1(Y(hl.y))}" r="${st.r}" fill="${st.color}"/>`;
+  const D = face.width, H = face.height;
+  const sy = (y) => H - y;                     // y od dołu płyty -> współrzędna SVG
+  let body = '';
+  body += `<text x="${D / 2}" y="-34" font-size="16" fill="${C.blue900}" font-weight="bold" text-anchor="middle">${escapeHtml(`${face.name} — strona ${face.side}`.toUpperCase())} <tspan font-size="11" fill="${C.slate500}" font-weight="normal">${fmt(D)} × ${fmt(H)} mm</tspan></text>`;
+  body += `<rect x="0" y="0" width="${D}" height="${r1(H)}" fill="${C.white}" stroke="${C.slate600}" stroke-width="1.5"/>`;
+  [[15, 'PRZÓD'], [D - 15, 'TYŁ']].forEach(([x, t]) => {
+    body += `<text x="${x}" y="${r1(H / 2)}" font-size="11" fill="${C.slate400}" font-weight="bold" transform="rotate(-90, ${x}, ${r1(H / 2)})" text-anchor="middle" letter-spacing="1">${t}</text>`;
   });
-  // Wysokości od dołu płyty - kolumna z prawej, w kolorze otworu.
-  const ys = [...new Map(face.holes.map((hl) => [`${hl.type}|${r1(hl.y)}`, hl])).values()].sort((a, b) => b.y - a.y);
-  let lastY = -Infinity;
-  ys.forEach((hl) => {
-    const st = HOLE_STYLE[hl.type];
-    let ty = Y(hl.y) + 4;
-    if (ty - lastY < 12) ty = lastY + 12;
-    lastY = ty;
-    svg += line(padL + w, Y(hl.y), padL + w + 30, ty - 4, st.color, 'stroke-dasharray="2,2"');
-    svg += text(padL + w + 34, ty, `${fmt(hl.y)} od dołu`, { anchor: 'start', size: 11, color: st.color });
+
+  // Otwory
+  face.holes.forEach((h) => {
+    const st = HOLE[h.type];
+    if (h.type === 'hinge') {
+      [-16, 16].forEach((dy) => { body += `<circle cx="${r1(h.x)}" cy="${r1(sy(h.y + dy))}" r="${st.r}" fill="${st.color}"/>`; });
+      body += `<text x="${r1(h.x + 8)}" y="${r1(sy(h.y) + 4)}" text-anchor="start">${getDimText(h.y, H, st.color)}</text>`;
+      return;
+    }
+    body += `<circle cx="${r1(h.x)}" cy="${r1(sy(h.y))}" r="${st.r}" fill="${st.color}"/>`;
   });
-  // Odległości od frontu - nad rysunkiem.
-  const xs = [...new Set(face.holes.map((hl) => r1(hl.x)))].sort((a, b) => a - b);
-  xs.forEach((x, i) => svg += text(X(x), padT - 8 - (i % 2) * 12, fmt(x), { size: 10, color: C.slate600 }));
-  if (xs.length) svg += text(padL, padT - 34, 'od frontu:', { anchor: 'start', size: 10, color: C.slate500 });
-  svg += legendFor(face.holes, H - 16, W);
-  svg += `</svg>`;
-  return svg;
+
+  // Kolumny opisów: prowadnice i łączniki z prawej, podpórki półek z lewej -
+  // jak przy boku skrajnym zwykłej szafki.
+  const uniq = (arr) => [...new Set(arr.map((v) => r1(v)))].sort((a, b) => a - b);
+  const drawerYs = uniq(face.holes.filter((h) => h.type === 'drawer').map((h) => h.y));
+  const corpusYs = uniq(face.holes.filter((h) => h.type === 'screw').map((h) => h.y));
+  const shelfAll = face.holes.filter((h) => h.type === 'shelf');
+  const shelfCenters = uniq(shelfAll.filter((h) => h.center).map((h) => h.y));
+  const right = { edgeX: D, x: D + 40, anchor: 'start', off: 8 };
+  const left = { edgeX: 0, x: -40, anchor: 'end', off: -8 };
+  const writeCol = (c, ys, color, rc, opacityFor = () => 1) => {
+    ys.forEach((y) => {
+      body += `<line x1="${c.edgeX}" y1="${r1(sy(y))}" x2="${c.x}" y2="${r1(sy(y))}" stroke="${color}" stroke-width="0.5" stroke-dasharray="2,2"/>`;
+      body += `<text x="${c.x + c.off}" y="${r1(sy(y) + 4)}" font-size="12" text-anchor="${c.anchor}" opacity="${opacityFor(y)}">${getDimText(y, H, color, rc)}</text>`;
+    });
+  };
+  let rightCols = 0;
+  if (drawerYs.length) { writeCol(right, drawerYs, C.sky600, false); right.x += 120; rightCols++; }
+  if (corpusYs.length) { writeCol(right, corpusYs, C.purple600, true); right.x += 120; rightCols++; }
+  if (shelfCenters.length) {
+    const all = uniq(shelfAll.map((h) => h.y));
+    writeCol(left, all, C.orange600, true, (y) => (shelfCenters.includes(y) ? 1 : 0.6));
+    // Rozstaw półek oś-oś przy krawędzi płyty.
+    for (let i = 0; i < shelfCenters.length - 1; i++) {
+      const yA = sy(shelfCenters[i]), yB = sy(shelfCenters[i + 1]), px = -26;
+      body += `<line x1="${px}" y1="${r1(yA)}" x2="${px}" y2="${r1(yB)}" stroke="${C.orange700}" stroke-width="1"/>`;
+      [yA, yB].forEach((yy) => { body += `<line x1="${px - 4}" y1="${r1(yy)}" x2="${px + 4}" y2="${r1(yy)}" stroke="${C.orange700}" stroke-width="1.4"/>`; });
+      const ty = (yA + yB) / 2;
+      body += `<text x="${px - 6}" y="${r1(ty)}" font-size="12" fill="${C.orange700}" text-anchor="middle" transform="rotate(-90 ${px - 6} ${r1(ty)})">${fmt(shelfCenters[i + 1] - shelfCenters[i])}<tspan font-size="9" fill="${C.orange800}"> oś-oś</tspan></text>`;
+    }
+  }
+  // Odległości od frontu nad płytą.
+  uniq(face.holes.map((h) => h.x)).forEach((x, i) => {
+    body += `<text x="${x}" y="${-6 - (i % 2) * 11}" font-size="9" fill="${C.slate500}" text-anchor="middle">${fmt(x)}</text>`;
+  });
+  body += legendSvg(face.holes.map((h) => h.type), 0, H + 26);
+
+  const minX = shelfCenters.length ? -250 : -20;
+  const maxX = D + 40 + Math.max(rightCols, 1) * 120 + 80;
+  return svgWrap(minX, -62, maxX - minX, H + 100, body);
 }
 
-// Rzut płyty poziomej / skośnej z łącznikami: długość w poziomie, front na dole.
+// Rzut płyty poziomej / skośnej z łącznikami - jak rzut wieńca zwykłej szafki
+// (render/viewer2d.js: drawPionMountViews): przód u góry, wymiary pozycji pod spodem.
 export function slopePlanSVG(plan) {
-  const W = 760, padL = 40, padT = 70;
-  const s = Math.min((W - padL - 120) / plan.length, 220 / plan.width);
-  const w = plan.length * s, h = plan.width * s;
-  const H = padT + h + 70;
-  const X = (x) => padL + x * s, Y = (z) => padT + h - z * s;
-  let svg = `<svg viewBox="0 0 ${W} ${r1(H)}" xmlns="http://www.w3.org/2000/svg" style="max-width:${W}px">`;
-  svg += `<rect width="${W}" height="${r1(H)}" fill="${C.white}"/>`;
-  svg += text(20, 22, `${plan.name} — łączniki`, { anchor: 'start', size: 14, weight: 'bold', color: C.slate900 });
-  svg += text(20, 40, `Płyta ${fmt(plan.length)} × ${fmt(plan.width)} mm, widok z góry, front na dole; pozycje ${plan.fromLabel}`, { anchor: 'start', size: 12, color: C.slate600 });
-  svg += `<rect x="${padL}" y="${padT}" width="${r1(w)}" height="${r1(h)}" fill="${C.slate50}" stroke="${C.slate800}" stroke-width="1.5"/>`;
-  svg += text(padL + w / 2, padT + h + 14, 'PRZÓD', { size: 10, color: C.slate400, weight: 'bold' });
-  plan.holes.forEach((hl) => {
-    const st = HOLE_STYLE[hl.type];
-    svg += `<circle cx="${r1(X(hl.x))}" cy="${r1(Y(hl.z))}" r="${st.r}" fill="${st.color}"/>`;
+  const L = plan.length, D = plan.width;
+  const color = C.purple600;
+  // Długie płyty (dno, skos ~2 m) - napisy i znaczniki powiększone proporcjonalnie,
+  // żeby po zmieszczeniu rysunku na kartce były czytelne jak rzut wieńca ~600 mm.
+  const k = Math.max(1, L / 700);
+  const f = (n) => r1(n * k);
+  let body = '';
+  body += `<text x="${r1(L / 2)}" y="${f(-40)}" font-size="${f(16)}" fill="${C.blue900}" font-weight="bold" text-anchor="middle">${escapeHtml(plan.name.toUpperCase())} (WIDOK Z GÓRY) — ${fmt(L)} × ${fmt(D)} mm</text>`;
+  body += `<rect x="0" y="0" width="${r1(L)}" height="${D}" fill="${C.white}" stroke="${C.slate600}" stroke-width="${f(1.5)}"/>`;
+  body += `<text x="${r1(L / 2)}" y="${f(-10)}" font-size="${f(11)}" fill="${C.slate400}" font-weight="bold" text-anchor="middle" letter-spacing="1">PRZÓD</text>`;
+  body += `<text x="${r1(L / 2)}" y="${r1(D + 20 * k)}" font-size="${f(11)}" fill="${C.slate400}" font-weight="bold" text-anchor="middle" letter-spacing="1">TYŁ</text>`;
+  const xs = new Set();
+  plan.holes.forEach((h) => {
+    body += `<circle cx="${r1(h.x)}" cy="${r1(h.z)}" r="${f(HOLE[h.type].r)}" fill="${color}"/>`;
+    if (h.type === 'screw') xs.add(r1(h.x));
   });
-  const xs = [...new Set(plan.holes.map((hl) => r1(hl.x)))].sort((a, b) => a - b);
-  xs.forEach((x, i) => svg += text(X(x), padT - 8 - (i % 2) * 12, fmt(x), { size: 10, color: C.purple600 }));
-  const zs = [...new Set(plan.holes.map((hl) => r1(hl.z)))].sort((a, b) => a - b);
-  zs.forEach((z) => svg += text(padL + w + 6, Y(z) + 4, `${fmt(z)} od frontu`, { anchor: 'start', size: 10, color: C.purple600 }));
-  if (!plan.holes.length) svg += text(padL + w / 2, padT + h / 2, 'brak łączników', { size: 12, color: C.slate500 });
-  svg += legendFor(plan.holes, H - 16, W);
-  svg += `</svg>`;
-  return svg;
+  const sorted = [...xs].sort((a, b) => a - b);
+  sorted.forEach((x, i) => {
+    const base = r1(D + (32 + i * 16) * k);
+    body += `<line x1="${x}" y1="${D}" x2="${x}" y2="${base}" stroke="${color}" stroke-width="${f(0.75)}" stroke-dasharray="${f(2)},${f(2)}"/>`;
+    body += `<line x1="0" y1="${base}" x2="${x}" y2="${base}" stroke="${color}" stroke-width="${f(0.5)}"/>`;
+    body += `<circle cx="0" cy="${base}" r="${f(2)}" fill="${color}"/>`;
+    // Przy prawym końcu płyty napis po lewej stronie linii, żeby nie wychodził poza rysunek.
+    const nearEnd = x > L * 0.6;
+    body += `<text x="${r1(nearEnd ? x - 4 * k : x + 4 * k)}" y="${r1(base + 12 * k)}" font-size="${f(10)}" fill="${color}" font-weight="bold" text-anchor="${nearEnd ? 'end' : 'start'}">${fmt(x)} mm ${escapeHtml(plan.fromLabel)}</text>`;
+  });
+  if (!plan.holes.length) body += `<text x="${r1(L / 2)}" y="${D / 2}" font-size="${f(14)}" fill="${C.slate500}" text-anchor="middle">brak łączników</text>`;
+  // Legenda (powiększona jak reszta opisów).
+  let lx = 0;
+  const ly = r1(D + (50 + sorted.length * 16) * k);
+  [...new Set(plan.holes.map((h) => h.type))].forEach((t) => {
+    const st = HOLE[t];
+    body += `<circle cx="${r1(lx + 4 * k)}" cy="${r1(ly - 4 * k)}" r="${f(Math.max(st.r, 2.5))}" fill="${st.color}"/>`;
+    body += `<text x="${r1(lx + 12 * k)}" y="${ly}" font-size="${f(11)}" fill="${C.slate600}">${st.label}</text>`;
+    lx += (22 + st.label.length * 6.5) * k;
+  });
+  return svgWrap(-20 * k, -62 * k, L + 220 * k, D + (130 + sorted.length * 16) * k, body);
 }

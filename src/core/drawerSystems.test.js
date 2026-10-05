@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { drawerSystems, moventoRunnerName } from "./drawerSystems.js";
+import { drawerSystems, moventoRunnerName, moventoRunnerHoles } from "./drawerSystems.js";
 
 // Katalog systemów szuflad to jedyne źródło tych danych. Ten test pilnuje
 // kompletności wpisów — regresja "brakującego tandemboxa" (system był do
@@ -108,5 +108,20 @@ describe("MOVENTO - katalog i forum", () => {
   it("nazwa prowadnic: 760H gdy NL jest w wersji 40 kg, inaczej 766H", () => {
     expect(moventoRunnerName(drawerSystems.movento_katalog, 500)).toContain("760H (40 kg) NL-500");
     expect(moventoRunnerName(drawerSystems.movento_katalog, 650)).toContain("766H (60 kg) NL-650");
+  });
+});
+
+describe("MOVENTO - wiercenie prowadnic wg katalogu Blum", () => {
+  const kat = drawerSystems.movento_katalog;
+  it("wkręty 38 mm nad dnem szafki", () => {
+    expect(kat.mounting.railOffset).toBe(38);
+    expect(drawerSystems.movento_forum.mounting.railOffset).toBe(38);
+  });
+  it("otwory od frontu zależne od długości NL (760H i 766H)", () => {
+    expect(moventoRunnerHoles(kat, 270)).toEqual([37, 69, 197]);
+    expect(moventoRunnerHoles(kat, 350)).toEqual([37, 69, 261]);
+    expect(moventoRunnerHoles(kat, 500)).toEqual([37, 69, 261, 293]);
+    expect(moventoRunnerHoles(kat, 580)).toEqual([37, 69, 261, 293, 357]);
+    expect(moventoRunnerHoles(kat, 700)).toEqual([37, 69, 261, 293, 357, 453]);
   });
 });

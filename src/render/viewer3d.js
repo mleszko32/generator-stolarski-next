@@ -1331,7 +1331,6 @@ export function update3D() {
                           // geometrię (baseZone.minY ~ th), nie tag "boundBottom" - starsze
                           // projekty (import AI) budują baseZone bez tego taga wcale.
                           const isBottomOuter = el.baseZone && parseFloat(el.baseZone.minY) <= th + 0.5;
-                          const dHoles = calculateDrawerHoles(sysName, el.y, simulatedSpace, th, el.frontIndex, isBottomInZone && isBottomOuter && !isInsetFront);
                           
                           // NAPRAWA: el.w to szerokość FRONTU (kurczy się dla wpuszczanego,
                           // patrz core/layout.js - front wpuszczany nie "zjeżdża" na boki o
@@ -1360,6 +1359,8 @@ export function update3D() {
                           // Pełne availableSpace, nie simulatedSpace — patrz analogiczny komentarz
                           // w engine/cabinet.js (getFrontsAndDrawers).
                           const drawerComps = getDrawerComponents(sysName, innerWidth, availableDepth, availableSpace, el.forceVariant || 'auto', el.drawerSideHeight);
+                          // NL z doboru szuflady - MOVENTO ma tylne otwory prowadnicy zależne od długości.
+                          const dHoles = calculateDrawerHoles(sysName, el.y, simulatedSpace, th, el.frontIndex, isBottomInZone && isBottomOuter && !isInsetFront, drawerComps ? drawerComps.nominalLength : null, el.baseZone ? (parseFloat(el.baseZone.minY) || 0) + (parseFloat(el.baseZone.offsetBottom) || 0) : null);
 
                           if (drawerComps && drawerComps.woodenBox) {
                               // MOVENTO: skrzynka z płyty (core/drawerMath.js) - boki na całą

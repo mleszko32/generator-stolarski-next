@@ -137,3 +137,24 @@ describe("calculateDrawerHoles", () => {
     expect(calculateDrawerHoles("merivobox", 0, 200, 18, 0, false).frontHoles).toHaveLength(3);
   });
 });
+
+describe("calculateDrawerHoles - MOVENTO", () => {
+  beforeEach(() => setProject(freshProject()));
+  it("dolna szuflada: wkręty 38 mm nad wieńcem, rozstaw wg NL", () => {
+    const h = calculateDrawerHoles("movento_katalog", 0, 300, 18, 0, true, 500);
+    expect(h.slideSideHoles.map((x) => x.x)).toEqual([37, 69, 261, 293]);
+    expect(h.slideSideHoles[0].y).toBe(18 + 38);
+  });
+  it("systemy metalowe bez zmian: 37 / 69 / 261", () => {
+    expect(calculateDrawerHoles("merivobox", 0, 300, 18, 0, true, 500).slideSideHoles.map((x) => x.x)).toEqual([37, 69, 261]);
+  });
+});
+
+describe("calculateDrawerHoles - MOVENTO na półce", () => {
+  beforeEach(() => setProject(freshProject()));
+  it("wkręty 38 mm nad wierzchem półki, nie nad dolną krawędzią frontu", () => {
+    // front zaczyna się 7,5 mm niżej niż wierzch półki (zachodzi na pół półki)
+    const h = calculateDrawerHoles("movento_katalog", 510.5, 300, 18, 0, false, 500, 518);
+    expect(h.slideSideHoles[0].y).toBe(556);
+  });
+});
