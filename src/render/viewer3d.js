@@ -1352,9 +1352,27 @@ export function update3D() {
 
                           // Pełne availableSpace, nie simulatedSpace — patrz analogiczny komentarz
                           // w engine/cabinet.js (getFrontsAndDrawers).
-                          const drawerComps = getDrawerComponents(sysName, innerWidth, availableDepth, availableSpace, el.forceVariant || 'auto');
+                          const drawerComps = getDrawerComponents(sysName, innerWidth, availableDepth, availableSpace, el.forceVariant || 'auto', el.drawerSideHeight);
 
-                          if (drawerComps) {
+                          if (drawerComps && drawerComps.woodenBox) {
+                              // MOVENTO: skrzynka z płyty (core/drawerMath.js) - boki na całą
+                              // długość SKL, dno między bokami podniesione o wcięcie, tył i czoło
+                              // wewnętrzne na dnie. Spód boków luz nad dołem wnęki.
+                              const t = drawerComps.sideThickness;
+                              const dw = drawerComps.bottom.width;
+                              const L = drawerComps.sides.length;
+                              const sH = drawerComps.sideHeight;
+                              const bH = drawerComps.back.height;
+                              const dX = posX + th + (innerWidth - dw) / 2;
+                              const dY = posY + el.y + (isBottomInZone && isBottomOuter && !isInsetFront ? th : 0) + drawerComps.bottomClearance;
+                              const bY = dY + drawerComps.bottomRecess;
+                              const boxStartZ = zForFront - L;
+                              addBox(t, sH, L, dX - t, dY, boxStartZ, 'drawerBox', isActive, udElement, innerGroup);
+                              addBox(t, sH, L, dX + dw, dY, boxStartZ, 'drawerBox', isActive, udElement, innerGroup);
+                              addBox(dw, t, L, dX, bY, boxStartZ, 'drawerBox', isActive, udElement, innerGroup);
+                              addBox(dw, bH, t, dX, bY + t, boxStartZ, 'drawerBox', isActive, udElement, innerGroup);
+                              addBox(dw, bH, t, dX, bY + t, zForFront - t, 'drawerBox', isActive, udElement, innerGroup);
+                          } else if (drawerComps) {
                               const NL = drawerComps.nominalLength;
                               const dw = drawerComps.bottom.width;
                               const dh = drawerComps.back.height;

@@ -7,6 +7,7 @@ import { calculateHinges } from "../core/hingeMath.js";
 import { getTraverseConfig, clampModuleToRoom, restModuleOnNeighbors } from "../core/layout.js";
 import { drawerSystems, DRAWER_VARIANT_ORDER, DRAWER_VARIANT_LABELS } from "../core/drawerSystems.js";
 import { getDrawerVariant } from "../core/drawerMath.js";
+import { getDrawerBoxInfo } from "../core/drawerBoxes.js";
 import { escapeHtml } from "../utils/dom.js";
 import { evalDimensionExpr, fmtMm } from "../utils/math.js";
 import { scheduleCheckpoint } from "../core/history.js";
@@ -174,6 +175,7 @@ export function initPropertiesPanel() {
   // też w panelu właściwości.
   const drawerSysName = (f.drawerSystem || 'merivobox').toLowerCase();
   const drawerSysVariants = (drawerSystems[drawerSysName] || drawerSystems.merivobox).variants;
+  const drawerSysIsWooden = !!(drawerSystems[drawerSysName] && drawerSystems[drawerSysName].woodenBox);
   const drawerFrontsList = (activeModule.elements || [])
       .filter(el => el.typ === 'front' && el.subtype && el.subtype.includes('szuflada'))
       .sort((a, b) => (parseFloat(a.y) || 0) - (parseFloat(b.y) || 0))
@@ -322,7 +324,7 @@ export function initPropertiesPanel() {
 
     ${tabContent("szuflady", `
       <h3>Ustawienia Szuflad</h3>
-      <div class="property-group"><label>System szuflad:</label><select id="input-drawer-system"><option value="merivobox" ${f.drawerSystem === 'merivobox' ? 'selected' : ''}>Blum Merivobox</option><option value="legrabox" ${f.drawerSystem === 'legrabox' ? 'selected' : ''}>Blum Legrabox</option><option value="tandembox" ${f.drawerSystem === 'tandembox' ? 'selected' : ''}>Blum TANDEMBOX</option><option value="antaro" ${f.drawerSystem === 'antaro' ? 'selected' : ''}>Blum TANDEMBOX antaro</option><option value="gtv_axis_16" ${f.drawerSystem === 'gtv_axis_16' ? 'selected' : ''}>GTV Axis Pro (płyta 16mm)</option><option value="gtv_axis_18" ${f.drawerSystem === 'gtv_axis_18' ? 'selected' : ''}>GTV Axis Pro (płyta 18mm)</option></select></div>
+      <div class="property-group"><label>System szuflad:</label><select id="input-drawer-system"><option value="merivobox" ${f.drawerSystem === 'merivobox' ? 'selected' : ''}>Blum Merivobox</option><option value="legrabox" ${f.drawerSystem === 'legrabox' ? 'selected' : ''}>Blum Legrabox</option><option value="tandembox" ${f.drawerSystem === 'tandembox' ? 'selected' : ''}>Blum TANDEMBOX</option><option value="antaro" ${f.drawerSystem === 'antaro' ? 'selected' : ''}>Blum TANDEMBOX antaro</option><option value="gtv_axis_16" ${f.drawerSystem === 'gtv_axis_16' ? 'selected' : ''}>GTV Axis Pro (płyta 16mm)</option><option value="gtv_axis_18" ${f.drawerSystem === 'gtv_axis_18' ? 'selected' : ''}>GTV Axis Pro (płyta 18mm)</option><option value="movento_katalog" ${f.drawerSystem === 'movento_katalog' ? 'selected' : ''}>Blum MOVENTO — katalog (bok 16 mm)</option><option value="movento_forum" ${f.drawerSystem === 'movento_forum' ? 'selected' : ''}>Blum MOVENTO — forum (bok 18 mm)</option></select></div>
 
       <h3>Szuflady — ustawienia ręczne</h3>
       ${drawerFrontsList.length === 0 ? `
@@ -333,16 +335,34 @@ export function initPropertiesPanel() {
           ).join('');
           const isInner = front.subtype === 'szuflada-wewnetrzna';
           const bz = front.baseZone || {};
+          // MOVENTO (skrzynka drewniana): zamiast wariantów - wysokość boku wpisywana
+          // ręcznie; podpowiedź pokazuje największą, jaka się zmieści.
+          let sideHeightHtml = '';
+          if (drawerSysIsWooden) {
+              const autoInfo = getDrawerBoxInfo(activeModule, { ...front, drawerSideHeight: null }, state.project);
+              const curInfo = getDrawerBoxInfo(activeModule, front, state.project);
+              const maxH = autoInfo ? autoInfo.comps.sideHeight : '';
+              const warn = curInfo && !curInfo.comps.fits
+                  ? `<div class="notice-warn fs-xs">Za mało miejsca na szufladę MOVENTO w tej wnęce.</div>`
+                  : (curInfo && curInfo.comps.clamped ? `<div class="notice-warn fs-xs">Wpisana wysokość się nie mieści — użyto ${maxH} mm.</div>` : '');
+              sideHeightHtml = `
+            <div class="property-group mb-8">
+              <label class="fs-xs">Wysokość boku szuflady [mm]:</label>
+              <input type="number" class="input-drawer-side-height" data-front-id="${front.id}" placeholder="Auto (maks. ${maxH})" value="${front.drawerSideHeight || ''}" />
+              ${warn}
+            </div>`;
+          }
           return `
           <div class="prop-box">
             <div class="prop-box-title"><i class="ti ti-box" aria-hidden="true"></i> ${escapeHtml(label)}</div>
+            ${drawerSysIsWooden ? sideHeightHtml : `
             <div class="property-group mb-8">
               <label class="fs-xs">Wymuszony wariant boku:</label>
               <select class="input-drawer-force-variant" data-front-id="${front.id}">
                 <option value="auto" ${(!front.forceVariant || front.forceVariant === 'auto') ? 'selected' : ''}>Auto (maksymalny)</option>
                 ${variantOptionsHtml}
               </select>
-            </div>
+            </div>`}
             <div class="property-group mb-8">
               <label class="fs-xs">Wymuszona głębokość (NL, mm):</label>
               <input type="number" class="input-drawer-force-nl" data-front-id="${front.id}" placeholder="Auto" value="${front.forceNL || ''}" />
@@ -602,6 +622,8 @@ function setupEventListeners() {
   const drawerSysInput = document.getElementById('input-drawer-system');
   if(drawerSysInput) drawerSysInput.addEventListener('change', (e) => {
       getSelectedMods().forEach(mod => { mod.front = mod.front || {}; mod.front.drawerSystem = e.target.value; }); updateAll();
+      // Lista szuflad zależy od systemu (warianty boku albo wysokość boku MOVENTO).
+      initPropertiesPanel();
   });
   const backType = document.getElementById('input-back-type');
   const nutOptions = document.getElementById('nut-options');
@@ -725,6 +747,17 @@ function setupEventListeners() {
       initPropertiesPanel();
     });
   });
+  document.querySelectorAll('.input-drawer-side-height').forEach(inp => {
+    inp.addEventListener('change', (e) => {
+      const front = findFront(inp.dataset.frontId);
+      if (front) {
+        const val = e.target.value === '' ? null : Number(e.target.value);
+        front.drawerSideHeight = (val === null || isNaN(val) || val <= 0) ? null : val;
+      }
+      updateAll();
+      initPropertiesPanel();
+    });
+  });
   document.querySelectorAll('.input-drawer-force-nl').forEach(inp => {
     inp.addEventListener('change', (e) => {
       const front = findFront(inp.dataset.frontId);
@@ -839,8 +872,9 @@ function setupEventListeners() {
       // prawie zawsze - silnik szuflad w praktyce dobiera dużo niższy wariant.
       // Liczymy tu dokładnie to, co dobrałby getDrawerComponents (core/drawerMath.js),
       // żeby sprawdzać miejsce nad RZECZYWISTYM, a nie zawyżonym, pudłem.
-      const { backHeight } = getDrawerVariant(front.h, sysName, front.forceVariant || 'auto');
-      const boxHeight = backHeight;
+      // MOVENTO: boxHeight to luz pod szufladą + bok (getDrawerVariant), nie sam tył.
+      const variantInfo = getDrawerVariant(front.h, sysName, front.forceVariant || 'auto', front.drawerSideHeight);
+      const boxHeight = variantInfo.boxHeight ?? variantInfo.backHeight;
 
       const newInnerBottomY = front.y + boxHeight + 5;
       const newInnerTopY = front.y + front.h;

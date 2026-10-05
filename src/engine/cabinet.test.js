@@ -292,3 +292,30 @@ describe("nawierty kołek+wkręt przegrody pionowej (isStructural) w wieńcach",
     expect(mountingData.some((m) => m.type === "wieniec-mount")).toBe(false);
   });
 });
+
+describe("Szuflada Blum MOVENTO (skrzynka drewniana)", () => {
+  const zone = { minX: 18, maxX: 582, minY: 18, maxY: 702, offsetBottom: 0, offsetTop: 0 };
+  const drawer = (extra = {}) => ({
+    id: "f0", typ: "front", subtype: "szuflada", frontIndex: 0, gap: 3, distribution: "1", baseZone: { ...zone }, ...extra,
+  });
+
+  it("formatki: 2 boki, dno, tył i czoło wewn. z wpisaną wysokością boku", () => {
+    const mod = baseModule({ front: { drawerSystem: "movento_katalog" }, elements: [drawer({ drawerSideHeight: 150 })] });
+    setProject(freshProject({ modules: [mod] }));
+    const { parts } = calculateParts();
+    const p = (prefix) => parts.find((x) => x.name.startsWith(prefix));
+    // LW = 564, NL = 500 (głębokość wieńca 510 - 5) -> SKW 522, SKL 490
+    expect(p("Bok szuflady")).toMatchObject({ length: 490, width: 150, qty: 2, category: "Szuflada" });
+    expect(p("Dno szuflady")).toMatchObject({ length: 490, width: 522, qty: 1 });
+    expect(p("Tył szuflady")).toMatchObject({ length: 522, width: 121, qty: 1 });
+    expect(p("Czoło wewn. szuflady")).toMatchObject({ length: 522, width: 121, qty: 1 });
+  });
+
+  it("okucia: komplet prowadnic MOVENTO z sprzęgłami zamiast kompletu szuflady", () => {
+    const mod = baseModule({ front: { drawerSystem: "movento_katalog" }, elements: [drawer()] });
+    setProject(freshProject({ modules: [mod] }));
+    const hw = calculateProjectHardware();
+    const list = Array.isArray(hw) ? hw : Object.values(hw);
+    expect(list.some((h) => /MOVENTO 760H \(40 kg\) NL-500 \+ sprzęgła T51\.7601/.test(h.name))).toBe(true);
+  });
+});

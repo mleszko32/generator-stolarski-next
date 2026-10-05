@@ -101,7 +101,10 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
 - `drawerSystems.js` — **jedyny** katalog danych systemów szuflad (Blum antaro / tandembox /
   merivobox / legrabox, GTV Axis): potrącenia wymiarów, warianty wysokości, offsety montażowe.
   Nigdy nie duplikuj tych danych gdzie indziej; komentarze w pliku opisują błędy, które
-  wcześniej z tego wynikły.
+  wcześniej z tego wynikły. Blum MOVENTO (`movento_katalog` / `movento_forum`) to
+  skrzynka drewniana (`woodenBox: true`): bez wariantów, wysokość boku wpisywana przy
+  szufladzie (`front.drawerSideHeight`), formatki 2 boki + dno między bokami + tył +
+  czoło wewn. (`getDrawerComponents` zwraca wtedy też `sides`/`innerFront`).
 - `drawerMath.js` — dobór długości nominalnej, dobór wariantu wysokości do dostępnego miejsca,
   wymiary elementów szuflady, pozycje wierceń `calculateDrawerHoles()`.
 - `hingeMath.js` — `calculateHinges()`: liczba zawiasów + pozycje Y puszek z omijaniem kolizji

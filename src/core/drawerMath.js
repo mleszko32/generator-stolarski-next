@@ -27,11 +27,35 @@ export function calculateNominalLength(internalDepth, systemId) {
   return selectedNL > 0 ? selectedNL : standardNLs[0];
 }
 
-export function getDrawerVariant(availableSpace, systemId, forceVariant = 'auto') {
+// Szuflada drewniana (MOVENTO, woodenBox): wysokość boku wpisana ręcznie
+// (sideHeight), przycięta do tego, co się mieści we wnęce (availableSpace minus
+// luz pod i nad szufladą); bez wpisu - największa mieszcząca się. Zwraca też
+// backHeight (tył/czoło wewn. stoją na dnie, więc są niższe o wcięcie i grubość
+// dna) oraz boxHeight - wysokość zajętą we wnęce od jej dołu do góry boków.
+export function getWoodenDrawerHeights(system, availableSpace, sideHeight = null) {
+  const maxSide = Math.floor(availableSpace - system.bottomClearance - system.topClearance);
+  const wanted = parseFloat(sideHeight);
+  let side = Number.isFinite(wanted) && wanted > 0 ? Math.min(wanted, maxSide) : maxSide;
+  side = Math.max(side, system.minSideHeight);
+  return {
+    sideHeight: side,
+    backHeight: side - system.bottomRecess - system.sideThickness,
+    boxHeight: system.bottomClearance + side,
+    fits: maxSide >= system.minSideHeight,
+    clamped: Number.isFinite(wanted) && wanted > maxSide,
+  };
+}
+
+export function getDrawerVariant(availableSpace, systemId, forceVariant = 'auto', sideHeight = null) {
   // Dane wariantów wysokości boku pobierane są z jedynego wspólnego katalogu
   // (drawerSystems.js), żeby uniknąć rozjazdu wartości między plikami.
   const safeSystemId = systemId ? systemId.toLowerCase() : 'merivobox';
-  const systemData = (drawerSystems[safeSystemId] || drawerSystems['merivobox']).variants;
+  const system = drawerSystems[safeSystemId] || drawerSystems['merivobox'];
+  if (system.woodenBox) {
+    const hh = getWoodenDrawerHeights(system, availableSpace, sideHeight);
+    return { type: `H${hh.sideHeight}`, backHeight: hh.backHeight, boxHeight: hh.boxHeight };
+  }
+  const systemData = system.variants;
 
   if (forceVariant && forceVariant !== 'auto' && systemData[forceVariant]) {
     if (availableSpace >= systemData[forceVariant].minSpace) {
@@ -62,15 +86,41 @@ export function getDrawerVariant(availableSpace, systemId, forceVariant = 'auto'
   }
 }
 
-export function getDrawerComponents(systemId, internalWidth, internalDepth, availableSpace, forceVariant = 'auto') {
+export function getDrawerComponents(systemId, internalWidth, internalDepth, availableSpace, forceVariant = 'auto', sideHeight = null) {
   const system = drawerSystems[systemId];
-  
+
   if (!system) {
     console.error(`Nie znaleziono systemu szuflad: ${systemId}`);
     return null;
   }
 
   const nl = calculateNominalLength(internalDepth, systemId);
+
+  // Skrzynka drewniana (MOVENTO): 2 boki, dno między bokami na całą długość,
+  // tył i czoło wewnętrzne na dnie, wszystko w szerokości wewnętrznej SKW.
+  // bottom/back zostają w tym samym kształcie co dla systemów metalowych, bo
+  // czytają je 3D, okucia i edytor wnętrza.
+  if (system.woodenBox) {
+    const t = system.sideThickness;
+    const hh = getWoodenDrawerHeights(system, availableSpace, sideHeight);
+    const innerW = internalWidth - system.innerWidthDeduct;   // SKW
+    const length = nl - system.lengthDeduct;                  // SKL
+    return {
+      systemName: system.name,
+      nominalLength: nl,
+      woodenBox: true,
+      sideThickness: t,
+      bottomRecess: system.bottomRecess,
+      bottomClearance: system.bottomClearance,
+      sideHeight: hh.sideHeight,
+      fits: hh.fits,
+      clamped: hh.clamped,
+      sides: { length, height: hh.sideHeight, qty: 2 },
+      bottom: { width: innerW, length },
+      back: { width: innerW, height: hh.backHeight, variantType: `H${hh.sideHeight}` },
+      innerFront: { width: innerW, height: hh.backHeight },
+    };
+  }
   const variant = getDrawerVariant(availableSpace, systemId, forceVariant);
 
   const bottomWidth = internalWidth - system.bottomWidthDeduct;
@@ -99,7 +149,8 @@ export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick
   // Offsety montażowe pobierane są z jedynego wspólnego katalogu
   // (drawerSystems.js), żeby uniknąć rozjazdu wartości między plikami.
   const safeSystemId = systemId ? systemId.toLowerCase() : 'merivobox';
-  const systemParams = (drawerSystems[safeSystemId] || drawerSystems['merivobox']).mounting;
+  const systemEntry = drawerSystems[safeSystemId] || drawerSystems['merivobox'];
+  const systemParams = systemEntry.mounting;
 
   let slideY;
   if (isBottom) {
@@ -123,7 +174,10 @@ export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick
     { y: localFrontHolesBase + 32, xOffsetLeft: localFrontHolesX_Left, xOffsetRight: localFrontHolesX_Right, diameter: 3 }
   ];
 
-  if (frontHeight >= 200) {
+  // Szuflada drewniana (MOVENTO): front przykręca się od środka przez czoło
+  // wewnętrzne skrzynki, nie do metalowych zaczepów - brak katalogowych otworów.
+  if (systemEntry.woodenBox) frontHoles.length = 0;
+  else if (frontHeight >= 200) {
     frontHoles.push({
       y: localFrontHolesBase + 160, 
       xOffsetLeft: localFrontHolesX_Left, 

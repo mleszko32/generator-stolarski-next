@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { drawerSystems } from "./drawerSystems.js";
+import { drawerSystems, moventoRunnerName } from "./drawerSystems.js";
 
 // Katalog systemów szuflad to jedyne źródło tych danych. Ten test pilnuje
 // kompletności wpisów — regresja "brakującego tandemboxa" (system był do
@@ -12,6 +12,8 @@ const REQUIRED_SYSTEMS = [
   "legrabox",
   "gtv_axis_16",
   "gtv_axis_18",
+  "movento_katalog",
+  "movento_forum",
 ];
 
 describe("drawerSystems catalog", () => {
@@ -22,6 +24,21 @@ describe("drawerSystems catalog", () => {
   });
 
   for (const [id, sys] of Object.entries(drawerSystems)) {
+    if (sys.woodenBox) {
+      // Skrzynka drewniana (MOVENTO): bez wariantów i odjęć dna/tyłu systemów
+      // metalowych - własne parametry skrzynki.
+      describe(id, () => {
+        it("ma komplet parametrów skrzynki drewnianej", () => {
+          for (const key of ["sideThickness", "innerWidthDeduct", "lengthDeduct", "bottomRecess", "bottomClearance", "topClearance", "minSideHeight"]) {
+            expect(typeof sys[key], `${id}.${key}`).toBe("number");
+            expect(sys[key]).toBeGreaterThan(0);
+          }
+          expect(sys.nlSeries.length).toBeGreaterThan(0);
+          expect(typeof sys.mounting.railOffset).toBe("number");
+        });
+      });
+      continue;
+    }
     describe(id, () => {
       it("ma komplet odjęć wymiarowych (liczby)", () => {
         for (const key of ["bottomWidthDeduct", "bottomLengthDeduct", "backWidthDeduct"]) {
@@ -78,5 +95,18 @@ describe("drawerSystems catalog", () => {
   it("Legrabox: ma najwyższy wariant F (212mm, min. miejsce 257mm)", () => {
     const v = drawerSystems.legrabox.variants;
     expect(v.bardzowysoka).toMatchObject({ type: "F", height: 212, minSpace: 257 });
+  });
+});
+
+describe("MOVENTO - katalog i forum", () => {
+  it("katalog: bok 16 mm, SKW = LW - 42, SKL = NL - 10, wcięcie 13 mm", () => {
+    expect(drawerSystems.movento_katalog).toMatchObject({ sideThickness: 16, innerWidthDeduct: 42, lengthDeduct: 10, bottomRecess: 13 });
+  });
+  it("forum: bok 18 mm, LW - 46, wcięcie 12 mm", () => {
+    expect(drawerSystems.movento_forum).toMatchObject({ sideThickness: 18, innerWidthDeduct: 46, lengthDeduct: 10, bottomRecess: 12 });
+  });
+  it("nazwa prowadnic: 760H gdy NL jest w wersji 40 kg, inaczej 766H", () => {
+    expect(moventoRunnerName(drawerSystems.movento_katalog, 500)).toContain("760H (40 kg) NL-500");
+    expect(moventoRunnerName(drawerSystems.movento_katalog, 650)).toContain("766H (60 kg) NL-650");
   });
 });

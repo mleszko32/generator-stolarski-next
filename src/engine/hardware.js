@@ -4,6 +4,7 @@
 // z engine/cabinet.js. Czyta zagregowaną listę formatek z calculateAllProjectParts().
 import { state } from "../core/state.js";
 import { getDrawerComponents } from "../core/drawerMath.js";
+import { drawerSystems, moventoRunnerName } from "../core/drawerSystems.js";
 import { calculateHinges } from "../core/hingeMath.js";
 import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "./edgeBanding.js";
 import { recalculateAllLayouts } from "../core/layout.js";
@@ -88,9 +89,13 @@ export function calculateProjectHardware() {
           const userForcedVariant = front.forceVariant || 'auto';
 
           const sysName = f.drawerSystem || 'merivobox';
-          const drawerComps = getDrawerComponents(sysName, innerWidth, topBottomDepth, availableSpace, userForcedVariant);
+          const drawerComps = getDrawerComponents(sysName, innerWidth, topBottomDepth, availableSpace, userForcedVariant, front.drawerSideHeight);
 
-          if (drawerComps) {
+          if (drawerComps && drawerComps.woodenBox) {
+            const hwKey = moventoRunnerName(drawerSystems[sysName], drawerComps.nominalLength);
+            if (!hardwareList[hwKey]) hardwareList[hwKey] = { name: hwKey, qty: 0, unit: 'kpl.' };
+            hardwareList[hwKey].qty += 1;
+          } else if (drawerComps) {
             const nl = drawerComps.nominalLength;
             const variantType = drawerComps.back.variantType ? drawerComps.back.variantType.toUpperCase() : 'M';
 

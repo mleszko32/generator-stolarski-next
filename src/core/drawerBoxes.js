@@ -43,7 +43,7 @@ export function getDrawerBoxInfo(mod, el, project) {
   if (Number.isFinite(forceNL)) depth = forceNL + 10;
 
   const sys = String(front.drawerSystem || "merivobox").toLowerCase();
-  const comps = getDrawerComponents(sys, innerW, depth, availableSpace, el.forceVariant || "auto");
+  const comps = getDrawerComponents(sys, innerW, depth, availableSpace, el.forceVariant || "auto", el.drawerSideHeight);
   if (!comps) return null;
 
   const dw = comps.bottom.width;
@@ -51,6 +51,13 @@ export function getDrawerBoxInfo(mod, el, project) {
   const isBottomInZone = el.frontIndex === 0;
   const isBottomOuter = !!el.baseZone && num(el.baseZone.minY) <= th + 0.5;
   const y0 = y + (isBottomInZone && isBottomOuter && !isInset ? th : 0);
+  if (comps.woodenBox) {
+    // MOVENTO: boki z płyty, skrzynka zaczyna się luz nad dołem wnęki.
+    const t = comps.sideThickness;
+    const x0 = th + (innerW - dw) / 2 - t;
+    const yb = y0 + comps.bottomClearance;
+    return { rect: { x0, x1: x0 + dw + 2 * t, y0: yb, y1: yb + comps.sideHeight }, comps, system: sys, openingW: innerW, openingH: availableSpace };
+  }
   const x0 = th + (innerW - dw) / 2 - SIDE_T;
   return { rect: { x0, x1: x0 + dw + 2 * SIDE_T, y0, y1: y0 + SIDE_T + dh }, comps, system: sys, openingW: innerW, openingH: availableSpace };
 }

@@ -70,6 +70,47 @@ describe("getDrawerComponents", () => {
   });
 });
 
+describe("MOVENTO - skrzynka drewniana", () => {
+  // Wnęka 564 mm szerokości (LW), 505 mm głębokości, 200 mm wysokości.
+  it("katalog: 5 formatek, dno między bokami, tył i czoło na dnie", () => {
+    const c = getDrawerComponents("movento_katalog", 564, 505, 200, "auto", 150);
+    expect(c.woodenBox).toBe(true);
+    expect(c.nominalLength).toBe(500);
+    expect(c.sides).toEqual({ length: 490, height: 150, qty: 2 });          // SKL = NL - 10
+    expect(c.bottom).toEqual({ width: 522, length: 490 });                    // SKW = LW - 42
+    expect(c.back).toMatchObject({ width: 522, height: 150 - 13 - 16 });      // bok - wcięcie - dno
+    expect(c.innerFront).toEqual({ width: 522, height: 121 });
+  });
+
+  it("forum: bok 18 mm, LW - 46, wcięcie 12 mm", () => {
+    const c = getDrawerComponents("movento_forum", 564, 505, 200, "auto", 150);
+    expect(c.sideThickness).toBe(18);
+    expect(c.bottom.width).toBe(518);
+    expect(c.back.height).toBe(150 - 12 - 18);
+  });
+
+  it("bez wpisanej wysokości bierze największą mieszczącą się (miejsce - 16 - 7)", () => {
+    const c = getDrawerComponents("movento_katalog", 564, 505, 200);
+    expect(c.sideHeight).toBe(177);
+    expect(c.clamped).toBe(false);
+  });
+
+  it("za wysoki bok jest przycinany do miejsca we wnęce", () => {
+    const c = getDrawerComponents("movento_katalog", 564, 505, 200, "auto", 300);
+    expect(c.sideHeight).toBe(177);
+    expect(c.clamped).toBe(true);
+  });
+
+  it("getDrawerVariant zwraca wysokość zajętą we wnęce (luz pod + bok)", () => {
+    expect(getDrawerVariant(200, "movento_katalog", "auto", 150)).toEqual({ type: "H150", backHeight: 121, boxHeight: 166 });
+  });
+
+  it("brak katalogowych otworów frontu (front przykręcany przez czoło wewn.)", () => {
+    setProject(freshProject());
+    expect(calculateDrawerHoles("movento_katalog", 0, 250, 18, 0, false).frontHoles).toHaveLength(0);
+  });
+});
+
 describe("calculateDrawerHoles", () => {
   beforeEach(() => setProject(freshProject()));
 

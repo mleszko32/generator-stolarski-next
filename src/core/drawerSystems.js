@@ -133,8 +133,67 @@ export const drawerSystems = {
       bardzowysoka: { type: 'D', height: 199, minSpace: 230 }
     },
     mounting: { railOffset: 33, frontHolesBase: 22, frontHolesXBase: 15.5 }
+  },
+
+  // Blum MOVENTO - ukryte prowadnice pod szufladę DREWNIANĄ (woodenBox: true).
+  // Inaczej niż wyżej: cała skrzynka jest z płyty (2 boki, tył, czoło wewn., dno),
+  // nie ma gotowych wariantów wysokości - wysokość boku wpisuje się ręcznie przy
+  // szufladzie (front.drawerSideHeight), a bez wpisu bierze się największą, jaka
+  // się mieści. Konstrukcja: dno MIĘDZY BOKAMI na całą długość szuflady, podniesione
+  // o wcięcie (bottomRecess) nad dolną krawędź boków - pod nim chowa się prowadnica;
+  // tył i czoło wewnętrzne stoją na dnie (wariant Blum "bez wycięcia w tyle":
+  // krótszy tył, dno do końca szuflady).
+  //
+  // ŹRÓDŁA (katalog): Blum "Building a MOVENTO drawer" (SKW = LW - 42, SKL = NL - 10,
+  // bok maks. 16 mm, wcięcie min. 12 mm wys.), katalog Blum KA-130 2018/19 PL
+  // (długości NL 760H/766H, min. głębokość korpusu NL + 3), instrukcja Blum MOVENTO
+  // US 2019 (wcięcie 13 mm, luz min. 7 mm nad szufladą, maks. wysokość szuflady =
+  // otwór - 23 mm, wiercenie prowadnicy 37/+32 mm od frontu).
+  // ŹRÓDŁO (forum): kornikowo.pl, wątek "Szuflady na prowadnicach MOVENTO. Prośba o
+  // sprawdzenie wymiarów" - przy boku 18 mm odjąć 46 zamiast 42 (frezowanie boku
+  // pod prowadnicę "wchodzi" w szerokość), wcięcie 12 mm. To porada z forum, nie
+  // dane katalogowe.
+  // DO POTWIERDZENIA: luzy pionowe (bottomClearance/topClearance) i railOffset są
+  // z instrukcji US (korpus z ramką), w katalogu PL te liczby są tylko na rysunkach.
+  'movento_katalog': {
+    name: 'Blum MOVENTO (katalog, bok 16 mm)',
+    woodenBox: true,
+    sideThickness: 16,       // bok i dno szuflady
+    innerWidthDeduct: 42,    // SKW = LW - 42 mm
+    lengthDeduct: 10,        // SKL = NL - 10 mm
+    bottomRecess: 13,        // dno podniesione o 13 mm nad dolną krawędź boków
+    bottomClearance: 16,     // od dołu wnęki do dolnej krawędzi boku
+    topClearance: 7,         // min. luz nad szufladą
+    minSideHeight: 60,
+    nlSeries: [250, 270, 300, 320, 350, 380, 400, 420, 450, 480, 500, 520, 550, 580, 600, 650, 700, 750],
+    // NL dostępne w wersji 40 kg (760H); pozostałe tylko 60 kg (766H)
+    nl760H: [250, 270, 300, 320, 350, 380, 400, 420, 450, 480, 500, 520, 550, 600],
+    variants: {},
+    mounting: { railOffset: 9, frontHolesBase: 0, frontHolesXBase: 0 }
+  },
+  'movento_forum': {
+    name: 'Blum MOVENTO (forum, bok 18 mm)',
+    woodenBox: true,
+    sideThickness: 18,
+    innerWidthDeduct: 46,    // forum: przy boku 18 mm LW - 46 mm
+    lengthDeduct: 10,
+    bottomRecess: 12,        // forum: tył i przód niższe o 12 mm
+    bottomClearance: 16,
+    topClearance: 7,
+    minSideHeight: 60,
+    nlSeries: [250, 270, 300, 320, 350, 380, 400, 420, 450, 480, 500, 520, 550, 580, 600, 650, 700, 750],
+    nl760H: [250, 270, 300, 320, 350, 380, 400, 420, 450, 480, 500, 520, 550, 600],
+    variants: {},
+    mounting: { railOffset: 9, frontHolesBase: 0, frontHolesXBase: 0 }
   }
 };
+
+// Nazwa kompletu prowadnic MOVENTO dla listy okuć: 760H (40 kg), gdy ta długość
+// jest w tej wersji, inaczej 766H (60 kg). Para sprzęgieł T51.7601 na szufladę.
+export function moventoRunnerName(system, nl) {
+  const model = (system.nl760H || []).includes(nl) ? '760H (40 kg)' : '766H (60 kg)';
+  return `Prowadnice Blum MOVENTO ${model} NL-${nl} + sprzęgła T51.7601`;
+}
 
 // Klucze wariantów wysokości (od najniższego) i ich polskie etykiety — wspólne dla
 // UI, żeby lista rozwijana "wymuszony wariant" (ui/properties.js zakładka Szuflady,

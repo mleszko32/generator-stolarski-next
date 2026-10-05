@@ -439,9 +439,18 @@ function getFrontsAndDrawers(mod, config) {
         // same sprawdzają, czy w realnej dostępnej przestrzeni mieści się wymuszony
         // wariant (próg minSpace jest zawsze większy niż sama wysokość wariantu).
         // Podanie tu simulatedSpace gwarantowałoby odrzucenie wymuszenia.
-        const drawerComps = getDrawerComponents(sysName, width - (board * 2), availableDepth, availableSpace, userForcedVariant);
-        
-        if (drawerComps) {
+        const drawerComps = getDrawerComponents(sysName, width - (board * 2), availableDepth, availableSpace, userForcedVariant, front.drawerSideHeight);
+
+        if (drawerComps && drawerComps.woodenBox) {
+          // MOVENTO: cała skrzynka z płyty (patrz core/drawerMath.js).
+          const nl = drawerComps.nominalLength;
+          const r1 = (v) => parseFloat((v || 0).toFixed(1));
+          const tag = `W${width} NL${nl} H${drawerComps.sideHeight}`;
+          parts.push({ name: `Bok szuflady ${tag}`, length: r1(drawerComps.sides.length), width: r1(drawerComps.sides.height), qty: 2, category: "Szuflada" });
+          parts.push({ name: `Dno szuflady ${tag}`, length: r1(drawerComps.bottom.length), width: r1(drawerComps.bottom.width), qty: 1, category: "Szuflada" });
+          parts.push({ name: `Tył szuflady ${tag}`, length: r1(drawerComps.back.width), width: r1(drawerComps.back.height), qty: 1, category: "Szuflada" });
+          parts.push({ name: `Czoło wewn. szuflady ${tag}`, length: r1(drawerComps.innerFront.width), width: r1(drawerComps.innerFront.height), qty: 1, category: "Szuflada" });
+        } else if (drawerComps) {
           parts.push({ name: `Dno W${width} NL${drawerComps.nominalLength}`, length: parseFloat((drawerComps.bottom.length || 0).toFixed(1)), width: parseFloat((drawerComps.bottom.width || 0).toFixed(1)), qty: 1, category: "Szuflada" });
           parts.push({ name: `Tył W${width} (${drawerComps.back.variantType})`, length: parseFloat((drawerComps.back.width || 0).toFixed(1)), width: parseFloat((drawerComps.back.height || 0).toFixed(1)), qty: 1, category: "Szuflada" });
         }
