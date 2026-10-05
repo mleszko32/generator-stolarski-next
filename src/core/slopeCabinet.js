@@ -332,6 +332,55 @@ export function getSlopeFrontSettings(mod, config) {
   };
 }
 
+// Wielokąt wypukły (punkty przeciwnie do ruchu wskazówek zegara) zwężony o d
+// z każdej strony - przesuwamy każdą krawędź do środka i przecinamy sąsiednie.
+export function insetPolygon(points, d) {
+  const n = points.length;
+  const lines = points.map((p, i) => {
+    const q = points[(i + 1) % n];
+    const dx = q[0] - p[0], dy = q[1] - p[1];
+    const len = Math.hypot(dx, dy);
+    const nx = -dy / len, ny = dx / len;   // normalna do środka
+    return { p: [p[0] + nx * d, p[1] + ny * d], dir: [dx, dy] };
+  });
+  return lines.map((l1, i) => {
+    const l0 = lines[(i - 1 + n) % n];
+    const det = l0.dir[0] * l1.dir[1] - l0.dir[1] * l1.dir[0];
+    const t = ((l1.p[0] - l0.p[0]) * l1.dir[1] - (l1.p[1] - l0.p[1]) * l1.dir[0]) / det;
+    return [l0.p[0] + l0.dir[0] * t, l0.p[1] + l0.dir[1] * t];
+  });
+}
+
+// Formatki o nieprostokątnym obrysie (fronty, blendy, plecy) do rysunków cięcia:
+// { name, category, qty, points } - punkty w rzeczywistej orientacji (patrząc od
+// frontu), przesunięte tak, że lewy dolny róg obrysu jest w (0, 0). Te same nazwy
+// co na liście formatek; identyczne kształty zliczone razem.
+export function getSlopeShapes(mod, config) {
+  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const g = getSlopeGeometry(mod, th);
+  const real = (pts) => (g.lowSide === 'right' ? pts.map(([x, y]) => [g.W - x, y]).reverse() : pts);
+  const norm = (pts) => {
+    const minX = Math.min(...pts.map((p) => p[0])), minY = Math.min(...pts.map((p) => p[1]));
+    return pts.map(([x, y]) => [x - minX, y - minY]);
+  };
+  const out = new Map();
+  const add = (name, category, pts) => {
+    const points = norm(real(pts));
+    const key = `${name}|${points.map((p) => p.map(r1).join(',')).join(';')}`;
+    if (out.has(key)) out.get(key).qty += 1;
+    else out.set(key, { name, category, qty: 1, points });
+  };
+  getSlopeFronts(mod, config).forEach((fr) => {
+    if (fr.type === 'brak' || fr.shape.kind === 'prostokat') return;
+    const name = fr.type === 'blenda' ? `Blenda skos (${fr.text})` : `Front szuflady skos (${fr.text})`;
+    add(name, 'Front', fr.shape.points);
+  });
+  const back = g.isTriangle ? [[0, 0], [g.W, 0], [g.W, g.H]] : [[0, 0], [g.W, 0], [g.W, g.H], [0, g.L]];
+  const shape = g.isTriangle ? 'trójkąt' : `trapez, niska strona ${r1(g.L - 4)}`;
+  add(`Plecy skos ${g.W}x${g.H} (${shape})`, 'Plecy', insetPolygon(back, 2));
+  return [...out.values()];
+}
+
 // Formatki frontów, blend i skrzynek szuflad szafki pod skos.
 export function getSlopeFrontParts(mod, config) {
   const th = parseFloat(config.materials?.boardThickness) || 18;
@@ -425,55 +474,83 @@ function frontSolids(mod, config) {
   return solids;
 }
 
-// Formatki korpusu szafki pod skos. Krawędzie docięte pod kątem: długość to
-// DŁUŻSZA krawędź, a w nazwie podana krótsza i kąt skosu - tyle wystarczy, żeby
-// formatkę wyciąć.
-export function getSlopeCabinetParts(mod, config) {
+// Płyty korpusu szafki pod skos jako prostokąty z końcami ciętymi przez grubość
+// (pochylona piła). Każda płyta: { name, width (głębokość), th, a: [a0, a1],
+// b: [b0, b1], aLabel, bLabel, startLabel, endLabel } - a i b to dwie powierzchnie
+// płyty wzdłuż jej długości (widok na grubość): od - do, w mm. Różnica między
+// a i b na końcu to cięcie pod kątem: pochylenie piły = atan(różnica / grubość).
+// Kolejność wzdłuż płyty: od strony skosu / od dołu (start) do drugiego końca.
+export function getSlopeBoards(mod, config) {
   const th = parseFloat(config.materials?.boardThickness) || 18;
   const backThick = parseFloat(config.materials?.backThickness) || 3;
   const g = getSlopeGeometry(mod, th);
-  const depth = g.D - backThick;
-  const ang = `${r1(g.angle)}°`;
-  const parts = [];
-  const cut = (name, long, short) => Math.abs(long - short) < 0.05
-    ? name
-    : `${name} (skos ${ang}, krótsza ${r1(short)})`;
+  const width = g.D - backThick;
+  const tanA = g.k;   // tg kąta skosu
+  const boards = [];
+  const add = (b) => boards.push({ width, th, ...b });
 
   // Skośna płyta: wierzch i spód. W trójkącie dolny koniec stoi na dnie,
-  // docięty poziomo, więc spód jest krótszy od wierzchu.
+  // docięty poziomo; górny koniec (przy wysokim boku) docięty pionowo.
   const cosA = Math.cos(g.angle * Math.PI / 180);
-  const topLen = g.isTriangle ? (g.W - th / g.k) / cosA : Math.hypot(g.W, g.H - g.L);
-  const underLen = g.isTriangle ? (g.W - g.underX(th)) / cosA : topLen;
-  parts.push({ name: cut('Skos (wieniec skośny)', topLen, underLen), length: r1(topLen), width: depth, qty: 1, category: 'Korpus' });
+  if (g.isTriangle) {
+    const topLen = (g.W - th / g.k) / cosA;
+    add({ name: 'Skos (wieniec skośny)', a: [th / tanA, topLen - th * tanA], b: [0, topLen], aLabel: 'spód', bLabel: 'wierzch', startLabel: 'dół (na dnie)', endLabel: 'przy wysokim boku' });
+  } else {
+    const topLen = Math.hypot(g.W, g.H - g.L);
+    add({ name: 'Skos (wieniec skośny)', a: [0, topLen], b: [th * tanA, topLen + th * tanA], aLabel: 'spód', bLabel: 'wierzch', startLabel: 'przy niskim boku', endLabel: 'przy wysokim boku' });
+  }
 
-  // Wysoki bok stoi na dnie; zewnętrzna ściana dłuższa.
-  const highOuter = g.under(g.W) - th, highInner = g.under(g.W - th) - th;
-  parts.push({ name: cut('Bok wysoki', highOuter, highInner), length: r1(highOuter), width: depth, qty: 1, category: 'Korpus' });
-
-  // Niski bok (tylko trapez) stoi na dnie; wewnętrzna ściana dłuższa.
+  // Wysoki bok stoi na dnie; zewnętrzna ściana dłuższa (góra docięta do skosu).
+  add({ name: 'Bok wysoki', a: [0, g.under(g.W - th) - th], b: [0, g.under(g.W) - th], aLabel: 'wewnątrz', bLabel: 'zewnątrz', startLabel: 'dół', endLabel: 'góra (pod skosem)' });
+  // Niski bok (tylko trapez); wewnętrzna ściana dłuższa.
   if (!g.isTriangle) {
-    const lowOuter = g.under(0) - th, lowInner = g.under(th) - th;
-    parts.push({ name: cut('Bok niski', lowInner, lowOuter), length: r1(lowInner), width: depth, qty: 1, category: 'Korpus' });
+    add({ name: 'Bok niski', a: [0, g.under(0) - th], b: [0, g.under(th) - th], aLabel: 'zewnątrz', bLabel: 'wewnątrz', startLabel: 'dół', endLabel: 'góra (pod skosem)' });
   }
   // Dno nakładane na całą szerokość; w trójkącie koniec przy skosie docięty
   // równo z linią skosu (spód pełny, wierzch krótszy).
-  const bottomLong = g.W;
-  const bottomShort = g.isTriangle ? g.W - th / g.k : g.W;
-  parts.push({ name: cut('Dno (wieniec dolny)', bottomLong, bottomShort), length: r1(bottomLong), width: depth, qty: 1, category: 'Korpus' });
+  add({ name: 'Dno (wieniec dolny)', a: [0, g.W], b: [g.isTriangle ? th / g.k : 0, g.W], aLabel: 'spód', bLabel: 'wierzch', startLabel: g.isTriangle ? 'przy skosie' : 'przy niskim boku', endLabel: 'przy wysokim boku' });
 
   getSlopeDividers(mod, th).forEach((d) => {
-    parts.push({ name: cut('Przegroda', d.hRight, d.hLeft), length: r1(d.hRight), width: depth, qty: 1, category: 'Korpus' });
+    add({ name: 'Przegroda', a: [0, d.hLeft], b: [0, d.hRight], aLabel: 'od strony skosu', bLabel: 'od wysokiego boku', startLabel: 'dół', endLabel: 'góra (pod skosem)' });
   });
 
   getSlopeShelfPieces(mod, th).forEach((p) => {
     const long = p.x1 - p.x0Bottom, short = p.x1 - p.x0Top;
-    parts.push({ name: cut('Półka', long, short), length: r1(long), width: depth - 5, qty: 1, category: 'Korpus' });
+    add({ name: 'Półka', width: width - 5, a: [0, long], b: [long - short, long], aLabel: 'spód', bLabel: 'wierzch', startLabel: 'przy skosie', endLabel: 'drugi koniec' });
   });
 
-  // Plecy nakładane (HDF) o obrysie szafki, 2 mm mniej z każdej strony.
-  const shape = g.isTriangle ? 'trójkąt' : `trapez, niska strona ${r1(g.L - 4)}`;
-  parts.push({ name: `Plecy skos ${g.W}x${g.H} (${shape})`, length: r1(g.H - 4), width: r1(g.W - 4), qty: 1, category: 'Plecy' });
+  return boards.map((b) => {
+    const lenA = b.a[1] - b.a[0], lenB = b.b[1] - b.b[0];
+    const tilt = (d) => (Math.abs(d) < 0.05 ? 0 : Math.atan(Math.abs(d) / b.th) * 180 / Math.PI);
+    return {
+      ...b,
+      length: Math.max(lenA, lenB),
+      short: Math.min(lenA, lenB),
+      tiltStart: tilt(b.a[0] - b.b[0]),
+      tiltEnd: tilt(b.a[1] - b.b[1]),
+    };
+  });
+}
 
+// Opis cięcia do nazwy formatki: kąty pochylenia piły na końcach i krótsza krawędź.
+function bevelName(b) {
+  const tilts = [b.tiltStart, b.tiltEnd].filter((t) => t > 0).map((t) => `${r1(t)}°`);
+  if (!tilts.length) return b.name;
+  return `${b.name} (cięcie ${tilts.join(' i ')}, krótsza ${r1(b.short)})`;
+}
+
+// Formatki korpusu szafki pod skos. Krawędzie docięte pod kątem: długość to
+// DŁUŻSZA krawędź, a w nazwie kąt pochylenia piły i krótsza krawędź - tyle
+// wystarczy, żeby formatkę wyciąć (rysunki: render/slopeDrawing2d.js).
+export function getSlopeCabinetParts(mod, config) {
+  const parts = getSlopeBoards(mod, config).map((b) => ({
+    name: bevelName(b), length: r1(b.length), width: b.width, qty: 1, category: 'Korpus',
+  }));
+  // Plecy nakładane (HDF) o obrysie szafki, 2 mm mniej z każdej strony;
+  // wymiar formatki to prostokąt opisany na tym obrysie (getSlopeShapes).
+  const back = getSlopeShapes(mod, config).find((s) => s.category === 'Plecy');
+  const bw = Math.max(...back.points.map((p) => p[0])), bh = Math.max(...back.points.map((p) => p[1]));
+  parts.push({ name: back.name, length: r1(bh), width: r1(bw), qty: 1, category: 'Plecy' });
   return parts;
 }
 

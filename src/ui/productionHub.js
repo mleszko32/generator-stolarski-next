@@ -333,7 +333,7 @@ function renderRysunki(el) {
       <tbody>${mods.map(m => {
         const l = moduleLabel(m);
         return `<tr class="${m.id === activeId ? 'hub-row-active' : ''}">
-          <td><div class="hub-strong" style="font-size:13px;">${escapeHtml(l.name)}${m.id === activeId ? ' <span class="hub-sub">· aktywna</span>' : ''}</div><div class="hub-sub">${escapeHtml(l.type)}${m.type === 'corner_cabinet' ? ' · wydruk z rzutem z góry i formatkami' : ''}</div></td>
+          <td><div class="hub-strong" style="font-size:13px;">${escapeHtml(l.name)}${m.id === activeId ? ' <span class="hub-sub">· aktywna</span>' : ''}</div><div class="hub-sub">${escapeHtml(l.type)}${m.type === 'corner_cabinet' ? ' · wydruk z rzutem z góry i formatkami' : ''}${m.type === 'slope_cabinet' ? ' · rysunki cięcia skosów' : ''}</div></td>
           <td>${escapeHtml(l.dims)}</td>
           <td class="num" style="width:150px;"><button type="button" class="btn btn-sm hub-draw" data-id="${m.id}">Otwórz rysunek</button></td>
         </tr>`;

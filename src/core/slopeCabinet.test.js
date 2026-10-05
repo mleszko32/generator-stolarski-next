@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getSlopeGeometry, getSlopeDividers, getSlopeShelfPieces, getSlopeCabinetParts, getSlopeCabinetPolygons, getSlopeColumns, getSlopeSettings, clipFrontRect, getSlopeFronts, getSlopeFrontParts, getSlopeDrawerHardware, getSlopeFrontSettings } from "./slopeCabinet.js";
+import { getSlopeGeometry, getSlopeDividers, getSlopeShelfPieces, getSlopeCabinetParts, getSlopeCabinetPolygons, getSlopeColumns, getSlopeSettings, clipFrontRect, getSlopeFronts, getSlopeFrontParts, getSlopeDrawerHardware, getSlopeFrontSettings, getSlopeBoards, insetPolygon, getSlopeShapes } from "./slopeCabinet.js";
 
 const config = { materials: { boardThickness: 18, backThickness: 3 } };
 const mod = (slope = {}, dims = {}) => ({
@@ -29,7 +29,9 @@ describe("szafka pod skos - trójkąt 45°", () => {
     expect(part(parts, "Dno")).toMatchObject({ length: 1000 });
     expect(part(parts, "Dno").name).toContain("krótsza 982");
     expect(part(parts, "Bok niski")).toBeUndefined();
-    expect(part(parts, "Plecy")).toMatchObject({ length: 996, width: 996, category: "Plecy" });
+    // Plecy zwężone o 2 mm z każdej strony; w ostrym rogu 45° przyprostokątna
+    // krótsza o 2 + 2 / tg 22,5° = 6,83 mm.
+    expect(part(parts, "Plecy")).toMatchObject({ length: 993.2, width: 993.2, category: "Plecy" });
   });
 
   it("przegroda od wieńca do skosu, wyższa ściana od strony wysokiej", () => {
@@ -215,5 +217,60 @@ describe("szafka pod skos - luzy frontów jak w zwykłej szafce", () => {
   it("domyślne ustawienia z projektu, moduł je nadpisuje", () => {
     expect(getSlopeFrontSettings(m(), cfg)).toMatchObject({ isInset: false, gap: 3, cLeft: 1.5, cRight: 1.5, cBottom: 0, cSlope: 3 });
     expect(getSlopeFrontSettings(m({ gap: 2, clearance: { bottom: 2 } }), cfg)).toMatchObject({ gap: 2, cBottom: 2, cSlope: 2, cLeft: 1.5 });
+  });
+});
+
+describe("szafka pod skos - cięcia przez grubość (pochylenie piły)", () => {
+  // 2000 x 1500, trójkąt: kąt skosu 36,87°, więc 90° - kąt = 53,13°.
+  const m = () => ({
+    type: "slope_cabinet", dimensions: { width: 2000, height: 1500, depth: 600 }, front: {},
+    slope: { lowSide: "left", lowHeight: 0, columns: [null, 650, 650], shelves: [500, 1000] },
+  });
+  const boards = () => getSlopeBoards(m(), config);
+  const one = (name) => boards().find((b) => b.name === name);
+
+  it("boki i przegrody: piła pochylona o kąt skosu u góry", () => {
+    expect(one("Bok wysoki").tiltEnd).toBeCloseTo(36.87, 2);
+    expect(one("Bok wysoki").tiltStart).toBe(0);
+    boards().filter((b) => b.name === "Przegroda").forEach((b) => expect(b.tiltEnd).toBeCloseTo(36.87, 2));
+  });
+
+  it("półki i dno przy skosie: piła pochylona o 90° minus kąt skosu", () => {
+    expect(one("Dno (wieniec dolny)").tiltStart).toBeCloseTo(53.13, 2);
+    const cut = boards().filter((b) => b.name === "Półka" && b.tiltStart > 0);
+    expect(cut).toHaveLength(2);
+    cut.forEach((b) => expect(b.tiltStart).toBeCloseTo(53.13, 2));
+  });
+
+  it("skośna płyta: dół na dnie 53,13°, góra przy wysokim boku 36,87°", () => {
+    const s = one("Skos (wieniec skośny)");
+    expect(s.tiltStart).toBeCloseTo(53.13, 2);
+    expect(s.tiltEnd).toBeCloseTo(36.87, 2);
+  });
+
+  it("nazwa na liście formatek podaje kąty cięcia", () => {
+    const p = getSlopeCabinetParts(mod(), config).find((x) => x.name.startsWith("Skos"));
+    expect(p.name).toBe("Skos (wieniec skośny) (cięcie 45° i 45°, krótsza 1352.8)");
+  });
+});
+
+describe("szafka pod skos - obrysy do rysunków", () => {
+  it("insetPolygon zwęża kwadrat o 2 mm z każdej strony", () => {
+    const r = insetPolygon([[0, 0], [100, 0], [100, 100], [0, 100]], 2);
+    r.forEach((p, i) => [[2, 2], [98, 2], [98, 98], [2, 98]][i].forEach((v, j) => expect(p[j]).toBeCloseTo(v, 6)));
+  });
+
+  it("kształty: fronty nieprostokątne i plecy, lustrzane dla skosu po prawej", () => {
+    const base = { type: "slope_cabinet", dimensions: { width: 2000, height: 1500, depth: 600 }, front: {} };
+    const left = getSlopeShapes({ ...base, slope: { lowSide: "left", columns: [null, 650, 650], shelves: [500, 1000] } }, config);
+    const right = getSlopeShapes({ ...base, slope: { lowSide: "right", columns: [650, 650, null], shelves: [500, 1000] } }, config);
+    expect(left.filter((s) => s.category === "Plecy")).toHaveLength(1);
+    expect(left.filter((s) => s.category === "Front").reduce((n, s) => n + s.qty, 0)).toBe(5);
+    expect(right.reduce((n, s) => n + s.qty, 0)).toBe(left.reduce((n, s) => n + s.qty, 0));
+    // Plecy trójkąta: kąt prosty po stronie wysokiego boku.
+    const lb = left.find((s) => s.category === "Plecy").points;
+    const rb = right.find((s) => s.category === "Plecy").points;
+    expect(Math.max(...lb.filter((p) => p[1] > 1000).map((p) => p[0]))).toBeGreaterThan(1900);
+    expect(Math.min(...rb.filter((p) => p[1] > 1000).map((p) => p[0]))).toBeLessThan(100);
   });
 });

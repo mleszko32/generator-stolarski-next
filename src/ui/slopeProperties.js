@@ -10,6 +10,7 @@ import { escapeHtml } from "../utils/dom.js";
 import { round1 } from "../utils/math.js";
 import { getSlopeGeometry, getSlopeSettings, getSlopeColumns, getSlopeDividers, getSlopeInnerSpan, getSlopeFronts, getSlopeFrontSettings } from "../core/slopeCabinet.js";
 import { drawerSystems } from "../core/drawerSystems.js";
+import { openSlopeCutDrawings } from "./slopeCutDrawings.js";
 
 const MIN_COLUMN = 50;
 
@@ -88,6 +89,8 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
       <label style="font-weight: 600;">Nazwa szafki:</label>
       <input type="text" id="input-slope-name" value="${escapeHtml(mod.name)}" style="font-weight: 600;" />
     </div>
+
+    <button type="button" id="btn-slope-cut-drawings" class="btn btn-block btn-sm mb-8"><i class="ti ti-file-text" aria-hidden="true"></i> Rysunki cięcia (skosy, fronty, plecy)</button>
 
     <h3>Wymiary</h3>
     <div class="property-group prop-box">
@@ -286,6 +289,8 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
     save({ shelves: Array.from({ length: n }, (_, i) => Math.round(th + (i + 1) * gap + i * th)) });
     refresh();
   });
+
+  document.getElementById('btn-slope-cut-drawings')?.addEventListener('click', () => openSlopeCutDrawings(mod));
 
   // --- Fronty ---
   // Luzy jak w zwykłej szafce: mod.front.gap i mod.front.clearance.* nadpisują projekt.

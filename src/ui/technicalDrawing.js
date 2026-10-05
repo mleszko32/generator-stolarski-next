@@ -7,6 +7,7 @@ import { state, getActiveModule } from "../core/state.js";
 import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel } from "./properties.js";
 import { openCornerBlankPrintView } from "./cornerProperties.js";
+import { openSlopeCutDrawings } from "./slopeCutDrawings.js";
 import { updateSidebar } from "./sidebar.js";
 import { escapeHtml } from "../utils/dom.js";
 import { showAlert } from "../utils/modal.js";
@@ -25,8 +26,9 @@ export function openTechnicalDrawing() {
         openCornerBlankPrintView(activeMod);
         return;
     }
+    // Szafka pod skos: rysunki cięcia skosów (płyty, fronty, plecy).
     if (activeMod.type === 'slope_cabinet') {
-        showAlert("Rysunek z wierceniami dla szafki pod skos nie jest jeszcze gotowy. Formatki są w hubie Produkcja i raporty.");
+        openSlopeCutDrawings(activeMod);
         return;
     }
     try {
