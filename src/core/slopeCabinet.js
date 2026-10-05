@@ -494,14 +494,17 @@ function frontSolids(mod, config) {
       add('drawerBox', rect(d.ox0, d.yBase, t, c.sideHeight), zOff, L);
       add('drawerBox', rect(d.ox1 - t, d.yBase, t, c.sideHeight), zOff, L);
       add('drawerBox', rect(d.ox0 + t, yB, d.ox1 - d.ox0 - 2 * t, t), zOff, L);
-      add('drawerBox', rect(d.ox0 + t, yB + t, d.ox1 - d.ox0 - 2 * t, c.back.height), zOff + L - t, t);
+      // Tył i czoło wewnętrzne na dnie - jak w zwykłej szafce (render/viewer3d.js).
+      const panel = rect(d.ox0 + t, yB + t, d.ox1 - d.ox0 - 2 * t, c.back.height);
+      add('drawerBox', panel, zOff + L - t, t);
+      add('drawerBox', panel, zOff, t);
       return;
     }
-    // System metalowy: dno na dole, boki (profil) i tył.
-    const h = 16 + c.back.height;
+    // System metalowy: dno na dole, boki (profil) i tył nad dnem - jak w zwykłej szafce.
+    const h = c.back.height;
     add('drawerBox', rect(d.ox0 + t, d.yBase, c.bottom.width, 16), zOff, L);
-    add('drawerBox', rect(d.ox0, d.yBase, t, h), zOff, L);
-    add('drawerBox', rect(d.ox1 - t, d.yBase, t, h), zOff, L);
+    add('drawerBox', rect(d.ox0, d.yBase + 16, t, h), zOff, L);
+    add('drawerBox', rect(d.ox1 - t, d.yBase + 16, t, h), zOff, L);
     add('drawerBox', rect(d.ox0 + t + (c.bottom.width - c.back.width) / 2, d.yBase + 16, c.back.width, c.back.height), zOff + L - t, t);
   });
   return solids;

@@ -335,3 +335,14 @@ describe("szafka pod skos - wysokość boku szuflady MOVENTO wpisana ręcznie", 
     expect(a.comps.sideHeight).toBe(300);
   });
 });
+
+describe("szafka pod skos - skrzynki szuflad w 3D", () => {
+  it("skrzynka drewniana A ma 5 płyt jak w zwykłej szafce: 2 boki, dno, tył i czoło wewnętrzne", () => {
+    const m = slopeMod({ width: 2000, height: 1500, dividers: [646, 1314], shelves: [500, 1000] });
+    const { solids } = getSlopeCabinetPolygons(m, cfg());
+    const drawers = getSlopeFronts(m, cfg()).filter((f) => f.type === "szuflada").length;
+    expect(solids.filter((s) => s.kind === "drawerBox")).toHaveLength(drawers * 5);
+    // Czoło wewnętrzne tuż za frontem (zFront 0), tył na końcu skrzynki.
+    expect(solids.filter((s) => s.kind === "drawerBox" && s.zFront === 0 && s.depth === 16).length).toBe(drawers);
+  });
+});
