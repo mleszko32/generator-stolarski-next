@@ -72,7 +72,7 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
     </div>
 
     <button type="button" id="btn-slope-interior" class="btn btn-block btn-primary mb-8"><i class="ti ti-layout-grid" aria-hidden="true"></i> Edytuj wnętrze (Wnętrze 2D)</button>
-    <button type="button" id="btn-slope-cut-drawings" class="btn btn-block btn-sm mb-8"><i class="ti ti-file-text" aria-hidden="true"></i> Rysunki cięcia (skosy, fronty, plecy)</button>
+    <button type="button" id="btn-slope-cut-drawings" class="btn btn-block btn-sm mb-8"><i class="ti ti-file-text" aria-hidden="true"></i> Rysunki cięcia i nawiertów</button>
     <div class="hint mb-8">Przegrody, półki, szuflady i drzwi dodajesz w edytorze Wnętrze 2D jak w zwykłej szafce. Skos sam przycina półki, przegrody i fronty; front, który wychodzi trójkątem, staje się blendą.</div>
 
     <h3>Wymiary</h3>

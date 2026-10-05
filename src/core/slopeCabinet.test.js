@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   getSlopeGeometry, getSlopeInnerRect, getSlopeDividers, getSlopeShelfPieces, getSlopeCabinetParts,
   getSlopeCabinetPolygons, clipFrontRect, getSlopeFronts, getSlopeFrontParts, getSlopeDrawerHardware,
-  getSlopeFrontSettings, getSlopeBoards, insetPolygon, getSlopeShapes, buildSlopeElements, migrateSlopeModule,
+  getSlopeFrontSettings, getSlopeBoards, insetPolygon, getSlopeShapes, buildSlopeElements, migrateSlopeModule, getSlopeDrillings,
 } from "./slopeCabinet.js";
 import { recalculateLayout } from "./layout.js";
 import { buildZoneTree, assignFront } from "./zoneTree.js";
@@ -344,5 +344,59 @@ describe("szafka pod skos - skrzynki szuflad w 3D", () => {
     expect(solids.filter((s) => s.kind === "drawerBox")).toHaveLength(drawers * 5);
     // Czoło wewnętrzne tuż za frontem (zFront 0), tył na końcu skrzynki.
     expect(solids.filter((s) => s.kind === "drawerBox" && s.zFront === 0 && s.depth === 16).length).toBe(drawers);
+  });
+});
+
+describe("szafka pod skos - nawierty jak w zwykłej szafce", () => {
+  // Trójkąt 2000 x 1500, przegrody 646 i 1314, półki 500 i 1000, MOVENTO:
+  // kolumna przy skosie - blenda; środkowa - szuflada na dole; przy wysokim boku - 2 szuflady.
+  const drill = () => getSlopeDrillings(slopeMod({ width: 2000, height: 1500, dividers: [646, 1314], shelves: [500, 1000] }), cfg());
+  const face = (d, name, side) => d.faces.find((f) => f.name === name && f.side === side);
+  const count = (fc, type) => fc.holes.filter((h) => h.type === type).length;
+
+  it("bok wysoki: prowadnice dwóch szuflad i podpórki dwóch półek", () => {
+    const fc = face(drill(), "Bok wysoki", "wewnętrzna");
+    expect(count(fc, "drawer")).toBe(6);
+    expect(count(fc, "shelf")).toBe(12);
+    // Prowadnice 37 / 69 / 261 od frontu, jak w zwykłej szafce.
+    expect([...new Set(fc.holes.filter((h) => h.type === "drawer").map((h) => h.x))].sort((a, b) => a - b)).toEqual([37, 69, 261]);
+  });
+
+  it("przegrody: każda strona wiercona pod to, co jest po jej stronie", () => {
+    const d = drill();
+    expect(count(face(d, "Przegroda 1", "lewa"), "drawer")).toBe(0);      // obok blenda
+    expect(count(face(d, "Przegroda 1", "prawa"), "drawer")).toBe(3);
+    expect(count(face(d, "Przegroda 1", "prawa"), "shelf")).toBe(0);      // półka nie sięga - skos
+    expect(count(face(d, "Przegroda 2", "lewa"), "drawer")).toBe(3);
+    expect(count(face(d, "Przegroda 2", "lewa"), "shelf")).toBe(6);
+    expect(count(face(d, "Przegroda 2", "prawa"), "drawer")).toBe(6);
+  });
+
+  it("łączniki: dno pod bokiem i przegrodami, wkręty w skośnej płycie", () => {
+    const d = drill();
+    const bottom = d.plans.find((p) => p.name.startsWith("Dno"));
+    expect(bottom.holes.filter((h) => h.type === "screw")).toHaveLength(6);
+    expect(bottom.holes.filter((h) => h.type === "dowel")).toHaveLength(6);
+    const slope = d.plans.find((p) => p.name.startsWith("Skos"));
+    expect(slope.holes).toHaveLength(6);
+    expect(slope.holes.every((h) => h.type === "screw")).toBe(true);
+    expect(d.notes).toEqual([]);
+  });
+
+  it("drzwi z zawiasami od strony skosu: brak płyty na zawiasy - ostrzeżenie", () => {
+    // Jedna kolumna od czubka skosu do wysokiego boku, półka na 500. Szuflada na dole
+    // by się nie zmieściła (przy skosie prawie zero miejsca), więc wstawiamy drzwi.
+    const m = slopeMod({ width: 2000, height: 1500, shelves: [500] });
+    const bottom = getSlopeFronts(m, cfg()).find((f) => f.el.y < 100).el;
+    bottom.subtype = "drzwi";
+    bottom.openingSide = "left";
+    recalculateLayout(m);
+    let d = getSlopeDrillings(m, cfg());
+    expect(d.notes.some((n) => n.includes("brak boku na zawiasy"))).toBe(true);
+    // Zawiasy od strony wysokiego boku - są nawierty, bez ostrzeżenia.
+    bottom.openingSide = "right";
+    d = getSlopeDrillings(m, cfg());
+    expect(count(face(d, "Bok wysoki", "wewnętrzna"), "hinge")).toBeGreaterThan(0);
+    expect(d.notes.some((n) => n.includes("zawiasy"))).toBe(false);
   });
 });

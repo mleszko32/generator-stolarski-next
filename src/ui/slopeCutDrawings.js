@@ -6,8 +6,9 @@
 import { state } from "../core/state.js";
 import { escapeHtml } from "../utils/dom.js";
 import { round1 } from "../utils/math.js";
-import { getSlopeBoards, getSlopeShapes, getSlopeGeometry } from "../core/slopeCabinet.js";
-import { slopeBoardSVG, slopeShapeSVG } from "../render/slopeDrawing2d.js";
+import { getSlopeBoards, getSlopeShapes, getSlopeGeometry, getSlopeDrillings } from "../core/slopeCabinet.js";
+import { recalculateLayout } from "../core/layout.js";
+import { slopeBoardSVG, slopeShapeSVG, slopeFaceSVG, slopePlanSVG } from "../render/slopeDrawing2d.js";
 
 // Identyczne płyty (np. kilka takich samych przegród) - jeden rysunek z ilością.
 function groupBoards(boards) {
@@ -26,14 +27,16 @@ export function openSlopeCutDrawings(mod) {
   const g = getSlopeGeometry(mod, th);
   const boards = groupBoards(getSlopeBoards(mod, config));
   const angled = boards.filter(({ board: b }) => b.tiltStart || b.tiltEnd);
+  recalculateLayout(mod);
   const shapes = getSlopeShapes(mod, config);
+  const drill = getSlopeDrillings(mod, config);
   const steep = angled.some(({ board: b }) => Math.max(b.tiltStart, b.tiltEnd) > 45);
 
   const html = `<!DOCTYPE html>
 <html lang="pl">
 <head>
   <meta charset="UTF-8">
-  <title>Rysunki cięcia - ${escapeHtml(mod.name)}</title>
+  <title>Rysunki cięcia i nawiertów - ${escapeHtml(mod.name)}</title>
   <style>
     :root { color-scheme: light; }
     html { background: #fff; }
@@ -53,7 +56,7 @@ export function openSlopeCutDrawings(mod) {
     <button onclick="window.print()" style="padding: 12px 24px; background-color: #059669; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px;">🖨️ Drukuj / Zapisz jako PDF</button>
   </div>
   <div class="header">
-    <h1>Rysunki cięcia: ${escapeHtml(mod.name)}</h1>
+    <h1>Rysunki cięcia i nawiertów: ${escapeHtml(mod.name)}</h1>
     <p>Szafka pod skos ${round1(g.W)} × ${round1(g.H)} × ${round1(g.D)} mm, ${g.isTriangle ? 'trójkąt' : `trapez (niska strona ${round1(g.L)} mm)`}, kąt skosu ${round1(g.angle)}°.<br>
     <b>Piła X°</b> — pochylenie piły od cięcia prostopadłego (kąt cięcia przez grubość płyty). Wymiar formatki to jej dłuższa krawędź.</p>
   </div>
@@ -62,6 +65,11 @@ export function openSlopeCutDrawings(mod) {
   ${angled.map(({ board, qty }) => `<div class="card">${slopeBoardSVG(board, qty)}</div>`).join('') || '<p>Brak.</p>'}
   <h2>Fronty, blendy i plecy o nieprostokątnym obrysie</h2>
   ${shapes.map((sh) => `<div class="card">${slopeShapeSVG(sh)}</div>`).join('') || '<p>Brak.</p>'}
+  <h2>Nawierty</h2>
+  <p style="font-size:13px;color:#475569">Te same wzory co w zwykłej szafce: prowadnice szuflad, podpórki półek (3 otwory co 32 mm), konfirmat + kołek, puszki zawiasów. Wysokości od dołu danej płyty, odległości od frontu.</p>
+  ${drill.notes.map((n) => `<div class="warn">${escapeHtml(n)}</div>`).join('')}
+  ${drill.faces.filter((fc) => fc.holes.length).map((fc) => `<div class="card">${slopeFaceSVG(fc)}</div>`).join('')}
+  ${drill.plans.map((pl) => `<div class="card">${slopePlanSVG(pl)}</div>`).join('')}
 </body>
 </html>`;
 

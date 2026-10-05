@@ -28,7 +28,8 @@
 // i rysunki z powrotem (lustro), formatki są takie same.
 
 import { drawerSystems } from './drawerSystems.js';
-import { getDrawerComponents, getWoodenDrawerHeights, drawerComponentsToParts, drawerHardwareKey } from './drawerMath.js';
+import { getDrawerComponents, getWoodenDrawerHeights, drawerComponentsToParts, drawerHardwareKey, calculateDrawerHoles } from './drawerMath.js';
+import { calculateHinges } from './hingeMath.js';
 
 const MIN_PIECE = 50;   // krótsze kawałki pomijamy (nie da się ich zrobić)
 const r1 = (v) => Math.round(v * 10) / 10;
@@ -588,6 +589,133 @@ export function getSlopeCabinetParts(mod, config) {
   const bw = Math.max(...back.points.map((p) => p[0])), bh = Math.max(...back.points.map((p) => p[1]));
   parts.push({ name: back.name, length: r1(bh), width: r1(bw), qty: 1, category: 'Plecy' });
   return parts;
+}
+
+// ---------------------------------------------------------------------------
+// Nawierty - te same wzory co w zwykłej szafce (engine/cabinet.js, carcaseParts.js,
+// render/viewer2d.js): prowadnice szuflad (calculateDrawerHoles), podpórki półek
+// ruchomych (37 / głęb.-37 od frontu, 3 otwory co 32 mm), konfirmat + kołek
+// (37 i +32 od każdej krawędzi), puszki zawiasów (37 od frontu, ±16 od osi).
+// ---------------------------------------------------------------------------
+
+const SHELF_PIN_DROP = 2.5;   // jak w render/viewer2d.js
+
+// Nawierty szafki pod skos:
+// - faces: ściany płyt pionowych (bok wysoki, bok niski, obie strony przegród)
+//   { name, side, height, width, holes: [{ x (od frontu), y (od dołu płyty), type }] },
+//   type: 'drawer' | 'shelf' | 'screw' | 'dowel' | 'hinge';
+// - plans: rzut płyty poziomej/skośnej z łącznikami do płyt pionowych
+//   { name, length, width, holes: [{ x (wzdłuż płyty), z (od frontu), type }] };
+// - notes: ostrzeżenia (np. szuflada bez boku do przykręcenia prowadnicy).
+export function getSlopeDrillings(mod, config) {
+  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const backThick = parseFloat(config.materials?.backThickness) || 3;
+  const g = getSlopeGeometry(mod, th);
+  const depth = g.D - backThick;
+  const f = { ...(config.front || {}), ...(mod.front || {}) };
+  const isInset = f.type === 'wpuszczane';
+  const sys = String(f.drawerSystem || 'merivobox').toLowerCase();
+  const nAt = (x) => (g.lowSide === 'right' ? g.W - x : x);   // punkt rzeczywisty -> układ skosu
+  const notes = [];
+
+  // Ściany płyt pionowych: x ściany (rzeczywiste), w którą stronę patrzy
+  // ('R' - wnętrze po prawej, 'L' - po lewej), spód płyty i wysokość ściany.
+  const faces = [];
+  const addFace = (name, side, x, dir, y0, yTop) => faces.push({ name, side, x, dir, y0, height: yTop - y0, width: depth, holes: [] });
+  const lowLeft = g.lowSide === 'left';
+  addFace('Bok wysoki', 'wewnętrzna', lowLeft ? g.W - th : th, lowLeft ? 'L' : 'R', th, g.under(nAt(lowLeft ? g.W - th : th)));
+  if (!g.isTriangle) addFace('Bok niski', 'wewnętrzna', lowLeft ? th : g.W - th, lowLeft ? 'R' : 'L', th, g.under(nAt(lowLeft ? th : g.W - th)));
+  const dividers = (mod.elements || []).filter((el) => el.typ === 'pion').sort((a, b) => a.x - b.x);
+  const shownDividers = getSlopeDividers(mod, th).map((d) => d.el);
+  dividers.filter((el) => shownDividers.includes(el)).forEach((el, i) => {
+    const x = parseFloat(el.x) || 0, y0 = parseFloat(el.y) || 0, y1 = y0 + (parseFloat(el.h) || 0);
+    const name = `Przegroda ${i + 1}`;
+    addFace(name, 'lewa', x, 'L', y0, Math.min(y1, g.under(nAt(x))));
+    addFace(name, 'prawa', x + th, 'R', y0, Math.min(y1, g.under(nAt(x + th))));
+  });
+  // Ściana, do której przylega granica wnęki: lewa granica wnęki -> ściana 'R' w tym x.
+  const faceAt = (x, dir) => faces.find((fc) => fc.dir === dir && Math.abs(fc.x - x) < 1);
+  const put = (fc, hole) => { if (fc) fc.holes.push({ ...hole, y: hole.y - fc.y0 }); };
+
+  // Prowadnice szuflad.
+  getSlopeFronts(mod, config).forEach((fr) => {
+    const el = fr.el, bz = el.baseZone || {};
+    if (fr.type === 'szuflada') {
+      const isBottomOuter = (parseFloat(bz.minY) || 0) <= th + 0.5;
+      const holes = calculateDrawerHoles(sys, el.y, el.h, th, el.frontIndex, el.frontIndex === 0 && isBottomOuter && !isInset);
+      const shift = el.subtype === 'szuflada-wewnetrzna' ? parseFloat(el.innerFrontThickness ?? 18) + parseFloat(el.innerSetback ?? 2) : 0;
+      [['R', parseFloat(bz.minX)], ['L', parseFloat(bz.maxX)]].forEach(([dir, x]) => {
+        const fc = faceAt(x, dir);
+        if (!fc) { notes.push(`${frontName(fr)}: brak boku do przykręcenia prowadnicy (${dir === 'R' ? 'lewa' : 'prawa'} strona to skos).`); return; }
+        holes.slideSideHoles.forEach((h) => put(fc, { x: h.x + shift, y: h.y, type: 'drawer' }));
+      });
+    } else if (fr.type === 'drzwi') {
+      const side = fr.subtype === 'drzwi-lp' ? (String(el.id).includes('-L-') ? 'left' : 'right') : (el.openingSide || 'left');
+      const fc = side === 'left' ? faceAt(parseFloat(bz.minX), 'R') : faceAt(parseFloat(bz.maxX), 'L');
+      if (!fc) { notes.push(`${frontName(fr)}: brak boku na zawiasy po stronie ${side === 'left' ? 'lewej' : 'prawej'}.`); return; }
+      calculateHinges(el, th, [], side).forEach((h) => {
+        put(fc, { x: 37, y: h.y - 16, type: 'hinge' });
+        put(fc, { x: 37, y: h.y + 16, type: 'hinge' });
+      });
+    }
+  });
+
+  // Półki: ruchome na podpórkach, stałe na konfirmat + kołek - po obu końcach,
+  // o ile na końcu jest płyta (koniec przy skosie nie ma czego wiercić).
+  (mod.elements || []).filter((el) => el.typ === 'poziom').forEach((el) => {
+    const x0 = parseFloat(el.x) || 0, x1 = x0 + (parseFloat(el.w) || 0), y = parseFloat(el.y) || 0;
+    [faceAt(x0, 'R'), faceAt(x1, 'L')].forEach((fc) => {
+      if (!fc) return;
+      if (y + th > fc.y0 + fc.height + 0.5) return;   // półka ponad skosem przy tej ścianie
+      if (el.isStructural) {
+        [37, depth - 37].forEach((hx) => {
+          put(fc, { x: hx, y: y + th / 2, type: 'screw' });
+          put(fc, { x: hx === 37 ? 69 : depth - 69, y: y + th / 2, type: 'dowel' });
+        });
+      } else {
+        [-32, 0, 32].forEach((dy) => [37, depth - 37].forEach((hx) => put(fc, { x: hx, y: y - SHELF_PIN_DROP + dy, type: 'shelf' })));
+      }
+    });
+  });
+
+  faces.forEach((fc) => {
+    if (fc.holes.some((h) => h.y > fc.height - 5 || h.y < 5)) notes.push(`${fc.name} (${fc.side}): otwór wychodzi poza płytę - sprawdź wysokości frontów i półek pod skosem.`);
+  });
+
+  // Rzuty płyt z łącznikami do płyt pionowych (konfirmat 37 od krawędzi + kołek 32 dalej).
+  const joint = (holes, x, withDowels = true) => {
+    [37, depth - 37].forEach((z) => {
+      holes.push({ x, z, type: 'screw' });
+      if (withDowels) holes.push({ x, z: z === 37 ? 69 : depth - 69, type: 'dowel' });
+    });
+  };
+  // Dno nakładane: boki i przegrody stoją na nim - łączniki od spodu dna.
+  const bottomHoles = [];
+  faces.filter((fc) => fc.side !== 'lewa' && Math.abs(fc.y0 - th) < 1).forEach((fc) => {
+    const cx = fc.name.startsWith('Przegroda') ? fc.x - th / 2 : (fc.dir === 'L' ? fc.x + th / 2 : fc.x - th / 2);
+    joint(bottomHoles, cx);
+  });
+  const plans = [{ name: 'Dno (wieniec dolny)', length: g.W, width: depth, holes: bottomHoles, fromLabel: 'od lewej krawędzi' }];
+
+  // Skośna płyta: wkręty przez płytę w górne końce boków i przegród sięgających
+  // do skosu (bez kołków - końce są cięte pod kątem). Pozycja wzdłuż wierzchu
+  // płyty od jej dolnego końca.
+  const cosA = Math.cos(g.angle * Math.PI / 180);
+  const topStart = g.isTriangle ? th / g.k : 0;
+  const slopeHoles = [];
+  const reachesSlope = (fc) => fc.y0 + fc.height >= g.under(nAt(fc.x)) - 1;
+  const seen = new Set();
+  faces.filter(reachesSlope).forEach((fc) => {
+    const key = fc.name;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const cxReal = fc.name.startsWith('Przegroda') ? (fc.side === 'lewa' ? fc.x + th / 2 : fc.x - th / 2) : (fc.dir === 'L' ? fc.x + th / 2 : fc.x - th / 2);
+    joint(slopeHoles, (nAt(cxReal) - topStart) / cosA, false);
+  });
+  const topLen = g.isTriangle ? (g.W - th / g.k) / cosA : Math.hypot(g.W, g.H - g.L);
+  plans.push({ name: 'Skos (wieniec skośny)', length: topLen, width: depth, holes: slopeHoles, fromLabel: 'wzdłuż wierzchu od dolnego końca' });
+
+  return { faces: faces.map(({ dir, ...fc }) => fc), plans, notes };
 }
 
 // Obszar nad spodem skośnej płyty w widoku od frontu (rzeczywiste x) - do

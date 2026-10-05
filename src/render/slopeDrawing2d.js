@@ -110,3 +110,95 @@ export function slopeShapeSVG(shape) {
   svg += `</svg>`;
   return svg;
 }
+
+// ---------------------------------------------------------------------------
+// Nawierty szafki pod skos (dane: core/slopeCabinet.js: getSlopeDrillings).
+// Kolory jak na rysunku boku zwykłej szafki (render/viewer2d.js).
+// ---------------------------------------------------------------------------
+
+const HOLE_STYLE = {
+  drawer: { color: C.sky600, r: 3.5, label: 'prowadnica szuflady' },
+  shelf: { color: C.orange600, r: 3, label: 'podpórka półki' },
+  screw: { color: C.purple600, r: 2.5, label: 'konfirmat' },
+  dowel: { color: C.purple600, r: 5, label: 'kołek' },
+  hinge: { color: C.green600, r: 3.5, label: 'puszka zawiasu (osie mocowania)' },
+};
+
+function legendFor(holes, y, W) {
+  const kinds = [...new Set(holes.map((h) => h.type))];
+  let x = 20, svg = '';
+  kinds.forEach((k) => {
+    const st = HOLE_STYLE[k];
+    svg += `<circle cx="${x + 5}" cy="${y - 4}" r="${Math.min(st.r, 5)}" fill="${st.color}"/>`;
+    svg += text(x + 14, y, st.label, { anchor: 'start', size: 11, color: C.slate600 });
+    x += 30 + st.label.length * 6;
+    if (x > W - 120) x = 20;
+  });
+  return svg;
+}
+
+// Ściana płyty pionowej: front po lewej, dół płyty na dole. Pod rysunkiem
+// wysokości otworów od dołu płyty, nad nim odległości od frontu.
+export function slopeFaceSVG(face) {
+  const W = 760, padL = 50, padT = 95;
+  const s = Math.min((W - padL - 230) / face.width, 380 / Math.max(face.height, 1));
+  const w = face.width * s, h = face.height * s;
+  const H = padT + h + 60;
+  const X = (x) => padL + x * s, Y = (y) => padT + h - y * s;
+  let svg = `<svg viewBox="0 0 ${W} ${r1(H)}" xmlns="http://www.w3.org/2000/svg" style="max-width:${W}px">`;
+  svg += `<rect width="${W}" height="${r1(H)}" fill="${C.white}"/>`;
+  svg += text(20, 22, `${face.name} — strona ${face.side}`, { anchor: 'start', size: 14, weight: 'bold', color: C.slate900 });
+  svg += text(20, 40, `Ściana ${fmt(face.width)} × ${fmt(face.height)} mm (głęb. × wys.), widok na tę stronę, front po lewej`, { anchor: 'start', size: 12, color: C.slate600 });
+  svg += `<rect x="${padL}" y="${padT}" width="${r1(w)}" height="${r1(h)}" fill="${C.slate50}" stroke="${C.slate800}" stroke-width="1.5"/>`;
+  svg += text(padL + 4, padT + h - 6, 'PRZÓD', { anchor: 'start', size: 10, color: C.slate400, weight: 'bold' });
+  svg += text(padL + w - 4, padT + h - 6, 'TYŁ', { anchor: 'end', size: 10, color: C.slate400, weight: 'bold' });
+  face.holes.forEach((hl) => {
+    const st = HOLE_STYLE[hl.type];
+    svg += `<circle cx="${r1(X(hl.x))}" cy="${r1(Y(hl.y))}" r="${st.r}" fill="${st.color}"/>`;
+  });
+  // Wysokości od dołu płyty - kolumna z prawej, w kolorze otworu.
+  const ys = [...new Map(face.holes.map((hl) => [`${hl.type}|${r1(hl.y)}`, hl])).values()].sort((a, b) => b.y - a.y);
+  let lastY = -Infinity;
+  ys.forEach((hl) => {
+    const st = HOLE_STYLE[hl.type];
+    let ty = Y(hl.y) + 4;
+    if (ty - lastY < 12) ty = lastY + 12;
+    lastY = ty;
+    svg += line(padL + w, Y(hl.y), padL + w + 30, ty - 4, st.color, 'stroke-dasharray="2,2"');
+    svg += text(padL + w + 34, ty, `${fmt(hl.y)} od dołu`, { anchor: 'start', size: 11, color: st.color });
+  });
+  // Odległości od frontu - nad rysunkiem.
+  const xs = [...new Set(face.holes.map((hl) => r1(hl.x)))].sort((a, b) => a - b);
+  xs.forEach((x, i) => svg += text(X(x), padT - 8 - (i % 2) * 12, fmt(x), { size: 10, color: C.slate600 }));
+  if (xs.length) svg += text(padL, padT - 34, 'od frontu:', { anchor: 'start', size: 10, color: C.slate500 });
+  svg += legendFor(face.holes, H - 16, W);
+  svg += `</svg>`;
+  return svg;
+}
+
+// Rzut płyty poziomej / skośnej z łącznikami: długość w poziomie, front na dole.
+export function slopePlanSVG(plan) {
+  const W = 760, padL = 40, padT = 70;
+  const s = Math.min((W - padL - 120) / plan.length, 220 / plan.width);
+  const w = plan.length * s, h = plan.width * s;
+  const H = padT + h + 70;
+  const X = (x) => padL + x * s, Y = (z) => padT + h - z * s;
+  let svg = `<svg viewBox="0 0 ${W} ${r1(H)}" xmlns="http://www.w3.org/2000/svg" style="max-width:${W}px">`;
+  svg += `<rect width="${W}" height="${r1(H)}" fill="${C.white}"/>`;
+  svg += text(20, 22, `${plan.name} — łączniki`, { anchor: 'start', size: 14, weight: 'bold', color: C.slate900 });
+  svg += text(20, 40, `Płyta ${fmt(plan.length)} × ${fmt(plan.width)} mm, widok z góry, front na dole; pozycje ${plan.fromLabel}`, { anchor: 'start', size: 12, color: C.slate600 });
+  svg += `<rect x="${padL}" y="${padT}" width="${r1(w)}" height="${r1(h)}" fill="${C.slate50}" stroke="${C.slate800}" stroke-width="1.5"/>`;
+  svg += text(padL + w / 2, padT + h + 14, 'PRZÓD', { size: 10, color: C.slate400, weight: 'bold' });
+  plan.holes.forEach((hl) => {
+    const st = HOLE_STYLE[hl.type];
+    svg += `<circle cx="${r1(X(hl.x))}" cy="${r1(Y(hl.z))}" r="${st.r}" fill="${st.color}"/>`;
+  });
+  const xs = [...new Set(plan.holes.map((hl) => r1(hl.x)))].sort((a, b) => a - b);
+  xs.forEach((x, i) => svg += text(X(x), padT - 8 - (i % 2) * 12, fmt(x), { size: 10, color: C.purple600 }));
+  const zs = [...new Set(plan.holes.map((hl) => r1(hl.z)))].sort((a, b) => a - b);
+  zs.forEach((z) => svg += text(padL + w + 6, Y(z) + 4, `${fmt(z)} od frontu`, { anchor: 'start', size: 10, color: C.purple600 }));
+  if (!plan.holes.length) svg += text(padL + w / 2, padT + h / 2, 'brak łączników', { size: 12, color: C.slate500 });
+  svg += legendFor(plan.holes, H - 16, W);
+  svg += `</svg>`;
+  return svg;
+}
