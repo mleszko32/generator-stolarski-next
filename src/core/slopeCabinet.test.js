@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getSlopeGeometry, getSlopeDividers, getSlopeShelfPieces, getSlopeCabinetParts, getSlopeCabinetPolygons } from "./slopeCabinet.js";
+import { getSlopeGeometry, getSlopeDividers, getSlopeShelfPieces, getSlopeCabinetParts, getSlopeCabinetPolygons, getSlopeColumns, getSlopeSettings } from "./slopeCabinet.js";
 
 const config = { materials: { boardThickness: 18, backThickness: 3 } };
 const mod = (slope = {}, dims = {}) => ({
@@ -18,14 +18,16 @@ describe("szafka pod skos - trójkąt 45°", () => {
     expect(g.c).toBeCloseTo(25.456, 2);
   });
 
-  it("formatki korpusu: skos, bok wysoki, wieniec dolny docięte pod kątem", () => {
+  it("formatki korpusu przy dnie nakładanym: skos i bok stoją na dnie", () => {
     const parts = getSlopeCabinetParts(mod(), config);
-    expect(part(parts, "Skos")).toMatchObject({ length: 1414.2, width: 597, qty: 1 });
-    expect(part(parts, "Skos").name).toContain("krótsza 1378.2");
-    expect(part(parts, "Bok wysoki")).toMatchObject({ length: 974.5, width: 597 });
-    expect(part(parts, "Bok wysoki").name).toContain("krótsza 956.5");
-    expect(part(parts, "Wieniec dolny")).toMatchObject({ length: 956.5 });
-    expect(part(parts, "Wieniec dolny").name).toContain("krótsza 938.5");
+    // Skos: wierzch od x = 18 (dno) do 1000 pod 45°, spód od x = 43,46 (956,54 / cos 45° = 1352,75).
+    expect(part(parts, "Skos")).toMatchObject({ length: 1388.8, width: 597, qty: 1 });
+    expect(part(parts, "Skos").name).toContain("krótsza 1352.8");
+    expect(part(parts, "Bok wysoki")).toMatchObject({ length: 956.5, width: 597 });
+    expect(part(parts, "Bok wysoki").name).toContain("krótsza 938.5");
+    // Dno na całą szerokość, koniec przy skosie docięty równo z linią skosu.
+    expect(part(parts, "Dno")).toMatchObject({ length: 1000 });
+    expect(part(parts, "Dno").name).toContain("krótsza 982");
     expect(part(parts, "Bok niski")).toBeUndefined();
     expect(part(parts, "Plecy")).toMatchObject({ length: 996, width: 996, category: "Plecy" });
   });
@@ -57,13 +59,13 @@ describe("szafka pod skos - trójkąt 45°", () => {
 });
 
 describe("szafka pod skos - trapez i strona skosu", () => {
-  it("trapez: niski bok i wieniec dolny między bokami", () => {
+  it("trapez: niski bok stoi na dnie, dno prostokątne na całą szerokość", () => {
     const g = getSlopeGeometry(mod({ lowHeight: 400 }));
     expect(g.isTriangle).toBe(false);
     const parts = getSlopeCabinetParts(mod({ lowHeight: 400 }), config);
-    expect(part(parts, "Bok niski")).toMatchObject({ length: 389.8 });
-    expect(part(parts, "Bok niski").name).toContain("krótsza 379");
-    expect(part(parts, "Wieniec dolny")).toMatchObject({ length: 964, name: "Wieniec dolny" });
+    expect(part(parts, "Bok niski")).toMatchObject({ length: 371.8 });
+    expect(part(parts, "Bok niski").name).toContain("krótsza 361");
+    expect(part(parts, "Dno")).toMatchObject({ length: 1000, name: "Dno (wieniec dolny)" });
   });
 
   it("za niska niska strona liczy się jak trójkąt", () => {
@@ -84,5 +86,26 @@ describe("szafka pod skos - trapez i strona skosu", () => {
     expect(l.back).toContainEqual([0, 0]);
     expect(r.back).toContainEqual([1000, 0]);
     expect(r.back).toContainEqual([0, 1000]);
+  });
+});
+
+describe("szafka pod skos - kolumny (przegrody)", () => {
+  it("reszta wylicza się z szerokości; przegrody między kolumnami", () => {
+    // trójkąt, skos po lewej: wnętrze od 0 (czubek) do 982
+    const c = getSlopeColumns(mod({ columns: [null, 300, 300] }));
+    expect(c.autoWidth).toBeCloseTo(982 - 600 - 36, 5);
+    expect(c.dividers).toEqual([346, 664]);
+  });
+
+  it("stare dane (dividers) zamieniają się na kolumny z resztą przy skosie", () => {
+    expect(getSlopeSettings(mod({ dividers: [500] })).columns).toEqual([null, 464]);
+    expect(getSlopeSettings(mod({ lowSide: "right", dividers: [482] })).columns).toEqual([464, null]);
+    expect(getSlopeColumns(mod({ lowSide: "right", dividers: [482] })).dividers).toEqual([482]);
+  });
+
+  it("skos po prawej: te same kolumny w odwróconej kolejności dają te same formatki", () => {
+    const left = getSlopeCabinetParts(mod({ columns: [null, 300, 300], shelves: [300] }), config);
+    const right = getSlopeCabinetParts(mod({ lowSide: "right", columns: [300, 300, null], shelves: [300] }), config);
+    expect(right).toEqual(left);
   });
 });

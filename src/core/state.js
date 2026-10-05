@@ -334,7 +334,7 @@ export function addSlopeModule() {
     backPanel: { type: "nakladane", offset: 20, grooveDepth: 7, nutBuild: "all", clearance: 2 },
     legs: { active: false, height: 100, plinth: false, plinthOffset: 40 },
     front: {},
-    slope: { lowSide: 'left', lowHeight: 0, dividers: [700, 1400], shelves: [500, 1000] },
+    slope: { lowSide: 'left', lowHeight: 0, columns: [null, 650, 650], shelves: [500, 1000] },
     elements: []
   };
 
