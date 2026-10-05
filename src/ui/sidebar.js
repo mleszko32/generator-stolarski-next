@@ -1,4 +1,4 @@
-import { state, addModule, deleteModule, duplicateModule, addSidePanel, deleteSidePanel, addCornerModule } from "../core/state.js";
+import { state, addModule, deleteModule, duplicateModule, addSidePanel, deleteSidePanel, addCornerModule, addSlopeModule } from "../core/state.js";
 import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel } from "./properties.js";
 import { openProductionHub } from "./productionHub.js";
@@ -37,6 +37,7 @@ const MODULE_ICONS = {
   upper_cabinet: 'ti-cloud',
   tall_cabinet: 'ti-layout-sidebar',
   corner_cabinet: 'ti-corner-up-right',
+  slope_cabinet: 'ti-stairs',
 };
 
 // Lewy panel: Szafki (lista + dodawanie), Boki dokładane, Narzędzia. Listy
@@ -84,6 +85,7 @@ export function updateSidebar() {
         <button id="btn-add-upper" class="btn btn-sm" title="Szafka wisząca"><i class="ti ti-plus" aria-hidden="true"></i> Wisząca</button>
         <button id="btn-add-tall" class="btn btn-sm" title="Słupek"><i class="ti ti-plus" aria-hidden="true"></i> Słupek</button>
         <button id="btn-add-corner" class="btn btn-sm" title="Szafka narożna z frontem łamanym (front prosty + skośny)"><i class="ti ti-plus" aria-hidden="true"></i> Narożna</button>
+        <button id="btn-add-slope" class="btn btn-sm" title="Szafka pod skos (pod schodami, pod dachem)"><i class="ti ti-plus" aria-hidden="true"></i> Skos</button>
       </div>
     </section>
 
@@ -210,6 +212,13 @@ export function updateSidebar() {
       updateSidebar();
     });
   }
+
+  document.getElementById('btn-add-slope')?.addEventListener('click', () => {
+    addSlopeModule();
+    initPropertiesPanel();
+    update3D();
+    updateSidebar();
+  });
 
   const btnModuleLibrary = document.getElementById('btn-module-library');
   if (btnModuleLibrary) {

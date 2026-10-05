@@ -24,6 +24,7 @@ const MODULE_TYPE_LABELS = {
   upper_cabinet: "Szafka wisząca",
   tall_cabinet: "Słupek",
   corner_cabinet: "Szafka narożna",
+  slope_cabinet: "Szafka pod skos",
 };
 
 // Polska odmiana: 1 szuflada, 2-4 szuflady, 5+ szuflad (z wyjątkiem 12-14).

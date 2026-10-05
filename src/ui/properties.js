@@ -17,6 +17,7 @@ import { moduleInfoHtml } from "./moduleInfoPanel.js";
 import { showCustomDialog } from "../core/storage.js";
 import { renderSidePanelProperties } from "./sidePanelProperties.js";
 import { renderCornerModuleProperties } from "./cornerProperties.js";
+import { renderSlopeModuleProperties } from "./slopeProperties.js";
 import { showAlert } from "../utils/modal.js";
 
 function getSelectedMods() {
@@ -121,6 +122,10 @@ export function initPropertiesPanel() {
 
   if (activeModule.type === 'corner_cabinet') {
     renderCornerModuleProperties(rightSidebar, activeModule);
+    return;
+  }
+  if (activeModule.type === 'slope_cabinet') {
+    renderSlopeModuleProperties(rightSidebar, activeModule);
     return;
   }
 

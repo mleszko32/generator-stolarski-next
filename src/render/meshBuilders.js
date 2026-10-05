@@ -177,6 +177,28 @@ export function addHardware(type, x, y, z, axis, parentGroup) {
   parentGroup.add(mesh);
 }
 
+// Płyta o dowolnym obrysie w widoku od frontu (szafka pod skos, render/
+// slopeCabinet3d.js): `points` to [x, y] w płaszczyźnie frontu, bryła ciągnie
+// się wzdłuż +Z od z0 na `depth`. Typy materiału jak w addBox.
+export function addPrism(points, z0, depth, type, isActiveModule, userData, parentGroup) {
+  const shape = new THREE.Shape(points.map(([x, y]) => new THREE.Vector2(x, y)));
+  const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
+  const matObj = isXrayMode ? mats.xray : mats.solid;
+  const mesh = new THREE.Mesh(geo, matObj[type] || matObj.corpus);
+  mesh.position.set(0, 0, z0);
+  if (userData) mesh.userData = userData;
+  mesh.castShadow = !isXrayMode; mesh.receiveShadow = !isXrayMode;
+
+  const edges = new THREE.EdgesGeometry(geo);
+  const isSelected = isActiveModule || (userData && state.selectedModules && state.selectedModules.has(userData.moduleId));
+  let edgeColor = isXrayMode ? 0x64748b : 0x334155;
+  if (isSelected) edgeColor = 0x2563eb;
+  const line = new THREE.LineSegments(edges, getLineMat(edgeColor));
+  if (userData) line.userData = userData;
+  mesh.add(line);
+  parentGroup.add(mesh);
+}
+
 // Panel wieńca narożnika (obrys L ze ściętym rogiem) - jedyna geometria w
 // całej aplikacji, która nie jest zwykłym prostopadłościanem (patrz
 // render/cornerCabinet3d.js: renderCornerCabinet). `shape` to THREE.Shape w

@@ -8,6 +8,7 @@ import { getWorktopParts } from "../core/worktops.js";
 import { recalculateAllLayouts, getWorldFootprint, getCornerDepths } from "../core/layout.js";
 import { getCorpusHoles, getPionMountHoles, getCorpusParts, getBackPanelParts } from "./carcaseParts.js";
 import { getCornerCorpusParts } from "./cornerParts.js";
+import { getSlopeCabinetParts } from "../core/slopeCabinet.js";
 
 export function calculateParts() {
   // Fronty muszą mieć aktualne el.x/y/w/h zanim policzymy z nich formatki.
@@ -31,6 +32,9 @@ export function calculateParts() {
   // technicznego dla tego typu modułu, patrz plan boki dokładane/narożnik).
   if (mod.type === 'corner_cabinet') {
       rawParts.push(...getCornerCorpusParts(mod, config));
+  } else if (mod.type === 'slope_cabinet') {
+      // Szafka pod skos: formatki korpusu i wnętrza z core/slopeCabinet.js.
+      rawParts.push(...getSlopeCabinetParts(mod, config));
   } else {
       rawParts.push(...getCorpusParts(mod, config));
       rawParts.push(...getBackPanelParts(mod, config));
@@ -150,6 +154,8 @@ export function collectProjectParts() {
     const modParts = [];
     if (mod.type === 'corner_cabinet') {
         modParts.push(...getCornerCorpusParts(mod, config));
+    } else if (mod.type === 'slope_cabinet') {
+        modParts.push(...getSlopeCabinetParts(mod, config));
     } else {
         modParts.push(...getCorpusParts(mod, config));
         modParts.push(...getBackPanelParts(mod, config));
@@ -176,7 +182,7 @@ export function collectProjectParts() {
   // co dałoby jedną fikcyjną, za długą listwę cokołu zamiast dwóch krótkich
   // (po jednej na czoło każdego ramienia). Render 3D na razie też nie rysuje
   // cokołu narożnika (patrz renderCornerCabinet) - tylko same nóżki.
-  const baseCabinets = config.modules.filter(m => m.legs && m.legs.active && m.legs.plinth && m.type !== 'corner_cabinet');
+  const baseCabinets = config.modules.filter(m => m.legs && m.legs.active && m.legs.plinth && m.type !== 'corner_cabinet' && m.type !== 'slope_cabinet');
 
   // Tylko szafki o TEJ SAMEJ orientacji (rotation) mogą fizycznie stać w jednym,
   // ciągłym biegu cokołu - stoją wtedy pod tą samą ścianą. Dla rotation 0/180

@@ -12,6 +12,7 @@ const TYPE_LABELS = {
   upper_cabinet: "Szafka wisząca",
   tall_cabinet: "Słupek",
   corner_cabinet: "Szafka narożna",
+  slope_cabinet: "Szafka pod skos",
 };
 
 const dim = (v) => Math.round((parseFloat(v) || 0) * 10) / 10;

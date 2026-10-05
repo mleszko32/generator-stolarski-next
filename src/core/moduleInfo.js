@@ -13,6 +13,7 @@ const TYPE_LABELS = {
   upper_cabinet: "Szafka wisząca",
   tall_cabinet: "Słupek",
   corner_cabinet: "Szafka narożna",
+  slope_cabinet: "Szafka pod skos",
 };
 
 // Zwraca { type, dims, inner, doors[], drawers[], shelves[], dividers } dla szafki zwykłej.

@@ -15,7 +15,7 @@ const NAVY = C.blue900;
 const ORANGE = C.amber600;
 const GRAY = C.slate500;
 
-const TYPE_PREFIX = { base_cabinet: 'D', upper_cabinet: 'W', tall_cabinet: 'S', corner_cabinet: 'N' };
+const TYPE_PREFIX = { base_cabinet: 'D', upper_cabinet: 'W', tall_cabinet: 'S', corner_cabinet: 'N', slope_cabinet: 'K' };
 
 // Kod szafki na rzucie: typ + szerokość (D600 = dolna 600, W800 = wisząca 800,
 // S = słupek, N = narożna - dla narożnej szerokość ramienia na tej ścianie).

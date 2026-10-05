@@ -312,6 +312,37 @@ export function addCornerModule() {
   return newModule;
 }
 
+// Szafka pod skos (core/slopeCabinet.js): trójkąt z wysoką stroną po prawej,
+// z dwiema przegrodami i dwiema półkami - jak typowa zabudowa pod schodami.
+// Bez nóżek (stoi na podłodze), wnętrze w mod.slope, nie w mod.elements.
+export function addSlopeModule() {
+  const newId = 'mod-' + Date.now();
+  const width = 2000, height = 1500, depth = 600;
+
+  let nextX = 0;
+  if (state.project.modules.length > 0) {
+    nextX = Math.max(...state.project.modules.map(m => (parseFloat(m.position.x) || 0) + (parseFloat(m.dimensions.width) || 0)));
+  }
+
+  const newModule = {
+    id: newId,
+    name: 'Szafka pod skos ' + (state.project.modules.filter(m => m.type === 'slope_cabinet').length + 1),
+    type: 'slope_cabinet',
+    dimensions: { width, height, depth },
+    position: { x: nextX, y: 0, z: 0 },
+    rotation: 0,
+    backPanel: { type: "nakladane", offset: 20, grooveDepth: 7, nutBuild: "all", clearance: 2 },
+    legs: { active: false, height: 100, plinth: false, plinthOffset: 40 },
+    front: {},
+    slope: { lowSide: 'left', lowHeight: 0, dividers: [700, 1400], shelves: [500, 1000] },
+    elements: []
+  };
+
+  state.project.modules.push(newModule);
+  state.activeModuleId = newId;
+  return newModule;
+}
+
 // kind: 'bok' (domyślnie) albo 'blenda' - obie to samodzielne płyty w project.sidePanels,
 // różnią się kształtem (blenda to listwa z czołem i kołnierzem mocującym) i formatkami.
 export function addSidePanel(kind = 'bok') {

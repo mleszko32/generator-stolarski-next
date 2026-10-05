@@ -180,6 +180,7 @@ const MODULE_TYPE_LABELS = {
   upper_cabinet: 'Szafka wisząca',
   tall_cabinet: 'Słupek',
   corner_cabinet: 'Szafka narożna',
+  slope_cabinet: 'Szafka pod skos',
 };
 
 // Opis szafki z wymiarami - czytelny także wtedy, gdy nie ma nazwy.
@@ -191,6 +192,8 @@ function moduleLabel(mod) {
   if (mod.type === 'corner_cabinet') {
     const { depthA, depthB } = getCornerDepths(mod);
     dims = `ramię A ${fmt(d.width)} · ramię B ${fmt(d.legB)} · wys. ${h} · głęb. ${fmt(depthA)}/${fmt(depthB)}`;
+  } else if (mod.type === 'slope_cabinet') {
+    dims = `${fmt(d.width)} × ${h} (niska strona ${fmt((mod.slope && mod.slope.lowHeight) || 0)}) × ${fmt(d.depth)} mm (szer. × wys. × głęb.)`;
   } else {
     dims = `${fmt(d.width)} × ${h} × ${fmt(d.depth)} mm (szer. × wys. × głęb.)`;
   }

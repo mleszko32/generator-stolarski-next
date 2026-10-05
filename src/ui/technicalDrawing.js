@@ -25,6 +25,10 @@ export function openTechnicalDrawing() {
         openCornerBlankPrintView(activeMod);
         return;
     }
+    if (activeMod.type === 'slope_cabinet') {
+        showAlert("Rysunek z wierceniami dla szafki pod skos nie jest jeszcze gotowy. Formatki są w hubie Produkcja i raporty.");
+        return;
+    }
     try {
         const sidePanel = parts.find(p => p.name.toLowerCase().includes('bok'));
         let drawHeight = sidePanel ? sidePanel.length : (parseFloat(activeMod.dimensions.height) || 720);

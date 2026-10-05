@@ -21,6 +21,7 @@ import { refreshModuleInfoCard } from '../ui/moduleInfoPanel.js';
 import { initPropertiesPanel } from '../ui/properties.js';
 import { mats, worktopMat, disposeObject, createLabelSprite, addBox, addHole, addHardware, isXrayMode, setXrayMode } from './meshBuilders.js';
 import { renderCornerCabinet } from './cornerCabinet3d.js';
+import { renderSlopeCabinet } from './slopeCabinet3d.js';
 import { initMeasureTool, isMeasureActive, setMeasureButton, toggleMeasureMode, updateMeasureHover, handleMeasureClick, measureHoverMouse } from './measureTool.js';
 import { showAlert } from "../utils/modal.js";
 
@@ -1074,6 +1075,12 @@ export function update3D() {
       // prostokątny korpus).
       if (mod.type === 'corner_cabinet') {
           renderCornerCabinet(mod, mod.id === state.activeModuleId, th, cabinetGroup);
+          return;
+      }
+
+      // Szafka pod skos (core/slopeCabinet.js) - płyty o nieprostokątnym obrysie.
+      if (mod.type === 'slope_cabinet') {
+          renderSlopeCabinet(mod, mod.id === state.activeModuleId, th, cabinetGroup);
           return;
       }
 

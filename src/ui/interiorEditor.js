@@ -283,6 +283,12 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);">Wybierz szafkę, żeby edytować jej wnętrze</div>`;
       return;
     }
+    // Szafka pod skos ma własne wnętrze (przegrody i półki w prawym panelu,
+    // ui/slopeProperties.js) - ten edytor zakłada prostokątne wnęki.
+    if (mod.type === "slope_cabinet") {
+      container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);text-align:center;padding:20px;">Wnętrze szafki pod skos ustawiasz w prawym panelu (przegrody i półki).</div>`;
+      return;
+    }
 
     // Grupa: moduły ze wspólnym groupId ("Połącz zaznaczone w grupę" w
     // ui/properties.js) rysują się WSZYSTKIE naraz, każdy w pełni edytowalny,
