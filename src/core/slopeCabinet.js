@@ -272,22 +272,35 @@ export function getSlopeFronts(mod, config) {
   const backThick = parseFloat(config.materials?.backThickness) || 3;
   const { g, cells } = getSlopeCells(mod, th);
   const s = getSlopeSettings(mod, th);
+  const { gap, isInset, cLeft, cRight, cBottom, cSlope } = getSlopeFrontSettings(mod, config);
   const f = { ...(config.front || {}), ...(mod.front || {}) };
-  const gap = parseFloat(f.gap ?? 3);
-  const cl = f.clearance || {};
-  const cSide = parseFloat(cl.sides ?? 1.5);
-  const cBottom = parseFloat(cl.bottom ?? 0);
+  // Luzy boków w układzie znormalizowanym: niska strona zawsze po lewej.
+  const cLow = g.lowSide === 'left' ? cLeft : cRight;
+  const cHigh = g.lowSide === 'left' ? cRight : cLeft;
   const sys = String(f.drawerSystem || 'merivobox').toLowerCase();
-  const ctx = { sys, system: drawerSystems[sys], depth: g.D - backThick, wantB: s.drawerBox === 'B' };
+  // Front wpuszczany wchodzi w korpus na swoją grubość - o tyle krótsza szuflada.
+  const ctx = { sys, system: drawerSystems[sys], depth: g.D - backThick - (isInset ? th : 0), wantB: s.drawerBox === 'B' };
   const types = s.cellTypes || {};
-  // Front kończy się pod skośną płytą (płyta zostaje widoczna), ze szczeliną.
-  const a0 = g.L - g.c - gap;
+  // Front kończy się pod skośną płytą (płyta zostaje widoczna); luz pod skosem
+  // mierzony prostopadle do płyty, więc w pionie jest większy o 1 / cos kąta.
+  const a0 = g.L - g.c - cSlope * Math.sqrt(1 + g.k * g.k);
 
   return cells.map((cell) => {
-    const fx0 = cell.leftIsDivider ? cell.x0 - th / 2 + gap / 2 : (g.isTriangle ? 0 : cSide);
-    const fx1 = cell.rightIsDivider ? cell.x1 + th / 2 - gap / 2 : g.W - cSide;
-    const fy0 = cell.bottomIsShelf ? cell.y0 - th / 2 + gap / 2 : cBottom;
-    const fy1 = cell.topIsShelf ? cell.y1 + th / 2 - gap / 2 : g.H;
+    let fx0, fx1, fy0, fy1;
+    if (isInset) {
+      // Wpuszczany: front w świetle wnęki; od korpusu luz, od przegrody/półki pół przerwy.
+      fx0 = cell.x0 + (cell.leftIsDivider ? gap / 2 : (g.isTriangle ? 0 : cLow));
+      fx1 = cell.x1 - (cell.rightIsDivider ? gap / 2 : cHigh);
+      fy0 = cell.y0 + (cell.bottomIsShelf ? gap / 2 : cBottom);
+      fy1 = cell.topIsShelf ? cell.y1 - gap / 2 : g.H;
+    } else {
+      // Nakładany: zachodzi na korpus (luz od zewnętrznej krawędzi), na
+      // przegrodach i półkach dzieli płytę na pół ze szczeliną.
+      fx0 = cell.leftIsDivider ? cell.x0 - th / 2 + gap / 2 : (g.isTriangle ? 0 : cLow);
+      fx1 = cell.rightIsDivider ? cell.x1 + th / 2 - gap / 2 : g.W - cHigh;
+      fy0 = cell.bottomIsShelf ? cell.y0 - th / 2 + gap / 2 : cBottom;
+      fy1 = cell.topIsShelf ? cell.y1 + th / 2 - gap / 2 : g.H;
+    }
     const shape = clipFrontRect(fx0, fx1, fy0, fy1, a0, g.k);
     const tooSmall = shape.kind === 'brak' || shape.h < 40 || shape.w < 40;
     const drawer = tooSmall ? null : slopeDrawer(cell, g, ctx);
@@ -296,8 +309,27 @@ export function getSlopeFronts(mod, config) {
     else if (shape.kind === 'trojkat' || !drawer || !drawer.fits) auto = 'blenda';
     const forced = types[cell.key];
     const type = tooSmall ? 'brak' : (['szuflada', 'blenda', 'brak'].includes(forced) ? forced : auto);
-    return { ...cell, shape, auto, type, drawer: type === 'szuflada' ? drawer : null, text: shapeText(shape, g.lowSide) };
+    return { ...cell, shape, auto, type, inset: isInset, drawer: type === 'szuflada' ? drawer : null, text: shapeText(shape, g.lowSide) };
   });
+}
+
+// Ustawienia frontów szafki pod skos - te same pola co w zwykłej szafce
+// (ui/properties.js, zakładka Front): typ, przerwa między frontami, luzy
+// lewy/prawy/dół; zamiast luzu górnego - luz pod skosem (clearance.slope,
+// domyślnie jak przerwa). mod.front nadpisuje domyślne projektu.
+export function getSlopeFrontSettings(mod, config) {
+  const f = { ...(config.front || {}), ...(mod.front || {}) };
+  const fc = { ...(config.front?.clearance || {}), ...(mod.front?.clearance || {}) };
+  const n = (v, d) => { const x = parseFloat(v); return Number.isFinite(x) ? x : d; };
+  const gap = n(f.gap, 3);
+  return {
+    isInset: f.type === 'wpuszczane',
+    gap,
+    cLeft: n(fc.left ?? fc.sides, 1.5),
+    cRight: n(fc.right ?? fc.sides, 1.5),
+    cBottom: n(fc.bottom, 0),
+    cSlope: n(fc.slope, gap),
+  };
 }
 
 // Formatki frontów, blend i skrzynek szuflad szafki pod skos.
@@ -356,7 +388,9 @@ function frontSolids(mod, config) {
   const rect = (x, y, w, h) => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
   getSlopeFronts(mod, config).forEach((fr) => {
     if (fr.type === 'brak') return;
-    add('front', fr.shape.points, -th, th);
+    // Nakładany stoi przed korpusem, wpuszczany w jego obrysie; skrzynka za frontem.
+    add('front', fr.shape.points, fr.inset ? 0 : -th, th);
+    const zOff = fr.inset ? th : 0;
     const d = fr.drawer;
     if (!d) return;
     const c = d.comps;
@@ -365,28 +399,28 @@ function frontSolids(mod, config) {
     if (d.boxType === 'B') {
       const b = d.box;
       const yB = b.yBase + b.recess;
-      add('drawerBox', rect(d.ox0, b.yBase, t, b.sideLow), 0, L);
-      add('drawerBox', rect(d.ox1 - t, b.yBase, t, b.sideHigh), 0, L);
-      add('drawerBox', rect(d.ox0 + t, yB, d.ox1 - d.ox0 - 2 * t, t), 0, L);
+      add('drawerBox', rect(d.ox0, b.yBase, t, b.sideLow), zOff, L);
+      add('drawerBox', rect(d.ox1 - t, b.yBase, t, b.sideHigh), zOff, L);
+      add('drawerBox', rect(d.ox0 + t, yB, d.ox1 - d.ox0 - 2 * t, t), zOff, L);
       const trap = [[d.ox0 + t, yB + t], [d.ox1 - t, yB + t], [d.ox1 - t, yB + t + b.backHigh], [d.ox0 + t, yB + t + b.backLow]];
-      add('drawerBox', trap, 0, t);
-      add('drawerBox', trap, L - t, t);
+      add('drawerBox', trap, zOff, t);
+      add('drawerBox', trap, zOff + L - t, t);
       return;
     }
     if (c.woodenBox) {
       const yB = d.yBase + c.bottomRecess;
-      add('drawerBox', rect(d.ox0, d.yBase, t, c.sideHeight), 0, L);
-      add('drawerBox', rect(d.ox1 - t, d.yBase, t, c.sideHeight), 0, L);
-      add('drawerBox', rect(d.ox0 + t, yB, d.ox1 - d.ox0 - 2 * t, t), 0, L);
-      add('drawerBox', rect(d.ox0 + t, yB + t, d.ox1 - d.ox0 - 2 * t, c.back.height), L - t, t);
+      add('drawerBox', rect(d.ox0, d.yBase, t, c.sideHeight), zOff, L);
+      add('drawerBox', rect(d.ox1 - t, d.yBase, t, c.sideHeight), zOff, L);
+      add('drawerBox', rect(d.ox0 + t, yB, d.ox1 - d.ox0 - 2 * t, t), zOff, L);
+      add('drawerBox', rect(d.ox0 + t, yB + t, d.ox1 - d.ox0 - 2 * t, c.back.height), zOff + L - t, t);
       return;
     }
     // System metalowy: dno na dole, boki (profil) i tył.
     const h = 16 + c.back.height;
-    add('drawerBox', rect(d.ox0 + t, fr.y0, c.bottom.width, 16), 0, L);
-    add('drawerBox', rect(d.ox0, fr.y0, t, h), 0, L);
-    add('drawerBox', rect(d.ox1 - t, fr.y0, t, h), 0, L);
-    add('drawerBox', rect(d.ox0 + t + (c.bottom.width - c.back.width) / 2, fr.y0 + 16, c.back.width, c.back.height), L - t, t);
+    add('drawerBox', rect(d.ox0 + t, fr.y0, c.bottom.width, 16), zOff, L);
+    add('drawerBox', rect(d.ox0, fr.y0, t, h), zOff, L);
+    add('drawerBox', rect(d.ox1 - t, fr.y0, t, h), zOff, L);
+    add('drawerBox', rect(d.ox0 + t + (c.bottom.width - c.back.width) / 2, fr.y0 + 16, c.back.width, c.back.height), zOff + L - t, t);
   });
   return solids;
 }

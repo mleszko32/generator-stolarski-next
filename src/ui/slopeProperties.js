@@ -8,7 +8,7 @@ import { updateSidebar } from "./sidebar.js";
 import { initPropertiesPanel } from "./properties.js";
 import { escapeHtml } from "../utils/dom.js";
 import { round1 } from "../utils/math.js";
-import { getSlopeGeometry, getSlopeSettings, getSlopeColumns, getSlopeDividers, getSlopeInnerSpan, getSlopeFronts } from "../core/slopeCabinet.js";
+import { getSlopeGeometry, getSlopeSettings, getSlopeColumns, getSlopeDividers, getSlopeInnerSpan, getSlopeFronts, getSlopeFrontSettings } from "../core/slopeCabinet.js";
 import { drawerSystems } from "../core/drawerSystems.js";
 
 const MIN_COLUMN = 50;
@@ -47,6 +47,7 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
   // --- Fronty: wnęki z typem (szuflada/blenda/pusta) ---
   const frontCfg = { ...(state.project.front || {}), ...(mod.front || {}) };
   const sysId = String(frontCfg.drawerSystem || 'merivobox').toLowerCase();
+  const fs = getSlopeFrontSettings(mod, state.project);
   const boxType = s.drawerBox === 'B' ? 'B' : 'A';
   const TYPE_LABELS = { szuflada: 'Szuflada', blenda: 'Blenda', brak: 'Pusta (bez frontu)' };
   const fronts = getSlopeFronts(mod, state.project)
@@ -125,6 +126,27 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
     </div>
 
     <h3>Fronty i szuflady</h3>
+    <div class="property-group prop-box">
+      <div class="mb-8"><label class="fs-xs">Typ frontów:</label>
+        <select id="input-slope-front-type">
+          <option value="nakladane" ${!fs.isInset ? 'selected' : ''}>Nakładane</option>
+          <option value="wpuszczane" ${fs.isInset ? 'selected' : ''}>Wpuszczane</option>
+        </select>
+      </div>
+      <div class="mb-8"><label class="fs-xs">Przerwa między frontami [mm]:</label><input type="number" step="0.5" class="input-slope-clr" data-key="gap" value="${fs.gap}" /></div>
+      <div class="row mb-8">
+        <div class="property-group grow"><label class="fs-xs">Luz lewy [mm]:</label><input type="number" step="0.5" class="input-slope-clr" data-key="left" value="${fs.cLeft}" /></div>
+        <div class="property-group grow"><label class="fs-xs">Luz prawy [mm]:</label><input type="number" step="0.5" class="input-slope-clr" data-key="right" value="${fs.cRight}" /></div>
+      </div>
+      <div class="row">
+        <div class="property-group grow"><label class="fs-xs">Luz dół [mm]:</label><input type="number" step="0.5" class="input-slope-clr" data-key="bottom" value="${fs.cBottom}" /></div>
+        <div class="property-group grow"><label class="fs-xs">Luz pod skosem [mm]:</label><input type="number" step="0.5" class="input-slope-clr" data-key="slope" value="${fs.cSlope}" /></div>
+      </div>
+    </div>
+    <div class="hint mb-8">${fs.isInset
+      ? 'Wpuszczane: luzy od wewnętrznych ścian korpusu, od przegród i półek pół przerwy.'
+      : `Nakładane: luz lewy/prawy/dół od zewnętrznej krawędzi korpusu (wpisz ${th}, żeby odsłonić bok).`}
+      Luz pod skosem mierzony prostopadle do skośnej płyty; skośna płyta zostaje widoczna.</div>
     <div class="property-group mb-8">
       <label class="fs-xs">System szuflad:</label>
       <select id="input-slope-drawer-system">
@@ -266,6 +288,18 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
   });
 
   // --- Fronty ---
+  // Luzy jak w zwykłej szafce: mod.front.gap i mod.front.clearance.* nadpisują projekt.
+  document.getElementById('input-slope-front-type')?.addEventListener('change', (e) => {
+    mod.front = { ...(mod.front || {}), type: e.target.value };
+    refresh();
+  });
+  rightSidebar.querySelectorAll('.input-slope-clr').forEach((inp) => inp.addEventListener('change', (e) => {
+    const v = Math.max(0, num(e.target.value));
+    mod.front = { ...(mod.front || {}) };
+    if (inp.dataset.key === 'gap') mod.front.gap = v;
+    else mod.front.clearance = { ...(mod.front.clearance || {}), [inp.dataset.key]: v };
+    refresh();
+  }));
   document.getElementById('input-slope-drawer-system')?.addEventListener('change', (e) => {
     mod.front = { ...(mod.front || {}), drawerSystem: e.target.value };
     refresh();

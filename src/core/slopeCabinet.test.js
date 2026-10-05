@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getSlopeGeometry, getSlopeDividers, getSlopeShelfPieces, getSlopeCabinetParts, getSlopeCabinetPolygons, getSlopeColumns, getSlopeSettings, clipFrontRect, getSlopeFronts, getSlopeFrontParts, getSlopeDrawerHardware } from "./slopeCabinet.js";
+import { getSlopeGeometry, getSlopeDividers, getSlopeShelfPieces, getSlopeCabinetParts, getSlopeCabinetPolygons, getSlopeColumns, getSlopeSettings, clipFrontRect, getSlopeFronts, getSlopeFrontParts, getSlopeDrawerHardware, getSlopeFrontSettings } from "./slopeCabinet.js";
 
 const config = { materials: { boardThickness: 18, backThickness: 3 } };
 const mod = (slope = {}, dims = {}) => ({
@@ -181,5 +181,39 @@ describe("szafka pod skos - fronty i szuflady", () => {
   it("skrzynka B przy systemie metalowym liczy się jako A", () => {
     const f = getSlopeFronts(m({ drawerBox: "B" }, { drawerSystem: "merivobox" }), cfg).find((x) => x.key === "c1-r0");
     expect(f.drawer.boxType).toBe("A");
+  });
+});
+
+describe("szafka pod skos - luzy frontów jak w zwykłej szafce", () => {
+  const cfg = { materials: { boardThickness: 18, backThickness: 3 }, front: { gap: 3, clearance: { sides: 1.5, top: 5, bottom: 0 }, drawerSystem: "movento_katalog" } };
+  const m = (front = {}) => ({
+    type: "slope_cabinet", dimensions: { width: 2000, height: 1500, depth: 600 }, front,
+    slope: { lowSide: "left", lowHeight: 0, columns: [null, 650, 650], shelves: [500, 1000] },
+  });
+  const cell = (mm, key) => getSlopeFronts(mm, cfg).find((f) => f.key === key);
+
+  it("luz prawy odsłania wysoki bok (nakładane)", () => {
+    const base = cell(m(), "c2-r0").shape.w;
+    const open = cell(m({ clearance: { right: 18 } }), "c2-r0").shape.w;
+    expect(base - open).toBeCloseTo(16.5, 5);
+  });
+
+  it("wpuszczane: front w świetle wnęki, krótsza szuflada", () => {
+    const f = cell(m({ type: "wpuszczane" }), "c2-r0");
+    expect(f.inset).toBe(true);
+    expect(f.shape).toMatchObject({ kind: "prostokat", w: 647, h: 480.5 });
+    expect(f.drawer.comps.nominalLength).toBe(550);
+  });
+
+  it("luz pod skosem mierzony prostopadle do płyty", () => {
+    const a = cell(m(), "c1-r0").shape.hLow;
+    const b = cell(m({ clearance: { slope: 10 } }), "c1-r0").shape.hLow;
+    // 7 mm więcej prostopadle = 7 / cos(36,87°) = 8,75 mm w pionie
+    expect(a - b).toBeCloseTo(8.75, 5);
+  });
+
+  it("domyślne ustawienia z projektu, moduł je nadpisuje", () => {
+    expect(getSlopeFrontSettings(m(), cfg)).toMatchObject({ isInset: false, gap: 3, cLeft: 1.5, cRight: 1.5, cBottom: 0, cSlope: 3 });
+    expect(getSlopeFrontSettings(m({ gap: 2, clearance: { bottom: 2 } }), cfg)).toMatchObject({ gap: 2, cBottom: 2, cSlope: 2, cLeft: 1.5 });
   });
 });
