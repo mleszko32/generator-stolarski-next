@@ -393,6 +393,14 @@ function frontName(fr) {
   return rect ? base : `${base} skos (${fr.text})`;
 }
 
+// Obrys z układu znormalizowanego (niska strona po lewej) w rzeczywistej
+// orientacji, patrząc od frontu, z lewym dolnym rogiem w (0, 0).
+function realOutline(g, pts) {
+  const real = g.lowSide === 'right' ? pts.map(([x, y]) => [g.W - x, y]).reverse() : pts;
+  const minX = Math.min(...real.map((p) => p[0])), minY = Math.min(...real.map((p) => p[1]));
+  return real.map(([x, y]) => [x - minX, y - minY]);
+}
+
 // Formatki o nieprostokątnym obrysie (fronty, blendy, plecy) do rysunków cięcia:
 // { name, category, qty, points } - punkty w rzeczywistej orientacji (patrząc od
 // frontu), przesunięte tak, że lewy dolny róg obrysu jest w (0, 0). Te same nazwy
@@ -400,14 +408,9 @@ function frontName(fr) {
 export function getSlopeShapes(mod, config) {
   const th = parseFloat(config.materials?.boardThickness) || 18;
   const g = getSlopeGeometry(mod, th);
-  const real = (pts) => (g.lowSide === 'right' ? pts.map(([x, y]) => [g.W - x, y]).reverse() : pts);
-  const norm = (pts) => {
-    const minX = Math.min(...pts.map((p) => p[0])), minY = Math.min(...pts.map((p) => p[1]));
-    return pts.map(([x, y]) => [x - minX, y - minY]);
-  };
   const out = new Map();
   const add = (name, category, pts) => {
-    const points = norm(real(pts));
+    const points = realOutline(g, pts);
     const key = `${name}|${points.map((p) => p.map(r1).join(',')).join(';')}`;
     if (out.has(key)) out.get(key).qty += 1;
     else out.set(key, { name, category, qty: 1, points });
@@ -429,7 +432,9 @@ export function getSlopeFrontParts(mod, config) {
   const parts = [];
   getSlopeFronts(mod, config).forEach((fr) => {
     if (fr.type === 'brak') return;
-    parts.push({ name: frontName(fr), length: r1(fr.shape.h), width: r1(fr.shape.w), qty: 1, category: 'Front', materialId: fr.el.materialId });
+    // outline: prawdziwy kształt frontu (DXF na CNC); prostokąt go nie potrzebuje.
+    const outline = fr.shape.kind === 'prostokat' ? undefined : realOutline(g, fr.shape.points);
+    parts.push({ name: frontName(fr), length: r1(fr.shape.h), width: r1(fr.shape.w), qty: 1, category: 'Front', materialId: fr.el.materialId, outline });
     const d = fr.drawer;
     if (!d) return;
     const bz = fr.el.baseZone || {};

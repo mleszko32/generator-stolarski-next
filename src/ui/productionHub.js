@@ -18,6 +18,7 @@ import { update3D, captureViewerSnapshot, captureModuleSnapshot } from "../rende
 import { buildOfferHtml, getOfferSettings } from "../core/offer.js";
 import { initPropertiesPanel } from "./properties.js";
 import { mountCutPlan } from "./cutPlanModal.js";
+import { mountFrontsDxf } from "./frontsDxfPanel.js";
 import { generateAllWallSVGs } from "../render/wallElevations.js";
 import { computeWorktops, getWorktopSettings, rectOf } from "../core/worktops.js";
 import { renderProjectCheck } from './projectCheck.js';
@@ -465,7 +466,10 @@ function renderKontrola(el) {
 }
 
 function renderRozkroj(el) {
-  el.innerHTML = '<div id="hub-cutplan"></div>';
+  el.innerHTML = '<div id="hub-cutplan"></div><div id="hub-fronts-dxf"></div>';
+  const dxf = mountFrontsDxf(el.querySelector('#hub-fronts-dxf'));
+  // Zmiana rozmiaru arkusza w rozkroju zmienia też arkusze DXF.
+  el.querySelector('#hub-cutplan').addEventListener('input', () => dxf.refresh());
   mountCutPlan(el.querySelector('#hub-cutplan'));
 }
 
