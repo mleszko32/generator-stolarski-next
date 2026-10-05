@@ -404,3 +404,22 @@ describe("szafka pod skos - nawierty jak w zwykłej szafce", () => {
     expect(d.notes.some((n) => n.includes("zawiasy"))).toBe(false);
   });
 });
+
+describe("szafka pod skos - strona płyty od wnętrza szafki", () => {
+  it("skos i boki: wnętrze od spodu / strony wewnętrznej, dno od wierzchu, przegrody i półki obie", () => {
+    const bs = getSlopeBoards(slopeMod({ width: 2000, height: 1500, lowHeight: 500, dividers: [646], shelves: [300] }), config);
+    const one = (n) => bs.find((b) => b.name === n);
+    expect(one("Skos (wieniec skośny)")).toMatchObject({ inside: "a", aLabel: "spód" });
+    expect(one("Bok wysoki")).toMatchObject({ inside: "a", aLabel: "strona wewnętrzna" });
+    expect(one("Bok niski")).toMatchObject({ inside: "b", bLabel: "strona wewnętrzna" });
+    expect(one("Dno (wieniec dolny)")).toMatchObject({ inside: "b", bLabel: "wierzch" });
+    expect(one("Przegroda").inside).toBe("both");
+    expect(one("Półka").inside).toBe("both");
+  });
+
+  it("nawierty: każda ściana ma opis, w którą stronę patrzy", () => {
+    const d = getSlopeDrillings(slopeMod({ width: 2000, height: 1500, dividers: [646, 1314], shelves: [500] }), cfg());
+    d.faces.forEach((f) => expect(f.note).toBeTruthy());
+    expect(d.faces.find((f) => f.name === "Przegroda 1" && f.side === "lewa").note).toContain("skosu");
+  });
+});

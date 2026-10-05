@@ -43,10 +43,23 @@ export function slopeBoardSVG(b, qty = 1) {
   // Widok na grubość: dwie powierzchnie płyty i ścięte końce.
   const poly = [[X(b.a[0]), yA], [X(b.a[1]), yA], [X(b.b[1]), yB], [X(b.b[0]), yB]];
   svg += `<polygon points="${poly.map((p) => p.join(',')).join(' ')}" fill="${C.amber100}" stroke="${C.slate800}" stroke-width="1.5"/>`;
-  svg += text(X(b.b[0]) + 6, yB + 13, b.bLabel, { anchor: 'start', size: 10, color: C.slate500 });
-  svg += text(X(b.a[0]) + 6, yA - 5, b.aLabel, { anchor: 'start', size: 10, color: C.slate500 });
+  // Strona od wnętrza szafki - pogrubiona niebieska krawędź (przy przegrodach
+  // i półkach obie strony są w środku, więc obie zaznaczone).
+  const inA = b.inside === 'a' || b.inside === 'both', inB = b.inside === 'b' || b.inside === 'both';
+  const insideEdge = (x1, x2, y) => `<line x1="${r1(x1)}" y1="${y}" x2="${r1(x2)}" y2="${y}" stroke="${C.blue600}" stroke-width="4"/>`;
+  if (inA) svg += insideEdge(X(b.a[0]), X(b.a[1]), yA);
+  if (inB) svg += insideEdge(X(b.b[0]), X(b.b[1]), yB);
+  const sideTxt = (label, side, inside) => `${label}${side ? ` — ${side}` : ''}${inside && b.inside !== 'both' ? ' (WNĘTRZE)' : ''}`;
+  svg += text(X(b.b[0]) + 6, yB + 13, sideTxt(b.bLabel, b.bSide, inB), { anchor: 'start', size: 10, color: inB ? C.blue700 : C.slate500, weight: inB ? 'bold' : 'normal' });
+  svg += text(X(b.a[0]) + 6, yA - 5, sideTxt(b.aLabel, b.aSide, inA), { anchor: 'start', size: 10, color: inA ? C.blue700 : C.slate500, weight: inA ? 'bold' : 'normal' });
   svg += dimH(X(b.b[0]), X(b.b[1]), yB - 10, `${b.bLabel}: ${fmt(b.b[1] - b.b[0])}`);
   svg += dimH(X(b.a[0]), X(b.a[1]), yA + 22, `${b.aLabel}: ${fmt(b.a[1] - b.a[0])}`);
+  if (b.inside) {
+    const legend = b.inside === 'both'
+      ? 'obie strony są wewnątrz szafki (niebieskie krawędzie)'
+      : 'niebieska krawędź = strona od wnętrza szafki';
+    svg += text(W - pad, 22, legend, { anchor: 'end', size: 11, color: C.blue700 });
+  }
 
   // Opisy końców: pochylenie piły (od cięcia prostopadłego).
   const endNote = (tilt, label, x, anchor) => {
@@ -148,7 +161,8 @@ export function slopeFaceSVG(face) {
   const D = face.width, H = face.height;
   const sy = (y) => H - y;                     // y od dołu płyty -> współrzędna SVG
   let body = '';
-  body += `<text x="${D / 2}" y="-34" font-size="16" fill="${C.blue900}" font-weight="bold" text-anchor="middle">${escapeHtml(`${face.name} — strona ${face.side}`.toUpperCase())} <tspan font-size="11" fill="${C.slate500}" font-weight="normal">${fmt(D)} × ${fmt(H)} mm</tspan></text>`;
+  body += `<text x="${D / 2}" y="-44" font-size="16" fill="${C.blue900}" font-weight="bold" text-anchor="middle">${escapeHtml(`${face.name} — strona ${face.side}`.toUpperCase())} <tspan font-size="11" fill="${C.slate500}" font-weight="normal">${fmt(D)} × ${fmt(H)} mm</tspan></text>`;
+  if (face.note) body += `<text x="${D / 2}" y="-28" font-size="11" fill="${C.blue700}" text-anchor="middle">${escapeHtml(face.note)}</text>`;
   body += `<rect x="0" y="0" width="${D}" height="${r1(H)}" fill="${C.white}" stroke="${C.slate600}" stroke-width="1.5"/>`;
   [[15, 'PRZÓD'], [D - 15, 'TYŁ']].forEach(([x, t]) => {
     body += `<text x="${x}" y="${r1(H / 2)}" font-size="11" fill="${C.slate400}" font-weight="bold" transform="rotate(-90, ${x}, ${r1(H / 2)})" text-anchor="middle" letter-spacing="1">${t}</text>`;
@@ -203,7 +217,7 @@ export function slopeFaceSVG(face) {
 
   const minX = shelfCenters.length ? -250 : -20;
   const maxX = D + 40 + Math.max(rightCols, 1) * 120 + 80;
-  return svgWrap(minX, -62, maxX - minX, H + 100, body);
+  return svgWrap(minX, -70, maxX - minX, H + 108, body);
 }
 
 // Rzut płyty poziomej / skośnej z łącznikami - jak rzut wieńca zwykłej szafki

@@ -513,8 +513,10 @@ function frontSolids(mod, config) {
 
 // Płyty korpusu szafki pod skos jako prostokąty z końcami ciętymi przez grubość
 // (pochylona piła). Każda płyta: { name, width (głębokość), th, a: [a0, a1],
-// b: [b0, b1], aLabel, bLabel, startLabel, endLabel } - a i b to dwie powierzchnie
-// płyty wzdłuż jej długości (widok na grubość): od - do, w mm. Różnica między
+// b: [b0, b1], aLabel, bLabel, inside, aSide, bSide, startLabel, endLabel } - a i b to
+// dwie powierzchnie płyty wzdłuż jej długości (widok na grubość): od - do, w mm;
+// inside - która jest od wnętrza szafki ('a' | 'b' | 'both' dla przegród i półek),
+// aSide/bSide - opis, gdzie dana strona patrzy. Różnica między
 // a i b na końcu to cięcie pod kątem: pochylenie piły = atan(różnica / grubość).
 // Kolejność wzdłuż płyty: od strony skosu / od dołu (start) do drugiego końca.
 export function getSlopeBoards(mod, config) {
@@ -531,29 +533,29 @@ export function getSlopeBoards(mod, config) {
   const cosA = Math.cos(g.angle * Math.PI / 180);
   if (g.isTriangle) {
     const topLen = (g.W - th / g.k) / cosA;
-    add({ name: 'Skos (wieniec skośny)', a: [th / tanA, topLen - th * tanA], b: [0, topLen], aLabel: 'spód', bLabel: 'wierzch', startLabel: 'dół (na dnie)', endLabel: 'przy wysokim boku' });
+    add({ name: 'Skos (wieniec skośny)', a: [th / tanA, topLen - th * tanA], b: [0, topLen], aLabel: 'spód', bLabel: 'wierzch', inside: 'a', aSide: 'wnętrze szafki', bSide: 'zewnątrz, widoczny', startLabel: 'dół (na dnie)', endLabel: 'przy wysokim boku' });
   } else {
     const topLen = Math.hypot(g.W, g.H - g.L);
-    add({ name: 'Skos (wieniec skośny)', a: [0, topLen], b: [th * tanA, topLen + th * tanA], aLabel: 'spód', bLabel: 'wierzch', startLabel: 'przy niskim boku', endLabel: 'przy wysokim boku' });
+    add({ name: 'Skos (wieniec skośny)', a: [0, topLen], b: [th * tanA, topLen + th * tanA], aLabel: 'spód', bLabel: 'wierzch', inside: 'a', aSide: 'wnętrze szafki', bSide: 'zewnątrz, widoczny', startLabel: 'przy niskim boku', endLabel: 'przy wysokim boku' });
   }
 
   // Wysoki bok stoi na dnie; zewnętrzna ściana dłuższa (góra docięta do skosu).
-  add({ name: 'Bok wysoki', a: [0, g.under(g.W - th) - th], b: [0, g.under(g.W) - th], aLabel: 'wewnątrz', bLabel: 'zewnątrz', startLabel: 'dół', endLabel: 'góra (pod skosem)' });
+  add({ name: 'Bok wysoki', a: [0, g.under(g.W - th) - th], b: [0, g.under(g.W) - th], aLabel: 'strona wewnętrzna', bLabel: 'strona zewnętrzna', inside: 'a', aSide: 'wnętrze szafki', bSide: 'widoczna z zewnątrz', startLabel: 'dół', endLabel: 'góra (pod skosem)' });
   // Niski bok (tylko trapez); wewnętrzna ściana dłuższa.
   if (!g.isTriangle) {
-    add({ name: 'Bok niski', a: [0, g.under(0) - th], b: [0, g.under(th) - th], aLabel: 'zewnątrz', bLabel: 'wewnątrz', startLabel: 'dół', endLabel: 'góra (pod skosem)' });
+    add({ name: 'Bok niski', a: [0, g.under(0) - th], b: [0, g.under(th) - th], aLabel: 'strona zewnętrzna', bLabel: 'strona wewnętrzna', inside: 'b', aSide: 'widoczna z zewnątrz', bSide: 'wnętrze szafki', startLabel: 'dół', endLabel: 'góra (pod skosem)' });
   }
   // Dno nakładane na całą szerokość; w trójkącie koniec przy skosie docięty
   // równo z linią skosu (spód pełny, wierzch krótszy).
-  add({ name: 'Dno (wieniec dolny)', a: [0, g.W], b: [g.isTriangle ? th / g.k : 0, g.W], aLabel: 'spód', bLabel: 'wierzch', startLabel: g.isTriangle ? 'przy skosie' : 'przy niskim boku', endLabel: 'przy wysokim boku' });
+  add({ name: 'Dno (wieniec dolny)', a: [0, g.W], b: [g.isTriangle ? th / g.k : 0, g.W], aLabel: 'spód', bLabel: 'wierzch', inside: 'b', aSide: 'na podłodze / cokole', bSide: 'wnętrze szafki', startLabel: g.isTriangle ? 'przy skosie' : 'przy niskim boku', endLabel: 'przy wysokim boku' });
 
   getSlopeDividers(mod, th).forEach((d) => {
-    add({ name: 'Przegroda', a: [0, d.hLeft], b: [0, d.hRight], aLabel: 'od strony skosu', bLabel: 'od wysokiego boku', startLabel: 'dół', endLabel: 'góra' });
+    add({ name: 'Przegroda', a: [0, d.hLeft], b: [0, d.hRight], aLabel: 'strona od skosu', bLabel: 'strona od wysokiego boku', inside: 'both', aSide: 'wnęka po stronie skosu', bSide: 'wnęka po stronie wysokiego boku', startLabel: 'dół', endLabel: 'góra' });
   });
 
   getSlopeShelfPieces(mod, th).forEach((p) => {
     const long = p.x1 - p.x0Bottom, short = p.x1 - p.x0Top;
-    add({ name: 'Półka', width: p.el.isStructural ? width : width - 5, a: [0, long], b: [long - short, long], aLabel: 'spód', bLabel: 'wierzch', startLabel: 'przy skosie', endLabel: 'drugi koniec' });
+    add({ name: 'Półka', width: p.el.isStructural ? width : width - 5, a: [0, long], b: [long - short, long], aLabel: 'spód', bLabel: 'wierzch', inside: 'both', aSide: 'wnęka pod półką', bSide: 'wnęka nad półką', startLabel: 'przy skosie', endLabel: 'drugi koniec' });
   });
 
   return boards.map((b) => {
@@ -621,17 +623,18 @@ export function getSlopeDrillings(mod, config) {
   // Ściany płyt pionowych: x ściany (rzeczywiste), w którą stronę patrzy
   // ('R' - wnętrze po prawej, 'L' - po lewej), spód płyty i wysokość ściany.
   const faces = [];
-  const addFace = (name, side, x, dir, y0, yTop) => faces.push({ name, side, x, dir, y0, height: yTop - y0, width: depth, holes: [] });
+  // note - gdzie patrzy ta strona płyty (do opisu na rysunku).
+  const addFace = (name, side, x, dir, y0, yTop, note) => faces.push({ name, side, note, x, dir, y0, height: yTop - y0, width: depth, holes: [] });
   const lowLeft = g.lowSide === 'left';
-  addFace('Bok wysoki', 'wewnętrzna', lowLeft ? g.W - th : th, lowLeft ? 'L' : 'R', th, g.under(nAt(lowLeft ? g.W - th : th)));
-  if (!g.isTriangle) addFace('Bok niski', 'wewnętrzna', lowLeft ? th : g.W - th, lowLeft ? 'R' : 'L', th, g.under(nAt(lowLeft ? th : g.W - th)));
+  addFace('Bok wysoki', 'wewnętrzna', lowLeft ? g.W - th : th, lowLeft ? 'L' : 'R', th, g.under(nAt(lowLeft ? g.W - th : th)), 'od wnętrza szafki; strona zewnętrzna bez nawiertów');
+  if (!g.isTriangle) addFace('Bok niski', 'wewnętrzna', lowLeft ? th : g.W - th, lowLeft ? 'R' : 'L', th, g.under(nAt(lowLeft ? th : g.W - th)), 'od wnętrza szafki; strona zewnętrzna bez nawiertów');
   const dividers = (mod.elements || []).filter((el) => el.typ === 'pion').sort((a, b) => a.x - b.x);
   const shownDividers = getSlopeDividers(mod, th).map((d) => d.el);
   dividers.filter((el) => shownDividers.includes(el)).forEach((el, i) => {
     const x = parseFloat(el.x) || 0, y0 = parseFloat(el.y) || 0, y1 = y0 + (parseFloat(el.h) || 0);
     const name = `Przegroda ${i + 1}`;
-    addFace(name, 'lewa', x, 'L', y0, Math.min(y1, g.under(nAt(x))));
-    addFace(name, 'prawa', x + th, 'R', y0, Math.min(y1, g.under(nAt(x + th))));
+    addFace(name, 'lewa', x, 'L', y0, Math.min(y1, g.under(nAt(x))), lowLeft ? 'patrzy w stronę skosu (wnęka po lewej)' : 'patrzy w stronę wysokiego boku (wnęka po lewej)');
+    addFace(name, 'prawa', x + th, 'R', y0, Math.min(y1, g.under(nAt(x + th))), lowLeft ? 'patrzy w stronę wysokiego boku (wnęka po prawej)' : 'patrzy w stronę skosu (wnęka po prawej)');
   });
   // Ściana, do której przylega granica wnęki: lewa granica wnęki -> ściana 'R' w tym x.
   const faceAt = (x, dir) => faces.find((fc) => fc.dir === dir && Math.abs(fc.x - x) < 1);

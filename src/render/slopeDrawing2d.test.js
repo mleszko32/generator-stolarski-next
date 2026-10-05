@@ -12,6 +12,12 @@ describe("rysunki cięcia szafki pod skos", () => {
     expect(svg).toContain("drugi koniec: cięcie proste");
   });
 
+  it("płyta: strona od wnętrza szafki oznaczona", () => {
+    const svg = slopeBoardSVG({ ...board, inside: "a", aSide: "wnętrze szafki", bSide: "zewnątrz, widoczny" }, 1);
+    expect(svg).toContain("spód — wnętrze szafki (WNĘTRZE)");
+    expect(svg).toContain("niebieska krawędź = strona od wnętrza szafki");
+  });
+
   it("obrys: długości boków i kąty inne niż proste", () => {
     const svg = slopeShapeSVG({ name: "Blenda skos", category: "Front", qty: 1, points: [[0, 0], [400, 0], [400, 300]] });
     expect(svg).toContain("<polygon");
