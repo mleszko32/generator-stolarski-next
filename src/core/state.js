@@ -1,5 +1,6 @@
 // src/core/state.js
 import { ensureCornerDefaults } from "./layout.js";
+import { buildSlopeElements, migrateSlopeModule } from "./slopeCabinet.js";
 // depth:600 z poprzedniego (martwego, nigdy nie renderowanego) pola room nie ma
 // sensu jako realny pokój - to szerokość korytarza, nie mieściłby się w nim nawet
 // jeden rząd szafek. Skoro pokój od teraz faktycznie się renderuje, domyślne
@@ -121,6 +122,11 @@ export function ensureSidePanelsDefaults(project) {
     project.sidePanels = [];
   }
   migrateLegacyFillers(project);
+  // Szafki pod skos ze starym wnętrzem (kolumny/półki w mod.slope) -> mod.elements,
+  // żeby działały w zwykłym edytorze Wnętrze 2D.
+  const th = parseFloat(project.materials?.boardThickness) || 18;
+  const gap = parseFloat(project.front?.gap) || 3;
+  (project.modules || []).forEach(m => migrateSlopeModule(m, th, gap));
   return project.sidePanels;
 }
 
@@ -334,9 +340,14 @@ export function addSlopeModule() {
     backPanel: { type: "nakladane", offset: 20, grooveDepth: 7, nutBuild: "all", clearance: 2 },
     legs: { active: false, height: 100, plinth: false, plinthOffset: 40 },
     front: {},
-    slope: { lowSide: 'left', lowHeight: 0, columns: [null, 650, 650], shelves: [500, 1000] },
+    slope: { lowSide: 'left', lowHeight: 0, drawerBox: 'A' },
     elements: []
   };
+  // Domyślne wnętrze jak na typowej zabudowie pod schodami: 3 kolumny (przegrody
+  // na 646 i 1314 mm), 2 półki, szuflady we wnękach - dalej edytowalne w Wnętrzu 2D.
+  const th = parseFloat(state.project.materials?.boardThickness) || 18;
+  const gap = parseFloat(state.project.front?.gap) || 3;
+  newModule.elements = buildSlopeElements(newModule, th, [646, 1314], [500, 1000], gap);
 
   state.project.modules.push(newModule);
   state.activeModuleId = newId;

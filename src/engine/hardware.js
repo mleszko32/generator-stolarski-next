@@ -5,7 +5,7 @@
 import { state } from "../core/state.js";
 import { getDrawerComponents, drawerHardwareKey } from "../core/drawerMath.js";
 import { calculateHinges } from "../core/hingeMath.js";
-import { getSlopeDrawerHardware } from "../core/slopeCabinet.js";
+import { getSlopeDrawerHardware, getSlopeFronts } from "../core/slopeCabinet.js";
 import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "./edgeBanding.js";
 import { recalculateAllLayouts } from "../core/layout.js";
 import { calculateAllProjectParts } from "./cabinet.js";
@@ -49,11 +49,19 @@ export function calculateProjectHardware() {
     if (!hardwareList[joinKey]) hardwareList[joinKey] = { name: joinKey, qty: 0, unit: 'kpl.' };
     hardwareList[joinKey].qty += 8; 
 
-    // Szafka pod skos: szuflady liczone z jej wnęk (core/slopeCabinet.js), nie z mod.elements.
+    // Szafka pod skos: fronty z mod.elements przycięte skosem (core/slopeCabinet.js) -
+    // szuflady liczą miejsce pod skosem, trójkąty to blendy bez okuć.
     if (mod.type === 'slope_cabinet') {
       getSlopeDrawerHardware(mod, config).forEach(hwKey => {
         if (!hardwareList[hwKey]) hardwareList[hwKey] = { name: hwKey, qty: 0, unit: 'kpl.' };
         hardwareList[hwKey].qty += 1;
+      });
+      // Drzwi pod skosem: zawiasy jak w zwykłej szafce (blendy ich nie mają).
+      getSlopeFronts(mod, config).filter(fr => fr.type === 'drzwi').forEach(fr => {
+        const side = fr.subtype === 'drzwi-lp' ? (String(fr.el.id).includes('-L-') ? 'left' : 'right') : (fr.el.openingSide || 'left');
+        const hingeKey = `Zawias meblowy + prowadnik krzyżakowy (puszka 35mm)`;
+        if (!hardwareList[hingeKey]) hardwareList[hingeKey] = { name: hingeKey, qty: 0, unit: 'kpl.' };
+        hardwareList[hingeKey].qty += calculateHinges(fr.el, board, [], side).length;
       });
       return;
     }

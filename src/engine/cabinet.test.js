@@ -3,6 +3,7 @@ import { calculateParts, calculateAllProjectParts } from "./cabinet.js";
 import { calculateProjectHardware } from "./hardware.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
 import { drawerSystems } from "../core/drawerSystems.js";
+import { buildSlopeElements } from "../core/slopeCabinet.js";
 
 const find = (parts, name) => parts.find((p) => p.name === name);
 
@@ -326,9 +327,11 @@ describe("Szafka pod skos w liście formatek i okuć projektu", () => {
       id: "skos-1", name: "Skos", type: "slope_cabinet",
       dimensions: { width: 2000, height: 1500, depth: 600 }, position: { x: 0, y: 0, z: 0 },
       legs: { active: false }, front: { drawerSystem: "movento_katalog" }, elements: [],
-      slope: { lowSide: "left", lowHeight: 0, columns: [null, 650, 650], shelves: [500, 1000] },
+      slope: { lowSide: "left", lowHeight: 0 },
     };
     setProject(freshProject({ modules: [mod] }));
+    // Wnętrze jak z edytora Wnętrze 2D: przegrody 646 i 1314, półki 500 i 1000.
+    mod.elements = buildSlopeElements(mod, 18, [646, 1314], [500, 1000], 3);
     const parts = calculateAllProjectParts();
     expect(parts.some((p) => p.name.startsWith("Skos (wieniec skośny)"))).toBe(true);
     expect(parts.filter((p) => p.name.startsWith("Blenda skos")).length).toBeGreaterThan(0);

@@ -1,83 +1,42 @@
 // src/core/slopeCabinet.js
 //
 // Szafka pod skos (mod.type === 'slope_cabinet'), np. pod schodami albo pod dachem.
-// Czysta geometria w widoku od frontu + formatki korpusu. Rysuje ją
-// render/slopeCabinet3d.js, edytuje ui/slopeProperties.js.
+// Czysta geometria w widoku od frontu + formatki. Rysuje ją render/slopeCabinet3d.js,
+// ustawienia skosu: ui/slopeProperties.js, wnętrze: zwykły edytor "Wnętrze 2D".
 //
 // Dane modułu:
 //   dimensions: { width, height, depth } - height to WYSOKA strona
-//   slope: { lowSide: 'left'|'right', lowHeight, columns: [w|null], shelves: [y] }
-//     lowHeight 0 = trójkąt (skos schodzi do podłogi), > 0 = trapez z niskim bokiem
-//     columns: szerokości wnęk w świetle, od LEWEJ do prawej; dokładnie jedna
-//       pozycja null = "reszta" (liczona z szerokości szafki). Przegrody stoją
-//       między kolumnami. Kolumna przy skosie w trójkącie liczona od czubka skosu.
-//     shelves: spód półki w mm od dołu szafki
-//     (starsze dane: dividers: [x] - lewa ściana przegrody od lewej krawędzi -
-//      zamieniane na columns w getSlopeSettings)
+//   slope: { lowSide: 'left'|'right', lowHeight, drawerBox: 'A'|'B' }
+//     lowHeight 0 = trójkąt (skos schodzi do dna), > 0 = trapez z niskim bokiem
+//   elements: TO SAMO wnętrze co w zwykłej szafce (core/zoneTree.js) - przegrody
+//     (pion), półki (poziom) i fronty z baseZone. Prostokąt wnętrza
+//     (getSlopeInnerRect) sięga do najwyższego miejsca pod skosem; edytor dzieli
+//     go jak zwykle, a skos przycina wynik: przegrody i półki dostają cięcie pod
+//     kątem, fronty są docinane linią skosu, szuflady liczą miejsce pod skosem.
+//     Front, który po docięciu jest trójkątem (albo szuflada się nie mieści),
+//     staje się blendą; el.slopeBlenda = true wymusza blendę.
+//   (stare dane: slope.columns / slope.dividers / slope.shelves - zamieniane na
+//    elements przez migrateSlopeModule)
 //
 // Konstrukcja: dno (wieniec dolny) NAKŁADANE - na całą szerokość szafki, a boki,
-// skośna płyta i przegrody stoją na nim. W trójkącie lewy koniec dna jest docięty
-// równo z linią skosu. Skośna płyta idzie na całą długość (od dna albo od niskiego
-// boku do zewnętrznej ściany wysokiego boku), boki i przegrody są do niej docięte
-// pod kątem. Przegrody są ciągłe od dna do skosu, półki są dzielone przegrodami
-// i docinane do skosu.
+// skośna płyta i przegrody stoją na nim. W trójkącie koniec dna przy skosie jest
+// docięty równo z linią skosu. Skośna płyta idzie na całą długość (od dna albo od
+// niskiego boku do zewnętrznej ściany wysokiego boku).
 //
-// Wszystko liczymy w układzie "niska strona po lewej" (x od lewej krawędzi, y od
-// dołu); dla lowSide === 'right' wynik 3D jest lustrzany (mirrorX), a formatki
-// są takie same.
+// Geometrię liczymy w układzie "niska strona po lewej" (x od lewej krawędzi, y od
+// dołu); dla lowSide === 'right' elementy są odbijane do tego układu, a wynik 3D
+// i rysunki z powrotem (lustro), formatki są takie same.
 
 import { drawerSystems } from './drawerSystems.js';
 import { getDrawerComponents, getWoodenDrawerHeights, drawerComponentsToParts, drawerHardwareKey } from './drawerMath.js';
 
 const MIN_PIECE = 50;   // krótsze kawałki pomijamy (nie da się ich zrobić)
+const r1 = (v) => Math.round(v * 10) / 10;
 
-export const SLOPE_DEFAULTS = { lowSide: 'left', lowHeight: 0, columns: [null], shelves: [] };
+export const SLOPE_DEFAULTS = { lowSide: 'left', lowHeight: 0, drawerBox: 'A' };
 
-// Granice wnętrza w poziomie (rzeczywiste x, od lewej krawędzi): w trójkącie
-// kolumna przy skosie zaczyna się od czubka (x = 0 albo x = W), przy boku - od
-// jego wewnętrznej ściany.
-export function getSlopeInnerSpan(mod, th = 18) {
-  const g = getSlopeGeometry(mod, th);
-  const left = (g.lowSide === 'left' && g.isTriangle) ? 0 : th;
-  const right = (g.lowSide === 'right' && g.isTriangle) ? g.W : g.W - th;
-  return { left, right };
-}
-
-// Stare dane (dividers: pozycje od lewej) -> szerokości kolumn, "reszta" przy skosie.
-function columnsFromDividers(mod, dividers, th) {
-  const { left, right } = getSlopeInnerSpan(mod, th);
-  const xs = dividers.map((x) => parseFloat(x) || 0).sort((a, b) => a - b);
-  const cols = [];
-  let prev = left;
-  xs.forEach((x) => { cols.push(Math.round((x - prev) * 10) / 10); prev = x + th; });
-  cols.push(Math.round((right - prev) * 10) / 10);
-  const lowRight = mod.slope && mod.slope.lowSide === 'right';
-  cols[lowRight ? cols.length - 1 : 0] = null;
-  return cols;
-}
-
-export function getSlopeSettings(mod, th = 18) {
-  const s = { ...SLOPE_DEFAULTS, ...(mod.slope || {}) };
-  if (!(mod.slope && Array.isArray(mod.slope.columns)) && mod.slope && Array.isArray(mod.slope.dividers)) {
-    s.columns = columnsFromDividers(mod, mod.slope.dividers, th);
-  }
-  if (!s.columns.length) s.columns = [null];
-  if (!s.columns.includes(null)) s.columns = [...s.columns.slice(0, -1), null];
-  return s;
-}
-
-// Szerokości wszystkich kolumn (z policzoną "resztą") i rzeczywiste x lewych
-// ścian przegród między nimi.
-export function getSlopeColumns(mod, th = 18) {
-  const { left, right } = getSlopeInnerSpan(mod, th);
-  const cols = getSlopeSettings(mod, th).columns;
-  const fixed = cols.reduce((sum, w) => sum + (w === null ? 0 : (parseFloat(w) || 0)), 0);
-  const autoW = right - left - fixed - (cols.length - 1) * th;
-  const widths = cols.map((w) => (w === null ? autoW : (parseFloat(w) || 0)));
-  const dividers = [];
-  let x = left;
-  widths.slice(0, -1).forEach((w) => { x += w; dividers.push(x); x += th; });
-  return { widths, autoIndex: cols.indexOf(null), autoWidth: autoW, dividers };
+export function getSlopeSettings(mod) {
+  return { ...SLOPE_DEFAULTS, ...(mod.slope || {}) };
 }
 
 // Podstawowe wielkości: k - nachylenie (przyrost wysokości na 1 mm szerokości),
@@ -86,8 +45,7 @@ export function getSlopeGeometry(mod, th = 18) {
   const W = parseFloat(mod.dimensions.width) || 0;
   const H = parseFloat(mod.dimensions.height) || 0;
   const D = parseFloat(mod.dimensions.depth) || 0;
-  // Bez getSlopeSettings - ta (przy starych danych) sama woła geometrię.
-  const s = { ...SLOPE_DEFAULTS, ...(mod.slope || {}) };
+  const s = getSlopeSettings(mod);
   let L = Math.max(0, parseFloat(s.lowHeight) || 0);
   const k = W > 0 ? (H - L) / W : 0;
   const c = th * Math.sqrt(1 + k * k);
@@ -96,104 +54,157 @@ export function getSlopeGeometry(mod, th = 18) {
   if (isTriangle) L = 0;
   const k2 = W > 0 ? (H - L) / W : 0;
   const c2 = th * Math.sqrt(1 + k2 * k2);
+  const lowSide = s.lowSide === 'right' ? 'right' : 'left';
   return {
-    W, H, D, L, th, k: k2, c: c2, isTriangle,
+    W, H, D, L, th, k: k2, c: c2, isTriangle, lowSide,
     angle: Math.atan2(H - L, W) * 180 / Math.PI,
-    lowSide: s.lowSide === 'right' ? 'right' : 'left',
     top: (x) => L + k2 * x,              // wierzch skośnej płyty
     under: (x) => L + k2 * x - c2,       // spód skośnej płyty
     underX: (y) => (y + c2 - L) / k2,    // x, w którym spód skosu jest na wysokości y
+    // rzeczywisty x <-> układ "niska strona po lewej" (dla odcinka x..x+w)
+    normX: (x, w = 0) => (lowSide === 'right' ? W - x - w : x),
   };
 }
 
-// Pozycja przegrody w układzie "niska strona po lewej" (lewa ściana przegrody).
-function normDividerX(g, x) {
-  return g.lowSide === 'right' ? g.W - x - g.th : x;
+// Prostokąt wnętrza (rzeczywiste x, od lewej): w trójkącie od czubka skosu, przy
+// boku od jego wewnętrznej ściany; od dna do najwyższego miejsca pod skosem
+// (przy wysokim boku). To korzeń drzewa wnęk (core/zoneTree.js) i granice
+// cab-left/right/bottom/top frontów (core/layout.js).
+export function getSlopeInnerRect(mod, th = 18) {
+  const g = getSlopeGeometry(mod, th);
+  return {
+    minX: (g.lowSide === 'left' && g.isTriangle) ? 0 : th,
+    maxX: (g.lowSide === 'right' && g.isTriangle) ? g.W : g.W - th,
+    minY: th,
+    maxY: g.under(g.W - th),
+  };
 }
 
-// Przegrody w układzie znormalizowanym, posortowane, z wysokością lewej i prawej ściany.
-// Odrzucamy te poza wnętrzem i te, które pod skosem miałyby mniej niż MIN_PIECE.
-export function getSlopeDividers(mod, th = 18) {
-  const g = getSlopeGeometry(mod, th);
-  const minX = g.isTriangle ? 0 : th;
-  return getSlopeColumns(mod, th).dividers
-    .map((x, index) => ({ index, x: normDividerX(g, x) }))
-    .filter((d) => d.x >= minX && d.x + th <= g.W - th)
-    .map((d) => ({ ...d, hLeft: g.under(d.x) - th, hRight: g.under(d.x + th) - th }))
-    .filter((d) => d.hLeft >= MIN_PIECE)
-    .sort((a, b) => a.x - b.x);
-}
+// ---------------------------------------------------------------------------
+// Budowa wnętrza (domyślne wnętrze nowej szafki i zamiana starych danych)
+// ---------------------------------------------------------------------------
 
-// Kawałki półek (półka jest dzielona przez ciągłe przegrody). Każdy kawałek:
-// { y, x0Bottom, x0Top, x1 } - lewy koniec spodu i wierzchu (różne, gdy docięty
-// do skosu) i prawy koniec; długość długiej krawędzi = x1 - x0Bottom.
-export function getSlopeShelfPieces(mod, th = 18) {
+let idCounter = 0;
+const newId = (prefix) => `${prefix}-${Date.now()}-${(idCounter++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+// Wnętrze jak w edytorze 2D: przegrody na całą wysokość wnętrza w pozycjach
+// dividerXs (lewa ściana, rzeczywiste x), w każdej kolumnie półki na wysokościach
+// shelfYs (spód półki) - tylko tam, gdzie mieszczą się pod skosem - i szuflada
+// w każdej wnęce, która pod skosem ma sensowną wysokość.
+export function buildSlopeElements(mod, th, dividerXs, shelfYs, gap = 3) {
   const g = getSlopeGeometry(mod, th);
-  const s = getSlopeSettings(mod);
-  const dividers = getSlopeDividers(mod, th);
-  const leftWall = g.isTriangle ? 0 : th;
-  const pieces = [];
-  (s.shelves || []).map((y) => parseFloat(y) || 0).sort((a, b) => a - b).forEach((y, index) => {
-    if (y < th || y + th > g.under(g.W - th)) return;
-    // Granice kawałków: lewa ściana (albo skos), przegrody, prawy bok.
-    const bounds = [leftWall];
-    dividers.forEach((d) => { bounds.push(d.x, d.x + th); });
-    bounds.push(g.W - th);
-    for (let i = 0; i < bounds.length; i += 2) {
-      const a = bounds[i], b = bounds[i + 1];
-      const x0Bottom = Math.max(a, g.underX(y));
-      const x0Top = Math.max(a, g.underX(y + th));
-      if (b - x0Top < MIN_PIECE) continue;
-      pieces.push({ index, y, x0Bottom, x0Top, x1: b });
-    }
+  const rect = getSlopeInnerRect(mod, th);
+  const elements = [];
+  const xs = dividerXs.map((x) => parseFloat(x) || 0).filter((x) => x > rect.minX && x + th < rect.maxX).sort((a, b) => a - b);
+  const pions = xs.map((x) => {
+    const el = { id: newId('pion'), typ: 'pion', x, y: rect.minY, w: th, h: rect.maxY - rect.minY, isStructural: true };
+    elements.push(el);
+    return el;
   });
-  return pieces;
-}
+  // Kolumny: [minX, maxX] i granice (cab-* albo id przegrody).
+  const cols = [];
+  let left = rect.minX, leftId = 'cab-left';
+  pions.forEach((p) => { cols.push({ minX: left, maxX: p.x, boundLeft: leftId, boundRight: p.id }); left = p.x + th; leftId = p.id; });
+  cols.push({ minX: left, maxX: rect.maxX, boundLeft: leftId, boundRight: 'cab-right' });
 
-const r1 = (v) => Math.round(v * 10) / 10;
+  // Najwyższy spód skosu w kolumnie (przy jej wyższym końcu).
+  const highestUnder = (c) => g.under(g.normX(c.minX, c.maxX - c.minX) + (c.maxX - c.minX));
 
-// ---------------------------------------------------------------------------
-// Fronty: każda wnęka (kolumna × rząd między półkami) dostaje własny front,
-// docięty linią skosu. Trójkąt = blenda (stała maskownica), reszta = szuflada.
-// Typ wnęki można wymusić: slope.cellTypes[klucz] = 'szuflada'|'blenda'|'brak'.
-// Skrzynka szuflady: slope.drawerBox 'A' (prostokątna, wysokość od niższej
-// strony) albo 'B' (ścięta pod skos: boki różnej wysokości, tył i czoło
-// wewnętrzne trapezowe - tylko systemy ze skrzynką drewnianą, np. MOVENTO).
-// ---------------------------------------------------------------------------
-
-// Wnęki w układzie znormalizowanym: x0..x1 to światło kolumny, y0..y1 światło
-// w pionie (y1 = Infinity, gdy górą jest skos). Klucz wnęki używa RZECZYWISTEGO
-// numeru kolumny (od lewej) i rzędu od dołu.
-export function getSlopeCells(mod, th = 18) {
-  const g = getSlopeGeometry(mod, th);
-  const dividers = getSlopeDividers(mod, th);
-  const pieces = getSlopeShelfPieces(mod, th);
-  const bounds = [];
-  let a = g.isTriangle ? 0 : th;
-  dividers.forEach((d) => { bounds.push([a, d.x]); a = d.x + th; });
-  bounds.push([a, g.W - th]);
-  const n = bounds.length;
-  const cells = [];
-  bounds.forEach(([x0, x1], j) => {
-    const col = g.lowSide === 'left' ? j : n - 1 - j;
-    const shelfYs = pieces.filter((p) => p.x1 > x0 + 0.5 && p.x1 <= x1 + 0.5).map((p) => p.y).sort((u, v) => u - v);
-    const rows = [];
-    let yB = th;
-    shelfYs.forEach((y) => { rows.push([yB, y]); yB = y + th; });
-    rows.push([yB, Infinity]);
-    rows.forEach(([y0, y1], row) => {
-      const spaceAt = (x) => Math.min(y1, g.under(x)) - y0;
-      if (spaceAt(x1) < MIN_PIECE) return;
-      cells.push({
-        key: `c${col}-r${row}`, col, row, x0, x1, y0, y1,
-        leftIsDivider: j > 0, rightIsDivider: j < n - 1,
-        bottomIsShelf: row > 0, topIsShelf: y1 !== Infinity,
-        spaceAt,
+  cols.forEach((c) => {
+    const ys = shelfYs.map((y) => parseFloat(y) || 0)
+      .filter((y) => y > rect.minY + MIN_PIECE && y + th < highestUnder(c) - MIN_PIECE)
+      .sort((a, b) => a - b);
+    const shelves = ys.map((y) => {
+      const el = { id: newId('poziom'), typ: 'poziom', x: c.minX, y, w: c.maxX - c.minX, h: th, isStructural: false };
+      elements.push(el);
+      return el;
+    });
+    // Wnęki w kolumnie i szuflada w każdej, która ma miejsce pod skosem.
+    let bottom = rect.minY, bottomId = 'cab-bottom';
+    const rows = shelves.map((s) => { const r = { minY: bottom, maxY: s.y, boundBottom: bottomId, boundTop: s.id }; bottom = s.y + th; bottomId = s.id; return r; });
+    rows.push({ minY: bottom, maxY: rect.maxY, boundBottom: bottomId, boundTop: 'cab-top' });
+    rows.forEach((r) => {
+      if (Math.min(r.maxY, highestUnder(c)) - r.minY < MIN_PIECE) return;
+      elements.push({
+        id: newId('front'), typ: 'front', subtype: 'szuflada',
+        baseZone: { minX: c.minX, maxX: c.maxX, minY: r.minY, maxY: r.maxY, boundLeft: c.boundLeft, boundRight: c.boundRight, boundBottom: r.boundBottom, boundTop: r.boundTop, offsetBottom: 0, offsetTop: 0 },
+        frontCount: 1, distribution: '1', frontIndex: 0, gap,
+        intGapX: 0, intGapY: 0, forceVariant: 'auto', forceNL: null,
       });
     });
   });
-  return { g, cells };
+  return elements;
 }
+
+// Pozycje przegród (rzeczywiste x) ze starych danych: slope.dividers albo
+// slope.columns (szerokości kolumn z jedną "resztą" = null).
+function legacyDividerXs(mod, th) {
+  const s = mod.slope || {};
+  if (!Array.isArray(s.columns) && Array.isArray(s.dividers)) return s.dividers.map((x) => parseFloat(x) || 0);
+  if (!Array.isArray(s.columns)) return [];
+  const rect = getSlopeInnerRect(mod, th);
+  const cols = s.columns.length ? s.columns : [null];
+  const fixed = cols.reduce((sum, w) => sum + (w === null ? 0 : (parseFloat(w) || 0)), 0);
+  const autoW = rect.maxX - rect.minX - fixed - (cols.length - 1) * th;
+  const xs = [];
+  let x = rect.minX;
+  cols.slice(0, -1).forEach((w) => { x += (w === null ? autoW : (parseFloat(w) || 0)); xs.push(x); x += th; });
+  return xs;
+}
+
+// Zamienia stare wnętrze skosu (kolumny/półki w mod.slope) na mod.elements.
+// Idempotentne: działa tylko, gdy są stare dane i wnętrze jest jeszcze puste.
+export function migrateSlopeModule(mod, th = 18, gap = 3) {
+  if (!mod || mod.type !== 'slope_cabinet' || !mod.slope) return false;
+  const s = mod.slope;
+  const hasLegacy = Array.isArray(s.columns) || Array.isArray(s.dividers) || Array.isArray(s.shelves);
+  if (!hasLegacy) return false;
+  if (!mod.elements || mod.elements.length === 0) {
+    mod.elements = buildSlopeElements(mod, th, legacyDividerXs(mod, th), s.shelves || [], gap);
+  }
+  delete s.columns; delete s.dividers; delete s.shelves; delete s.cellTypes;
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Przegrody i półki z mod.elements, przycięte skosem (układ znormalizowany)
+// ---------------------------------------------------------------------------
+
+// Przegrody: { el, x, y0, hLeft, hRight } - x lewej ściany, wysokości ścian od
+// spodu przegrody do skosu (albo do jej górnego końca, gdy jest niżej).
+export function getSlopeDividers(mod, th = 18) {
+  const g = getSlopeGeometry(mod, th);
+  return (mod.elements || [])
+    .filter((el) => el.typ === 'pion')
+    .map((el) => {
+      const x = g.normX(parseFloat(el.x) || 0, th);
+      const y0 = parseFloat(el.y) || 0;
+      const y1 = y0 + (parseFloat(el.h) || 0);
+      return { el, x, y0, hLeft: Math.min(y1, g.under(x)) - y0, hRight: Math.min(y1, g.under(x + th)) - y0 };
+    })
+    .filter((d) => d.hRight >= MIN_PIECE && d.hLeft > 0)
+    .sort((a, b) => a.x - b.x);
+}
+
+// Półki: { el, y, x0Bottom, x0Top, x1 } - lewy koniec spodu i wierzchu (różne,
+// gdy docięta do skosu) i prawy koniec; długość długiej krawędzi = x1 - x0Bottom.
+export function getSlopeShelfPieces(mod, th = 18) {
+  const g = getSlopeGeometry(mod, th);
+  return (mod.elements || [])
+    .filter((el) => el.typ === 'poziom')
+    .map((el) => {
+      const w = parseFloat(el.w) || 0;
+      const nx0 = g.normX(parseFloat(el.x) || 0, w);
+      const y = parseFloat(el.y) || 0;
+      return { el, y, x0Bottom: Math.max(nx0, g.underX(y)), x0Top: Math.max(nx0, g.underX(y + th)), x1: nx0 + w };
+    })
+    .filter((p) => p.x1 - p.x0Top >= MIN_PIECE)
+    .sort((a, b) => a.y - b.y || a.x1 - b.x1);
+}
+
+// ---------------------------------------------------------------------------
+// Fronty
+// ---------------------------------------------------------------------------
 
 // Prostokąt frontu [fx0, fx1] × [fy0, fy1] przycięty linią y = a0 + k·x
 // (k > 0, skos rośnie w prawo). Zwraca kształt, wierzchołki i wymiary.
@@ -228,9 +239,9 @@ function shapeText(shape, lowSide) {
   }
 }
 
-// Szuflada we wnęce. Zwraca { comps, boxType, fits, box } albo null, gdy system
-// nieznany. box - dane do 3D i formatek skrzynki B.
-function slopeDrawer(cell, g, ctx) {
+// Szuflada w przestrzeni cell = { x0, x1 (światło, układ skosu), y0, y1, spaceAt }.
+// Zwraca { comps, boxType, fits, ox0, ox1, t, yBase, box } albo null.
+function slopeDrawer(cell, ctx, sideHeight) {
   const { sys, system, depth, wantB } = ctx;
   if (!system) return null;
   const innerW = cell.x1 - cell.x0;
@@ -243,7 +254,7 @@ function slopeDrawer(cell, g, ctx) {
   const ox0 = cell.x0 + (innerW - outerW) / 2;
   const ox1 = ox0 + outerW;
   const spaceLow = cell.spaceAt(ox0), spaceHigh = cell.spaceAt(ox1);
-  const comps = getDrawerComponents(sys, innerW, depth, spaceLow);
+  const comps = getDrawerComponents(sys, innerW, depth, spaceLow, 'auto', sideHeight);
   const boxB = wantB && !!system.woodenBox;
 
   const lo = boxB ? getWoodenDrawerHeights(system, spaceLow) : null;
@@ -258,65 +269,16 @@ function slopeDrawer(cell, g, ctx) {
       box: { sideLow: lo.sideHeight, sideHigh: hi.sideHeight, backLow, backHigh, yBase: cell.y0 + system.bottomClearance, recess: system.bottomRecess },
     };
   }
-  let fits;
-  if (system.woodenBox) fits = comps.fits;
-  else fits = spaceLow >= Math.min(...Object.values(system.variants).map((v) => v.minSpace));
+  const fits = system.woodenBox
+    ? comps.fits
+    : spaceLow >= Math.min(...Object.values(system.variants).map((v) => v.minSpace));
   const yBase = cell.y0 + (system.woodenBox ? system.bottomClearance : 0);
-  return { comps, boxType: 'A', fits, ox0, ox1, t, yBase, wantedB: wantB };
+  return { comps, boxType: 'A', fits, ox0, ox1, t, yBase };
 }
 
-// Wszystkie fronty szafki pod skos (układ znormalizowany), z typem, kształtem
-// i - dla szuflad - danymi skrzynki.
-export function getSlopeFronts(mod, config) {
-  const th = parseFloat(config.materials?.boardThickness) || 18;
-  const backThick = parseFloat(config.materials?.backThickness) || 3;
-  const { g, cells } = getSlopeCells(mod, th);
-  const s = getSlopeSettings(mod, th);
-  const { gap, isInset, cLeft, cRight, cBottom, cSlope } = getSlopeFrontSettings(mod, config);
-  const f = { ...(config.front || {}), ...(mod.front || {}) };
-  // Luzy boków w układzie znormalizowanym: niska strona zawsze po lewej.
-  const cLow = g.lowSide === 'left' ? cLeft : cRight;
-  const cHigh = g.lowSide === 'left' ? cRight : cLeft;
-  const sys = String(f.drawerSystem || 'merivobox').toLowerCase();
-  // Front wpuszczany wchodzi w korpus na swoją grubość - o tyle krótsza szuflada.
-  const ctx = { sys, system: drawerSystems[sys], depth: g.D - backThick - (isInset ? th : 0), wantB: s.drawerBox === 'B' };
-  const types = s.cellTypes || {};
-  // Front kończy się pod skośną płytą (płyta zostaje widoczna); luz pod skosem
-  // mierzony prostopadle do płyty, więc w pionie jest większy o 1 / cos kąta.
-  const a0 = g.L - g.c - cSlope * Math.sqrt(1 + g.k * g.k);
-
-  return cells.map((cell) => {
-    let fx0, fx1, fy0, fy1;
-    if (isInset) {
-      // Wpuszczany: front w świetle wnęki; od korpusu luz, od przegrody/półki pół przerwy.
-      fx0 = cell.x0 + (cell.leftIsDivider ? gap / 2 : (g.isTriangle ? 0 : cLow));
-      fx1 = cell.x1 - (cell.rightIsDivider ? gap / 2 : cHigh);
-      fy0 = cell.y0 + (cell.bottomIsShelf ? gap / 2 : cBottom);
-      fy1 = cell.topIsShelf ? cell.y1 - gap / 2 : g.H;
-    } else {
-      // Nakładany: zachodzi na korpus (luz od zewnętrznej krawędzi), na
-      // przegrodach i półkach dzieli płytę na pół ze szczeliną.
-      fx0 = cell.leftIsDivider ? cell.x0 - th / 2 + gap / 2 : (g.isTriangle ? 0 : cLow);
-      fx1 = cell.rightIsDivider ? cell.x1 + th / 2 - gap / 2 : g.W - cHigh;
-      fy0 = cell.bottomIsShelf ? cell.y0 - th / 2 + gap / 2 : cBottom;
-      fy1 = cell.topIsShelf ? cell.y1 + th / 2 - gap / 2 : g.H;
-    }
-    const shape = clipFrontRect(fx0, fx1, fy0, fy1, a0, g.k);
-    const tooSmall = shape.kind === 'brak' || shape.h < 40 || shape.w < 40;
-    const drawer = tooSmall ? null : slopeDrawer(cell, g, ctx);
-    let auto = 'szuflada';
-    if (tooSmall) auto = 'brak';
-    else if (shape.kind === 'trojkat' || !drawer || !drawer.fits) auto = 'blenda';
-    const forced = types[cell.key];
-    const type = tooSmall ? 'brak' : (['szuflada', 'blenda', 'brak'].includes(forced) ? forced : auto);
-    return { ...cell, shape, auto, type, inset: isInset, drawer: type === 'szuflada' ? drawer : null, text: shapeText(shape, g.lowSide) };
-  });
-}
-
-// Ustawienia frontów szafki pod skos - te same pola co w zwykłej szafce
-// (ui/properties.js, zakładka Front): typ, przerwa między frontami, luzy
-// lewy/prawy/dół; zamiast luzu górnego - luz pod skosem (clearance.slope,
-// domyślnie jak przerwa). mod.front nadpisuje domyślne projektu.
+// Ustawienia frontów - luzy jak w zwykłej szafce liczy core/layout.js; tu tylko
+// to, czego zwykła szafka nie ma: luz pod skosem (clearance.slope, mierzony
+// prostopadle do płyty, domyślnie jak przerwa między frontami). Reszta do panelu.
 export function getSlopeFrontSettings(mod, config) {
   const f = { ...(config.front || {}), ...(mod.front || {}) };
   const fc = { ...(config.front?.clearance || {}), ...(mod.front?.clearance || {}) };
@@ -327,10 +289,70 @@ export function getSlopeFrontSettings(mod, config) {
     gap,
     cLeft: n(fc.left ?? fc.sides, 1.5),
     cRight: n(fc.right ?? fc.sides, 1.5),
-    cBottom: n(fc.bottom, 0),
+    cBottom: n(fc.bottom ?? fc.dol, 2),
     cSlope: n(fc.slope, gap),
   };
 }
+
+// Wszystkie fronty szafki pod skos (z mod.elements, po recalculateLayout - el.x/y/w/h),
+// w układzie skosu: kształt po docięciu, typ ('szuflada' | 'drzwi' | 'blenda' |
+// 'brak') i - dla szuflad - skrzynka. auto - typ bez wymuszenia el.slopeBlenda.
+export function getSlopeFronts(mod, config) {
+  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const backThick = parseFloat(config.materials?.backThickness) || 3;
+  const g = getSlopeGeometry(mod, th);
+  const s = getSlopeSettings(mod);
+  const { isInset, cSlope } = getSlopeFrontSettings(mod, config);
+  const f = { ...(config.front || {}), ...(mod.front || {}) };
+  const sys = String(f.drawerSystem || 'merivobox').toLowerCase();
+  const system = drawerSystems[sys];
+  // Front kończy się pod skośną płytą (płyta zostaje widoczna).
+  const a0 = g.L - g.c - cSlope * Math.sqrt(1 + g.k * g.k);
+
+  return (mod.elements || [])
+    .filter((el) => el.typ === 'front' && (parseFloat(el.w) || 0) > 0 && (parseFloat(el.h) || 0) > 0)
+    .map((el) => {
+      const ew = parseFloat(el.w), eh = parseFloat(el.h), ey = parseFloat(el.y) || 0;
+      const nx0 = g.normX(parseFloat(el.x) || 0, ew);
+      const shape = clipFrontRect(nx0, nx0 + ew, ey, ey + eh, a0, g.k);
+      const tooSmall = shape.kind === 'brak' || shape.h < 40 || shape.w < 40;
+      const isDrawer = (el.subtype || '').includes('szuflada');
+      const isInner = el.subtype === 'szuflada-wewnetrzna';
+      const innerThick = parseFloat(el.innerFrontThickness ?? 18);
+      const innerSetback = parseFloat(el.innerSetback ?? 2);
+
+      let drawer = null;
+      if (isDrawer && !tooSmall) {
+        // Miejsce na skrzynkę: światło wnęki (baseZone) w zakresie wysokości frontu.
+        const bz = el.baseZone || {};
+        const zMinX = parseFloat(bz.minX) || 0, zMaxX = parseFloat(bz.maxX) || g.W;
+        const zx0 = g.normX(zMinX, zMaxX - zMinX);
+        const y0 = Math.max(ey, (parseFloat(bz.minY) || th) + (parseFloat(bz.offsetBottom) || 0));
+        const y1 = Math.min(ey + eh, (parseFloat(bz.maxY) || g.H) - (parseFloat(bz.offsetTop) || 0));
+        const cell = { x0: zx0, x1: zx0 + (zMaxX - zMinX), y0, y1, spaceAt: (x) => Math.min(y1, g.under(x)) - y0 };
+        const depth = g.D - backThick - (isInner ? innerThick + innerSetback : (isInset ? th : 0));
+        drawer = slopeDrawer(cell, { sys, system, depth, wantB: s.drawerBox === 'B' }, el.drawerSideHeight);
+      }
+      let auto;
+      if (tooSmall) auto = 'brak';
+      else if (shape.kind === 'trojkat') auto = 'blenda';
+      else if (isDrawer) auto = drawer && drawer.fits ? 'szuflada' : 'blenda';
+      else auto = 'drzwi';
+      const type = tooSmall ? 'brak' : (el.slopeBlenda ? 'blenda' : auto);
+      // Głębokość frontu w 3D: nakładany przed korpusem, wpuszczany w obrysie,
+      // front szuflady wewnętrznej cofnięty o swoje odsunięcie.
+      const z = isInner ? { front: innerSetback, thick: innerThick } : { front: isInset ? 0 : -th, thick: th };
+      return {
+        el, key: el.id, subtype: el.subtype, shape, auto, type, z,
+        drawer: type === 'szuflada' ? drawer : null,
+        text: shapeText(shape, g.lowSide),
+      };
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Rysunki, formatki, okucia
+// ---------------------------------------------------------------------------
 
 // Wielokąt wypukły (punkty przeciwnie do ruchu wskazówek zegara) zwężony o d
 // z każdej strony - przesuwamy każdą krawędź do środka i przecinamy sąsiednie.
@@ -349,6 +371,20 @@ export function insetPolygon(points, d) {
     const t = ((l1.p[0] - l0.p[0]) * l1.dir[1] - (l1.p[1] - l0.p[1]) * l1.dir[0]) / det;
     return [l0.p[0] + l0.dir[0] * t, l0.p[1] + l0.dir[1] * t];
   });
+}
+
+function doorSide(fr) {
+  if (fr.subtype === 'drzwi-lp') return String(fr.el.id).includes('-L-') ? 'lewe' : 'prawe';
+  return (fr.el.openingSide || 'left') === 'right' ? 'prawe' : 'lewe';
+}
+
+// Nazwa frontu na liście formatek i na rysunku.
+function frontName(fr) {
+  const rect = fr.shape.kind === 'prostokat';
+  if (fr.type === 'blenda') return rect ? 'Blenda' : `Blenda skos (${fr.text})`;
+  if (fr.type === 'drzwi') return rect ? `Drzwi ${doorSide(fr) === 'prawe' ? 'Prawe' : 'Lewe'}` : `Drzwi ${doorSide(fr)} skos (${fr.text})`;
+  const base = fr.subtype === 'szuflada-wewnetrzna' ? 'Front szuflady wewn.' : 'Front szuflady';
+  return rect ? base : `${base} skos (${fr.text})`;
 }
 
 // Formatki o nieprostokątnym obrysie (fronty, blendy, plecy) do rysunków cięcia:
@@ -372,8 +408,7 @@ export function getSlopeShapes(mod, config) {
   };
   getSlopeFronts(mod, config).forEach((fr) => {
     if (fr.type === 'brak' || fr.shape.kind === 'prostokat') return;
-    const name = fr.type === 'blenda' ? `Blenda skos (${fr.text})` : `Front szuflady skos (${fr.text})`;
-    add(name, 'Front', fr.shape.points);
+    add(frontName(fr), 'Front', fr.shape.points);
   });
   const back = g.isTriangle ? [[0, 0], [g.W, 0], [g.W, g.H]] : [[0, 0], [g.W, 0], [g.W, g.H], [0, g.L]];
   const shape = g.isTriangle ? 'trójkąt' : `trapez, niska strona ${r1(g.L - 4)}`;
@@ -388,16 +423,11 @@ export function getSlopeFrontParts(mod, config) {
   const parts = [];
   getSlopeFronts(mod, config).forEach((fr) => {
     if (fr.type === 'brak') return;
-    const rect = fr.shape.kind === 'prostokat';
-    const len = r1(fr.shape.h), wid = r1(fr.shape.w);
-    if (fr.type === 'blenda') {
-      parts.push({ name: rect ? 'Blenda' : `Blenda skos (${fr.text})`, length: len, width: wid, qty: 1, category: 'Front' });
-      return;
-    }
-    parts.push({ name: rect ? 'Front szuflady' : `Front szuflady skos (${fr.text})`, length: len, width: wid, qty: 1, category: 'Front' });
+    parts.push({ name: frontName(fr), length: r1(fr.shape.h), width: r1(fr.shape.w), qty: 1, category: 'Front', materialId: fr.el.materialId });
     const d = fr.drawer;
     if (!d) return;
-    const eqW = Math.round(fr.x1 - fr.x0 + 2 * th);
+    const bz = fr.el.baseZone || {};
+    const eqW = Math.round((parseFloat(bz.maxX) || 0) - (parseFloat(bz.minX) || 0) + 2 * th);
     if (d.boxType === 'A') {
       parts.push(...drawerComponentsToParts(d.comps, eqW));
       return;
@@ -427,19 +457,17 @@ export function getSlopeDrawerHardware(mod, config) {
     .map((fr) => drawerHardwareKey(sys, fr.drawer.comps));
 }
 
-// Bryły frontów i skrzynek do 3D (układ znormalizowany): { kind, points, zFront, depth }
+// Bryły frontów i skrzynek do 3D (układ skosu): { kind, points, zFront, depth }
 // - zFront: odległość przedniej ściany bryły od płaszczyzny frontu korpusu
 //   (ujemna = przed korpusem), depth - grubość w głąb.
 function frontSolids(mod, config) {
-  const th = parseFloat(config.materials?.boardThickness) || 18;
   const solids = [];
   const add = (kind, points, zFront, depth) => solids.push({ kind, points, zFront, depth });
   const rect = (x, y, w, h) => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
   getSlopeFronts(mod, config).forEach((fr) => {
     if (fr.type === 'brak') return;
-    // Nakładany stoi przed korpusem, wpuszczany w jego obrysie; skrzynka za frontem.
-    add('front', fr.shape.points, fr.inset ? 0 : -th, th);
-    const zOff = fr.inset ? th : 0;
+    add('front', fr.shape.points, fr.z.front, fr.z.thick);
+    const zOff = Math.max(0, fr.z.front + fr.z.thick);
     const d = fr.drawer;
     if (!d) return;
     const c = d.comps;
@@ -466,10 +494,10 @@ function frontSolids(mod, config) {
     }
     // System metalowy: dno na dole, boki (profil) i tył.
     const h = 16 + c.back.height;
-    add('drawerBox', rect(d.ox0 + t, fr.y0, c.bottom.width, 16), zOff, L);
-    add('drawerBox', rect(d.ox0, fr.y0, t, h), zOff, L);
-    add('drawerBox', rect(d.ox1 - t, fr.y0, t, h), zOff, L);
-    add('drawerBox', rect(d.ox0 + t + (c.bottom.width - c.back.width) / 2, fr.y0 + 16, c.back.width, c.back.height), zOff + L - t, t);
+    add('drawerBox', rect(d.ox0 + t, d.yBase, c.bottom.width, 16), zOff, L);
+    add('drawerBox', rect(d.ox0, d.yBase, t, h), zOff, L);
+    add('drawerBox', rect(d.ox1 - t, d.yBase, t, h), zOff, L);
+    add('drawerBox', rect(d.ox0 + t + (c.bottom.width - c.back.width) / 2, d.yBase + 16, c.back.width, c.back.height), zOff + L - t, t);
   });
   return solids;
 }
@@ -511,12 +539,12 @@ export function getSlopeBoards(mod, config) {
   add({ name: 'Dno (wieniec dolny)', a: [0, g.W], b: [g.isTriangle ? th / g.k : 0, g.W], aLabel: 'spód', bLabel: 'wierzch', startLabel: g.isTriangle ? 'przy skosie' : 'przy niskim boku', endLabel: 'przy wysokim boku' });
 
   getSlopeDividers(mod, th).forEach((d) => {
-    add({ name: 'Przegroda', a: [0, d.hLeft], b: [0, d.hRight], aLabel: 'od strony skosu', bLabel: 'od wysokiego boku', startLabel: 'dół', endLabel: 'góra (pod skosem)' });
+    add({ name: 'Przegroda', a: [0, d.hLeft], b: [0, d.hRight], aLabel: 'od strony skosu', bLabel: 'od wysokiego boku', startLabel: 'dół', endLabel: 'góra' });
   });
 
   getSlopeShelfPieces(mod, th).forEach((p) => {
     const long = p.x1 - p.x0Bottom, short = p.x1 - p.x0Top;
-    add({ name: 'Półka', width: width - 5, a: [0, long], b: [long - short, long], aLabel: 'spód', bLabel: 'wierzch', startLabel: 'przy skosie', endLabel: 'drugi koniec' });
+    add({ name: 'Półka', width: p.el.isStructural ? width : width - 5, a: [0, long], b: [long - short, long], aLabel: 'spód', bLabel: 'wierzch', startLabel: 'przy skosie', endLabel: 'drugi koniec' });
   });
 
   return boards.map((b) => {
@@ -539,9 +567,9 @@ function bevelName(b) {
   return `${b.name} (cięcie ${tilts.join(' i ')}, krótsza ${r1(b.short)})`;
 }
 
-// Formatki korpusu szafki pod skos. Krawędzie docięte pod kątem: długość to
-// DŁUŻSZA krawędź, a w nazwie kąt pochylenia piły i krótsza krawędź - tyle
-// wystarczy, żeby formatkę wyciąć (rysunki: render/slopeDrawing2d.js).
+// Formatki korpusu i wnętrza szafki pod skos. Krawędzie docięte pod kątem:
+// długość to DŁUŻSZA krawędź, a w nazwie kąt pochylenia piły i krótsza krawędź -
+// tyle wystarczy, żeby formatkę wyciąć (rysunki: render/slopeDrawing2d.js).
 export function getSlopeCabinetParts(mod, config) {
   const parts = getSlopeBoards(mod, config).map((b) => ({
     name: bevelName(b), length: r1(b.length), width: b.width, qty: 1, category: 'Korpus',
@@ -552,6 +580,19 @@ export function getSlopeCabinetParts(mod, config) {
   const bw = Math.max(...back.points.map((p) => p[0])), bh = Math.max(...back.points.map((p) => p[1]));
   parts.push({ name: back.name, length: r1(bh), width: r1(bw), qty: 1, category: 'Plecy' });
   return parts;
+}
+
+// Obszar nad spodem skośnej płyty w widoku od frontu (rzeczywiste x) - do
+// zaciemnienia w edytorze wnętrza: { slab: płyta skosu, above: nad skosem }.
+export function getSlopeOverlay(mod, th = 18) {
+  const g = getSlopeGeometry(mod, th);
+  const xu0 = g.isTriangle ? g.underX(th) : 0;
+  const slab = g.isTriangle
+    ? [[th / g.k, th], [xu0, th], [g.W, g.under(g.W)], [g.W, g.H]]
+    : [[0, g.under(0)], [g.W, g.under(g.W)], [g.W, g.H], [0, g.L]];
+  const above = g.isTriangle ? [[0, th], [th / g.k, th], [g.W, g.H], [0, g.H]] : [[0, g.L], [g.W, g.H], [0, g.H]];
+  const m = (pts) => (g.lowSide === 'right' ? pts.map(([x, y]) => [g.W - x, y]).reverse() : pts);
+  return { slab: m(slab), above: m(above) };
 }
 
 // Wielokąty płyt w widoku od frontu (x, y), do rysowania 3D. Każdy: { kind, points }.
@@ -580,7 +621,7 @@ export function getSlopeCabinetPolygons(mod, config = { materials: { boardThickn
     add('corpus', [[0, 0], [g.W, 0], [g.W, th], [th / g.k, th]]);
   }
   getSlopeDividers(mod, th).forEach((d) => {
-    add('corpus', [[d.x, th], [d.x + th, th], [d.x + th, g.under(d.x + th)], [d.x, g.under(d.x)]]);
+    add('corpus', [[d.x, d.y0], [d.x + th, d.y0], [d.x + th, d.y0 + d.hRight], [d.x, d.y0 + d.hLeft]]);
   });
   getSlopeShelfPieces(mod, th).forEach((p) => {
     add('shelf', [[p.x0Bottom, p.y], [p.x1, p.y], [p.x1, p.y + th], [p.x0Top, p.y + th]]);

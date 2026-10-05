@@ -23,6 +23,7 @@
 import { state } from "./state.js";
 import { autoDistributeShelves } from "./shelfMath.js";
 import { getCornerArmRect } from "./layout.js";
+import { getSlopeInnerRect } from "./slopeCabinet.js";
 
 const EPS = 2; // mm tolerancji przy porównaniach geometrycznych (zaokrąglenia)
 
@@ -44,6 +45,8 @@ function getConsForModule(mod) {
 // liczony od dołu modułu (0,0 = lewy dolny róg wnętrza korpusu).
 export function getCabinetInnerRect(mod) {
   const th = getBoardThickness();
+  // Szafka pod skos: wnętrze do najwyższego miejsca pod skosem (core/slopeCabinet.js).
+  if (mod.type === "slope_cabinet") return getSlopeInnerRect(mod, th);
   const W = parseFloat(mod.dimensions.width) || 600;
   const H = parseFloat(mod.dimensions.height) || 720;
   const cons = getConsForModule(mod);

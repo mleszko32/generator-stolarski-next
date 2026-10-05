@@ -8,6 +8,7 @@
 // (el.y/el.h po recalculateLayout).
 import { getDrawerComponents } from "./drawerMath.js";
 import { num } from "../utils/math.js";
+import { getSlopeFronts, getSlopeGeometry } from "./slopeCabinet.js";
 
 const SIDE_T = 16;   // grubość boku i dna szuflady
 
@@ -64,6 +65,21 @@ export function getDrawerBoxInfo(mod, el, project) {
 
 // Sam obrys skrzynki (patrz getDrawerBoxInfo) albo null.
 export function getDrawerBoxRect(mod, el, project) {
+  if (mod.type === "slope_cabinet") return slopeDrawerBoxRect(mod, el, project);
   const info = getDrawerBoxInfo(mod, el, project);
   return info ? info.rect : null;
+}
+
+// Szafka pod skos: skrzynka liczona pod skosem (core/slopeCabinet.js); front,
+// który stał się blendą (trójkąt albo szuflada się nie mieści), nie ma skrzynki.
+function slopeDrawerBoxRect(mod, el, project) {
+  const th = num(project.materials && project.materials.boardThickness, 18) || 18;
+  const fr = getSlopeFronts(mod, project).find((f) => f.el.id === el.id);
+  if (!fr || fr.type !== "szuflada" || !fr.drawer) return null;
+  const d = fr.drawer, c = d.comps;
+  const g = getSlopeGeometry(mod, th);
+  const yBase = d.boxType === "B" ? d.box.yBase : d.yBase;
+  const h = d.boxType === "B" ? Math.max(d.box.sideLow, d.box.sideHigh) : (c.woodenBox ? c.sideHeight : 16 + c.back.height);
+  const x0 = g.normX(d.ox0, d.ox1 - d.ox0);
+  return { x0, x1: x0 + (d.ox1 - d.ox0), y0: yBase, y1: yBase + h };
 }

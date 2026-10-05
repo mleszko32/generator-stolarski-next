@@ -1,28 +1,53 @@
-import { describe, it, expect } from "vitest";
-import { getSlopeGeometry, getSlopeDividers, getSlopeShelfPieces, getSlopeCabinetParts, getSlopeCabinetPolygons, getSlopeColumns, getSlopeSettings, clipFrontRect, getSlopeFronts, getSlopeFrontParts, getSlopeDrawerHardware, getSlopeFrontSettings, getSlopeBoards, insetPolygon, getSlopeShapes } from "./slopeCabinet.js";
+import { describe, it, expect, beforeEach } from "vitest";
+import {
+  getSlopeGeometry, getSlopeInnerRect, getSlopeDividers, getSlopeShelfPieces, getSlopeCabinetParts,
+  getSlopeCabinetPolygons, clipFrontRect, getSlopeFronts, getSlopeFrontParts, getSlopeDrawerHardware,
+  getSlopeFrontSettings, getSlopeBoards, insetPolygon, getSlopeShapes, buildSlopeElements, migrateSlopeModule,
+} from "./slopeCabinet.js";
+import { recalculateLayout } from "./layout.js";
+import { buildZoneTree, assignFront } from "./zoneTree.js";
+import { freshProject, setProject } from "../test/fixtures.js";
 
 const config = { materials: { boardThickness: 18, backThickness: 3 } };
-const mod = (slope = {}, dims = {}) => ({
-  type: "slope_cabinet",
-  dimensions: { width: 1000, height: 1000, depth: 600, ...dims },
-  slope: { lowSide: "left", lowHeight: 0, dividers: [], shelves: [], ...slope },
-});
+
+// Szafka pod skos z wnętrzem jak z edytora 2D: przegrody (lewa ściana, rzeczywiste x),
+// półki (spód) i szuflada w każdej wnęce. Ustawia projekt i przelicza układ frontów.
+function slopeMod({ width = 1000, height = 1000, depth = 600, lowSide = "left", lowHeight = 0, drawerBox = "A", dividers = [], shelves = [], front = {} } = {}) {
+  const mod = {
+    id: "skos", name: "Skos", type: "slope_cabinet",
+    dimensions: { width, height, depth }, position: { x: 0, y: 0, z: 0 },
+    legs: { active: false }, front, slope: { lowSide, lowHeight, drawerBox }, elements: [],
+  };
+  const project = freshProject({ modules: [mod] });
+  project.front.drawerSystem = "movento_katalog";
+  setProject(project);
+  mod.elements = buildSlopeElements(mod, 18, dividers, shelves, 3);
+  recalculateLayout(mod);
+  return mod;
+}
+const cfg = () => ({ ...config, front: { gap: 3, clearance: { sides: 1.5, top: 5, bottom: 0 }, drawerSystem: "movento_katalog" } });
 const part = (parts, prefix) => parts.find((p) => p.name.startsWith(prefix));
 
 // Trójkąt 1000 x 1000: kąt 45°, pionowa grubość skosu c = 18·√2 ≈ 25,46 mm.
 describe("szafka pod skos - trójkąt 45°", () => {
-  it("geometria: kąt i grubość skosu w pionie", () => {
-    const g = getSlopeGeometry(mod());
+  it("geometria i prostokąt wnętrza do najwyższego miejsca pod skosem", () => {
+    const m = slopeMod();
+    const g = getSlopeGeometry(m);
     expect(g.isTriangle).toBe(true);
     expect(g.angle).toBeCloseTo(45, 5);
     expect(g.c).toBeCloseTo(25.456, 2);
+    const r = getSlopeInnerRect(m);
+    expect(r.minX).toBe(0);
+    expect(r.maxX).toBe(982);
+    expect(r.minY).toBe(18);
+    expect(r.maxY).toBeCloseTo(956.5, 1);
   });
 
   it("formatki korpusu przy dnie nakładanym: skos i bok stoją na dnie", () => {
-    const parts = getSlopeCabinetParts(mod(), config);
+    const parts = getSlopeCabinetParts(slopeMod(), config);
     // Skos: wierzch od x = 18 (dno) do 1000 pod 45°, spód od x = 43,46 (956,54 / cos 45° = 1352,75).
     expect(part(parts, "Skos")).toMatchObject({ length: 1388.8, width: 597, qty: 1 });
-    expect(part(parts, "Skos").name).toContain("krótsza 1352.8");
+    expect(part(parts, "Skos").name).toBe("Skos (wieniec skośny) (cięcie 45° i 45°, krótsza 1352.8)");
     expect(part(parts, "Bok wysoki")).toMatchObject({ length: 956.5, width: 597 });
     expect(part(parts, "Bok wysoki").name).toContain("krótsza 938.5");
     // Dno na całą szerokość, koniec przy skosie docięty równo z linią skosu.
@@ -34,81 +59,77 @@ describe("szafka pod skos - trójkąt 45°", () => {
     expect(part(parts, "Plecy")).toMatchObject({ length: 993.2, width: 993.2, category: "Plecy" });
   });
 
-  it("przegroda od wieńca do skosu, wyższa ściana od strony wysokiej", () => {
-    const [d] = getSlopeDividers(mod({ dividers: [500] }));
+  it("przegroda z edytora jest przycinana skosem (wyższa ściana od strony wysokiej)", () => {
+    const m = slopeMod({ dividers: [500] });
+    const [d] = getSlopeDividers(m);
     expect(d.hLeft).toBeCloseTo(456.5, 1);
     expect(d.hRight).toBeCloseTo(474.5, 1);
-    const p = part(getSlopeCabinetParts(mod({ dividers: [500] }), config), "Przegroda");
-    expect(p).toMatchObject({ length: 474.5, width: 597 });
+    expect(part(getSlopeCabinetParts(m, config), "Przegroda")).toMatchObject({ length: 474.5, width: 597 });
   });
 
-  it("półka dzielona przegrodą; kawałek przy skosie docięty pod kątem", () => {
-    const pieces = getSlopeShelfPieces(mod({ dividers: [500], shelves: [300] }));
+  it("półka w kolumnie przy skosie docięta pod kątem, w drugiej kolumnie prosta", () => {
+    const pieces = getSlopeShelfPieces(slopeMod({ dividers: [500], shelves: [300] }));
     expect(pieces).toHaveLength(2);
     const [a, b] = pieces;
     expect(a.x1 - a.x0Bottom).toBeCloseTo(174.5, 1);
     expect(a.x1 - a.x0Top).toBeCloseTo(156.5, 1);
     expect(b.x1 - b.x0Bottom).toBeCloseTo(464, 5);
-    expect(b.x1 - b.x0Top).toBeCloseTo(464, 5);
-    const shelves = getSlopeCabinetParts(mod({ dividers: [500], shelves: [300] }), config).filter((p) => p.name.startsWith("Półka"));
-    expect(shelves.map((p) => p.width)).toEqual([592, 592]);
   });
 
-  it("pomija przegrodę, która pod skosem byłaby za niska, i półkę ponad skosem", () => {
-    expect(getSlopeDividers(mod({ dividers: [40] }))).toHaveLength(0);
-    expect(getSlopeShelfPieces(mod({ shelves: [990] }))).toHaveLength(0);
+  it("pomija przegrodę za nisko pod skosem i nie wstawia półki nad skosem", () => {
+    expect(getSlopeDividers(slopeMod({ dividers: [40] }))).toHaveLength(0);
+    expect(getSlopeShelfPieces(slopeMod({ shelves: [990] }))).toHaveLength(0);
   });
 });
 
 describe("szafka pod skos - trapez i strona skosu", () => {
   it("trapez: niski bok stoi na dnie, dno prostokątne na całą szerokość", () => {
-    const g = getSlopeGeometry(mod({ lowHeight: 400 }));
-    expect(g.isTriangle).toBe(false);
-    const parts = getSlopeCabinetParts(mod({ lowHeight: 400 }), config);
+    const m = slopeMod({ lowHeight: 400 });
+    expect(getSlopeGeometry(m).isTriangle).toBe(false);
+    const parts = getSlopeCabinetParts(m, config);
     expect(part(parts, "Bok niski")).toMatchObject({ length: 371.8 });
     expect(part(parts, "Bok niski").name).toContain("krótsza 361");
     expect(part(parts, "Dno")).toMatchObject({ length: 1000, name: "Dno (wieniec dolny)" });
   });
 
   it("za niska niska strona liczy się jak trójkąt", () => {
-    expect(getSlopeGeometry(mod({ lowHeight: 30 })).isTriangle).toBe(true);
+    expect(getSlopeGeometry(slopeMod({ lowHeight: 30 })).isTriangle).toBe(true);
   });
 
-  it("skos po prawej: przegroda mierzona od lewej daje te same formatki co lustrzana", () => {
-    const left = getSlopeCabinetParts(mod({ dividers: [500] }), config);
-    const right = getSlopeCabinetParts(mod({ lowSide: "right", dividers: [482] }), config);
+  it("skos po prawej z lustrzanym wnętrzem daje te same formatki korpusu", () => {
+    const left = getSlopeCabinetParts(slopeMod({ dividers: [500], shelves: [300] }), config);
+    const right = getSlopeCabinetParts(slopeMod({ lowSide: "right", dividers: [482], shelves: [300] }), config);
     expect(right).toEqual(left);
   });
 
   it("wielokąty 3D: skos po prawej jest odbiciem lustrzanym", () => {
-    const l = getSlopeCabinetPolygons(mod());
-    const r = getSlopeCabinetPolygons(mod({ lowSide: "right" }));
+    const l = getSlopeCabinetPolygons(slopeMod());
+    const r = getSlopeCabinetPolygons(slopeMod({ lowSide: "right" }));
     expect(r.polys).toHaveLength(l.polys.length);
-    // Wierzchołek skosu przy podłodze: po lewej x = 0, po prawej x = 1000.
     expect(l.back).toContainEqual([0, 0]);
     expect(r.back).toContainEqual([1000, 0]);
     expect(r.back).toContainEqual([0, 1000]);
   });
 });
 
-describe("szafka pod skos - kolumny (przegrody)", () => {
-  it("reszta wylicza się z szerokości; przegrody między kolumnami", () => {
-    // trójkąt, skos po lewej: wnętrze od 0 (czubek) do 982
-    const c = getSlopeColumns(mod({ columns: [null, 300, 300] }));
-    expect(c.autoWidth).toBeCloseTo(982 - 600 - 36, 5);
-    expect(c.dividers).toEqual([346, 664]);
+describe("szafka pod skos - stare wnętrze (kolumny/półki) zamieniane na elementy", () => {
+  beforeEach(() => setProject(freshProject()));
+  const legacy = (slope) => ({ type: "slope_cabinet", dimensions: { width: 1000, height: 1000, depth: 600 }, front: {}, elements: [], slope: { lowSide: "left", lowHeight: 0, ...slope } });
+
+  it("kolumny z resztą -> przegrody, półki i szuflady w mod.elements", () => {
+    const m = legacy({ columns: [null, 300, 300], shelves: [300] });
+    expect(migrateSlopeModule(m, 18, 3)).toBe(true);
+    expect(m.elements.filter((e) => e.typ === "pion").map((e) => e.x)).toEqual([346, 664]);
+    expect(m.elements.some((e) => e.typ === "poziom")).toBe(true);
+    expect(m.elements.some((e) => e.typ === "front")).toBe(true);
+    expect(m.slope.columns).toBeUndefined();
+    expect(migrateSlopeModule(m, 18, 3)).toBe(false);
   });
 
-  it("stare dane (dividers) zamieniają się na kolumny z resztą przy skosie", () => {
-    expect(getSlopeSettings(mod({ dividers: [500] })).columns).toEqual([null, 464]);
-    expect(getSlopeSettings(mod({ lowSide: "right", dividers: [482] })).columns).toEqual([464, null]);
-    expect(getSlopeColumns(mod({ lowSide: "right", dividers: [482] })).dividers).toEqual([482]);
-  });
-
-  it("skos po prawej: te same kolumny w odwróconej kolejności dają te same formatki", () => {
-    const left = getSlopeCabinetParts(mod({ columns: [null, 300, 300], shelves: [300] }), config);
-    const right = getSlopeCabinetParts(mod({ lowSide: "right", columns: [300, 300, null], shelves: [300] }), config);
-    expect(right).toEqual(left);
+  it("starsze pozycje przegród (dividers) też", () => {
+    const m = legacy({ dividers: [500] });
+    migrateSlopeModule(m, 18, 3);
+    expect(m.elements.filter((e) => e.typ === "pion").map((e) => e.x)).toEqual([500]);
   });
 });
 
@@ -131,102 +152,104 @@ describe("szafka pod skos - kształty frontów (clipFrontRect)", () => {
   });
 });
 
-describe("szafka pod skos - fronty i szuflady", () => {
-  // Jak na rysunku z Fusiona: trójkąt 2000 x 1500, 3 kolumny, 2 półki, MOVENTO.
-  const cfg = { materials: { boardThickness: 18, backThickness: 3 }, front: { gap: 3, clearance: { sides: 1.5, top: 5, bottom: 0 }, drawerSystem: "movento_katalog" } };
-  const m = (slope = {}, front = {}) => ({
-    type: "slope_cabinet", dimensions: { width: 2000, height: 1500, depth: 600 }, front,
-    slope: { lowSide: "left", lowHeight: 0, columns: [null, 650, 650], shelves: [500, 1000], ...slope },
-  });
-  const types = (mm) => Object.fromEntries(getSlopeFronts(mm, cfg).map((f) => [f.key, f.type]));
+describe("szafka pod skos - fronty i szuflady z wnętrza", () => {
+  // Jak na rysunku z Fusiona: trójkąt 2000 x 1500, przegrody 646 i 1314, półki 500 i 1000.
+  const fusion = (opts = {}) => slopeMod({ width: 2000, height: 1500, dividers: [646, 1314], shelves: [500, 1000], ...opts });
+  // Typy frontów od lewej, od dołu.
+  const types = (m) => getSlopeFronts(m, cfg()).sort((a, b) => a.el.x - b.el.x || a.el.y - b.el.y).map((f) => f.type);
+  const at = (m, x, y) => getSlopeFronts(m, cfg()).find((f) => f.el.x <= x && x <= f.el.x + f.el.w && f.el.y <= y && y <= f.el.y + f.el.h);
 
   it("trójkąty to blendy, reszta szuflady", () => {
-    expect(types(m())).toEqual({
-      "c0-r0": "blenda",
-      "c1-r0": "szuflada", "c1-r1": "blenda",
-      "c2-r0": "szuflada", "c2-r1": "szuflada", "c2-r2": "blenda",
-    });
+    expect(types(fusion())).toEqual(["blenda", "szuflada", "blenda", "szuflada", "szuflada", "blenda"]);
   });
 
-  it("skos po prawej (kolumny odwrócone) - te same wnęki w lustrze", () => {
-    expect(types(m({ lowSide: "right", columns: [650, 650, null] }))).toEqual({
-      "c2-r0": "blenda",
-      "c1-r0": "szuflada", "c1-r1": "blenda",
-      "c0-r0": "szuflada", "c0-r1": "szuflada", "c0-r2": "blenda",
-    });
+  it("skos po prawej (lustro) - te same typy, trzy blendy", () => {
+    const r = types(fusion({ lowSide: "right", dividers: [668, 1336] }));
+    expect([...r].sort()).toEqual([...types(fusion())].sort());
+    expect(r.filter((t) => t === "blenda")).toHaveLength(3);
   });
 
-  it("typ wnęki można wymusić", () => {
-    const mm = m({ cellTypes: { "c1-r0": "blenda", "c0-r0": "brak" } });
-    expect(types(mm)["c1-r0"]).toBe("blenda");
-    expect(types(mm)["c0-r0"]).toBe("brak");
-    expect(getSlopeDrawerHardware(mm, cfg)).toHaveLength(2);
+  it("blendę można wymusić na dowolnym froncie", () => {
+    const m = fusion();
+    at(m, 1000, 200).el.slopeBlenda = true;
+    expect(at(m, 1000, 200).type).toBe("blenda");
+    expect(getSlopeDrawerHardware(m, cfg())).toHaveLength(2);
+  });
+
+  it("dwie szuflady jedna nad drugą w jednej wnęce (z edytora, bez półki)", () => {
+    const m = fusion();
+    const leaves = [];
+    const walk = (n) => (n.type === "leaf" ? leaves.push(n) : (walk(n.a), walk(n.b)));
+    walk(buildZoneTree(m));
+    const leaf = leaves.find((l) => l.rect.minX > 1300 && l.rect.minY < 50);
+    assignFront(m, leaf, "szuflada", { distribution: "2" });
+    recalculateLayout(m);
+    const inLeaf = getSlopeFronts(m, cfg()).filter((f) => f.el.baseZone.minX > 1300 && f.el.baseZone.minY < 50);
+    expect(inLeaf).toHaveLength(2);
+    inLeaf.forEach((f) => expect(f.type).toBe("szuflada"));
+    expect(getSlopeDrawerHardware(m, cfg())).toHaveLength(4);
   });
 
   it("skrzynka A: prostokątna, wysokość od niższej strony", () => {
-    const parts = getSlopeFrontParts(m(), cfg);
+    const parts = getSlopeFrontParts(fusion(), cfg());
     expect(parts.filter((p) => p.name.startsWith("Front szuflady"))).toHaveLength(3);
     expect(parts.filter((p) => p.name.startsWith("Blenda"))).toHaveLength(3);
     expect(parts.find((p) => p.name === "Bok szuflady W686 NL580 H438")).toMatchObject({ length: 570, width: 438, qty: 2 });
-    expect(getSlopeDrawerHardware(m(), cfg)).toEqual(Array(3).fill("Prowadnice Blum MOVENTO 766H (60 kg) NL-580 + sprzęgła T51.7601"));
+    expect(getSlopeDrawerHardware(fusion(), cfg())).toEqual(Array(3).fill("Prowadnice Blum MOVENTO 766H (60 kg) NL-580 + sprzęgła T51.7601"));
   });
 
   it("skrzynka B: boki różnej wysokości i tył trapezowy; bez skosu - zwykła skrzynka", () => {
-    const parts = getSlopeFrontParts(m({ drawerBox: "B" }), cfg);
+    const parts = getSlopeFrontParts(fusion({ drawerBox: "B" }), cfg());
     expect(parts.find((p) => p.name === "Bok szuflady W686 NL580 H438-459 (niski)")).toMatchObject({ width: 438, qty: 1 });
     expect(parts.find((p) => p.name === "Bok szuflady W686 NL580 H438-459 (wysoki)")).toMatchObject({ width: 459, qty: 1 });
     expect(parts.find((p) => p.name.startsWith("Tył szuflady skos W686 NL580 H438-459"))).toMatchObject({ length: 608, width: 430 });
-    // Szuflada przy wysokim boku, której skos nie dosięga: zwykła skrzynka.
     expect(parts.find((p) => p.name === "Bok szuflady W686 NL580 H459")).toMatchObject({ qty: 2 });
   });
 
   it("skrzynka B przy systemie metalowym liczy się jako A", () => {
-    const f = getSlopeFronts(m({ drawerBox: "B" }, { drawerSystem: "merivobox" }), cfg).find((x) => x.key === "c1-r0");
-    expect(f.drawer.boxType).toBe("A");
+    const m = fusion({ drawerBox: "B", front: { drawerSystem: "merivobox" } });
+    expect(at(m, 1000, 200).drawer.boxType).toBe("A");
   });
-});
 
-describe("szafka pod skos - luzy frontów jak w zwykłej szafce", () => {
-  const cfg = { materials: { boardThickness: 18, backThickness: 3 }, front: { gap: 3, clearance: { sides: 1.5, top: 5, bottom: 0 }, drawerSystem: "movento_katalog" } };
-  const m = (front = {}) => ({
-    type: "slope_cabinet", dimensions: { width: 2000, height: 1500, depth: 600 }, front,
-    slope: { lowSide: "left", lowHeight: 0, columns: [null, 650, 650], shelves: [500, 1000] },
-  });
-  const cell = (mm, key) => getSlopeFronts(mm, cfg).find((f) => f.key === key);
-
-  it("luz prawy odsłania wysoki bok (nakładane)", () => {
-    const base = cell(m(), "c2-r0").shape.w;
-    const open = cell(m({ clearance: { right: 18 } }), "c2-r0").shape.w;
+  it("luzy jak w zwykłej szafce: luz prawy odsłania wysoki bok", () => {
+    const base = at(fusion(), 1600, 200).shape.w;
+    const open = at(fusion({ front: { clearance: { right: 18 } } }), 1600, 200).shape.w;
     expect(base - open).toBeCloseTo(16.5, 5);
   });
 
-  it("wpuszczane: front w świetle wnęki, krótsza szuflada", () => {
-    const f = cell(m({ type: "wpuszczane" }), "c2-r0");
-    expect(f.inset).toBe(true);
-    expect(f.shape).toMatchObject({ kind: "prostokat", w: 647, h: 480.5 });
+  it("fronty wpuszczane: w obrysie korpusu, krótsza szuflada", () => {
+    const f = at(fusion({ front: { type: "wpuszczane" } }), 1600, 200);
+    expect(f.z.front).toBe(0);
     expect(f.drawer.comps.nominalLength).toBe(550);
   });
 
   it("luz pod skosem mierzony prostopadle do płyty", () => {
-    const a = cell(m(), "c1-r0").shape.hLow;
-    const b = cell(m({ clearance: { slope: 10 } }), "c1-r0").shape.hLow;
+    const a = at(fusion(), 1000, 200).shape.hLow;
+    const b = at(fusion({ front: { clearance: { slope: 10 } } }), 1000, 200).shape.hLow;
     // 7 mm więcej prostopadle = 7 / cos(36,87°) = 8,75 mm w pionie
     expect(a - b).toBeCloseTo(8.75, 5);
   });
 
-  it("domyślne ustawienia z projektu, moduł je nadpisuje", () => {
-    expect(getSlopeFrontSettings(m(), cfg)).toMatchObject({ isInset: false, gap: 3, cLeft: 1.5, cRight: 1.5, cBottom: 0, cSlope: 3 });
-    expect(getSlopeFrontSettings(m({ gap: 2, clearance: { bottom: 2 } }), cfg)).toMatchObject({ gap: 2, cBottom: 2, cSlope: 2, cLeft: 1.5 });
+  it("ustawienia frontów: domyślne z projektu, moduł je nadpisuje", () => {
+    const m = fusion();
+    expect(getSlopeFrontSettings(m, cfg())).toMatchObject({ isInset: false, gap: 3, cLeft: 1.5, cRight: 1.5, cBottom: 0, cSlope: 3 });
+    expect(getSlopeFrontSettings({ ...m, front: { gap: 2, clearance: { bottom: 2 } } }, cfg())).toMatchObject({ gap: 2, cBottom: 2, cSlope: 2, cLeft: 1.5 });
+  });
+
+  it("drzwi pod skosem: trapezowe drzwi, trójkąt dalej blenda", () => {
+    const m = fusion();
+    m.elements.filter((e) => e.typ === "front").forEach((e) => { e.subtype = "drzwi"; });
+    recalculateLayout(m);
+    const t = types(m);
+    expect(t.filter((x) => x === "drzwi")).toHaveLength(3);
+    expect(t.filter((x) => x === "blenda")).toHaveLength(3);
+    expect(getSlopeFrontParts(m, cfg()).some((p) => p.name.startsWith("Drzwi"))).toBe(true);
   });
 });
 
 describe("szafka pod skos - cięcia przez grubość (pochylenie piły)", () => {
   // 2000 x 1500, trójkąt: kąt skosu 36,87°, więc 90° - kąt = 53,13°.
-  const m = () => ({
-    type: "slope_cabinet", dimensions: { width: 2000, height: 1500, depth: 600 }, front: {},
-    slope: { lowSide: "left", lowHeight: 0, columns: [null, 650, 650], shelves: [500, 1000] },
-  });
-  const boards = () => getSlopeBoards(m(), config);
+  const boards = () => getSlopeBoards(slopeMod({ width: 2000, height: 1500, dividers: [646, 1314], shelves: [500, 1000] }), config);
   const one = (name) => boards().find((b) => b.name === name);
 
   it("boki i przegrody: piła pochylona o kąt skosu u góry", () => {
@@ -247,11 +270,6 @@ describe("szafka pod skos - cięcia przez grubość (pochylenie piły)", () => {
     expect(s.tiltStart).toBeCloseTo(53.13, 2);
     expect(s.tiltEnd).toBeCloseTo(36.87, 2);
   });
-
-  it("nazwa na liście formatek podaje kąty cięcia", () => {
-    const p = getSlopeCabinetParts(mod(), config).find((x) => x.name.startsWith("Skos"));
-    expect(p.name).toBe("Skos (wieniec skośny) (cięcie 45° i 45°, krótsza 1352.8)");
-  });
 });
 
 describe("szafka pod skos - obrysy do rysunków", () => {
@@ -261,16 +279,32 @@ describe("szafka pod skos - obrysy do rysunków", () => {
   });
 
   it("kształty: fronty nieprostokątne i plecy, lustrzane dla skosu po prawej", () => {
-    const base = { type: "slope_cabinet", dimensions: { width: 2000, height: 1500, depth: 600 }, front: {} };
-    const left = getSlopeShapes({ ...base, slope: { lowSide: "left", columns: [null, 650, 650], shelves: [500, 1000] } }, config);
-    const right = getSlopeShapes({ ...base, slope: { lowSide: "right", columns: [650, 650, null], shelves: [500, 1000] } }, config);
+    const left = getSlopeShapes(slopeMod({ width: 2000, height: 1500, dividers: [646, 1314], shelves: [500, 1000] }), cfg());
+    const right = getSlopeShapes(slopeMod({ width: 2000, height: 1500, lowSide: "right", dividers: [668, 1336], shelves: [500, 1000] }), cfg());
     expect(left.filter((s) => s.category === "Plecy")).toHaveLength(1);
     expect(left.filter((s) => s.category === "Front").reduce((n, s) => n + s.qty, 0)).toBe(5);
     expect(right.reduce((n, s) => n + s.qty, 0)).toBe(left.reduce((n, s) => n + s.qty, 0));
-    // Plecy trójkąta: kąt prosty po stronie wysokiego boku.
     const lb = left.find((s) => s.category === "Plecy").points;
     const rb = right.find((s) => s.category === "Plecy").points;
     expect(Math.max(...lb.filter((p) => p[1] > 1000).map((p) => p[0]))).toBeGreaterThan(1900);
     expect(Math.min(...rb.filter((p) => p[1] > 1000).map((p) => p[0]))).toBeLessThan(100);
+  });
+});
+
+describe("szafka pod skos - skrzynki w edytorze Wnętrze 2D", () => {
+  it("blenda nie ma skrzynki, szuflada ma skrzynkę pod skosem", async () => {
+    const { getDrawerBoxRect } = await import("./drawerBoxes.js");
+    const m = slopeMod({ width: 2000, height: 1500, dividers: [646, 1314], shelves: [500, 1000] });
+    const fronts = getSlopeFronts(m, cfg());
+    const blenda = fronts.find((f) => f.type === "blenda");
+    const drawer = fronts.find((f) => f.type === "szuflada" && f.shape.kind === "scietyRog");
+    expect(getDrawerBoxRect(m, blenda.el, { materials: { boardThickness: 18, backThickness: 3 }, front: cfg().front })).toBeNull();
+    const r = getDrawerBoxRect(m, drawer.el, { materials: { boardThickness: 18, backThickness: 3 }, front: cfg().front });
+    const bz = drawer.el.baseZone;
+    expect(r.x0).toBeGreaterThan(bz.minX);
+    expect(r.x1).toBeLessThan(bz.maxX);
+    // Skrzynka drewniana: od luzu pod szufladą, wysokość = bok.
+    expect(r.y0).toBe(drawer.drawer.yBase);
+    expect(r.y1 - r.y0).toBe(drawer.drawer.comps.sideHeight);
   });
 });

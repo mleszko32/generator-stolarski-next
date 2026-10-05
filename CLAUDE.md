@@ -189,6 +189,17 @@ z tych rzutów odcinki blatów i łączenia w narożnikach. Szafki narożne
 liczoną w `core/layout.js` (`getCornerArmRect`, `getCornerDepths`), a fronty używają
 tokenów powiązań `corner-A-*`/`corner-B-*`.
 
+**Szafka pod skos** (`type: 'slope_cabinet'`, przycisk „+ Skos”): `core/slopeCabinet.js` (czyste,
+z testami) + `render/slopeCabinet3d.js` (bryły z wielokątów, `meshBuilders.addPrism`) +
+`ui/slopeProperties.js` + rysunki cięcia (`render/slopeDrawing2d.js`, `ui/slopeCutDrawings.js`).
+Wnętrze to zwykłe `mod.elements` edytowane w „Wnętrze 2D”: `getCabinetInnerRect` / granice `cab-*`
+w `recalculateLayout` zwracają dla skosu `getSlopeInnerRect` (prostokąt do najwyższego miejsca pod
+skosem), a skos dopiero przycina wynik — przegrody/półki dostają cięcie pod kątem (`getSlopeBoards`,
+nazwy z kątem pochylenia piły), fronty są docinane linią skosu (`clipFrontRect`), trójkąt albo
+niemieszcząca się szuflada = blenda (`el.slopeBlenda` wymusza). Skrzynka szuflady A/B (`slope.drawerBox`).
+`engine/cabinet.js` i `hardware.js` dla skosu NIE idą przez zwykłe `getInteriorParts`/`getFrontsAndDrawers`.
+Stare dane (`slope.columns`/`dividers`/`shelves`) zamienia `migrateSlopeModule` w `ensureSidePanelsDefaults`.
+
 **Plan rozkroju**: `engine/nesting.js` — „półkowe” układanie formatek na arkuszach z cięciami na
 wylot (sprawdza kilka orientacji, wybiera najmniej arkuszy), wyświetlane przez
 `ui/cutPlanModal.js`.

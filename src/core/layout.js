@@ -13,6 +13,7 @@
 // obiekcie state.
 import { state, DEFAULT_ROOM } from "./state.js";
 import { assignFront } from "./zoneTree.js";
+import { getSlopeInnerRect } from "./slopeCabinet.js";
 
 // Przelicza layout wszystkich modułów projektu. Wołaj przed każdym liczeniem
 // formatek/okuć całego projektu — fronty z sąsiednich modułów też muszą mieć
@@ -196,6 +197,9 @@ export function recalculateLayout(mod) {
   const hasTraverses = cons.topType.includes('trawersy');
   const isVerticalTraverse = cons.topType === 'trawersy_pion';
   const traverseWidth = cons.traverseWidth || 100;
+  // Szafka pod skos: granice cab-* z prostokąta wnętrza skosu (wnętrze do
+  // najwyższego miejsca pod skosem; skos docina fronty dopiero w core/slopeCabinet.js).
+  const slopeRect = mod.type === 'slope_cabinet' ? getSlopeInnerRect(mod, th) : null;
 
   // Dogrywa bound-tokeny starym, zapisanym przed wprowadzeniem generycznego
   // systemu wnęk frontom narożnika (patrz migrateCornerElement wyżej) -
@@ -222,6 +226,12 @@ export function recalculateLayout(mod) {
                           if (side === 'bottom') return rect.minY;
                           if (side === 'top') return rect.maxY;
                       }
+                  }
+                  if (slopeRect) {
+                      if (id === 'cab-left') return slopeRect.minX;
+                      if (id === 'cab-right') return slopeRect.maxX;
+                      if (id === 'cab-bottom') return slopeRect.minY;
+                      if (id === 'cab-top') return slopeRect.maxY;
                   }
                   if (id === 'cab-left') return th;
                   if (id === 'cab-right') return width - th;
@@ -277,7 +287,9 @@ export function recalculateLayout(mod) {
               const isLeftOuter = el.baseZone.forceOuterLeft !== undefined ? el.baseZone.forceOuterLeft : minX <= th + 1;
               const isRightOuter = el.baseZone.forceOuterRight !== undefined ? el.baseZone.forceOuterRight : maxX >= width - th - 1;
               const isBottomOuter = minY <= th + 1;
-              const isTopOuter = maxY >= (hasTraverses && isVerticalTraverse ? height - traverseWidth - 1 : height - th - 1);
+              const isTopOuter = slopeRect
+                  ? maxY >= slopeRect.maxY - 1
+                  : maxY >= (hasTraverses && isVerticalTraverse ? height - traverseWidth - 1 : height - th - 1);
 
               // Domyślnie granica wewnętrzna (front kończy się na prawdziwym wieńcu/
               // półce, nie na krawędzi korpusu ani na innym froncie) dzieli szczelinę

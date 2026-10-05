@@ -41,14 +41,17 @@ export function calculateParts() {
       rawParts.push(...getBackPanelParts(mod, config));
       mountingData.push(...getCorpusHoles(mod, config));
   }
-  rawParts.push(...getInteriorParts(mod, config));
+  // Szafka pod skos ma wnętrze i fronty już policzone wyżej (przycięte skosem).
+  if (mod.type !== 'slope_cabinet') {
+    rawParts.push(...getInteriorParts(mod, config));
 
-  const frontsAndDrawers = getFrontsAndDrawers(mod, config);
-  rawParts.push(...frontsAndDrawers.parts);
+    const frontsAndDrawers = getFrontsAndDrawers(mod, config);
+    rawParts.push(...frontsAndDrawers.parts);
 
-  mountingData.push(...frontsAndDrawers.mountingData);
-  mountingData.push(...getPionMountHoles(mod, config));
-  mountingData.push(...getGlobalHingesForModule(mod, config));
+    mountingData.push(...frontsAndDrawers.mountingData);
+    mountingData.push(...getPionMountHoles(mod, config));
+    mountingData.push(...getGlobalHingesForModule(mod, config));
+  }
 
   const aggregated = {};
   rawParts.forEach(part => {
@@ -162,10 +165,10 @@ export function collectProjectParts() {
         modParts.push(...getCorpusParts(mod, config));
         modParts.push(...getBackPanelParts(mod, config));
     }
-    modParts.push(...getInteriorParts(mod, config));
-
-    const frontsAndDrawers = getFrontsAndDrawers(mod, config);
-    modParts.push(...frontsAndDrawers.parts);
+    if (mod.type !== 'slope_cabinet') {
+      modParts.push(...getInteriorParts(mod, config));
+      modParts.push(...getFrontsAndDrawers(mod, config).parts);
+    }
 
     allParts.push(...modParts.map(p => ({ ...p, moduleName: mod.name })));
   });

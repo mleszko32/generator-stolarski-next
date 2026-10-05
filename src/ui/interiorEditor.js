@@ -50,6 +50,7 @@ import { calculateHinges } from "../core/hingeMath.js";
 import { getCornerDoorHingeSide } from "../engine/cornerParts.js";
 import { findInteriorCollisions } from "../core/validate.js";
 import { getDrawerBoxRect } from "../core/drawerBoxes.js";
+import { getSlopeOverlay } from "../core/slopeCabinet.js";
 
 const FRONT_LABELS = {
   drzwi: "Drzwi",
@@ -283,12 +284,6 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);">Wybierz szafkę, żeby edytować jej wnętrze</div>`;
       return;
     }
-    // Szafka pod skos ma własne wnętrze (przegrody i półki w prawym panelu,
-    // ui/slopeProperties.js) - ten edytor zakłada prostokątne wnęki.
-    if (mod.type === "slope_cabinet") {
-      container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);text-align:center;padding:20px;">Wnętrze szafki pod skos ustawiasz w prawym panelu (przegrody i półki).</div>`;
-      return;
-    }
 
     // Grupa: moduły ze wspólnym groupId ("Połącz zaznaczone w grupę" w
     // ui/properties.js) rysują się WSZYSTKIE naraz, każdy w pełni edytowalny,
@@ -451,6 +446,21 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       }
 
       renderNode(it.tree, world, px, it.mod);
+
+      // Szafka pod skos: wnęki są prostokątami do najwyższego miejsca pod skosem
+      // (core/slopeCabinet.js: getSlopeInnerRect) - skośną płytę i to, co nad nią,
+      // przykrywamy, żeby było widać, jak skos przytnie półki, przegrody i fronty.
+      if (!cornerArm && it.mod.type === "slope_cabinet") {
+        const th = parseFloat(state.project.materials?.boardThickness) || 18;
+        const ov = getSlopeOverlay(it.mod, th);
+        const pts = (poly) => poly.map(([x, y]) => `${px.toPxX(x)},${px.toPxY(y)}`).join(" ");
+        const svgNS = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(svgNS, "svg");
+        Object.assign(svg.style, { position: "absolute", left: "0", top: "0", width: "1px", height: "1px", overflow: "visible", pointerEvents: "none" });
+        svg.innerHTML = `<polygon points="${pts(ov.above)}" fill="#f8fafc" fill-opacity="0.92" />`
+          + `<polygon points="${pts(ov.slab)}" fill="#dbe2ea" stroke="#334155" stroke-width="2" />`;
+        world.appendChild(svg);
+      }
     });
 
     viewport.appendChild(world);
