@@ -8,7 +8,7 @@
 import { escapeHtml } from "../utils/dom.js";
 import { state } from "../core/state.js";
 import { collectProjectParts } from "../engine/cabinet.js";
-import { DXF_DEFAULTS, collectFrontPieces, nestFronts, placedOutline, sheetToDxf, allSheetsToDxf } from "../engine/frontsDxf.js";
+import { DXF_DEFAULTS, collectFrontPieces, nestFronts, placedOutlines, centroid, sheetToDxf, allSheetsToDxf } from "../engine/frontsDxf.js";
 
 function getSettings() {
   const cut = { sheetW: 2800, sheetH: 2070, ...(state.project.cutPlan || {}) };
@@ -27,9 +27,12 @@ function sheetPreview(sheet, s) {
   svg += `<rect x="0" y="0" width="${s.sheetW}" height="${s.sheetH}" fill="var(--surface-subtle)" stroke="var(--border-strong)" stroke-width="3"/>`;
   sheet.placements.forEach((pl) => {
     // DXF ma Y w górę, SVG w dół.
-    const pts = placedOutline(pl, s.sheetH).map(([x, y]) => `${x},${s.sheetH - y}`).join(' ');
-    svg += `<polygon points="${pts}" fill="var(--info-bg)" stroke="var(--danger)" stroke-width="3"/>`;
-    svg += `<text x="${pl.x + pl.w / 2}" y="${pl.y + pl.h / 2}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle" fill="var(--text-primary)">${escapeHtml(pl.piece.id)}</text>`;
+    placedOutlines(pl, s.sheetH).forEach(({ piece, points }) => {
+      const pts = points.map(([x, y]) => `${x},${s.sheetH - y}`).join(' ');
+      const [cx, cy] = centroid(points);
+      svg += `<polygon points="${pts}" fill="var(--info-bg)" stroke="var(--danger)" stroke-width="3"/>`;
+      svg += `<text x="${cx}" y="${s.sheetH - cy}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle" fill="var(--text-primary)">${escapeHtml(piece.id)}</text>`;
+    });
   });
   return svg + '</svg>';
 }
@@ -51,7 +54,7 @@ export function mountFrontsDxf(container) {
   const s = getSettings();
   container.innerHTML = `
     <div class="hub-bar" style="margin-top:20px">
-      <div><h3>Fronty do CNC (DXF)</h3><div class="hub-sub">Wszystkie fronty ułożone na arkuszach płyty, osobno dla każdego materiału. Warstwy: FRONTY_KONTUR (obrysy do wycięcia), ARKUSZ, OPISY. Jednostki mm, rozmiar arkusza jak w rozkroju wyżej.</div></div>
+      <div><h3>Fronty do CNC (DXF)</h3><div class="hub-sub">Wszystkie fronty ułożone na arkuszach płyty jak najciaśniej (bez cięć na wylot, bo frez wytnie każdy układ), osobno dla każdego materiału. Warstwy: FRONTY_KONTUR (obrysy do wycięcia), ARKUSZ, OPISY. Jednostki mm, rozmiar arkusza jak w rozkroju wyżej.</div></div>
       <div class="hub-actions">
         <button type="button" id="dxf-all" class="btn btn-sm"><i class="ti ti-download" aria-hidden="true"></i> Wszystkie arkusze (1 plik)</button>
       </div>
@@ -76,16 +79,16 @@ export function mountFrontsDxf(container) {
       return;
     }
     let html = '';
-    const unplaced = data.groups.flatMap((g) => g.result.unplaced);
+    const unplaced = data.groups.flatMap((g) => g.result.unplaced.flatMap((it) => it.members.map((m) => m.piece)));
     if (unplaced.length) {
       html += `<div class="notice-warn"><i class="ti ti-alert-triangle" aria-hidden="true"></i> ${unplaced.length} frontów nie mieści się na arkuszu: ${unplaced.slice(0, 8).map((p) => `${escapeHtml(p.id)} ${escapeHtml(p.name)}`).join(', ')}</div>`;
     }
     data.groups.forEach((g, gi) => {
       g.result.sheets.forEach((sh, si) => {
-        html += `<details class="hub-details" ${gi === 0 && si === 0 ? 'open' : ''}><summary>${escapeHtml(g.materialName)} - arkusz ${sh.index + 1} z ${g.result.sheetCount} <span class="hub-sub">(${sh.placements.length} frontów, odpad ${sh.wastePct.toFixed(1)} %)</span>
+        html += `<details class="hub-details" ${gi === 0 && si === 0 ? 'open' : ''}><summary>${escapeHtml(g.materialName)} - arkusz ${sh.index + 1} z ${g.result.sheetCount} <span class="hub-sub">(${sh.placements.reduce((n, pl) => n + pl.piece.members.length, 0)} frontów, odpad ${sh.wastePct.toFixed(1)} %)</span>
           <button type="button" class="btn btn-sm" data-dxf="${gi}:${si}" style="margin-left:8px"><i class="ti ti-download" aria-hidden="true"></i> DXF</button></summary>
           ${sheetPreview(sh, data.settings)}
-          <div class="hub-sub" style="margin-top:6px">${sh.placements.map((pl) => `<b>${escapeHtml(pl.piece.id)}</b> ${escapeHtml(pl.piece.name)} ${Math.round(pl.piece.frontW)}×${Math.round(pl.piece.frontH)}${pl.piece.moduleName ? ` (${escapeHtml(pl.piece.moduleName)})` : ''}`).join(' · ')}</div>
+          <div class="hub-sub" style="margin-top:6px">${sh.placements.flatMap((pl) => pl.piece.members.map((m) => m.piece)).map((p) => `<b>${escapeHtml(p.id)}</b> ${escapeHtml(p.name)} ${Math.round(p.frontW)}×${Math.round(p.frontH)}${p.moduleName ? ` (${escapeHtml(p.moduleName)})` : ''}`).join(' · ')}</div>
         </details>`;
       });
     });

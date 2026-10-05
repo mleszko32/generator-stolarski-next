@@ -207,10 +207,10 @@ wylot (sprawdza kilka orientacji, wybiera najmniej arkuszy), wyświetlane przez
 `ui/cutPlanModal.js`.
 
 **DXF frontów na CNC**: `engine/frontsDxf.js` (czysta, z testami) — wszystkie formatki kategorii
-„Front” (też boki dokładane i blendy) ułożone przez `nestParts` na arkuszach, osobno dla każdego
+„Front” (też boki dokładane i blendy) ułożone przez `nestPartsFree` (MaxRects, bez cięć na wylot — CNC tego nie potrzebuje) na arkuszach, osobno dla każdego
 materiału frontu, zapis DXF R12 (warstwy `ARKUSZ`, `FRONTY_KONTUR`, `OPISY`; teksty bez polskich
 znaków). Fronty szafki pod skos niosą prawdziwy obrys w polu `outline` (`getSlopeFrontParts`),
-reszta to prostokąty. Karta pod planem rozkroju: `ui/frontsDxfPanel.js` (rozmiar arkusza z
+reszta to prostokąty. Dwa jednakowe trójkąty prostokątne (blendy skosu) `pairTriangles` składa przeciwprostokątnymi w jeden prostokąt (drugi obrócony o 180°, odstęp mierzony prostopadle). Karta pod planem rozkroju: `ui/frontsDxfPanel.js` (rozmiar arkusza z
 `project.cutPlan`, odstęp/obrzeże w `project.frontsDxf`).
 
 ### Zapis danych

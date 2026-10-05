@@ -11,7 +11,7 @@
 // wycięcia), OPISY (numer i nazwa frontu, tylko do podglądu).
 // Oś X arkusza = jego długość (słoje), oś Y w górę; (0, 0) = lewy dolny róg.
 
-import { nestParts } from "./nesting.js";
+import { nestPartsFree } from "./nesting.js";
 
 export const DXF_DEFAULTS = { gap: 20, trim: 10, rotateFronts: false };
 
@@ -79,22 +79,105 @@ export function nestFronts(pieces, opts) {
   });
   return [...groups.values()].map((g) => {
     // Wysokość frontu wzdłuż długości arkusza (słoje), dopóki nie wolno obracać.
-    const items = g.pieces.map((p) => ({ ...p, w: p.frontH, h: p.frontW, canRotate: !!opts.rotateFronts }));
-    return { ...g, result: nestParts(items, { sheetW, sheetH, kerf: gap, trim }) };
+    const items = pairTriangles(g.pieces, gap).map((p) => ({ ...p, w: p.frontH, h: p.frontW, canRotate: !!opts.rotateFronts }));
+    return { ...g, result: nestPartsFree(items, { sheetW, sheetH, kerf: gap, trim }) };
   });
 }
 
-// Obrys frontu w miejscu na arkuszu, w układzie DXF (Y w górę). Bez obrotu
-// wysokość frontu leży wzdłuż X arkusza (front obrócony o 90° w prawo), z
-// obrotem - wzdłuż Y. W obu przypadkach to obrót, nie lustro: obrys widziany
-// od strony licowej.
-export function placedOutline(placement, sheetH) {
-  const p = placement.piece;
-  const top = sheetH - placement.y;           // górna krawędź miejsca w DXF
-  if (placement.rotated) {
-    return p.outline.map(([x, y]) => [placement.x + x, top - p.frontH + y]);
+const EPS = 0.05;
+const near = (a, b) => Math.abs(a - b) < EPS;
+
+// Trójkąt prostokątny o przyprostokątnych równych bokom prostokąta, który go
+// obejmuje (blendy skosu). Zwraca róg kąta prostego: { lr: 'L'|'R', bt: 'B'|'T' }.
+export function rightTriangleCorner(outline, w, h) {
+  if (!outline || outline.length !== 3) return null;
+  for (let i = 0; i < 3; i++) {
+    const [vx, vy] = outline[i];
+    const others = outline.filter((_, j) => j !== i);
+    const sameX = others.find(([x]) => near(x, vx));
+    const sameY = others.find(([, y]) => near(y, vy));
+    if (!sameX || !sameY || sameX === sameY) continue;
+    if (!near(Math.abs(sameY[0] - vx), w) || !near(Math.abs(sameX[1] - vy), h)) continue;
+    return { lr: near(vx, 0) ? 'L' : 'R', bt: near(vy, 0) ? 'B' : 'T' };
   }
-  return p.outline.map(([x, y]) => [placement.x + y, top - x]);
+  return null;
+}
+
+// Dwa jednakowe trójkąty prostokątne składa przeciwprostokątnymi w jeden
+// prostokąt (drugi obrócony o 180° - obrót, nie lustro, więc lico i słoje
+// zostają). Między przeciwprostokątnymi zostaje odstęp `gap`: drugi trójkąt
+// jest odsunięty w poziomie o gap · przeciwprostokątna / wysokość.
+// Każdy element wyniku ma `members` - obrysy pojedynczych frontów w układzie
+// elementu (dla zwykłych frontów jeden, dla pary dwa).
+export function pairTriangles(pieces, gap) {
+  const out = [];
+  const waiting = new Map();   // klucz wymiarów -> trójkąty czekające na parę
+  const single = (p) => ({ ...p, members: [{ piece: p, points: p.outline }] });
+  pieces.forEach((p) => {
+    const corner = rightTriangleCorner(p.outline, p.frontW, p.frontH);
+    if (!corner) { out.push(single(p)); return; }
+    const key = `${Math.round(p.frontW * 10)}x${Math.round(p.frontH * 10)}`;
+    if (!waiting.has(key)) waiting.set(key, []);
+    const list = waiting.get(key);
+    const mate = list.shift();
+    // Pierwszy z pary na razie stoi sam; drugi podmienia go na parę.
+    if (!mate) { list.push({ p, corner, slot: out.length }); out.push(single(p)); return; }
+    const { p: a, corner: ca } = mate;
+    const w = a.frontW, h = a.frontH;
+    // Drugi trójkąt z kątem prostym w rogu naprzeciwko pierwszego.
+    const opposite = corner.lr !== ca.lr && corner.bt !== ca.bt;
+    const bPts = opposite ? p.outline : p.outline.map(([x, y]) => [w - x, h - y]);
+    const dx = gap * Math.hypot(w, h) / h;
+    // Trójkąt z kątem prostym po lewej zostaje z lewej, drugi idzie w prawo.
+    const [offA, offB] = ca.lr === 'L' ? [0, dx] : [dx, 0];
+    out[mate.slot] = {
+      id: `${a.id}+${p.id}`,
+      name: `${a.name} (para)`,
+      moduleName: a.moduleName,
+      materialId: a.materialId,
+      materialName: a.materialName,
+      frontW: w + dx,
+      frontH: h,
+      members: [
+        { piece: a, points: a.outline.map(([x, y]) => [x + offA, y]) },
+        { piece: p, points: bPts.map(([x, y]) => [x + offB, y]) },
+      ],
+    };
+  });
+  return out;
+}
+
+// Obrysy frontów w miejscu na arkuszu, w układzie DXF (Y w górę):
+// [{ piece, points }]. Bez obrotu wysokość frontu leży wzdłuż X arkusza (front
+// obrócony o 90° w prawo), z obrotem - wzdłuż Y. W obu przypadkach to obrót,
+// nie lustro: obrys widziany od strony licowej.
+export function placedOutlines(placement, sheetH) {
+  const item = placement.piece;
+  const top = sheetH - placement.y;           // górna krawędź miejsca w DXF
+  const members = item.members || [{ piece: item, points: item.outline }];
+  return members.map(({ piece, points }) => ({
+    piece,
+    points: placement.rotated
+      ? points.map(([x, y]) => [placement.x + x, top - item.frontH + y])
+      : points.map(([x, y]) => [placement.x + y, top - x]),
+  }));
+}
+
+// Obrys pojedynczego frontu (pierwszego w elemencie).
+export function placedOutline(placement, sheetH) {
+  return placedOutlines(placement, sheetH)[0].points;
+}
+
+// Środek ciężkości wielokąta (do opisu w środku frontu, też trójkąta).
+export function centroid(points) {
+  let a = 0, cx = 0, cy = 0;
+  points.forEach(([x1, y1], i) => {
+    const [x2, y2] = points[(i + 1) % points.length];
+    const f = x1 * y2 - x2 * y1;
+    a += f; cx += (x1 + x2) * f; cy += (y1 + y2) * f;
+  });
+  if (Math.abs(a) < 1e-9) return points[0];
+  return [cx / (3 * a), cy / (3 * a)];
 }
 
 function polyline(points, layer) {
@@ -103,8 +186,10 @@ function polyline(points, layer) {
   return s + `0\nSEQEND\n8\n${layer}\n`;
 }
 
-function text(x, y, height, value, layer) {
-  return `0\nTEXT\n8\n${layer}\n10\n${fmt(x)}\n20\n${fmt(y)}\n30\n0\n40\n${fmt(height)}\n1\n${asciiText(value)}\n`;
+function text(x, y, height, value, layer, centered = false) {
+  // Wyśrodkowany: 72 = 1 i punkt wyrównania 11/21 (R12).
+  const align = centered ? `72\n1\n11\n${fmt(x)}\n21\n${fmt(y)}\n31\n0\n` : '';
+  return `0\nTEXT\n8\n${layer}\n10\n${fmt(x)}\n20\n${fmt(y)}\n30\n0\n40\n${fmt(height)}\n1\n${asciiText(value)}\n${align}`;
 }
 
 // Encje jednego arkusza przesunięte o offsetX (kilka arkuszy w jednym pliku).
@@ -114,14 +199,16 @@ function sheetEntities(sheet, settings, offsetX, title) {
   let s = polyline(sh([[0, 0], [sheetW, 0], [sheetW, sheetH], [0, sheetH]]), 'ARKUSZ');
   if (title) s += text(offsetX, sheetH + 30, 40, title, 'OPISY');
   sheet.placements.forEach((pl) => {
-    s += polyline(sh(placedOutline(pl, sheetH)), 'FRONTY_KONTUR');
-    // Opis w środku miejsca, wielkość dopasowana do mniejszego boku.
-    const p = pl.piece;
-    const hgt = Math.max(8, Math.min(30, Math.min(pl.w, pl.h) / 8));
-    const cx = offsetX + pl.x + hgt;
-    const cy = sheetH - pl.y - pl.h / 2;
-    s += text(cx, cy + hgt * 0.8, hgt, `${p.id} ${p.name}`, 'OPISY');
-    s += text(cx, cy - hgt * 0.8, hgt * 0.8, `${fmt(p.frontW)} x ${fmt(p.frontH)}${p.moduleName ? ' - ' + p.moduleName : ''}`, 'OPISY');
+    const outlines = placedOutlines(pl, sheetH);
+    outlines.forEach(({ piece: p, points }) => {
+      s += polyline(sh(points), 'FRONTY_KONTUR');
+      // Opis w środku ciężkości frontu, wielkość dopasowana do mniejszego boku
+      // (w parze trójkątów mniejsza, bo trójkąt jest wąski przy wierzchołkach).
+      const hgt = Math.max(8, Math.min(30, Math.min(pl.w, pl.h) / (outlines.length > 1 ? 14 : 8)));
+      const [cx, cy] = centroid(points);
+      s += text(cx + offsetX, cy + hgt * 0.7, hgt, p.id, 'OPISY', true);
+      s += text(cx + offsetX, cy - hgt * 0.9, hgt * 0.8, `${fmt(p.frontW)} x ${fmt(p.frontH)}`, 'OPISY', true);
+    });
   });
   return s;
 }

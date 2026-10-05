@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { collectFrontPieces, nestFronts, placedOutline, sheetToDxf, allSheetsToDxf, asciiText } from "./frontsDxf.js";
+import { collectFrontPieces, nestFronts, placedOutline, placedOutlines, pairTriangles, rightTriangleCorner, sheetToDxf, allSheetsToDxf, asciiText } from "./frontsDxf.js";
 
 const mats = [{ id: 'm1', name: 'Biały mat' }, { id: 'm2', name: 'Dąb' }];
 const settings = { sheetW: 2800, sheetH: 2070, gap: 20, trim: 10 };
@@ -60,5 +60,66 @@ describe("DXF frontów na CNC", () => {
 
   it("asciiText", () => {
     expect(asciiText('Żółć — 45°')).toBe('Zolc - 45%%d');
+  });
+});
+
+describe("parowanie trójkątów (blendy skosu)", () => {
+  const tri = (name, outline, qty = 1) => ({ name, length: 300, width: 400, qty, category: 'Front', outline });
+  const BR = [[0, 0], [400, 0], [400, 300]];   // kąt prosty w prawym dolnym rogu
+  const area = (p) => p.reduce((s, [x, y], i) => { const [x2, y2] = p[(i + 1) % p.length]; return s + x * y2 - x2 * y; }, 0) / 2;
+  // Najmniejsza odległość wierzchołka jednego trójkąta od przeciwprostokątnej drugiego.
+  const distToLine = ([px, py], [ax, ay], [bx, by]) => Math.abs((bx - ax) * (ay - py) - (ax - px) * (by - ay)) / Math.hypot(bx - ax, by - ay);
+
+  it("rozpoznaje róg kąta prostego", () => {
+    expect(rightTriangleCorner(BR, 400, 300)).toEqual({ lr: 'R', bt: 'B' });
+    expect(rightTriangleCorner([[0, 0], [400, 0], [0, 300]], 400, 300)).toEqual({ lr: 'L', bt: 'B' });
+    expect(rightTriangleCorner([[0, 0], [400, 0], [200, 300]], 400, 300)).toBeNull();
+    expect(rightTriangleCorner([[0, 0], [400, 0], [400, 300], [0, 300]], 400, 300)).toBeNull();
+  });
+
+  it("dwa jednakowe trójkąty = jeden element, szerszy o odstęp mierzony prostopadle do przeciwprostokątnej", () => {
+    const pieces = collectFrontPieces([tri('Blenda skos', BR, 2)]);
+    const items = pairTriangles(pieces, 20);
+    expect(items).toHaveLength(1);
+    const it = items[0];
+    expect(it.id).toBe('F001+F002');
+    expect(it.frontW).toBeCloseTo(400 + 20 * 500 / 300);    // przeciwprostokątna 500
+    expect(it.frontH).toBe(300);
+    const [a, b] = it.members.map((m) => m.points);
+    // Drugi trójkąt obrócony o 180° (nie lustro) i z kątem prostym naprzeciwko.
+    expect(area(b)).toBeCloseTo(area(a));
+    // Odstęp między przeciwprostokątnymi = 20 mm.
+    const hypA = a.filter(([x, y]) => !(x === Math.max(...a.map((p) => p[0])) && y === 0));
+    const minDist = Math.min(...b.map((pt) => distToLine(pt, hypA[0], hypA[1])));
+    expect(minDist).toBeCloseTo(20);
+    // Wszystko w obrębie elementu.
+    [...a, ...b].forEach(([x, y]) => { expect(x).toBeGreaterThanOrEqual(-1e-9); expect(x).toBeLessThanOrEqual(it.frontW + 1e-9); expect(y).toBeLessThanOrEqual(300); });
+  });
+
+  it("nieparzysta liczba: ostatni trójkąt zostaje sam, inne kształty nietknięte", () => {
+    const pieces = collectFrontPieces([tri('Blenda skos', BR, 3), { name: 'Drzwi', length: 700, width: 400, qty: 1, category: 'Front' }]);
+    const items = pairTriangles(pieces, 20);
+    expect(items.map((i) => i.members.length).sort()).toEqual([1, 1, 2]);
+    expect(items.flatMap((i) => i.members.map((m) => m.piece.id)).sort()).toEqual(['F001', 'F002', 'F003', 'F004']);
+  });
+
+  it("para trafia do DXF jako dwa osobne obrysy", () => {
+    const groups = nestFronts(collectFrontPieces([tri('Blenda skos', BR, 2)]), settings);
+    const pl = groups[0].result.sheets[0].placements[0];
+    expect(placedOutlines(pl, settings.sheetH)).toHaveLength(2);
+    const dxf = sheetToDxf(groups[0].result.sheets[0], settings);
+    expect((dxf.match(/\r\nPOLYLINE\r\n/g) || []).length).toBe(3);   // arkusz + 2 trójkąty
+    expect(dxf).toContain('F001');
+    expect(dxf).toContain('F002');
+  });
+  it('kąt prosty po lewej: trójkąty nie nachodzą na siebie, odstęp 20 mm', () => {
+    const LB = [[0, 0], [400, 0], [0, 300]];
+    const [it] = pairTriangles(collectFrontPieces([tri('Blenda skos', LB, 2)]), 20);
+    const [a, b] = it.members.map((m) => m.points);
+    // Przeciwprostokątna a: wierzchołki inne niż kąt prosty (najmniejsze x i y).
+    const hypA = a.filter(([x, y]) => !(x === Math.min(...a.map((p) => p[0])) && y === 0));
+    expect(Math.min(...b.map((pt) => distToLine(pt, hypA[0], hypA[1])))).toBeCloseTo(20);
+    expect(Math.min(...a.map((p) => p[0]))).toBeCloseTo(0);
+    expect(Math.max(...b.map((p) => p[0]))).toBeCloseTo(it.frontW);
   });
 });

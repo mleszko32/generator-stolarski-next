@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nestParts } from './nesting.js';
+import { nestParts, nestPartsFree } from './nesting.js';
 import { partEdgeBandingMm, totalEdgeBandingMeters } from './edgeBanding.js';
 
 const OPTS = { sheetW: 2800, sheetH: 2070, kerf: 4, trim: 10 };
@@ -79,5 +79,51 @@ describe('oklejanie krawędzi', () => {
       { category: 'Plecy', length: 700, width: 500, qty: 1 },
     ]);
     expect(m).toBeCloseTo((2 * (715 + 300) * 2) / 1000, 5);
+  });
+});
+
+describe("rozkrój dowolny (CNC, MaxRects)", () => {
+  const opts = { sheetW: 2800, sheetH: 2070, kerf: 20, trim: 10 };
+  const overlaps = (a, b, gap) => a.x < b.x + b.w + gap && b.x < a.x + a.w + gap && a.y < b.y + b.h + gap && b.y < a.y + a.h + gap;
+
+  // Mieszanka frontów kuchni: drzwi, szuflady, wąskie blendy.
+  const mix = [];
+  let n = 0;
+  const add = (w, h, qty) => { for (let i = 0; i < qty; i++) mix.push({ id: 'p' + (++n), w, h, canRotate: false }); };
+  add(713, 396, 8); add(713, 596, 4); add(140, 596, 6); add(283, 596, 6); add(2100, 596, 2); add(713, 146, 3); add(1400, 450, 3);
+
+  it("formatki nie nachodzą na siebie (z odstępem) i mieszczą się w arkuszu bez obrzeża", () => {
+    const r = nestPartsFree(mix, opts);
+    expect(r.unplaced).toHaveLength(0);
+    r.sheets.forEach((s) => {
+      s.placements.forEach((p, i) => {
+        expect(p.x).toBeGreaterThanOrEqual(10);
+        expect(p.y).toBeGreaterThanOrEqual(10);
+        expect(p.x + p.w).toBeLessThanOrEqual(2790);
+        expect(p.y + p.h).toBeLessThanOrEqual(2060);
+        s.placements.slice(i + 1).forEach((q) => expect(overlaps(p, q, 20 - 1e-6)).toBe(false));
+      });
+    });
+    expect(r.sheets.flatMap((s) => s.placements)).toHaveLength(mix.length);
+  });
+
+  it("nigdy nie gorzej niż układ rzędami (cięcia na wylot)", () => {
+    expect(nestPartsFree(mix, opts).sheetCount).toBeLessThanOrEqual(nestParts(mix, opts).sheetCount);
+  });
+
+  it("wypełnia miejsce obok wysokiej formatki, czego układ rzędami nie potrafi", () => {
+    // Jeden wysoki front i dużo niskich: w rzędach niskie stoją obok wysokiego
+    // tylko w jego rzędzie, a reszta idzie pod nim.
+    const pcs = [{ id: 'big', w: 1400, h: 2040, canRotate: false }];
+    for (let i = 0; i < 12; i++) pcs.push({ id: 's' + i, w: 1300, h: 300, canRotate: false });
+    expect(nestPartsFree(pcs, { ...opts, kerf: 10 }).sheetCount).toBe(2);
+  });
+
+  it("przekrecanie tylko gdy wolno", () => {
+    const r = nestPartsFree([{ id: 'a', w: 500, h: 2600, canRotate: false }], opts);
+    expect(r.unplaced).toHaveLength(1);
+    const r2 = nestPartsFree([{ id: 'a', w: 500, h: 2600, canRotate: true }], opts);
+    expect(r2.unplaced).toHaveLength(0);
+    expect(r2.sheets[0].placements[0].rotated).toBe(true);
   });
 });
