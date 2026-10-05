@@ -8,7 +8,8 @@ import { updateSidebar } from "./sidebar.js";
 import { initPropertiesPanel } from "./properties.js";
 import { escapeHtml } from "../utils/dom.js";
 import { round1 } from "../utils/math.js";
-import { getSlopeGeometry, getSlopeSettings, getSlopeColumns, getSlopeDividers, getSlopeInnerSpan } from "../core/slopeCabinet.js";
+import { getSlopeGeometry, getSlopeSettings, getSlopeColumns, getSlopeDividers, getSlopeInnerSpan, getSlopeFronts } from "../core/slopeCabinet.js";
+import { drawerSystems } from "../core/drawerSystems.js";
 
 const MIN_COLUMN = 50;
 
@@ -42,6 +43,34 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
         ${s.columns.length > 1 ? `<button type="button" class="icon-btn btn-slope-del-column" data-index="${i}" title="Usuń kolumnę" style="margin-bottom:4px;"><i class="ti ti-trash" aria-hidden="true"></i></button>` : ''}
       </div>`;
   }).join('');
+
+  // --- Fronty: wnęki z typem (szuflada/blenda/pusta) ---
+  const frontCfg = { ...(state.project.front || {}), ...(mod.front || {}) };
+  const sysId = String(frontCfg.drawerSystem || 'merivobox').toLowerCase();
+  const boxType = s.drawerBox === 'B' ? 'B' : 'A';
+  const TYPE_LABELS = { szuflada: 'Szuflada', blenda: 'Blenda', brak: 'Pusta (bez frontu)' };
+  const fronts = getSlopeFronts(mod, state.project)
+    .slice().sort((a, b) => a.col - b.col || a.row - b.row);
+  const drawerInfo = (fr) => {
+    if (fr.type !== 'szuflada') return '';
+    const dr = fr.drawer;
+    if (!dr) return '<div class="notice-warn fs-xs">Nieznany system szuflad.</div>';
+    if (!dr.fits) return '<div class="notice-warn fs-xs">Za mało miejsca na szufladę w tej wnęce.</div>';
+    const c = dr.comps;
+    const h = dr.boxType === 'B'
+      ? `boki ${dr.box.sideLow}/${dr.box.sideHigh} mm`
+      : (c.woodenBox ? `bok ${c.sideHeight} mm` : `wariant ${c.back.variantType}`);
+    return `<div class="hint">Skrzynka ${dr.boxType}: NL ${c.nominalLength}, ${h}</div>`;
+  };
+  const cellRows = fronts.map((fr) => `
+      <div class="prop-box mb-8">
+        <div class="fs-xs" style="font-weight:600;">Kolumna ${fr.col + 1}, rząd ${fr.row + 1} <span class="hint">· ${escapeHtml(fr.text)}</span></div>
+        <select class="input-slope-cell" data-key="${fr.key}">
+          <option value="auto" ${!(s.cellTypes || {})[fr.key] ? 'selected' : ''}>Auto (${TYPE_LABELS[fr.auto]})</option>
+          ${['szuflada', 'blenda', 'brak'].map((t) => `<option value="${t}" ${(s.cellTypes || {})[fr.key] === t ? 'selected' : ''}>${TYPE_LABELS[t]}</option>`).join('')}
+        </select>
+        ${drawerInfo(fr)}
+      </div>`).join('');
 
   const shelfRows = (s.shelves || []).map((v, i) => `
       <div class="row mb-8" style="align-items: flex-end;">
@@ -94,6 +123,24 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
       <input type="number" id="input-slope-shelf-count" value="${(s.shelves || []).length || 2}" min="0" style="width: 60px;" />
       <button type="button" class="btn btn-sm" id="btn-slope-even-shelves">Rozłóż równo</button>
     </div>
+
+    <h3>Fronty i szuflady</h3>
+    <div class="property-group mb-8">
+      <label class="fs-xs">System szuflad:</label>
+      <select id="input-slope-drawer-system">
+        ${Object.entries(drawerSystems).map(([id, sys]) => `<option value="${id}" ${id === sysId ? 'selected' : ''}>${escapeHtml(sys.name)}</option>`).join('')}
+      </select>
+    </div>
+    <label class="fs-xs">Skrzynka szuflady:</label>
+    <div class="property-group seg">
+      <button type="button" class="seg-btn btn-slope-box${boxType === 'A' ? ' active' : ''}" data-box="A">A — prostokątna</button>
+      <button type="button" class="seg-btn btn-slope-box${boxType === 'B' ? ' active' : ''}" data-box="B">B — ścięta pod skos</button>
+    </div>
+    <div class="hint mb-8">${boxType === 'A'
+      ? 'Skrzynka prostokątna, wysokość od niższej strony wnęki. Działa z każdym systemem.'
+      : 'Boki różnej wysokości, tył i czoło wewnętrzne jako trapez — więcej miejsca w szufladzie.'}</div>
+    ${boxType === 'B' && !(drawerSystems[sysId] && drawerSystems[sysId].woodenBox) ? `<div class="notice-warn fs-xs mb-8">Skrzynka B wymaga szuflady drewnianej (np. Blum MOVENTO). Przy tym systemie liczona jest skrzynka A.</div>` : ''}
+    ${cellRows || '<div class="empty-note">Brak wnęk na fronty.</div>'}
 
     <hr class="divider">
 
@@ -217,6 +264,23 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
     save({ shelves: Array.from({ length: n }, (_, i) => Math.round(th + (i + 1) * gap + i * th)) });
     refresh();
   });
+
+  // --- Fronty ---
+  document.getElementById('input-slope-drawer-system')?.addEventListener('change', (e) => {
+    mod.front = { ...(mod.front || {}), drawerSystem: e.target.value };
+    refresh();
+  });
+  rightSidebar.querySelectorAll('.btn-slope-box').forEach((btn) => btn.addEventListener('click', () => {
+    save({ drawerBox: btn.dataset.box });
+    refresh();
+  }));
+  rightSidebar.querySelectorAll('.input-slope-cell').forEach((sel) => sel.addEventListener('change', (e) => {
+    const types = { ...(s.cellTypes || {}) };
+    if (e.target.value === 'auto') delete types[sel.dataset.key];
+    else types[sel.dataset.key] = e.target.value;
+    save({ cellTypes: types });
+    refresh();
+  }));
 
   document.getElementById('btn-slope-delete')?.addEventListener('click', () => {
     deleteModule(mod.id);

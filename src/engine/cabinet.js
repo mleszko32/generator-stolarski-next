@@ -1,6 +1,6 @@
 // src/engine/cabinet.js
 import { state } from "../core/state.js";
-import { calculateDrawerHoles, getDrawerComponents } from "../core/drawerMath.js";
+import { calculateDrawerHoles, getDrawerComponents, drawerComponentsToParts } from "../core/drawerMath.js";
 import { drawerSystems } from "../core/drawerSystems.js";
 import { calculateHinges } from "../core/hingeMath.js";
 import { fmtMm } from "../utils/math.js";
@@ -8,7 +8,7 @@ import { getWorktopParts } from "../core/worktops.js";
 import { recalculateAllLayouts, getWorldFootprint, getCornerDepths } from "../core/layout.js";
 import { getCorpusHoles, getPionMountHoles, getCorpusParts, getBackPanelParts } from "./carcaseParts.js";
 import { getCornerCorpusParts } from "./cornerParts.js";
-import { getSlopeCabinetParts } from "../core/slopeCabinet.js";
+import { getSlopeCabinetParts, getSlopeFrontParts } from "../core/slopeCabinet.js";
 
 export function calculateParts() {
   // Fronty muszą mieć aktualne el.x/y/w/h zanim policzymy z nich formatki.
@@ -35,6 +35,7 @@ export function calculateParts() {
   } else if (mod.type === 'slope_cabinet') {
       // Szafka pod skos: formatki korpusu i wnętrza z core/slopeCabinet.js.
       rawParts.push(...getSlopeCabinetParts(mod, config));
+      rawParts.push(...getSlopeFrontParts(mod, config));
   } else {
       rawParts.push(...getCorpusParts(mod, config));
       rawParts.push(...getBackPanelParts(mod, config));
@@ -156,6 +157,7 @@ export function collectProjectParts() {
         modParts.push(...getCornerCorpusParts(mod, config));
     } else if (mod.type === 'slope_cabinet') {
         modParts.push(...getSlopeCabinetParts(mod, config));
+        modParts.push(...getSlopeFrontParts(mod, config));
     } else {
         modParts.push(...getCorpusParts(mod, config));
         modParts.push(...getBackPanelParts(mod, config));
@@ -447,19 +449,7 @@ function getFrontsAndDrawers(mod, config) {
         // Podanie tu simulatedSpace gwarantowałoby odrzucenie wymuszenia.
         const drawerComps = getDrawerComponents(sysName, width - (board * 2), availableDepth, availableSpace, userForcedVariant, front.drawerSideHeight);
 
-        if (drawerComps && drawerComps.woodenBox) {
-          // MOVENTO: cała skrzynka z płyty (patrz core/drawerMath.js).
-          const nl = drawerComps.nominalLength;
-          const r1 = (v) => parseFloat((v || 0).toFixed(1));
-          const tag = `W${width} NL${nl} H${drawerComps.sideHeight}`;
-          parts.push({ name: `Bok szuflady ${tag}`, length: r1(drawerComps.sides.length), width: r1(drawerComps.sides.height), qty: 2, category: "Szuflada" });
-          parts.push({ name: `Dno szuflady ${tag}`, length: r1(drawerComps.bottom.length), width: r1(drawerComps.bottom.width), qty: 1, category: "Szuflada" });
-          parts.push({ name: `Tył szuflady ${tag}`, length: r1(drawerComps.back.width), width: r1(drawerComps.back.height), qty: 1, category: "Szuflada" });
-          parts.push({ name: `Czoło wewn. szuflady ${tag}`, length: r1(drawerComps.innerFront.width), width: r1(drawerComps.innerFront.height), qty: 1, category: "Szuflada" });
-        } else if (drawerComps) {
-          parts.push({ name: `Dno W${width} NL${drawerComps.nominalLength}`, length: parseFloat((drawerComps.bottom.length || 0).toFixed(1)), width: parseFloat((drawerComps.bottom.width || 0).toFixed(1)), qty: 1, category: "Szuflada" });
-          parts.push({ name: `Tył W${width} (${drawerComps.back.variantType})`, length: parseFloat((drawerComps.back.width || 0).toFixed(1)), width: parseFloat((drawerComps.back.height || 0).toFixed(1)), qty: 1, category: "Szuflada" });
-        }
+        if (drawerComps) parts.push(...drawerComponentsToParts(drawerComps, width));
       }
     } 
   });

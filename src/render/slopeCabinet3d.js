@@ -7,9 +7,11 @@ import * as THREE from 'three';
 import { state } from '../core/state.js';
 import { getWorldFootprint } from '../core/layout.js';
 import { getSlopeCabinetPolygons } from '../core/slopeCabinet.js';
-import { addPrism } from './meshBuilders.js';
+import { addPrism, isXrayMode } from './meshBuilders.js';
 
-export function renderSlopeCabinet(mod, isActive, th, parentGroup) {
+// frontsVisible - przełącznik "fronty" z podglądu 3D; skrzynki szuflad są
+// widoczne, gdy fronty są schowane albo w trybie przezroczystym.
+export function renderSlopeCabinet(mod, isActive, th, parentGroup, frontsVisible = true) {
   const W = parseFloat(mod.dimensions.width) || 0;
   const H = parseFloat(mod.dimensions.height) || 0;
   const D = parseFloat(mod.dimensions.depth) || 0;
@@ -33,9 +35,17 @@ export function renderSlopeCabinet(mod, isActive, th, parentGroup) {
   modGroup.add(innerGroup);
 
   const ud = { moduleId: mod.id, type: 'corpus' };
-  const { polys, back } = getSlopeCabinetPolygons(mod, th);
+  const { polys, back, solids } = getSlopeCabinetPolygons(mod, state.project);
   polys.forEach((p) => addPrism(p.points, backThick, D - backThick, p.kind, isActive, ud, innerGroup));
   addPrism(back, 0, backThick, 'hdf', isActive, { ...ud, part: 'back' }, innerGroup);
+
+  const showBoxes = !frontsVisible || isXrayMode;
+  solids.forEach((s) => {
+    if (s.kind === 'front' && !frontsVisible) return;
+    if (s.kind === 'drawerBox' && !showBoxes) return;
+    // zFront liczone od płaszczyzny frontu korpusu (z = D) w głąb.
+    addPrism(s.points, D - s.zFront - s.depth, s.depth, s.kind, isActive, ud, innerGroup);
+  });
 
   parentGroup.add(modGroup);
 }

@@ -1,5 +1,5 @@
 // src/core/drawerMath.js
-import { drawerSystems } from './drawerSystems.js';
+import { drawerSystems, moventoRunnerName } from './drawerSystems.js';
 import { state } from './state.js';
 
 // Domyślna, "Blumowa" seria NL — używana gdy system nie podaje własnej
@@ -194,4 +194,33 @@ export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick
     ],
     frontHoles: frontHoles
   };
+}
+
+// Formatki skrzynki szuflady z wyniku getDrawerComponents - wspólne dla zwykłych
+// szafek (engine/cabinet.js) i szafki pod skos (core/slopeCabinet.js), żeby te
+// same szuflady miały te same nazwy i scalały się w jeden wiersz listy.
+// width = szerokość szafki (do nazwy formatki, jak dotąd).
+export function drawerComponentsToParts(comps, width) {
+  const r1 = (v) => parseFloat((v || 0).toFixed(1));
+  if (comps.woodenBox) {
+    // MOVENTO: cała skrzynka z płyty.
+    const tag = `W${width} NL${comps.nominalLength} H${comps.sideHeight}`;
+    return [
+      { name: `Bok szuflady ${tag}`, length: r1(comps.sides.length), width: r1(comps.sides.height), qty: 2, category: "Szuflada" },
+      { name: `Dno szuflady ${tag}`, length: r1(comps.bottom.length), width: r1(comps.bottom.width), qty: 1, category: "Szuflada" },
+      { name: `Tył szuflady ${tag}`, length: r1(comps.back.width), width: r1(comps.back.height), qty: 1, category: "Szuflada" },
+      { name: `Czoło wewn. szuflady ${tag}`, length: r1(comps.innerFront.width), width: r1(comps.innerFront.height), qty: 1, category: "Szuflada" },
+    ];
+  }
+  return [
+    { name: `Dno W${width} NL${comps.nominalLength}`, length: r1(comps.bottom.length), width: r1(comps.bottom.width), qty: 1, category: "Szuflada" },
+    { name: `Tył W${width} (${comps.back.variantType})`, length: r1(comps.back.width), width: r1(comps.back.height), qty: 1, category: "Szuflada" },
+  ];
+}
+
+// Nazwa kompletu okuć szuflady na liście okuć (engine/hardware.js).
+export function drawerHardwareKey(sysName, comps) {
+  if (comps.woodenBox) return moventoRunnerName(drawerSystems[sysName], comps.nominalLength);
+  const variantType = comps.back.variantType ? comps.back.variantType.toUpperCase() : 'M';
+  return `Komplet szuflady (${sysName.toUpperCase()} - H:${variantType} L-${comps.nominalLength})`;
 }

@@ -3,9 +3,9 @@
 // Lista okuć projektu (nóżki, złącza, komplety szuflad, zawiasy, okleina) - wydzielona
 // z engine/cabinet.js. Czyta zagregowaną listę formatek z calculateAllProjectParts().
 import { state } from "../core/state.js";
-import { getDrawerComponents } from "../core/drawerMath.js";
-import { drawerSystems, moventoRunnerName } from "../core/drawerSystems.js";
+import { getDrawerComponents, drawerHardwareKey } from "../core/drawerMath.js";
 import { calculateHinges } from "../core/hingeMath.js";
+import { getSlopeDrawerHardware } from "../core/slopeCabinet.js";
 import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "./edgeBanding.js";
 import { recalculateAllLayouts } from "../core/layout.js";
 import { calculateAllProjectParts } from "./cabinet.js";
@@ -49,6 +49,15 @@ export function calculateProjectHardware() {
     if (!hardwareList[joinKey]) hardwareList[joinKey] = { name: joinKey, qty: 0, unit: 'kpl.' };
     hardwareList[joinKey].qty += 8; 
 
+    // Szafka pod skos: szuflady liczone z jej wnęk (core/slopeCabinet.js), nie z mod.elements.
+    if (mod.type === 'slope_cabinet') {
+      getSlopeDrawerHardware(mod, config).forEach(hwKey => {
+        if (!hardwareList[hwKey]) hardwareList[hwKey] = { name: hwKey, qty: 0, unit: 'kpl.' };
+        hardwareList[hwKey].qty += 1;
+      });
+      return;
+    }
+
     if (!mod.elements) return;
 
     const allFronts = mod.elements.filter(el => el.typ === 'front');
@@ -91,16 +100,8 @@ export function calculateProjectHardware() {
           const sysName = f.drawerSystem || 'merivobox';
           const drawerComps = getDrawerComponents(sysName, innerWidth, topBottomDepth, availableSpace, userForcedVariant, front.drawerSideHeight);
 
-          if (drawerComps && drawerComps.woodenBox) {
-            const hwKey = moventoRunnerName(drawerSystems[sysName], drawerComps.nominalLength);
-            if (!hardwareList[hwKey]) hardwareList[hwKey] = { name: hwKey, qty: 0, unit: 'kpl.' };
-            hardwareList[hwKey].qty += 1;
-          } else if (drawerComps) {
-            const nl = drawerComps.nominalLength;
-            const variantType = drawerComps.back.variantType ? drawerComps.back.variantType.toUpperCase() : 'M';
-
-            const hwKey = `Komplet szuflady (${sysName.toUpperCase()} - H:${variantType} L-${nl})`;
-
+          if (drawerComps) {
+            const hwKey = drawerHardwareKey(sysName, drawerComps);
             if (!hardwareList[hwKey]) hardwareList[hwKey] = { name: hwKey, qty: 0, unit: 'kpl.' };
             hardwareList[hwKey].qty += 1;
           }

@@ -1080,7 +1080,7 @@ export function update3D() {
 
       // Szafka pod skos (core/slopeCabinet.js) - płyty o nieprostokątnym obrysie.
       if (mod.type === 'slope_cabinet') {
-          renderSlopeCabinet(mod, mod.id === state.activeModuleId, th, cabinetGroup);
+          renderSlopeCabinet(mod, mod.id === state.activeModuleId, th, cabinetGroup, isFrontsVisible);
           return;
       }
 

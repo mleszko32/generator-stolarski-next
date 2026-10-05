@@ -26,6 +26,9 @@
 // dołu); dla lowSide === 'right' wynik 3D jest lustrzany (mirrorX), a formatki
 // są takie same.
 
+import { drawerSystems } from './drawerSystems.js';
+import { getDrawerComponents, getWoodenDrawerHeights, drawerComponentsToParts, drawerHardwareKey } from './drawerMath.js';
+
 const MIN_PIECE = 50;   // krótsze kawałki pomijamy (nie da się ich zrobić)
 
 export const SLOPE_DEFAULTS = { lowSide: 'left', lowHeight: 0, columns: [null], shelves: [] };
@@ -149,6 +152,245 @@ export function getSlopeShelfPieces(mod, th = 18) {
 
 const r1 = (v) => Math.round(v * 10) / 10;
 
+// ---------------------------------------------------------------------------
+// Fronty: każda wnęka (kolumna × rząd między półkami) dostaje własny front,
+// docięty linią skosu. Trójkąt = blenda (stała maskownica), reszta = szuflada.
+// Typ wnęki można wymusić: slope.cellTypes[klucz] = 'szuflada'|'blenda'|'brak'.
+// Skrzynka szuflady: slope.drawerBox 'A' (prostokątna, wysokość od niższej
+// strony) albo 'B' (ścięta pod skos: boki różnej wysokości, tył i czoło
+// wewnętrzne trapezowe - tylko systemy ze skrzynką drewnianą, np. MOVENTO).
+// ---------------------------------------------------------------------------
+
+// Wnęki w układzie znormalizowanym: x0..x1 to światło kolumny, y0..y1 światło
+// w pionie (y1 = Infinity, gdy górą jest skos). Klucz wnęki używa RZECZYWISTEGO
+// numeru kolumny (od lewej) i rzędu od dołu.
+export function getSlopeCells(mod, th = 18) {
+  const g = getSlopeGeometry(mod, th);
+  const dividers = getSlopeDividers(mod, th);
+  const pieces = getSlopeShelfPieces(mod, th);
+  const bounds = [];
+  let a = g.isTriangle ? 0 : th;
+  dividers.forEach((d) => { bounds.push([a, d.x]); a = d.x + th; });
+  bounds.push([a, g.W - th]);
+  const n = bounds.length;
+  const cells = [];
+  bounds.forEach(([x0, x1], j) => {
+    const col = g.lowSide === 'left' ? j : n - 1 - j;
+    const shelfYs = pieces.filter((p) => p.x1 > x0 + 0.5 && p.x1 <= x1 + 0.5).map((p) => p.y).sort((u, v) => u - v);
+    const rows = [];
+    let yB = th;
+    shelfYs.forEach((y) => { rows.push([yB, y]); yB = y + th; });
+    rows.push([yB, Infinity]);
+    rows.forEach(([y0, y1], row) => {
+      const spaceAt = (x) => Math.min(y1, g.under(x)) - y0;
+      if (spaceAt(x1) < MIN_PIECE) return;
+      cells.push({
+        key: `c${col}-r${row}`, col, row, x0, x1, y0, y1,
+        leftIsDivider: j > 0, rightIsDivider: j < n - 1,
+        bottomIsShelf: row > 0, topIsShelf: y1 !== Infinity,
+        spaceAt,
+      });
+    });
+  });
+  return { g, cells };
+}
+
+// Prostokąt frontu [fx0, fx1] × [fy0, fy1] przycięty linią y = a0 + k·x
+// (k > 0, skos rośnie w prawo). Zwraca kształt, wierzchołki i wymiary.
+export function clipFrontRect(fx0, fx1, fy0, fy1, a0, k) {
+  const yL = a0 + k * fx0, yR = a0 + k * fx1;
+  const xAt = (y) => (y - a0) / k;
+  const w = fx1 - fx0, h = fy1 - fy0;
+  if (yL >= fy1) return { kind: 'prostokat', points: [[fx0, fy0], [fx1, fy0], [fx1, fy1], [fx0, fy1]], w, h };
+  if (yR <= fy0) return { kind: 'brak', points: [], w: 0, h: 0 };
+  if (yL >= fy0 && yR >= fy1) {
+    const xc = xAt(fy1);
+    return { kind: 'scietyRog', points: [[fx0, fy0], [fx1, fy0], [fx1, fy1], [xc, fy1], [fx0, yL]], w, h, hLow: yL - fy0, wTop: fx1 - xc };
+  }
+  if (yL >= fy0) return { kind: 'trapez', points: [[fx0, fy0], [fx1, fy0], [fx1, yR], [fx0, yL]], w, h: yR - fy0, hLow: yL - fy0, hHigh: yR - fy0 };
+  if (yR >= fy1) {
+    const xb = xAt(fy0), xt = xAt(fy1);
+    return { kind: 'skosnyBok', points: [[xb, fy0], [fx1, fy0], [fx1, fy1], [xt, fy1]], w: fx1 - xb, h, wBottom: fx1 - xb, wTop: fx1 - xt };
+  }
+  const xb = xAt(fy0);
+  return { kind: 'trojkat', points: [[xb, fy0], [fx1, fy0], [fx1, yR]], w: fx1 - xb, h: yR - fy0 };
+}
+
+function shapeText(shape, lowSide) {
+  const low = lowSide === 'left' ? 'lewa' : 'prawa';
+  const high = lowSide === 'left' ? 'prawa' : 'lewa';
+  switch (shape.kind) {
+    case 'trapez': return `trapez ${r1(shape.w)} × ${r1(shape.h)}, wys. ${low} ${r1(shape.hLow)}, ${high} ${r1(shape.hHigh)}`;
+    case 'scietyRog': return `ścięty róg ${r1(shape.w)} × ${r1(shape.h)}, bok ${low} ${r1(shape.hLow)}, góra ${r1(shape.wTop)}`;
+    case 'skosnyBok': return `skośny bok, dół ${r1(shape.wBottom)}, góra ${r1(shape.wTop)}, wys. ${r1(shape.h)}`;
+    case 'trojkat': return `trójkąt, podstawa ${r1(shape.w)}, wys. ${r1(shape.h)}`;
+    default: return `${r1(shape.w)} × ${r1(shape.h)}`;
+  }
+}
+
+// Szuflada we wnęce. Zwraca { comps, boxType, fits, box } albo null, gdy system
+// nieznany. box - dane do 3D i formatek skrzynki B.
+function slopeDrawer(cell, g, ctx) {
+  const { sys, system, depth, wantB } = ctx;
+  if (!system) return null;
+  const innerW = cell.x1 - cell.x0;
+  // Najpierw szerokość skrzynki (nie zależy od wysokości), potem miejsce mierzone
+  // przy jej bokach, a nie przy ścianach wnęki.
+  const probe = getDrawerComponents(sys, innerW, depth, cell.spaceAt(cell.x0));
+  if (!probe) return null;
+  const t = system.woodenBox ? system.sideThickness : 16;
+  const outerW = probe.bottom.width + 2 * t;
+  const ox0 = cell.x0 + (innerW - outerW) / 2;
+  const ox1 = ox0 + outerW;
+  const spaceLow = cell.spaceAt(ox0), spaceHigh = cell.spaceAt(ox1);
+  const comps = getDrawerComponents(sys, innerW, depth, spaceLow);
+  const boxB = wantB && !!system.woodenBox;
+
+  const lo = boxB ? getWoodenDrawerHeights(system, spaceLow) : null;
+  const hi = boxB ? getWoodenDrawerHeights(system, spaceHigh) : null;
+  // Skrzynka B tylko wtedy, gdy skos faktycznie obniża jeden bok - przy równych
+  // bokach to zwykła skrzynka prostokątna (A).
+  if (boxB && hi.sideHeight > lo.sideHeight) {
+    const backLow = lo.sideHeight - system.bottomRecess - t;
+    const backHigh = hi.sideHeight - system.bottomRecess - t;
+    return {
+      comps, boxType: 'B', fits: lo.fits, ox0, ox1, t,
+      box: { sideLow: lo.sideHeight, sideHigh: hi.sideHeight, backLow, backHigh, yBase: cell.y0 + system.bottomClearance, recess: system.bottomRecess },
+    };
+  }
+  let fits;
+  if (system.woodenBox) fits = comps.fits;
+  else fits = spaceLow >= Math.min(...Object.values(system.variants).map((v) => v.minSpace));
+  const yBase = cell.y0 + (system.woodenBox ? system.bottomClearance : 0);
+  return { comps, boxType: 'A', fits, ox0, ox1, t, yBase, wantedB: wantB };
+}
+
+// Wszystkie fronty szafki pod skos (układ znormalizowany), z typem, kształtem
+// i - dla szuflad - danymi skrzynki.
+export function getSlopeFronts(mod, config) {
+  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const backThick = parseFloat(config.materials?.backThickness) || 3;
+  const { g, cells } = getSlopeCells(mod, th);
+  const s = getSlopeSettings(mod, th);
+  const f = { ...(config.front || {}), ...(mod.front || {}) };
+  const gap = parseFloat(f.gap ?? 3);
+  const cl = f.clearance || {};
+  const cSide = parseFloat(cl.sides ?? 1.5);
+  const cBottom = parseFloat(cl.bottom ?? 0);
+  const sys = String(f.drawerSystem || 'merivobox').toLowerCase();
+  const ctx = { sys, system: drawerSystems[sys], depth: g.D - backThick, wantB: s.drawerBox === 'B' };
+  const types = s.cellTypes || {};
+  // Front kończy się pod skośną płytą (płyta zostaje widoczna), ze szczeliną.
+  const a0 = g.L - g.c - gap;
+
+  return cells.map((cell) => {
+    const fx0 = cell.leftIsDivider ? cell.x0 - th / 2 + gap / 2 : (g.isTriangle ? 0 : cSide);
+    const fx1 = cell.rightIsDivider ? cell.x1 + th / 2 - gap / 2 : g.W - cSide;
+    const fy0 = cell.bottomIsShelf ? cell.y0 - th / 2 + gap / 2 : cBottom;
+    const fy1 = cell.topIsShelf ? cell.y1 + th / 2 - gap / 2 : g.H;
+    const shape = clipFrontRect(fx0, fx1, fy0, fy1, a0, g.k);
+    const tooSmall = shape.kind === 'brak' || shape.h < 40 || shape.w < 40;
+    const drawer = tooSmall ? null : slopeDrawer(cell, g, ctx);
+    let auto = 'szuflada';
+    if (tooSmall) auto = 'brak';
+    else if (shape.kind === 'trojkat' || !drawer || !drawer.fits) auto = 'blenda';
+    const forced = types[cell.key];
+    const type = tooSmall ? 'brak' : (['szuflada', 'blenda', 'brak'].includes(forced) ? forced : auto);
+    return { ...cell, shape, auto, type, drawer: type === 'szuflada' ? drawer : null, text: shapeText(shape, g.lowSide) };
+  });
+}
+
+// Formatki frontów, blend i skrzynek szuflad szafki pod skos.
+export function getSlopeFrontParts(mod, config) {
+  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const g = getSlopeGeometry(mod, th);
+  const parts = [];
+  getSlopeFronts(mod, config).forEach((fr) => {
+    if (fr.type === 'brak') return;
+    const rect = fr.shape.kind === 'prostokat';
+    const len = r1(fr.shape.h), wid = r1(fr.shape.w);
+    if (fr.type === 'blenda') {
+      parts.push({ name: rect ? 'Blenda' : `Blenda skos (${fr.text})`, length: len, width: wid, qty: 1, category: 'Front' });
+      return;
+    }
+    parts.push({ name: rect ? 'Front szuflady' : `Front szuflady skos (${fr.text})`, length: len, width: wid, qty: 1, category: 'Front' });
+    const d = fr.drawer;
+    if (!d) return;
+    const eqW = Math.round(fr.x1 - fr.x0 + 2 * th);
+    if (d.boxType === 'A') {
+      parts.push(...drawerComponentsToParts(d.comps, eqW));
+      return;
+    }
+    // Skrzynka B (ścięta pod skos): boki różnej wysokości, tył i czoło trapezowe.
+    const c = d.comps, b = d.box;
+    const low = g.lowSide === 'left' ? 'lewa' : 'prawa';
+    const tag = `W${eqW} NL${c.nominalLength} H${b.sideLow}-${b.sideHigh}`;
+    const trap = `trapez, ${low} ${r1(b.backLow)}`;
+    parts.push(
+      { name: `Bok szuflady ${tag} (niski)`, length: r1(c.sides.length), width: r1(b.sideLow), qty: 1, category: 'Szuflada' },
+      { name: `Bok szuflady ${tag} (wysoki)`, length: r1(c.sides.length), width: r1(b.sideHigh), qty: 1, category: 'Szuflada' },
+      { name: `Dno szuflady ${tag}`, length: r1(c.bottom.length), width: r1(c.bottom.width), qty: 1, category: 'Szuflada' },
+      { name: `Tył szuflady skos ${tag} (${trap})`, length: r1(c.back.width), width: r1(b.backHigh), qty: 1, category: 'Szuflada' },
+      { name: `Czoło wewn. szuflady skos ${tag} (${trap})`, length: r1(c.innerFront.width), width: r1(b.backHigh), qty: 1, category: 'Szuflada' },
+    );
+  });
+  return parts;
+}
+
+// Komplety okuć szuflad szafki pod skos (nazwa jak w zwykłych szafkach).
+export function getSlopeDrawerHardware(mod, config) {
+  const f = { ...(config.front || {}), ...(mod.front || {}) };
+  const sys = String(f.drawerSystem || 'merivobox').toLowerCase();
+  return getSlopeFronts(mod, config)
+    .filter((fr) => fr.type === 'szuflada' && fr.drawer)
+    .map((fr) => drawerHardwareKey(sys, fr.drawer.comps));
+}
+
+// Bryły frontów i skrzynek do 3D (układ znormalizowany): { kind, points, zFront, depth }
+// - zFront: odległość przedniej ściany bryły od płaszczyzny frontu korpusu
+//   (ujemna = przed korpusem), depth - grubość w głąb.
+function frontSolids(mod, config) {
+  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const solids = [];
+  const add = (kind, points, zFront, depth) => solids.push({ kind, points, zFront, depth });
+  const rect = (x, y, w, h) => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+  getSlopeFronts(mod, config).forEach((fr) => {
+    if (fr.type === 'brak') return;
+    add('front', fr.shape.points, -th, th);
+    const d = fr.drawer;
+    if (!d) return;
+    const c = d.comps;
+    const L = c.sides ? c.sides.length : c.nominalLength;
+    const t = d.t;
+    if (d.boxType === 'B') {
+      const b = d.box;
+      const yB = b.yBase + b.recess;
+      add('drawerBox', rect(d.ox0, b.yBase, t, b.sideLow), 0, L);
+      add('drawerBox', rect(d.ox1 - t, b.yBase, t, b.sideHigh), 0, L);
+      add('drawerBox', rect(d.ox0 + t, yB, d.ox1 - d.ox0 - 2 * t, t), 0, L);
+      const trap = [[d.ox0 + t, yB + t], [d.ox1 - t, yB + t], [d.ox1 - t, yB + t + b.backHigh], [d.ox0 + t, yB + t + b.backLow]];
+      add('drawerBox', trap, 0, t);
+      add('drawerBox', trap, L - t, t);
+      return;
+    }
+    if (c.woodenBox) {
+      const yB = d.yBase + c.bottomRecess;
+      add('drawerBox', rect(d.ox0, d.yBase, t, c.sideHeight), 0, L);
+      add('drawerBox', rect(d.ox1 - t, d.yBase, t, c.sideHeight), 0, L);
+      add('drawerBox', rect(d.ox0 + t, yB, d.ox1 - d.ox0 - 2 * t, t), 0, L);
+      add('drawerBox', rect(d.ox0 + t, yB + t, d.ox1 - d.ox0 - 2 * t, c.back.height), L - t, t);
+      return;
+    }
+    // System metalowy: dno na dole, boki (profil) i tył.
+    const h = 16 + c.back.height;
+    add('drawerBox', rect(d.ox0 + t, fr.y0, c.bottom.width, 16), 0, L);
+    add('drawerBox', rect(d.ox0, fr.y0, t, h), 0, L);
+    add('drawerBox', rect(d.ox1 - t, fr.y0, t, h), 0, L);
+    add('drawerBox', rect(d.ox0 + t + (c.bottom.width - c.back.width) / 2, fr.y0 + 16, c.back.width, c.back.height), L - t, t);
+  });
+  return solids;
+}
+
 // Formatki korpusu szafki pod skos. Krawędzie docięte pod kątem: długość to
 // DŁUŻSZA krawędź, a w nazwie podana krótsza i kąt skosu - tyle wystarczy, żeby
 // formatkę wyciąć.
@@ -202,9 +444,12 @@ export function getSlopeCabinetParts(mod, config) {
 }
 
 // Wielokąty płyt w widoku od frontu (x, y), do rysowania 3D. Każdy: { kind, points }.
-// Dla lowSide === 'right' punkty są odbite w poziomie.
-export function getSlopeCabinetPolygons(mod, th = 18) {
+// solids - fronty i skrzynki szuflad (frontSolids). Dla lowSide === 'right'
+// punkty są odbite w poziomie.
+export function getSlopeCabinetPolygons(mod, config = { materials: { boardThickness: 18, backThickness: 3 } }) {
+  const th = parseFloat(config.materials?.boardThickness) || 18;
   const g = getSlopeGeometry(mod, th);
+  const solids = frontSolids(mod, config);
   const polys = [];
   const add = (kind, points) => polys.push({ kind, points });
 
@@ -235,7 +480,8 @@ export function getSlopeCabinetPolygons(mod, th = 18) {
   if (g.lowSide === 'right') {
     const m = (pts) => pts.map(([x, y]) => [g.W - x, y]).reverse();
     polys.forEach((p) => { p.points = m(p.points); });
-    return { polys, back: m(back), geometry: g };
+    solids.forEach((p) => { p.points = m(p.points); });
+    return { polys, back: m(back), solids, geometry: g };
   }
-  return { polys, back, geometry: g };
+  return { polys, back, solids, geometry: g };
 }

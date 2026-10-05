@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getSlopeGeometry, getSlopeDividers, getSlopeShelfPieces, getSlopeCabinetParts, getSlopeCabinetPolygons, getSlopeColumns, getSlopeSettings } from "./slopeCabinet.js";
+import { getSlopeGeometry, getSlopeDividers, getSlopeShelfPieces, getSlopeCabinetParts, getSlopeCabinetPolygons, getSlopeColumns, getSlopeSettings, clipFrontRect, getSlopeFronts, getSlopeFrontParts, getSlopeDrawerHardware } from "./slopeCabinet.js";
 
 const config = { materials: { boardThickness: 18, backThickness: 3 } };
 const mod = (slope = {}, dims = {}) => ({
@@ -107,5 +107,79 @@ describe("szafka pod skos - kolumny (przegrody)", () => {
     const left = getSlopeCabinetParts(mod({ columns: [null, 300, 300], shelves: [300] }), config);
     const right = getSlopeCabinetParts(mod({ lowSide: "right", columns: [300, 300, null], shelves: [300] }), config);
     expect(right).toEqual(left);
+  });
+});
+
+describe("szafka pod skos - kształty frontów (clipFrontRect)", () => {
+  it("prostokąt, gdy skos jest ponad frontem", () => {
+    expect(clipFrontRect(0, 100, 0, 50, 200, 1).kind).toBe("prostokat");
+  });
+  it("trapez: skos przecina oba pionowe boki", () => {
+    expect(clipFrontRect(0, 100, 0, 300, 100, 1)).toMatchObject({ kind: "trapez", hLow: 100, hHigh: 200 });
+  });
+  it("ścięty róg: skos przecina bok i górę", () => {
+    expect(clipFrontRect(0, 100, 0, 150, 100, 1)).toMatchObject({ kind: "scietyRog", hLow: 100, wTop: 50 });
+  });
+  it("skośny bok: skos przecina dół i górę", () => {
+    expect(clipFrontRect(100, 300, 0, 100, -150, 1)).toMatchObject({ kind: "skosnyBok", wBottom: 150, wTop: 50 });
+  });
+  it("trójkąt i brak frontu", () => {
+    expect(clipFrontRect(100, 300, 0, 200, -150, 1)).toMatchObject({ kind: "trojkat", w: 150, h: 150 });
+    expect(clipFrontRect(100, 300, 0, 200, -500, 1).kind).toBe("brak");
+  });
+});
+
+describe("szafka pod skos - fronty i szuflady", () => {
+  // Jak na rysunku z Fusiona: trójkąt 2000 x 1500, 3 kolumny, 2 półki, MOVENTO.
+  const cfg = { materials: { boardThickness: 18, backThickness: 3 }, front: { gap: 3, clearance: { sides: 1.5, top: 5, bottom: 0 }, drawerSystem: "movento_katalog" } };
+  const m = (slope = {}, front = {}) => ({
+    type: "slope_cabinet", dimensions: { width: 2000, height: 1500, depth: 600 }, front,
+    slope: { lowSide: "left", lowHeight: 0, columns: [null, 650, 650], shelves: [500, 1000], ...slope },
+  });
+  const types = (mm) => Object.fromEntries(getSlopeFronts(mm, cfg).map((f) => [f.key, f.type]));
+
+  it("trójkąty to blendy, reszta szuflady", () => {
+    expect(types(m())).toEqual({
+      "c0-r0": "blenda",
+      "c1-r0": "szuflada", "c1-r1": "blenda",
+      "c2-r0": "szuflada", "c2-r1": "szuflada", "c2-r2": "blenda",
+    });
+  });
+
+  it("skos po prawej (kolumny odwrócone) - te same wnęki w lustrze", () => {
+    expect(types(m({ lowSide: "right", columns: [650, 650, null] }))).toEqual({
+      "c2-r0": "blenda",
+      "c1-r0": "szuflada", "c1-r1": "blenda",
+      "c0-r0": "szuflada", "c0-r1": "szuflada", "c0-r2": "blenda",
+    });
+  });
+
+  it("typ wnęki można wymusić", () => {
+    const mm = m({ cellTypes: { "c1-r0": "blenda", "c0-r0": "brak" } });
+    expect(types(mm)["c1-r0"]).toBe("blenda");
+    expect(types(mm)["c0-r0"]).toBe("brak");
+    expect(getSlopeDrawerHardware(mm, cfg)).toHaveLength(2);
+  });
+
+  it("skrzynka A: prostokątna, wysokość od niższej strony", () => {
+    const parts = getSlopeFrontParts(m(), cfg);
+    expect(parts.filter((p) => p.name.startsWith("Front szuflady"))).toHaveLength(3);
+    expect(parts.filter((p) => p.name.startsWith("Blenda"))).toHaveLength(3);
+    expect(parts.find((p) => p.name === "Bok szuflady W686 NL580 H438")).toMatchObject({ length: 570, width: 438, qty: 2 });
+    expect(getSlopeDrawerHardware(m(), cfg)).toEqual(Array(3).fill("Prowadnice Blum MOVENTO 766H (60 kg) NL-580 + sprzęgła T51.7601"));
+  });
+
+  it("skrzynka B: boki różnej wysokości i tył trapezowy; bez skosu - zwykła skrzynka", () => {
+    const parts = getSlopeFrontParts(m({ drawerBox: "B" }), cfg);
+    expect(parts.find((p) => p.name === "Bok szuflady W686 NL580 H438-459 (niski)")).toMatchObject({ width: 438, qty: 1 });
+    expect(parts.find((p) => p.name === "Bok szuflady W686 NL580 H438-459 (wysoki)")).toMatchObject({ width: 459, qty: 1 });
+    expect(parts.find((p) => p.name.startsWith("Tył szuflady skos W686 NL580 H438-459"))).toMatchObject({ length: 608, width: 430 });
+    // Szuflada przy wysokim boku, której skos nie dosięga: zwykła skrzynka.
+    expect(parts.find((p) => p.name === "Bok szuflady W686 NL580 H459")).toMatchObject({ qty: 2 });
+  });
+
+  it("skrzynka B przy systemie metalowym liczy się jako A", () => {
+    const f = getSlopeFronts(m({ drawerBox: "B" }, { drawerSystem: "merivobox" }), cfg).find((x) => x.key === "c1-r0");
+    expect(f.drawer.boxType).toBe("A");
   });
 });

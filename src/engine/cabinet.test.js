@@ -319,3 +319,22 @@ describe("Szuflada Blum MOVENTO (skrzynka drewniana)", () => {
     expect(list.some((h) => /MOVENTO 760H \(40 kg\) NL-500 \+ sprzęgła T51\.7601/.test(h.name))).toBe(true);
   });
 });
+
+describe("Szafka pod skos w liście formatek i okuć projektu", () => {
+  it("korpus, fronty, blendy i komplety prowadnic trafiają do list projektu", () => {
+    const mod = {
+      id: "skos-1", name: "Skos", type: "slope_cabinet",
+      dimensions: { width: 2000, height: 1500, depth: 600 }, position: { x: 0, y: 0, z: 0 },
+      legs: { active: false }, front: { drawerSystem: "movento_katalog" }, elements: [],
+      slope: { lowSide: "left", lowHeight: 0, columns: [null, 650, 650], shelves: [500, 1000] },
+    };
+    setProject(freshProject({ modules: [mod] }));
+    const parts = calculateAllProjectParts();
+    expect(parts.some((p) => p.name.startsWith("Skos (wieniec skośny)"))).toBe(true);
+    expect(parts.filter((p) => p.name.startsWith("Blenda skos")).length).toBeGreaterThan(0);
+    expect(parts.some((p) => p.name.startsWith("Front szuflady"))).toBe(true);
+    const hw = Object.values(calculateProjectHardware());
+    const runners = hw.find((h) => h.name.includes("MOVENTO 766H (60 kg) NL-580"));
+    expect(runners).toMatchObject({ qty: 3 });
+  });
+});
