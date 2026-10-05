@@ -423,3 +423,14 @@ describe("szafka pod skos - strona płyty od wnętrza szafki", () => {
     expect(d.faces.find((f) => f.name === "Przegroda 1" && f.side === "lewa").note).toContain("skosu");
   });
 });
+
+describe("szafka pod skos - kierunek frontu na rysunkach nawiertów", () => {
+  it("strony przegrody skierowane do siebie frontami; bok wysoki jak widziany z wnętrza", () => {
+    const d = getSlopeDrillings(slopeMod({ width: 2000, height: 1500, dividers: [646, 1314], shelves: [500] }), cfg());
+    const f = (n, side) => d.faces.find((x) => x.name === n && x.side === side);
+    expect(f("Przegroda 1", "lewa").frontOnRight).toBe(true);
+    expect(f("Przegroda 1", "prawa").frontOnRight).toBe(false);
+    // skos po lewej, bok wysoki po prawej - z wnętrza patrzymy w prawo, front po prawej ręce
+    expect(f("Bok wysoki", "wewnętrzna").frontOnRight).toBe(true);
+  });
+});

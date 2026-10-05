@@ -58,3 +58,29 @@ describe("rysunki nawiertów szafki pod skos", () => {
     expect(svg).toContain("kołek");
   });
 });
+
+describe("rysunki skosu - kierunek frontu i prawdziwy kąt", () => {
+  it("ściana z frontem po prawej: PRZÓD przy prawej krawędzi, opisy po stronie tyłu (z lewej)", async () => {
+    const { slopeFaceSVG } = await import("./slopeDrawing2d.js");
+    const face = { name: "Przegroda 1", side: "lewa", note: "patrzy w stronę skosu", width: 597, height: 800, frontOnRight: true, holes: [{ x: 37, y: 38, type: "drawer" }] };
+    const svg = slopeFaceSVG(face);
+    expect(svg).toMatch(/<text x="582"[^>]*>PRZÓD</);         // 597 - 15
+    expect(svg).toContain('cx="560"');                       // otwór 37 od frontu = 597 - 37
+    expect(svg).toMatch(/<text x="-48"[^>]*text-anchor="end"/); // kolumna opisów po lewej (tył)
+  });
+
+  it("obie strony przegrody w jednej parze", async () => {
+    const { slopeFacePairSVG } = await import("./slopeDrawing2d.js");
+    const base = { name: "Przegroda 1", width: 597, height: 800, holes: [] };
+    const html = slopeFacePairSVG({ ...base, side: "lewa", frontOnRight: true }, { ...base, side: "prawa", frontOnRight: false });
+    expect(html.indexOf("STRONA LEWA")).toBeLessThan(html.indexOf("STRONA PRAWA"));
+    expect((html.match(/<svg/g) || []).length).toBe(2);
+  });
+
+  it("płyta: ścięty koniec w prawdziwym kącie (53,13° dla 24 mm na 18 mm grubości)", () => {
+    const svg = slopeBoardSVG({ name: "Półka", width: 592, th: 18, a: [0, 541.8], b: [24, 541.8], aLabel: "spód", bLabel: "wierzch", startLabel: "przy skosie", endLabel: "drugi koniec", length: 541.8, short: 517.8, tiltStart: 53.13, tiltEnd: 0 }, 1);
+    // grubość 34 px -> 24 mm przesunięcia = 45,3 px: atan(45,3 / 34) = 53,1°
+    expect(svg).toContain("85.3,70");
+    expect(svg).toContain(">53,1°<");
+  });
+});

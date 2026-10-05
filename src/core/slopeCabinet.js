@@ -716,7 +716,11 @@ export function getSlopeDrillings(mod, config) {
   const topLen = g.isTriangle ? (g.W - th / g.k) / cosA : Math.hypot(g.W, g.H - g.L);
   plans.push({ name: 'Skos (wieniec skośny)', length: topLen, width: depth, holes: slopeHoles, fromLabel: 'wzdłuż wierzchu od dolnego końca' });
 
-  return { faces: faces.map(({ dir, ...fc }) => fc), plans, notes };
+  // frontOnRight - jak widzi tę stronę stolarz stojący we wnęce: ściana zwrócona
+  // w lewo (wnęka po lewej) ma front po prawej, zwrócona w prawo - po lewej.
+  // Dzięki temu obie strony przegrody na rysunku są skierowane do siebie frontami
+  // (jak przegroda na rysunku boku zwykłej szafki).
+  return { faces: faces.map(({ dir, ...fc }) => ({ ...fc, frontOnRight: dir === 'L' })), plans, notes };
 }
 
 // Obszar nad spodem skośnej płyty w widoku od frontu (rzeczywiste x) - do

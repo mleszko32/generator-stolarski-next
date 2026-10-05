@@ -11,7 +11,7 @@ import { escapeHtml } from "../utils/dom.js";
 import { round1 } from "../utils/math.js";
 import { getSlopeBoards, getSlopeShapes, getSlopeGeometry, getSlopeDrillings } from "../core/slopeCabinet.js";
 import { recalculateLayout } from "../core/layout.js";
-import { slopeBoardSVG, slopeShapeSVG, slopeFaceSVG, slopePlanSVG } from "../render/slopeDrawing2d.js";
+import { slopeBoardSVG, slopeShapeSVG, slopeFaceSVG, slopeFacePairSVG, slopePlanSVG } from "../render/slopeDrawing2d.js";
 
 const fmt = (v) => String(round1(v)).replace('.', ',');
 
@@ -53,7 +53,9 @@ export function openSlopeCutDrawings(mod) {
   const angled = boards.filter(({ board: b }) => b.tiltStart || b.tiltEnd);
   const shapes = getSlopeShapes(mod, config);
   const drill = getSlopeDrillings(mod, config);
-  const faces = drill.faces.filter((fc) => fc.holes.length);
+  // Płyty z nawiertami; przegroda zawsze z obiema stronami (nawet gdy jedna pusta).
+  const drilledNames = new Set(drill.faces.filter((fc) => fc.holes.length).map((fc) => fc.name));
+  const faces = drill.faces.filter((fc) => drilledNames.has(fc.name));
   const steep = angled.some(({ board: b }) => Math.max(b.tiltStart, b.tiltEnd) > 45);
 
   // --- Korpus ---
@@ -84,14 +86,20 @@ export function openSlopeCutDrawings(mod) {
     <div class="grid">${shapeCards.map((c) => `<div class="card" id="${c.id}">${c.html}</div>`).join('') || '<p>Brak.</p>'}</div>`;
 
   // --- Nawierty ---
-  const faceCards = faces.map((fc, i) => ({ id: `nawierty-${i}`, label: `${fc.name} — ${fc.side}`, html: slopeFaceSVG(fc) }));
+  // Jedna karta na płytę; obie strony przegrody obok siebie, frontami do siebie.
+  const faceCards = [...drilledNames].map((name, i) => {
+    const own = faces.filter((fc) => fc.name === name);
+    const l = own.find((fc) => fc.side === 'lewa'), r = own.find((fc) => fc.side === 'prawa');
+    const html = l && r ? slopeFacePairSVG(l, r) : own.map((fc) => slopeFaceSVG(fc)).join('');
+    return { id: `nawierty-${i}`, label: l && r ? `${name} (obie strony)` : `${name} — ${own[0].side}`, html, wide: !!(l && r) };
+  });
   const planCards = drill.plans.map((pl, i) => ({ id: `rzut-${i}`, label: `${pl.name} — łączniki`, html: slopePlanSVG(pl) }));
   const nawierty = `
     <p class="lead">Te same wzory co w zwykłej szafce: prowadnice szuflad (MOVENTO wg katalogu Blum), podpórki półek (3 otwory co 32 mm), konfirmat + kołek, puszki zawiasów. Wysokości od dołu danej płyty, odległości od frontu. Każdy rysunek pokazuje jedną stronę płyty — pod tytułem napisane, w którą stronę patrzy.</p>
     ${drill.notes.map((n) => `<div class="warn">${escapeHtml(n)}</div>`).join('')}
     ${index([...faceCards, ...planCards])}
     <h3>Ściany płyt pionowych</h3>
-    <div class="grid">${faceCards.map((c) => `<div class="card" id="${c.id}">${c.html}</div>`).join('') || '<p>Brak nawiertów.</p>'}</div>
+    <div class="grid">${faceCards.map((c) => `<div class="card${c.wide ? ' wide' : ''}" id="${c.id}">${c.html}</div>`).join('') || '<p>Brak nawiertów.</p>'}</div>
     <h3>Rzuty płyt z łącznikami</h3>
     ${planCards.map((c) => `<div class="card" id="${c.id}">${c.html}</div>`).join('')}`;
 
@@ -131,6 +139,9 @@ export function openSlopeCutDrawings(mod) {
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(520px, 1fr)); gap: 14px; align-items: start; }
     .card { border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 14px; page-break-inside: avoid; break-inside: avoid; background: #fff; }
     .grid .card { margin-bottom: 0; }
+    .grid .card.wide { grid-column: 1 / -1; }
+    .pair { display: flex; gap: 0; align-items: flex-end; }
+    .pair svg { flex: 1 1 0; min-width: 0; }
     svg { width: 100%; height: auto; display: block; }
     table.parts { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0; }
     table.parts th { text-align: left; background: #f1f5f9; padding: 6px 8px; border-bottom: 2px solid #cbd5e1; }
