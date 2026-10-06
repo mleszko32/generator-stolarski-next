@@ -210,6 +210,14 @@ gdzie dojdą do wysokości wysokiego boku, idą poziomo (`box.backPoints`: trape
 `engine/cabinet.js` i `hardware.js` dla skosu NIE idą przez zwykłe `getInteriorParts`/`getFrontsAndDrawers`.
 Stare dane (`slope.columns`/`dividers`/`shelves`) zamienia `migrateSlopeModule` w `ensureSidePanelsDefaults`.
 
+**Skrzynki szuflad (MOVENTO)**: `core/drawerBoxBuild.js` (czyste, z testami) zbiera skrzynki
+drewniane z całego projektu (zwykłe szafki przez `getDrawerBoxInfo`, skos przez `getSlopeFronts`, też
+skrzynka B), scala identyczne i liczy otwory: łączniki wg `project.drawerBox` (domyślnie kołek +
+wkręt na przemian; konfirmat / kołki / wkręty; odstępy to ustawienia, bo pochodzą z poradników) oraz
+zaczep tylny prowadnicy Ø6×10 w tylnej krawędzi dna (Blum TD-132/1). Sprzęgła T51.7601 tylko jako
+uwaga — Blum podaje je szablonem T65.1000.02, bez wymiarów. Rysunki: `render/drawerBoxDrawing2d.js`,
+okno `ui/drawerBoxDrawings.js`, sekcja huba „Skrzynki szuflad”.
+
 **Plan rozkroju**: `engine/nesting.js` — „półkowe” układanie formatek na arkuszach z cięciami na
 wylot (sprawdza kilka orientacji, wybiera najmniej arkuszy), wyświetlane przez
 `ui/cutPlanModal.js`.

@@ -28,11 +28,14 @@ import { openCsvExport } from "./csvEditor.js";
 import { printHardwareList } from "./hardwareList.js";
 import { openTechnicalDrawing } from "./technicalDrawing.js";
 import { mountKosztorys } from "./kosztorysModal.js";
+import { collectDrawerBoxes, getDrawerBoxSettings, JOIN_METHODS } from "../core/drawerBoxBuild.js";
+import { openDrawerBoxDrawings } from "./drawerBoxDrawings.js";
 
 const SECTIONS = [
   { id: 'formatki', label: 'Formatki', icon: 'ti-list-details' },
   { id: 'rozkroj', label: 'Rozkrój i etykiety', icon: 'ti-cut' },
   { id: 'rysunki', label: 'Rysunki 2D', icon: 'ti-ruler-2' },
+  { id: 'skrzynki', label: 'Skrzynki szuflad', icon: 'ti-box' },
   { id: 'sciany', label: 'Rzuty ścian', icon: 'ti-wall' },
   { id: 'blaty', label: 'Blaty', icon: 'ti-layout-board' },
   { id: 'okucia', label: 'Okucia i okleina', icon: 'ti-shopping-cart' },
@@ -352,6 +355,46 @@ function renderRysunki(el) {
   }));
 }
 
+// Skrzynki szuflad drewnianych (MOVENTO): sposób łączenia i odstępy łączników
+// (project.drawerBox, core/drawerBoxBuild.js), lista identycznych skrzynek scalonych
+// w jedną pozycję i rysunki warsztatowe z otworami (ui/drawerBoxDrawings.js).
+const DB_FIELDS = [
+  ['edge', 'Łącznik tyłu/czoła od krawędzi [mm]'],
+  ['bottomEdge', 'Łącznik dna od przodu i tyłu [mm]'],
+  ['bottomSpacing', 'Maks. rozstaw łączników dna [mm]'],
+  ['screwLength', 'Długość wkrętu / konfirmatu [mm]'],
+  ['dowelLength', 'Długość kołka Ø8 [mm]'],
+];
+function renderSkrzynki(el) {
+  const p = state.project;
+  const s = getDrawerBoxSettings(p);
+  const boxes = collectDrawerBoxes(p);
+  const total = boxes.reduce((n, b) => n + b.qty, 0);
+  const save = (patch) => { p.drawerBox = { ...getDrawerBoxSettings(p), ...patch }; scheduleCheckpoint(); renderSkrzynki(el); };
+  el.innerHTML = `
+    <div class="hub-bar"><div><h3>Skrzynki szuflad</h3>
+      <div class="hub-sub">Rysunki warsztatowe skrzynek szuflad drewnianych (Blum MOVENTO): boki, dno, tył i czoło wewnętrzne z ponumerowanymi otworami pod łączniki i zaczep tylny prowadnicy. Jednakowe skrzynki z całego projektu są zebrane w jedną pozycję.</div></div>
+      ${total ? `<button type="button" class="btn btn-primary" id="db-open"><i class="ti ti-printer" aria-hidden="true"></i> Otwórz rysunki (${total} szt.)</button>` : ''}
+    </div>
+    <div class="field-grid" style="margin:12px 0">
+      <div class="field"><label>Łączenie skrzynki</label><select id="db-join">${Object.entries(JOIN_METHODS).map(([k, l]) => `<option value="${k}" ${s.join === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      ${DB_FIELDS.map(([k, l]) => `<div class="field"><label>${l}</label><input type="number" class="db-f" data-k="${k}" value="${s[k]}" min="0"></div>`).join('')}
+    </div>
+    <p class="hub-sub">Odstępy i liczba łączników to wartości z poradników stolarskich, nie z katalogu — dopasuj je do swojego warsztatu. Wymiary skrzynki i zaczep tylny prowadnicy są wg Blum.</p>
+    ${boxes.length ? `<table class="hub-table">
+      <thead><tr><th>Skrzynka</th><th class="num">Szt.</th><th>Formatki</th><th>Szafki</th></tr></thead>
+      <tbody>${boxes.map(b => `<tr>
+        <td><div class="hub-strong">${escapeHtml(b.name)}</div><div class="hub-sub">${escapeHtml(b.system)}</div></td>
+        <td class="num">${b.qty}</td>
+        <td class="hub-sub">${b.panels.map(pn => `${escapeHtml(pn.name)} ${fmt(pn.length)}×${fmt(pn.width)}${pn.qty > 1 ? ` ×${pn.qty}` : ''}`).join('<br>')}</td>
+        <td>${escapeHtml(b.modules.join(', '))}</td>
+      </tr>`).join('')}</tbody>
+    </table>` : '<p class="hub-empty">Brak skrzynek szuflad drewnianych. Rysunki dotyczą szuflad Blum MOVENTO — wybierz ten system szuflad w szafce (Szuflady → System szuflad) albo w ustawieniach projektu.</p>'}`;
+  el.querySelector('#db-join').addEventListener('change', e => save({ join: e.target.value }));
+  el.querySelectorAll('.db-f').forEach(i => i.addEventListener('change', () => { const v = parseFloat(i.value); if (v > 0) save({ [i.dataset.k]: v }); }));
+  el.querySelector('#db-open')?.addEventListener('click', () => openDrawerBoxDrawings(boxes, s, p.name));
+}
+
 let showEmptyWalls = false;
 // Tryb wymiarowania rzutów - globalny dla całego wydruku (patrz
 // render/wallElevations.js: dimMode), nie per ściana: 'fronts' (domyślny) =
@@ -477,6 +520,7 @@ const RENDERERS = {
   formatki: renderFormatki,
   rozkroj: renderRozkroj,
   rysunki: renderRysunki,
+  skrzynki: renderSkrzynki,
   sciany: renderSciany,
   blaty: renderBlaty,
   okucia: renderOkucia,
