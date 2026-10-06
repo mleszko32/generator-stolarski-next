@@ -27,13 +27,14 @@ export function drawerFrontsOf(mod) {
 // boku, jaka się mieści (podpowiedź "Auto"), i ewentualne ostrzeżenie. Każdy rodzaj szafki
 // liczy to po swojemu (zwykła - core/drawerBoxes.js, skos - core/slopeCabinet.js).
 // extraHtml(front) - dodatkowa treść na górze karty (np. informacja o skrzynce).
-export function drawerCardsHtml(mod, { sideInfo, extraHtml = () => '' }) {
+// list - własna lista [{ front, label }] zamiast wszystkich szuflad od dołu (skos pokazuje
+// tylko fronty, które naprawdę są szufladą, w kolejności listy frontów).
+export function drawerCardsHtml(mod, { sideInfo, extraHtml = () => '', list = drawerFrontsOf(mod), emptyHtml = '' }) {
   const f = { ...(state.project.front || {}), ...(mod.front || {}) };
   const sysName = (f.drawerSystem || 'merivobox').toLowerCase();
   const system = drawerSystems[sysName] || drawerSystems.merivobox;
   const isWooden = !!system.woodenBox;
-  const list = drawerFrontsOf(mod);
-  if (list.length === 0) return `<div class="hint">Ta szafka nie ma jeszcze żadnych szuflad.</div>`;
+  if (list.length === 0) return emptyHtml || `<div class="hint">Ta szafka nie ma jeszcze żadnych szuflad.</div>`;
 
   return list.map(({ front, label }) => {
     const isInner = front.subtype === 'szuflada-wewnetrzna';

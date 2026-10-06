@@ -139,12 +139,13 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
             : (dr.clamped ? `<div class="notice-warn fs-xs">Wpisana wysokość się nie mieści — użyto ${dr.boxType === 'B' ? dr.box.sideHigh : dr.comps.sideHeight} mm.</div>` : '');
           return { maxH: dr.maxSide ?? '', warn };
         },
-        extraHtml: (front) => {
-          const fr = frontById(front.id);
-          if (!fr) return '';
-          if (fr.type !== 'szuflada') return `<div class="notice-warn fs-xs mb-8">Ten front liczony jest jako ${TYPE_LABELS[fr.type].toLowerCase()} — skrzynki tu nie ma.</div>`;
-          return `<div class="mb-8">${drawerInfo(fr)}</div>`;
-        },
+        extraHtml: (front) => `<div class="mb-8">${drawerInfo(frontById(front.id))}</div>`,
+        // Tylko fronty, które pod skosem naprawdę są szufladą (nie blendą), z tym samym
+        // numerem co na liście frontów w sekcji Front - inaczej karta blendy miała pola,
+        // które nic nie zmieniały, a numeracja nie zgadzała się z listą frontów.
+        list: fronts.map((fr, i) => ({ fr, i })).filter(({ fr }) => fr.type === 'szuflada')
+          .map(({ fr, i }) => ({ front: fr.el, label: `${i + 1}. ${SUBTYPE_LABELS[fr.subtype] || 'Szuflada'} · ${fr.text}` })),
+        emptyHtml: '<div class="hint">Brak szuflad. Fronty, które pod skosem są blendą (trójkąt albo za mało miejsca), nie mają skrzynki — zobacz listę frontów w sekcji Front.</div>',
       })}
     `, overridden.szuflady)}
   `;
