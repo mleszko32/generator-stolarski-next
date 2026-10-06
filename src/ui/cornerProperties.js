@@ -2,7 +2,7 @@
 //
 // Prawy panel szafki narożnej i wydruk wykroju formatki narożnej - wydzielone z
 // ui/properties.js (renderCornerModuleProperties zamiast zakładek zwykłego modułu).
-import { state, deleteModule } from "../core/state.js";
+import { state } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
 import { getCornerDepths } from "../core/layout.js";
@@ -11,6 +11,7 @@ import { fmtMm } from "../utils/math.js";
 import { openCornerConfigModal } from "./cornerConfigModal.js";
 import { generateCornerBlankSVG, generateCornerPartsDrawings } from "../render/cornerDrawing2d.js";
 import { initPropertiesPanel } from "./properties.js";
+import { propHeaderHtml, sectionHtml, bindSections, positionRotationHtml, bindModulePosition } from "./propertiesShell.js";
 
 // Prosty, samodzielny widok do druku wykroju L-kształtnej formatki narożnej
 // (Wieniec narożny / Półka narożna, engine/cornerParts.js: getCornerCorpusParts) -
@@ -71,13 +72,11 @@ export function openCornerBlankPrintView(mod) {
 }
 
 // Szafka narożna z frontem łamanym (mod.type === 'corner_cabinet', core/
-// state.js: addCornerModule) - PIERWSZY nieprostokątny moduł w aplikacji,
-// więc dostaje osobny, krótki formularz zamiast pełnych zakładek Wymiary/
-// Front/Szuflady/Konstrukcja/Zawiasy (te zakładają jeden prostokątny
-// korpus - nie mają tu zastosowania). Wymiary ramion i konfiguracja
-// frontów/półek per ramię przeniosły się do osobnego okna
-// (ui/cornerConfigModal.js) - tu zostają tylko częste, szybkie edycje
-// (nazwa/pozycja/obrót), tak jak w prawym panelu zwykłego modułu.
+// state.js: addCornerModule) - nieprostokątny moduł, więc zamiast zakładek
+// Front/Szuflady/Konstrukcja/Zawiasy zwykłej szafki (zakładają jeden prostokątny
+// korpus) wymiary ramion i fronty/półki per ramię ustawia się w osobnym oknie
+// (ui/cornerConfigModal.js). Panel ma tę samą ramę co zwykła szafka
+// (ui/propertiesShell.js): nagłówek z nazwą, sekcja Wymiary z pozycją i obrotem.
 export function renderCornerModuleProperties(rightSidebar, mod) {
   const legA = parseFloat(mod.dimensions.width) || 0;
   const legB = parseFloat(mod.dimensions.legB) || 0;
@@ -85,74 +84,35 @@ export function renderCornerModuleProperties(rightSidebar, mod) {
   const height = parseFloat(mod.dimensions.height) || 0;
 
   rightSidebar.innerHTML = `
-    <h2>Parametry szafki narożnej</h2>
-    <div class="property-group prop-box">
-      <label style="font-weight: 600;">Nazwa szafki:</label>
-      <input type="text" id="input-corner-name" value="${escapeHtml(mod.name)}" style="font-weight: 600;" />
-    </div>
+    ${propHeaderHtml({ name: mod.name, dims: `${legA}×${legB}×${height}`, extra: 'narożna', nameId: 'input-corner-name' })}
 
-    <div style="font-size: 12px; color: #475569; margin: 12px 0 10px; line-height: 1.6;">
-      Ramię A: <b>${legA}</b> mm · Ramię B: <b>${legB}</b> mm · Głębokość A/B: <b>${depthA}/${depthB}</b> mm · Wysokość: <b>${height}</b> mm
-    </div>
     <button type="button" id="btn-corner-configure" class="btn btn-block btn-primary mb-8"><i class="ti ti-settings" aria-hidden="true"></i> Konfiguruj szafkę narożną</button>
-    <button type="button" id="btn-corner-blank-print" class="btn btn-block btn-sm" style="margin-bottom: 15px;"><i class="ti ti-file-text" aria-hidden="true"></i> Wykrój narożny (jak wyciąć wieniec/półkę)</button>
+    <button type="button" id="btn-corner-blank-print" class="btn btn-block btn-sm mb-8"><i class="ti ti-file-text" aria-hidden="true"></i> Wykrój narożny (jak wyciąć wieniec/półkę)</button>
 
-    <hr class="divider">
+    ${sectionHtml('wymiary', `
+      <h3>Wymiary Modułu</h3>
+      <div class="prop-info"><div class="info-body">
+        <div class="info-row"><span class="info-k">Ramię A</span><span class="info-v">${legA} mm</span></div>
+        <div class="info-row"><span class="info-k">Ramię B</span><span class="info-v">${legB} mm</span></div>
+        <div class="info-row"><span class="info-k">Głębokość A / B</span><span class="info-v">${depthA} / ${depthB} mm</span></div>
+        <div class="info-row"><span class="info-k">Wysokość</span><span class="info-v">${height} mm</span></div>
+      </div></div>
+      <div class="hint mb-8">Wymiary ramion, fronty i półki zmieniasz w oknie „Konfiguruj szafkę narożną”.</div>
 
-    <h3>Pozycja w przestrzeni (3D)</h3>
-    <div class="property-group prop-box">
-      <div class="mb-8"><label class="fs-xs">Odsunięcie od lewej ściany (X) [mm]:</label><input type="number" id="input-corner-pos-x" value="${mod.position.x}" /></div>
-      <div class="mb-8"><label class="fs-xs">Odsunięcie od tylnej ściany (Z) [mm]:</label><input type="number" id="input-corner-pos-z" value="${mod.position.z || 0}" /></div>
-      <div><label class="fs-xs">Wysokość od podłogi (Y) [mm]:</label><input type="number" id="input-corner-pos-y" value="${mod.position.y}" /></div>
-    </div>
+      <hr class="divider">
 
-    <h3>Obrót (co 90°)</h3>
-    <div class="property-group seg">
-      ${[0, 90, 180, 270].map(rot => {
-          const active = (mod.rotation || 0) === rot;
-          return `<button type="button" class="seg-btn btn-corner-rotate${active ? ' active' : ''}" data-rot="${rot}">${rot}°</button>`;
-      }).join('')}
-    </div>
-    <div class="hint">Ramię A biegnie wzdłuż lokalnej osi X, ramię B wzdłuż lokalnej osi Z (przed obrotem).</div>
-
-    <hr class="divider">
-    <button type="button" id="btn-corner-delete" class="btn btn-danger btn-block btn-sm"><i class="ti ti-trash" aria-hidden="true"></i> Usuń szafkę narożną</button>
+      ${positionRotationHtml({
+        prefix: 'input-corner-pos', position: mod.position, rotation: mod.rotation, rotClass: 'btn-corner-rotate',
+        hint: 'Ramię A biegnie wzdłuż lokalnej osi X, ramię B wzdłuż lokalnej osi Z (przed obrotem).',
+      })}
+    `)}
   `;
 
-  const bindText = (id, apply) => {
-      const el = document.getElementById(id);
-      if (el) el.addEventListener('input', e => { apply(e.target.value); update3D(); updateSidebar(); });
-  };
-  const bindPos = (id, apply) => {
-      const el = document.getElementById(id);
-      if (el) el.addEventListener('input', e => { apply(parseFloat(e.target.value) || 0); update3D(); updateSidebar(); });
-  };
+  const refresh = () => { update3D(); updateSidebar(); };
+  bindSections(rightSidebar);
+  document.getElementById('input-corner-name')?.addEventListener('input', e => { mod.name = e.target.value; refresh(); });
+  bindModulePosition(rightSidebar, mod, { prefix: 'input-corner-pos', rotClass: 'btn-corner-rotate', onChange: refresh, rerender: initPropertiesPanel });
 
-  bindText('input-corner-name', v => mod.name = v);
-  bindPos('input-corner-pos-x', v => mod.position.x = v);
-  bindPos('input-corner-pos-z', v => mod.position.z = v);
-  bindPos('input-corner-pos-y', v => mod.position.y = v);
-
-  const configBtn = document.getElementById('btn-corner-configure');
-  if (configBtn) configBtn.addEventListener('click', () => openCornerConfigModal(mod));
-
-  const blankPrintBtn = document.getElementById('btn-corner-blank-print');
-  if (blankPrintBtn) blankPrintBtn.addEventListener('click', () => openCornerBlankPrintView(mod));
-
-  rightSidebar.querySelectorAll('.btn-corner-rotate').forEach(btn => {
-      btn.addEventListener('click', () => {
-          mod.rotation = parseInt(btn.getAttribute('data-rot'), 10);
-          update3D();
-          updateSidebar();
-          initPropertiesPanel();
-      });
-  });
-
-  const delBtn = document.getElementById('btn-corner-delete');
-  if (delBtn) delBtn.addEventListener('click', () => {
-      deleteModule(mod.id);
-      initPropertiesPanel();
-      update3D();
-      updateSidebar();
-  });
+  document.getElementById('btn-corner-configure')?.addEventListener('click', () => openCornerConfigModal(mod));
+  document.getElementById('btn-corner-blank-print')?.addEventListener('click', () => openCornerBlankPrintView(mod));
 }

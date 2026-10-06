@@ -19,6 +19,7 @@ import { renderSidePanelProperties } from "./sidePanelProperties.js";
 import { renderCornerModuleProperties } from "./cornerProperties.js";
 import { renderSlopeModuleProperties } from "./slopeProperties.js";
 import { showAlert } from "../utils/modal.js";
+import { propHeaderHtml, sectionHtml, bindSections, setSectionDots, positionRotationHtml } from "./propertiesShell.js";
 
 function getSelectedMods() {
     if (state.selectedModules && state.selectedModules.size > 0) {
@@ -28,37 +29,14 @@ function getSelectedMods() {
     return active ? [active] : [];
 }
 
-// Panel jest odświeżany po każdej zmianie (patrz setupEventListeners -> 'change'),
-// więc żeby klik w zakładkę "Front" nie wracał do "Wymiary" po każdej edycji,
-// aktywna zakładka żyje w module-level zmiennej, nie w DOM.
-// Sekcje panelu właściwości (zwijane, kilka może być otwartych naraz). Stan
-// otwarcia pamiętany w localStorage, żeby panel nie "zapominał" układu.
-const TABS = [
-  { id: "wymiary", label: "Wymiary", icon: "ti-ruler-2" },
-  { id: "front", label: "Front", icon: "ti-door" },
-  { id: "szuflady", label: "Szuflady", icon: "ti-box" },
-  { id: "konstrukcja", label: "Konstrukcja", icon: "ti-layout-board" },
-  { id: "nogi", label: "Nóżki", icon: "ti-arrows-vertical" },
-  { id: "zawiasy", label: "Zawiasy", icon: "ti-settings" },
-];
-const OPEN_SECTIONS_KEY = "propertiesOpenSections";
-function loadOpenSections() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(OPEN_SECTIONS_KEY));
-    if (Array.isArray(raw)) return new Set(raw.filter(id => TABS.some(t => t.id === id)));
-  } catch (e) { /* localStorage niedostępny - domyślnie tylko Wymiary */ }
-  return new Set(["wymiary"]);
-}
-function saveOpenSections(set) {
-  try { localStorage.setItem(OPEN_SECTIONS_KEY, JSON.stringify([...set])); } catch (e) { /* brak zapisu jest nieszkodliwy */ }
-}
-let openSections = loadOpenSections();
+// Sekcje panelu (zwijane, kilka może być otwartych naraz) i ich stan otwarcia są
+// wspólne dla wszystkich rodzajów szafek - patrz ui/propertiesShell.js.
 
 // Nadpisaniem jest klucz, którego wartość w szafce RÓŻNI SIĘ od ustawienia
 // projektu (samo istnienie klucza nic nie znaczy - szafki dostają np.
 // front.hinges już przy tworzeniu). Plecy nie mają ustawienia projektu, więc
 // nie biorą udziału w porównaniu.
-function computeOverridden(mod) {
+export function computeOverridden(mod) {
   const diffKeys = (local, base, skip = []) => Object.keys(local || {})
     .filter(k => !skip.includes(k) && JSON.stringify(local[k]) !== JSON.stringify((base || {})[k]));
   const proj = state.project;
@@ -71,21 +49,9 @@ function computeOverridden(mod) {
 
 function refreshOverrideDots() {
   const mod = getActiveModule();
-  if (!mod) return;
-  const overridden = computeOverridden(mod);
-  document.querySelectorAll('.pacc').forEach(sec => {
-    const id = sec.dataset.section;
-    const head = sec.querySelector('.pacc-head');
-    const dot = head.querySelector('.pacc-dot');
-    if (overridden[id] && !dot) {
-      const d = document.createElement('span');
-      d.className = 'pacc-dot';
-      d.title = 'Ta szafka ma własne ustawienia, różne od domyślnych projektu';
-      head.insertBefore(d, head.querySelector('.pacc-chev'));
-    } else if (!overridden[id] && dot) {
-      dot.remove();
-    }
-  });
+  const rs = document.querySelector('.sidebar-right');
+  if (!mod || !rs) return;
+  setSectionDots(rs, computeOverridden(mod));
 }
 
 // Kolejność i znaczenie indeksów 0-3 MUSI się zgadzać z kolejnością addBox()
@@ -226,28 +192,15 @@ export function initPropertiesPanel() {
   // projektu (mod.front / mod.construction są scalane nad ustawieniami projektu).
   const overridden = computeOverridden(activeModule);
 
-  const tabContent = (id, html) => {
-    const t = TABS.find(x => x.id === id);
-    const open = openSections.has(id);
-    return `<section class="pacc${open ? ' open' : ''}" data-section="${id}">
-      <button type="button" class="pacc-head" data-section="${id}" aria-expanded="${open}">
-        <i class="ti ${t.icon}" aria-hidden="true"></i>
-        <span class="pacc-label">${t.label}</span>
-        ${overridden[id] ? '<span class="pacc-dot" title="Ta szafka ma własne ustawienia, różne od domyślnych projektu"></span>' : ''}
-        <i class="ti ti-chevron-down pacc-chev" aria-hidden="true"></i>
-      </button>
-      <div class="pacc-body">${html}</div>
-    </section>`;
-  };
+  const tabContent = (id, html) => sectionHtml(id, html, overridden[id]);
 
   rightSidebar.innerHTML = `
-    <div class="prop-sticky">
-      <h2>${escapeHtml(activeModule.name)} <span style="font-weight:400; color:var(--text-secondary); font-size:12px;">${activeModule.dimensions.width}×${activeModule.dimensions.height}×${activeModule.dimensions.depth}${multiCount > 1 ? ` · zaznaczono ${multiCount}` : ''}</span></h2>
-      <div class="property-group" style="margin-top:6px;">
-        <label>Nazwa szafki:</label>
-        <input type="text" id="input-mod-name" value="${escapeHtml(activeModule.name)}" style="font-weight: 600;" />
-      </div>
-    </div>
+    ${propHeaderHtml({
+      name: activeModule.name,
+      dims: `${activeModule.dimensions.width}×${activeModule.dimensions.height}×${activeModule.dimensions.depth}`,
+      extra: multiCount > 1 ? `zaznaczono ${multiCount}` : '',
+      nameId: 'input-mod-name',
+    })}
 
     ${moduleInfoHtml(activeModule)}
 
@@ -259,21 +212,10 @@ export function initPropertiesPanel() {
 
       <hr class="divider">
 
-      <h3>Pozycja w przestrzeni (3D)</h3>
-      <div class="property-group prop-box">
-        <div class="mb-8"><label class="fs-xs">Odsunięcie od lewej ściany (X) [mm]:</label><input type="number" id="input-pos-x" value="${activeModule.position.x}" /></div>
-        <div class="mb-8"><label class="fs-xs">Odsunięcie od tylnej ściany (Z) [mm]:</label><input type="number" id="input-pos-z" value="${activeModule.position.z || 0}" /></div>
-        <div><label class="fs-xs">Wysokość od podłogi (Y) [mm]:</label><input type="number" id="input-pos-y" value="${activeModule.position.y}" /></div>
-      </div>
-
-      <h3>Obrót (co 90°)</h3>
-      <div class="property-group seg">
-        ${[0, 90, 180, 270].map(rot => {
-            const active = (activeModule.rotation || 0) === rot;
-            return `<button type="button" class="seg-btn btn-rotate${active ? ' active' : ''}" data-rot="${rot}">${rot}°</button>`;
-        }).join('')}
-      </div>
-      <div class="hint">Skrót: klawisz R obraca aktywną szafkę o +90°.</div>
+      ${positionRotationHtml({
+        prefix: 'input-pos', position: activeModule.position, rotation: activeModule.rotation,
+        rotClass: 'btn-rotate', hint: 'Skrót: klawisz R obraca aktywną szafkę o +90°.',
+      })}
 
       ${(canCombineIntoGroup || activeModule.groupId) ? `
         <h3>Grupowanie</h3>
@@ -555,17 +497,7 @@ function setupEventListeners() {
     ['input', 'change'].forEach(ev => rs.addEventListener(ev, () => setTimeout(refreshOverrideDots, 0)));
   }
 
-  document.querySelectorAll('.pacc-head').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const id = btn.dataset.section;
-      const section = btn.closest('.pacc');
-      const nowOpen = !section.classList.contains('open');
-      section.classList.toggle('open', nowOpen);
-      btn.setAttribute('aria-expanded', String(nowOpen));
-      if (nowOpen) openSections.add(id); else openSections.delete(id);
-      saveOpenSections(openSections);
-    });
-  });
+  bindSections(rs);
 
   const numberInputs = [
     'pos-x', 'pos-y', 'pos-z', 'traverse-width', 'board-thick', 'width', 'height', 'depth',

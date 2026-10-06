@@ -146,8 +146,11 @@ Wszystkie panele renderują się przez przypisanie szablonów tekstowych do `inn
 - `properties.js` — prawy panel: formularze właściwości modułu i globalnych.
   `updateAll = () => { update3D(); updateSidebar(); }` to standardowe odświeżenie „coś się
   zmieniło”; pola tekstowe mają debounce 50 ms. Boki dokładane i blendy mają własny panel w
-  `sidePanelProperties.js`, szafka narożna w `cornerProperties.js` (`initPropertiesPanel()`
-  wybiera właściwy).
+  `sidePanelProperties.js`, szafka narożna w `cornerProperties.js`, skos w `slopeProperties.js`
+  (`initPropertiesPanel()` wybiera właściwy). Wszystkie składają panel z tych samych klocków
+  `ui/propertiesShell.js` (przyklejony nagłówek z nazwą, zwijane sekcje ze wspólnym stanem
+  otwarcia, blok pozycja + obrót z `bindModulePosition`) — nowy rodzaj szafki też ma z nich
+  korzystać. Usuwanie jest tylko na liście w lewym panelu, nie w prawym.
 
 ### Konwencje UI (spójny interfejs)
 
