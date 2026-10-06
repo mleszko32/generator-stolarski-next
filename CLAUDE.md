@@ -204,7 +204,9 @@ Wnętrze to zwykłe `mod.elements` edytowane w „Wnętrze 2D”: `getCabinetInn
 w `recalculateLayout` zwracają dla skosu `getSlopeInnerRect` (prostokąt do najwyższego miejsca pod
 skosem), a skos dopiero przycina wynik — przegrody/półki dostają cięcie pod kątem (`getSlopeBoards`,
 nazwy z kątem pochylenia piły), fronty są docinane linią skosu (`clipFrontRect`), trójkąt albo
-niemieszcząca się szuflada = blenda (`el.slopeBlenda` wymusza). Skrzynka szuflady A/B (`slope.drawerBox`).
+niemieszcząca się szuflada = blenda (`el.slopeBlenda` wymusza). Skrzynka szuflady A/B (`slope.drawerBox`);
+w B tył i czoło wewn. mają skośną krawędź równoległą do skosu szafki (od góry niskiego boku), a
+gdzie dojdą do wysokości wysokiego boku, idą poziomo (`box.backPoints`: trapez albo pięciokąt).
 `engine/cabinet.js` i `hardware.js` dla skosu NIE idą przez zwykłe `getInteriorParts`/`getFrontsAndDrawers`.
 Stare dane (`slope.columns`/`dividers`/`shelves`) zamienia `migrateSlopeModule` w `ensureSidePanelsDefaults`.
 

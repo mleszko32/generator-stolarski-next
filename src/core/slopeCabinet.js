@@ -261,24 +261,43 @@ function slopeDrawer(cell, ctx, el = {}) {
   const outerW = probe.bottom.width + 2 * t;
   const ox0 = cell.x0 + (innerW - outerW) / 2;
   const ox1 = ox0 + outerW;
-  const spaceLow = cell.spaceAt(ox0), spaceHigh = cell.spaceAt(ox1);
+  const spaceLow = cell.spaceAt(ox0);
   const comps = getDrawerComponents(sys, innerW, depth, spaceLow, variant, sideHeight);
   const boxB = wantB && !!system.woodenBox;
 
   // Wysokość boku wpisana ręcznie (jak w zwykłej szafce, tylko szuflady drewniane):
   // ogranicza oba boki; bok, pod którym skos jest niżej, i tak nie wyjdzie wyżej
   // niż pozwala miejsce. maxSide - największy bok, jaki się mieści (podpowiedź "Auto").
+  // Każdy bok mierzony przy swojej ścianie bliżej niskiej strony (tam skos jest
+  // najniżej nad tym bokiem): niski przy zewnętrznej, wysoki przy wewnętrznej - inaczej
+  // górny róg wysokiego boku wchodził w skos.
   const lo = boxB ? getWoodenDrawerHeights(system, spaceLow, sideHeight) : null;
-  const hi = boxB ? getWoodenDrawerHeights(system, spaceHigh, sideHeight) : null;
+  const hi = boxB ? getWoodenDrawerHeights(system, cell.spaceAt(ox1 - t), sideHeight) : null;
   // Skrzynka B tylko wtedy, gdy skos faktycznie obniża jeden bok - przy równych
   // bokach to zwykła skrzynka prostokątna (A).
   if (boxB && hi.sideHeight > lo.sideHeight) {
-    const backLow = lo.sideHeight - system.bottomRecess - t;
-    const backHigh = hi.sideHeight - system.bottomRecess - t;
+    const r = system.bottomRecess;
+    // Tył i czoło wewnętrzne między bokami: skośna krawędź RÓWNOLEGŁA do skosu szafki,
+    // zaczyna się równo z górą niskiego boku; gdzie dochodzi do wysokości wysokiego
+    // boku (półka nad szufladą albo wpisana wysokość boku), dalej idzie poziomo.
+    // Wcześniej był to trapez od boku do boku - przy wysokim boku ograniczonym półką
+    // skos tyłu był prawie płaski, zupełnie inny niż skos szafki.
+    const w = outerW - 2 * t;
+    const backLow = lo.sideHeight - r - t;
+    const backHigh = hi.sideHeight - r - t;
+    const k = ctx.k;
+    const xBreak = k > 0 ? (backHigh - backLow) / k : 0;
+    const backPoints = xBreak > 0.5 && xBreak < w - 0.5
+      ? [[0, 0], [w, 0], [w, backHigh], [xBreak, backHigh], [0, backLow]]
+      : [[0, 0], [w, 0], [w, Math.min(backHigh, backLow + k * w)], [0, backLow]];
     return {
       comps, boxType: 'B', fits: lo.fits, ox0, ox1, t,
-      maxSide: getWoodenDrawerHeights(system, spaceHigh).sideHeight, clamped: hi.clamped,
-      box: { sideLow: lo.sideHeight, sideHigh: hi.sideHeight, backLow, backHigh, yBase: cell.y0 + system.bottomClearance, recess: system.bottomRecess },
+      maxSide: getWoodenDrawerHeights(system, cell.spaceAt(ox1 - t)).sideHeight, clamped: hi.clamped,
+      box: {
+        sideLow: lo.sideHeight, sideHigh: hi.sideHeight, backLow, backHigh, backPoints,
+        backFlat: backPoints.length === 5 ? w - xBreak : 0,
+        yBase: cell.y0 + system.bottomClearance, recess: r,
+      },
     };
   }
   const fits = system.woodenBox
@@ -344,7 +363,7 @@ export function getSlopeFronts(mod, config) {
         const y1 = Math.min(ey + eh, (parseFloat(bz.maxY) || g.H) - (parseFloat(bz.offsetTop) || 0));
         const cell = { x0: zx0, x1: zx0 + (zMaxX - zMinX), y0, y1, spaceAt: (x) => Math.min(y1, g.under(x)) - y0 };
         const depth = g.D - backThick - (isInner ? innerThick + innerSetback : (isInset ? th : 0));
-        drawer = slopeDrawer(cell, { sys, system, depth, wantB: s.drawerBox === 'B' }, el);
+        drawer = slopeDrawer(cell, { sys, system, depth, k: g.k, wantB: s.drawerBox === 'B' }, el);
       }
       let auto;
       if (tooSmall) auto = 'brak';
@@ -423,13 +442,31 @@ export function getSlopeShapes(mod, config) {
     else out.set(key, { name, category, qty: 1, points });
   };
   getSlopeFronts(mod, config).forEach((fr) => {
-    if (fr.type === 'brak' || fr.shape.kind === 'prostokat') return;
-    add(frontName(fr), 'Front', fr.shape.points);
+    if (fr.type === 'brak') return;
+    if (fr.shape.kind !== 'prostokat') add(frontName(fr), 'Front', fr.shape.points);
+    if (fr.drawer && fr.drawer.boxType === 'B') {
+      const bz = fr.el.baseZone || {};
+      const eqW = Math.round((parseFloat(bz.maxX) || 0) - (parseFloat(bz.minX) || 0) + 2 * th);
+      const { back, inner } = drawerBNames(fr, g, eqW);
+      add(back, 'Szuflada', fr.drawer.box.backPoints);
+      add(inner, 'Szuflada', fr.drawer.box.backPoints);
+    }
   });
   const back = g.isTriangle ? [[0, 0], [g.W, 0], [g.W, g.H]] : [[0, 0], [g.W, 0], [g.W, g.H], [0, g.L]];
   const shape = g.isTriangle ? 'trójkąt' : `trapez, niska strona ${r1(g.L - 4)}`;
   add(`Plecy skos ${g.W}x${g.H} (${shape})`, 'Plecy', insetPolygon(back, 2));
   return [...out.values()];
+}
+
+// Nazwy formatek skrzynki B (ścięta pod skos) - te same na liście formatek i na rysunkach.
+function drawerBNames(fr, g, eqW) {
+  const c = fr.drawer.comps, b = fr.drawer.box;
+  const low = g.lowSide === 'left' ? 'lewa' : 'prawa';
+  const tag = `W${eqW} NL${c.nominalLength} H${b.sideLow}-${b.sideHigh}`;
+  const shape = b.backFlat > 0
+    ? `ścięty róg, ${low} ${r1(b.backLow)}, płasko ${r1(b.backFlat)}`
+    : `trapez, ${low} ${r1(b.backLow)}`;
+  return { tag, back: `Tył szuflady skos ${tag} (${shape})`, inner: `Czoło wewn. szuflady skos ${tag} (${shape})` };
 }
 
 // Formatki frontów, blend i skrzynek szuflad szafki pod skos.
@@ -452,15 +489,13 @@ export function getSlopeFrontParts(mod, config) {
     }
     // Skrzynka B (ścięta pod skos): boki różnej wysokości, tył i czoło trapezowe.
     const c = d.comps, b = d.box;
-    const low = g.lowSide === 'left' ? 'lewa' : 'prawa';
-    const tag = `W${eqW} NL${c.nominalLength} H${b.sideLow}-${b.sideHigh}`;
-    const trap = `trapez, ${low} ${r1(b.backLow)}`;
+    const { tag, back, inner } = drawerBNames(fr, g, eqW);
     parts.push(
       { name: `Bok szuflady ${tag} (niski)`, length: r1(c.sides.length), width: r1(b.sideLow), qty: 1, category: 'Szuflada' },
       { name: `Bok szuflady ${tag} (wysoki)`, length: r1(c.sides.length), width: r1(b.sideHigh), qty: 1, category: 'Szuflada' },
       { name: `Dno szuflady ${tag}`, length: r1(c.bottom.length), width: r1(c.bottom.width), qty: 1, category: 'Szuflada' },
-      { name: `Tył szuflady skos ${tag} (${trap})`, length: r1(c.back.width), width: r1(b.backHigh), qty: 1, category: 'Szuflada' },
-      { name: `Czoło wewn. szuflady skos ${tag} (${trap})`, length: r1(c.innerFront.width), width: r1(b.backHigh), qty: 1, category: 'Szuflada' },
+      { name: back, length: r1(c.back.width), width: r1(b.backHigh), qty: 1, category: 'Szuflada' },
+      { name: inner, length: r1(c.innerFront.width), width: r1(b.backHigh), qty: 1, category: 'Szuflada' },
     );
   });
   return parts;
@@ -497,9 +532,9 @@ function frontSolids(mod, config) {
       add('drawerBox', rect(d.ox0, b.yBase, t, b.sideLow), zOff, L);
       add('drawerBox', rect(d.ox1 - t, b.yBase, t, b.sideHigh), zOff, L);
       add('drawerBox', rect(d.ox0 + t, yB, d.ox1 - d.ox0 - 2 * t, t), zOff, L);
-      const trap = [[d.ox0 + t, yB + t], [d.ox1 - t, yB + t], [d.ox1 - t, yB + t + b.backHigh], [d.ox0 + t, yB + t + b.backLow]];
-      add('drawerBox', trap, zOff, t);
-      add('drawerBox', trap, zOff + L - t, t);
+      const panel = b.backPoints.map(([x, y]) => [d.ox0 + t + x, yB + t + y]);
+      add('drawerBox', panel, zOff, t);
+      add('drawerBox', panel, zOff + L - t, t);
       return;
     }
     if (c.woodenBox) {

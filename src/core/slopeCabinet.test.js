@@ -455,3 +455,44 @@ describe("szafka pod skos - wymuszony wariant i głębokość szuflady (jak w zw
     expect(forced).toBe("M");
   });
 });
+
+describe("szafka pod skos - skrzynka B: tył i czoło idą równolegle do skosu szafki", () => {
+  const fusion = (opts = {}) => slopeMod({ width: 2000, height: 1500, dividers: [646, 1314], shelves: [500, 1000], drawerBox: "B", ...opts });
+  const drawers = (m) => getSlopeFronts(m, cfg()).filter((f) => f.drawer && f.drawer.boxType === "B");
+
+  it("pod półką: pięciokąt - skos jak szafki (k = 0,75), dalej poziomo", () => {
+    const m = fusion();
+    const ds = drawers(m);
+    expect(ds.length).toBeGreaterThan(0);
+    ds.forEach((fr) => {
+      const pts = fr.drawer.box.backPoints;
+      const [x0, y0] = pts[pts.length - 1];   // przy niskim boku
+      const [x1, y1] = pts[pts.length - 2];   // następny punkt skośnej krawędzi
+      expect((y1 - y0) / (x1 - x0)).toBeCloseTo(0.75, 5);
+      expect(Math.max(...pts.map((p) => p[1]))).toBeCloseTo(fr.drawer.box.backHigh, 5);
+    });
+    expect(ds.some((fr) => fr.drawer.box.backPoints.length === 5)).toBe(true);
+  });
+
+  it("wysoki bok i tył nie wchodzą w skos (zostaje luz nad szufladą)", () => {
+    const m = fusion();
+    const g = { k: 0.75, c: 18 * Math.sqrt(1 + 0.75 * 0.75) };
+    drawers(m).forEach((fr) => {
+      const d = fr.drawer, b = d.box;
+      const under = (x) => g.k * x - g.c;   // trójkąt: niska strona 0
+      // Lewy górny róg wysokiego boku (ox1 - t) i każdy punkt tyłu - pod spodem skosu.
+      expect(b.yBase + b.sideHigh).toBeLessThanOrEqual(under(d.ox1 - d.t) + 1e-6);
+      b.backPoints.forEach(([x, y]) => {
+        expect(b.yBase + b.recess + d.t + y).toBeLessThanOrEqual(under(d.ox0 + d.t + x) + 1e-6);
+      });
+    });
+  });
+
+  it("nazwa formatki opisuje ścięty róg, rysunki cięcia dostają kształt tyłu", () => {
+    const m = fusion();
+    const parts = getSlopeFrontParts(m, cfg());
+    expect(parts.some((p) => p.name.startsWith("Tył szuflady skos") && p.name.includes("ścięty róg"))).toBe(true);
+    const shapes = getSlopeShapes(m, cfg()).filter((s) => s.category === "Szuflada");
+    expect(shapes.some((s) => s.name.startsWith("Tył szuflady skos") && s.points.length === 5)).toBe(true);
+  });
+});
