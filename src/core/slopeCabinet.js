@@ -242,20 +242,27 @@ function shapeText(shape, lowSide) {
 
 // Szuflada w przestrzeni cell = { x0, x1 (światło, układ skosu), y0, y1, spaceAt }.
 // Zwraca { comps, boxType, fits, ox0, ox1, t, yBase, box } albo null.
-function slopeDrawer(cell, ctx, sideHeight) {
-  const { sys, system, depth, wantB } = ctx;
+// Ręczne ustawienia jak w zwykłej szafce (core/drawerBoxes.js): el.forceVariant (wariant
+// boku systemu metalowego), el.forceNL (długość nominalna - głębokość = NL + 10, żeby
+// dobór NL trafił dokładnie w wpisaną), el.drawerSideHeight (bok szuflady drewnianej).
+function slopeDrawer(cell, ctx, el = {}) {
+  const { sys, system, wantB } = ctx;
+  const sideHeight = el.drawerSideHeight;
+  const variant = el.forceVariant || 'auto';
+  const forceNL = parseFloat(el.forceNL);
+  const depth = Number.isFinite(forceNL) ? forceNL + 10 : ctx.depth;
   if (!system) return null;
   const innerW = cell.x1 - cell.x0;
   // Najpierw szerokość skrzynki (nie zależy od wysokości), potem miejsce mierzone
   // przy jej bokach, a nie przy ścianach wnęki.
-  const probe = getDrawerComponents(sys, innerW, depth, cell.spaceAt(cell.x0));
+  const probe = getDrawerComponents(sys, innerW, depth, cell.spaceAt(cell.x0), variant);
   if (!probe) return null;
   const t = system.woodenBox ? system.sideThickness : 16;
   const outerW = probe.bottom.width + 2 * t;
   const ox0 = cell.x0 + (innerW - outerW) / 2;
   const ox1 = ox0 + outerW;
   const spaceLow = cell.spaceAt(ox0), spaceHigh = cell.spaceAt(ox1);
-  const comps = getDrawerComponents(sys, innerW, depth, spaceLow, 'auto', sideHeight);
+  const comps = getDrawerComponents(sys, innerW, depth, spaceLow, variant, sideHeight);
   const boxB = wantB && !!system.woodenBox;
 
   // Wysokość boku wpisana ręcznie (jak w zwykłej szafce, tylko szuflady drewniane):
@@ -337,7 +344,7 @@ export function getSlopeFronts(mod, config) {
         const y1 = Math.min(ey + eh, (parseFloat(bz.maxY) || g.H) - (parseFloat(bz.offsetTop) || 0));
         const cell = { x0: zx0, x1: zx0 + (zMaxX - zMinX), y0, y1, spaceAt: (x) => Math.min(y1, g.under(x)) - y0 };
         const depth = g.D - backThick - (isInner ? innerThick + innerSetback : (isInset ? th : 0));
-        drawer = slopeDrawer(cell, { sys, system, depth, wantB: s.drawerBox === 'B' }, el.drawerSideHeight);
+        drawer = slopeDrawer(cell, { sys, system, depth, wantB: s.drawerBox === 'B' }, el);
       }
       let auto;
       if (tooSmall) auto = 'brak';

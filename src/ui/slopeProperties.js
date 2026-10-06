@@ -17,6 +17,7 @@ import { getSlopeGeometry, getSlopeSettings, getSlopeFronts, getSlopeFrontSettin
 import { recalculateLayout } from "../core/layout.js";
 import { drawerSystems } from "../core/drawerSystems.js";
 import { openSlopeCutDrawings } from "./slopeCutDrawings.js";
+import { drawerCardsHtml, bindDrawerCards } from "./drawerSettings.js";
 
 const TYPE_LABELS = { szuflada: 'Szuflada', drzwi: 'Drzwi', blenda: 'Blenda', brak: 'Brak (za mały)' };
 const SUBTYPE_LABELS = { szuflada: 'Szuflada', 'szuflada-wewnetrzna': 'Szuflada wewn.', drzwi: 'Drzwi', 'drzwi-lp': 'Drzwi' };
@@ -52,6 +53,7 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
       : (c.woodenBox ? `bok ${c.sideHeight} mm` : `wariant ${c.back.variantType}`);
     return `<div class="hint">Skrzynka ${dr.boxType}: NL ${c.nominalLength}, ${h}</div>`;
   };
+  const frontById = (id) => fronts.find((fr) => fr.el.id === id);
   const frontRows = fronts.map((fr, i) => `
       <div class="prop-box mb-8">
         <div class="fs-xs" style="font-weight:600;">${i + 1}. ${SUBTYPE_LABELS[fr.subtype] || 'Front'} → ${TYPE_LABELS[fr.type]} <span class="hint">· ${escapeHtml(fr.text)}</span></div>
@@ -59,11 +61,6 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
           <option value="auto" ${!fr.el.slopeBlenda ? 'selected' : ''}>Auto (${TYPE_LABELS[fr.auto]})</option>
           <option value="blenda" ${fr.el.slopeBlenda ? 'selected' : ''}>Blenda (stała maskownica)</option>
         </select>
-        ${system && system.woodenBox && fr.type === 'szuflada' && fr.drawer ? `
-        <div class="property-group mt-8"><label class="fs-xs">Wysokość boku szuflady [mm]:</label>
-          <input type="number" class="input-slope-side-height" data-front-id="${fr.el.id}" placeholder="Auto (maks. ${fr.drawer.maxSide})" value="${fr.el.drawerSideHeight || ''}" />
-          ${fr.drawer.clamped ? `<div class="notice-warn fs-xs">Wpisana wysokość się nie mieści — użyto ${fr.drawer.boxType === 'B' ? fr.drawer.box.sideHigh : fr.drawer.comps.sideHeight} mm.</div>` : ''}
-        </div>` : ''}
         ${drawerInfo(fr)}
       </div>`).join('');
 
@@ -130,9 +127,29 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
         ? 'Skrzynka prostokątna, wysokość od niższej strony pod skosem. Działa z każdym systemem.'
         : 'Boki różnej wysokości, tył i czoło wewnętrzne jako trapez — więcej miejsca w szufladzie.'}</div>
       ${boxType === 'B' && !(system && system.woodenBox) ? `<div class="notice-warn fs-xs mb-8">Skrzynka B wymaga szuflady drewnianej (np. Blum MOVENTO). Przy tym systemie liczona jest skrzynka A.</div>` : ''}
+
+      <h3>Szuflady — ustawienia ręczne</h3>
+      ${drawerCardsHtml(mod, {
+        // Skrzynka liczona pod skosem (core/slopeCabinet.js), nie jak w prostokątnej szafce.
+        sideInfo: (front) => {
+          const dr = frontById(front.id)?.drawer;
+          if (!dr) return { maxH: '' };
+          const warn = !dr.fits
+            ? '<div class="notice-warn fs-xs">Za mało miejsca na szufladę MOVENTO w tej wnęce.</div>'
+            : (dr.clamped ? `<div class="notice-warn fs-xs">Wpisana wysokość się nie mieści — użyto ${dr.boxType === 'B' ? dr.box.sideHigh : dr.comps.sideHeight} mm.</div>` : '');
+          return { maxH: dr.maxSide ?? '', warn };
+        },
+        extraHtml: (front) => {
+          const fr = frontById(front.id);
+          if (!fr) return '';
+          if (fr.type !== 'szuflada') return `<div class="notice-warn fs-xs mb-8">Ten front liczony jest jako ${TYPE_LABELS[fr.type].toLowerCase()} — skrzynki tu nie ma.</div>`;
+          return `<div class="mb-8">${drawerInfo(fr)}</div>`;
+        },
+      })}
     `, overridden.szuflady)}
   `;
   bindSections(rightSidebar);
+  bindDrawerCards(rightSidebar, mod, () => { update3D(); updateSidebar(); initPropertiesPanel(); });
 
   const saveSlope = (patch) => { mod.slope = { ...(mod.slope || {}), ...patch }; };
   // Zmiana struktury - przerysuj też panel (kąt, ostrzeżenia, lista frontów).
@@ -186,12 +203,6 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
   rightSidebar.querySelectorAll('.input-slope-front-kind').forEach((sel) => sel.addEventListener('change', (e) => {
     const el = findFront(sel.dataset.frontId);
     if (el) { if (e.target.value === 'blenda') el.slopeBlenda = true; else delete el.slopeBlenda; }
-    refresh();
-  }));
-  rightSidebar.querySelectorAll('.input-slope-side-height').forEach((inp) => inp.addEventListener('change', (e) => {
-    const el = findFront(inp.dataset.frontId);
-    const v = e.target.value === '' ? null : num(e.target.value);
-    if (el) el.drawerSideHeight = v && v > 0 ? v : null;
     refresh();
   }));
 

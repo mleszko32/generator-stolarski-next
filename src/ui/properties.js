@@ -5,8 +5,6 @@ import { update3D } from "../render/viewer3d.js";
 import { calculateParts } from "../engine/cabinet.js";
 import { calculateHinges } from "../core/hingeMath.js";
 import { getTraverseConfig, clampModuleToRoom, restModuleOnNeighbors } from "../core/layout.js";
-import { drawerSystems, DRAWER_VARIANT_ORDER, DRAWER_VARIANT_LABELS } from "../core/drawerSystems.js";
-import { getDrawerVariant } from "../core/drawerMath.js";
 import { getDrawerBoxInfo } from "../core/drawerBoxes.js";
 import { escapeHtml } from "../utils/dom.js";
 import { evalDimensionExpr, fmtMm } from "../utils/math.js";
@@ -18,7 +16,7 @@ import { showCustomDialog } from "../core/storage.js";
 import { renderSidePanelProperties } from "./sidePanelProperties.js";
 import { renderCornerModuleProperties } from "./cornerProperties.js";
 import { renderSlopeModuleProperties } from "./slopeProperties.js";
-import { showAlert } from "../utils/modal.js";
+import { drawerCardsHtml, bindDrawerCards } from "./drawerSettings.js";
 import { propHeaderHtml, sectionHtml, bindSections, setSectionDots, positionRotationHtml } from "./propertiesShell.js";
 
 function getSelectedMods() {
@@ -137,23 +135,6 @@ export function initPropertiesPanel() {
           return { front, side, label, hinges };
       })
       .sort((a, b) => (parseFloat(a.front.y) || 0) - (parseFloat(b.front.y) || 0));
-
-  // Lista szuflad aktywnej szafki (zewn. i wewn.) — do ręcznego wymuszenia wariantu
-  // wysokości boku i/lub głębokości (NL) dla konkretnej sztuki, zamiast tylko dla
-  // całej szafki naraz (patrz zakładka "Szuflady"). front.forceVariant/forceNL
-  // istniały już wcześniej w danych i były edytowalne tylko z prawoklik-menu w
-  // widoku 3D (render/viewer3d.js) — to jest ten sam mechanizm, tylko widoczny
-  // też w panelu właściwości.
-  const drawerSysName = (f.drawerSystem || 'merivobox').toLowerCase();
-  const drawerSysVariants = (drawerSystems[drawerSysName] || drawerSystems.merivobox).variants;
-  const drawerSysIsWooden = !!(drawerSystems[drawerSysName] && drawerSystems[drawerSysName].woodenBox);
-  const drawerFrontsList = (activeModule.elements || [])
-      .filter(el => el.typ === 'front' && el.subtype && el.subtype.includes('szuflada'))
-      .sort((a, b) => (parseFloat(a.y) || 0) - (parseFloat(b.y) || 0))
-      .map((front, idx) => ({
-          front,
-          label: `Szuflada ${idx + 1}${front.subtype === 'szuflada-wewnetrzna' ? ' (wewn.)' : ''}`,
-      }));
 
   // Lista WSZYSTKICH frontów (drzwi i szuflady) do ręcznego "luzu od osi wieńca"
   // (core/layout.js: el.gapFromAxisTop/Bottom) - nadpisuje domyślny symetryczny
@@ -274,97 +255,18 @@ export function initPropertiesPanel() {
       <div class="property-group"><label>System szuflad:</label><select id="input-drawer-system"><option value="merivobox" ${f.drawerSystem === 'merivobox' ? 'selected' : ''}>Blum Merivobox</option><option value="legrabox" ${f.drawerSystem === 'legrabox' ? 'selected' : ''}>Blum Legrabox</option><option value="tandembox" ${f.drawerSystem === 'tandembox' ? 'selected' : ''}>Blum TANDEMBOX</option><option value="antaro" ${f.drawerSystem === 'antaro' ? 'selected' : ''}>Blum TANDEMBOX antaro</option><option value="gtv_axis_16" ${f.drawerSystem === 'gtv_axis_16' ? 'selected' : ''}>GTV Axis Pro (płyta 16mm)</option><option value="gtv_axis_18" ${f.drawerSystem === 'gtv_axis_18' ? 'selected' : ''}>GTV Axis Pro (płyta 18mm)</option><option value="movento_katalog" ${f.drawerSystem === 'movento_katalog' ? 'selected' : ''}>Blum MOVENTO — katalog (bok 16 mm)</option><option value="movento_forum" ${f.drawerSystem === 'movento_forum' ? 'selected' : ''}>Blum MOVENTO — forum (bok 18 mm)</option></select></div>
 
       <h3>Szuflady — ustawienia ręczne</h3>
-      ${drawerFrontsList.length === 0 ? `
-        <div class="hint">Ta szafka nie ma jeszcze żadnych szuflad.</div>
-      ` : drawerFrontsList.map(({ front, label }) => {
-          const variantOptionsHtml = DRAWER_VARIANT_ORDER.filter(k => drawerSysVariants[k]).map(k =>
-              `<option value="${k}" ${front.forceVariant === k ? 'selected' : ''}>${DRAWER_VARIANT_LABELS[k]} (${drawerSysVariants[k].type}, ${drawerSysVariants[k].height}mm)</option>`
-          ).join('');
-          const isInner = front.subtype === 'szuflada-wewnetrzna';
-          const bz = front.baseZone || {};
-          // MOVENTO (skrzynka drewniana): zamiast wariantów - wysokość boku wpisywana
-          // ręcznie; podpowiedź pokazuje największą, jaka się zmieści.
-          let sideHeightHtml = '';
-          if (drawerSysIsWooden) {
-              const autoInfo = getDrawerBoxInfo(activeModule, { ...front, drawerSideHeight: null }, state.project);
-              const curInfo = getDrawerBoxInfo(activeModule, front, state.project);
-              const maxH = autoInfo ? autoInfo.comps.sideHeight : '';
-              const warn = curInfo && !curInfo.comps.fits
-                  ? `<div class="notice-warn fs-xs">Za mało miejsca na szufladę MOVENTO w tej wnęce.</div>`
-                  : (curInfo && curInfo.comps.clamped ? `<div class="notice-warn fs-xs">Wpisana wysokość się nie mieści — użyto ${maxH} mm.</div>` : '');
-              sideHeightHtml = `
-            <div class="property-group mb-8">
-              <label class="fs-xs">Wysokość boku szuflady [mm]:</label>
-              <input type="number" class="input-drawer-side-height" data-front-id="${front.id}" placeholder="Auto (maks. ${maxH})" value="${front.drawerSideHeight || ''}" />
-              ${warn}
-            </div>`;
-          }
-          return `
-          <div class="prop-box">
-            <div class="prop-box-title"><i class="ti ti-box" aria-hidden="true"></i> ${escapeHtml(label)}</div>
-            ${drawerSysIsWooden ? sideHeightHtml : `
-            <div class="property-group mb-8">
-              <label class="fs-xs">Wymuszony wariant boku:</label>
-              <select class="input-drawer-force-variant" data-front-id="${front.id}">
-                <option value="auto" ${(!front.forceVariant || front.forceVariant === 'auto') ? 'selected' : ''}>Auto (maksymalny)</option>
-                ${variantOptionsHtml}
-              </select>
-            </div>`}
-            <div class="property-group mb-8">
-              <label class="fs-xs">Wymuszona głębokość (NL, mm):</label>
-              <input type="number" class="input-drawer-force-nl" data-front-id="${front.id}" placeholder="Auto" value="${front.forceNL || ''}" />
-            </div>
-
-            <div class="row mb-8">
-              <div class="property-group grow">
-                <label class="fs-xs">Wymuś wys. [mm]:</label>
-                <input type="number" class="input-front-force-h" data-front-id="${front.id}" placeholder="Auto" value="${front.forceH || ''}" />
-              </div>
-              <div class="property-group grow">
-                <label class="fs-xs">Wymuś szer. [mm]:</label>
-                <input type="number" class="input-front-force-w" data-front-id="${front.id}" placeholder="Auto" value="${front.forceW || ''}" />
-              </div>
-            </div>
-            <div style="display: flex; gap: 6px; margin-bottom: ${isInner ? '8px' : '0'};">
-              <div class="property-group grow">
-                <label class="fs-xs">Przesuń Y ↕ [mm]:</label>
-                <input type="number" class="input-front-force-offset-y" data-front-id="${front.id}" value="${front.forceOffsetY || 0}" />
-              </div>
-              <div class="property-group grow">
-                <label class="fs-xs">Przesuń X ↔ [mm]:</label>
-                <input type="number" class="input-front-force-offset-x" data-front-id="${front.id}" value="${front.forceOffsetX || 0}" />
-              </div>
-            </div>
-
-            ${isInner ? `
-              <hr class="divider">
-              <div class="row mb-8">
-                <div class="property-group grow">
-                  <label class="fs-xs">Grubość frontu wewn. [mm]:</label>
-                  <input type="number" class="input-inner-front-thickness" data-front-id="${front.id}" value="${front.innerFrontThickness ?? 18}" />
-                </div>
-                <div class="property-group grow">
-                  <label class="fs-xs">Luz do krawędzi [mm]:</label>
-                  <input type="number" class="input-inner-front-setback" data-front-id="${front.id}" value="${front.innerSetback ?? 2}" />
-                </div>
-              </div>
-              <div class="row mb-8">
-                <div class="property-group grow">
-                  <label class="fs-xs">Wolne miejsce od dołu:</label>
-                  <input type="number" class="input-inner-basezone-bottom" data-front-id="${front.id}" value="${bz.offsetBottom || 0}" />
-                </div>
-                <div class="property-group grow">
-                  <label class="fs-xs">Wolne miejsce od góry:</label>
-                  <input type="number" class="input-inner-basezone-top" data-front-id="${front.id}" value="${bz.offsetTop || 0}" />
-                </div>
-              </div>
-            ` : `
-              <button type="button" class="btn btn-sm btn-block btn-add-inner-drawer" data-front-id="${front.id}"><i class="ti ti-plus" aria-hidden="true"></i> Dodaj szufladę wewnętrzną nad tą</button>
-            `}
-            <button type="button" class="btn btn-sm btn-block btn-danger btn-delete-front" data-front-id="${front.id}"><i class="ti ti-trash" aria-hidden="true"></i> Usuń tę szufladę</button>
-          </div>
-        `;
-      }).join('')}
+      ${drawerCardsHtml(activeModule, {
+        // MOVENTO: podpowiedź największej wysokości boku i ostrzeżenia (core/drawerBoxes.js).
+        sideInfo: (front) => {
+          const autoInfo = getDrawerBoxInfo(activeModule, { ...front, drawerSideHeight: null }, state.project);
+          const curInfo = getDrawerBoxInfo(activeModule, front, state.project);
+          const maxH = autoInfo ? autoInfo.comps.sideHeight : '';
+          const warn = curInfo && !curInfo.comps.fits
+            ? `<div class="notice-warn fs-xs">Za mało miejsca na szufladę MOVENTO w tej wnęce.</div>`
+            : (curInfo && curInfo.comps.clamped ? `<div class="notice-warn fs-xs">Wpisana wysokość się nie mieści — użyto ${maxH} mm.</div>` : '');
+          return { maxH, warn };
+        },
+      })}
     `)}
 
     ${tabContent("konstrukcja", `
@@ -676,39 +578,7 @@ function setupEventListeners() {
     });
   });
 
-  document.querySelectorAll('.input-drawer-force-variant').forEach(sel => {
-    sel.addEventListener('change', (e) => {
-      const front = findFront(sel.dataset.frontId);
-      if (front) front.forceVariant = e.target.value;
-      updateAll();
-      initPropertiesPanel();
-    });
-  });
-  document.querySelectorAll('.input-drawer-side-height').forEach(inp => {
-    inp.addEventListener('change', (e) => {
-      const front = findFront(inp.dataset.frontId);
-      if (front) {
-        const val = e.target.value === '' ? null : Number(e.target.value);
-        front.drawerSideHeight = (val === null || isNaN(val) || val <= 0) ? null : val;
-      }
-      updateAll();
-      initPropertiesPanel();
-    });
-  });
-  document.querySelectorAll('.input-drawer-force-nl').forEach(inp => {
-    inp.addEventListener('change', (e) => {
-      const front = findFront(inp.dataset.frontId);
-      if (front) {
-        const val = e.target.value === '' ? null : Number(e.target.value);
-        front.forceNL = (val === null || isNaN(val)) ? null : val;
-      }
-      updateAll();
-      initPropertiesPanel();
-    });
-  });
-
-  // Korekta ręczna frontu (dawniej tylko w menu kontekstowym 3D, patrz
-  // render/viewer3d.js) - wysokość/szerokość/przesunięcie wymuszone per front.
+  // Luz od osi wieńca per front (pola w sekcji Front).
   const wireFrontNumberOverride = (className, field) => {
     document.querySelectorAll(`.${className}`).forEach(inp => {
       inp.addEventListener('change', (e) => {
@@ -722,10 +592,6 @@ function setupEventListeners() {
       });
     });
   };
-  wireFrontNumberOverride('input-front-force-h', 'forceH');
-  wireFrontNumberOverride('input-front-force-w', 'forceW');
-  wireFrontNumberOverride('input-front-force-offset-y', 'forceOffsetY');
-  wireFrontNumberOverride('input-front-force-offset-x', 'forceOffsetX');
   wireFrontNumberOverride('input-front-axisgap-top', 'gapFromAxisTop');
   wireFrontNumberOverride('input-front-axisgap-bottom', 'gapFromAxisBottom');
   document.querySelectorAll('.input-front-material').forEach(sel => {
@@ -750,101 +616,7 @@ function setupEventListeners() {
     });
   });
 
-  document.querySelectorAll('.input-inner-front-thickness').forEach(inp => {
-    inp.addEventListener('change', (e) => {
-      const front = findFront(inp.dataset.frontId);
-      if (front) front.innerFrontThickness = parseFloat(e.target.value) || 18;
-      updateAll();
-      initPropertiesPanel();
-    });
-  });
-  document.querySelectorAll('.input-inner-front-setback').forEach(inp => {
-    inp.addEventListener('change', (e) => {
-      const front = findFront(inp.dataset.frontId);
-      if (front) front.innerSetback = parseFloat(e.target.value) || 0;
-      updateAll();
-      initPropertiesPanel();
-    });
-  });
-  document.querySelectorAll('.input-inner-basezone-bottom').forEach(inp => {
-    inp.addEventListener('change', (e) => {
-      const front = findFront(inp.dataset.frontId);
-      if (front && front.baseZone) front.baseZone.offsetBottom = parseFloat(e.target.value) || 0;
-      updateAll();
-      initPropertiesPanel();
-    });
-  });
-  document.querySelectorAll('.input-inner-basezone-top').forEach(inp => {
-    inp.addEventListener('change', (e) => {
-      const front = findFront(inp.dataset.frontId);
-      if (front && front.baseZone) front.baseZone.offsetTop = parseFloat(e.target.value) || 0;
-      updateAll();
-      initPropertiesPanel();
-    });
-  });
-
-  document.querySelectorAll('.btn-delete-front').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const mod = getActiveModule();
-      if (!mod) return;
-      mod.elements = mod.elements.filter(e => e.id !== btn.dataset.frontId);
-      updateAll();
-      initPropertiesPanel();
-    });
-  });
-
-  // "Dodaj szufladę wewnętrzną nad tą" - port 1:1 z menu kontekstowego 3D
-  // (render/viewer3d.js), żeby liczyć dokładnie to samo boxHeight/baseZone.
-  document.querySelectorAll('.btn-add-inner-drawer').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const mod = getActiveModule();
-      const front = findFront(btn.dataset.frontId);
-      if (!mod || !front || !front.baseZone) return;
-
-      const fMerged = { ...(state.project.front || {}), ...(mod.front || {}) };
-      const sysName = (fMerged.drawerSystem || 'merivobox').toLowerCase();
-
-      // NAPRAWA: w oryginale (menu 3D) boxHeight w trybie "Auto" zakładał całą
-      // wysokość frontu (front.h), więc "za mało miejsca nad pudłem" wychodziło
-      // prawie zawsze - silnik szuflad w praktyce dobiera dużo niższy wariant.
-      // Liczymy tu dokładnie to, co dobrałby getDrawerComponents (core/drawerMath.js),
-      // żeby sprawdzać miejsce nad RZECZYWISTYM, a nie zawyżonym, pudłem.
-      // MOVENTO: boxHeight to luz pod szufladą + bok (getDrawerVariant), nie sam tył.
-      const variantInfo = getDrawerVariant(front.h, sysName, front.forceVariant || 'auto', front.drawerSideHeight);
-      const boxHeight = variantInfo.boxHeight ?? variantInfo.backHeight;
-
-      const newInnerBottomY = front.y + boxHeight + 5;
-      const newInnerTopY = front.y + front.h;
-
-      if (newInnerBottomY + 40 > newInnerTopY) {
-        showAlert("Za mało miejsca nad pudłem! Zmniejsz wariant boku tej szuflady (np. na M lub K) i zapisz, aby zrobić miejsce.");
-        return;
-      }
-
-      const baseMinY = parseFloat(front.baseZone.minY) || 18;
-      const baseMaxY = parseFloat(front.baseZone.maxY) || parseFloat(mod.dimensions.height);
-
-      const newOffsetBottom = newInnerBottomY - baseMinY;
-      const newOffsetTop = baseMaxY - newInnerTopY;
-
-      mod.elements.push({
-        id: 'front-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
-        typ: 'front',
-        subtype: 'szuflada-wewnetrzna',
-        baseZone: {
-          ...front.baseZone,
-          offsetBottom: Math.max(0, newOffsetBottom),
-          offsetTop: Math.max(0, newOffsetTop)
-        },
-        frontCount: 1, distribution: "1", frontIndex: 0, gap: parseFloat(state.project.front?.gap || 3),
-        intGapX: 15, intGapY: 5, forceVariant: 'auto', forceNL: null,
-        innerFrontThickness: 18, innerSetback: 2
-      });
-
-      updateAll();
-      initPropertiesPanel();
-    });
-  });
+  bindDrawerCards(document.querySelector('.sidebar-right'), getActiveModule(), () => { updateAll(); initPropertiesPanel(); });
 
   numberInputs.forEach(id => {
     const el = document.getElementById(`input-${id}`);

@@ -150,7 +150,10 @@ Wszystkie panele renderują się przez przypisanie szablonów tekstowych do `inn
   (`initPropertiesPanel()` wybiera właściwy). Wszystkie składają panel z tych samych klocków
   `ui/propertiesShell.js` (przyklejony nagłówek z nazwą, zwijane sekcje ze wspólnym stanem
   otwarcia, blok pozycja + obrót z `bindModulePosition`) — nowy rodzaj szafki też ma z nich
-  korzystać. Usuwanie jest tylko na liście w lewym panelu, nie w prawym.
+  korzystać. Usuwanie jest tylko na liście w lewym panelu, nie w prawym. Karty „Szuflady —
+  ustawienia ręczne” (wariant/wysokość boku, NL, wymiary frontu, szuflada wewnętrzna) są w
+  `ui/drawerSettings.js`, wspólne dla zwykłej szafki i skosu (skos podaje własne `sideInfo`
+  ze skrzynki liczonej pod skosem; `core/slopeCabinet.js` honoruje `forceVariant`/`forceNL`).
 
 ### Konwencje UI (spójny interfejs)
 

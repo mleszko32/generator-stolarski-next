@@ -555,7 +555,7 @@ button, input, select, textarea { font-family: inherit; }
 }
 .fs-xs { font-size: var(--fs-xs); }
 .no-shrink { flex-shrink: 0; }
-.grow { flex: 1; margin-bottom: 0; }
+.grow { flex: 1; margin-bottom: 0; min-width: 0; } /* bez min-width pola w .row rozpychały panel */
 .flex-1 { flex: 1; }
 .mb-0 { margin-bottom: 0; }
 .mb-8 { margin-bottom: 8px; }

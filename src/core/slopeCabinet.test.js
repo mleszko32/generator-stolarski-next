@@ -434,3 +434,24 @@ describe("szafka pod skos - kierunek frontu na rysunkach nawiertów", () => {
     expect(f("Bok wysoki", "wewnętrzna").frontOnRight).toBe(true);
   });
 });
+
+describe("szafka pod skos - wymuszony wariant i głębokość szuflady (jak w zwykłej szafce)", () => {
+  const fusion = (opts = {}) => slopeMod({ width: 2000, height: 1500, dividers: [646, 1314], shelves: [500, 1000], ...opts });
+  const drawerAt = (m) => getSlopeFronts(m, cfg()).find((f) => f.el.x <= 1000 && 1000 <= f.el.x + f.el.w && f.el.y < 200);
+
+  it("wymuszone NL zmienia długość skrzynki", () => {
+    const m = fusion();
+    expect(drawerAt(m).drawer.comps.nominalLength).toBe(580);
+    drawerAt(m).el.forceNL = 450;
+    expect(drawerAt(m).drawer.comps.nominalLength).toBe(450);
+  });
+
+  it("wymuszony wariant boku systemu metalowego", () => {
+    const m = fusion({ front: { drawerSystem: "merivobox" } });
+    const auto = drawerAt(m).drawer.comps.back.variantType;
+    drawerAt(m).el.forceVariant = "niska";
+    const forced = drawerAt(m).drawer.comps.back.variantType;
+    expect(forced).not.toBe(auto);
+    expect(forced).toBe("M");
+  });
+});
