@@ -215,7 +215,9 @@ drewniane z całego projektu (zwykłe szafki przez `getDrawerBoxInfo`, skos prze
 skrzynka B), scala identyczne i liczy otwory: łączniki wg `project.drawerBox` (domyślnie kołek +
 wkręt na przemian; konfirmat / kołki / wkręty; odstępy to ustawienia, bo pochodzą z poradników) oraz
 zaczep tylny prowadnicy Ø6×10 w tylnej krawędzi dna (Blum TD-132/1). Sprzęgła T51.7601 tylko jako
-uwaga — Blum podaje je szablonem T65.1000.02, bez wymiarów. Rysunki: `render/drawerBoxDrawing2d.js`,
+uwaga — Blum podaje je szablonem T65.1000.02, bez wymiarów. Rysunki: `render/drawerBoxDrawing2d.js`
+(formatki z otworami + `assemblySVG`: montaż w izometrii, rozstrzelony i złożony, własny rzut w SVG
+bez Three.js, żeby się drukował; `assemblyStepsHtml` — kolejność montażu wg sposobu łączenia),
 okno `ui/drawerBoxDrawings.js`, sekcja huba „Skrzynki szuflad”.
 
 **Plan rozkroju**: `engine/nesting.js` — „półkowe” układanie formatek na arkuszach z cięciami na

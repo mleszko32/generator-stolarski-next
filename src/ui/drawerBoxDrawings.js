@@ -6,7 +6,7 @@
 // na stronę wydruku. Dane: core/drawerBoxBuild.js, rysunki: render/drawerBoxDrawing2d.js.
 import { escapeHtml } from "../utils/dom.js";
 import { JOIN_METHODS } from "../core/drawerBoxBuild.js";
-import { sideSVG, bottomSVG, plateSVG, legendHtml, holeTableHtml, panelStartNumbers } from "../render/drawerBoxDrawing2d.js";
+import { sideSVG, bottomSVG, plateSVG, legendHtml, holeTableHtml, panelStartNumbers, assemblySVG, assemblyStepsHtml } from "../render/drawerBoxDrawing2d.js";
 
 const fmt = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
 
@@ -30,6 +30,7 @@ function boxCard(box, settings, idx) {
         <div><b>Zaczep tylny</b> Ø6 × 10 w tylnej krawędzi dna, 7 mm od boku, 11 mm nad spodem dna (Blum TD-132/1 str. 5 — dla wariantu z wycięciem w tyle; tu przeniesione na dno). Można wiercić szablonem T65.1000.02.</div>
       </div>
     </div>
+    <div class="assembly"><div class="card">${assemblySVG(box)}</div><div><h3>Kolejność montażu</h3>${assemblyStepsHtml(box)}</div></div>
     ${legendHtml(box)}
     <div class="grid">${svgs.map((s) => `<div class="card">${s}</div>`).join("")}</div>
     <h3>Otwory</h3>
@@ -70,6 +71,10 @@ export function openDrawerBoxDrawings(boxes, settings, projectName = "") {
     table.parts td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
     table.holes td:first-child { font-weight: bold; width: 32px; }
     .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    .assembly { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; align-items: start; margin: 12px 0; }
+    .assembly h3 { margin-top: 0; }
+    .steps { font-size: 13px; color: #334155; line-height: 1.5; padding-left: 20px; margin: 0; }
+    .steps li { margin-bottom: 6px; }
     .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: #475569; margin: 10px 0; }
     .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
     .legend i.open { background: #fff; border: 1.5px solid; }
@@ -79,6 +84,7 @@ export function openDrawerBoxDrawings(boxes, settings, projectName = "") {
       .box { page-break-before: always; border-top: none; margin-top: 0; }
       .box:first-of-type { page-break-before: auto; }
       .grid { grid-template-columns: 1fr 1fr; }
+      .assembly { grid-template-columns: 3fr 2fr; }
     }
   </style>
 </head>
