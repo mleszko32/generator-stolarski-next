@@ -32,7 +32,7 @@
 //   (Bedienungsanleitung_Clamex_P14.pdf), broszura P-System EN, opis makra Biesse P-System;
 //   grubości z kart produktów dystrybutorów (dane Lamello).
 import { getDrawerBoxInfo } from "./drawerBoxes.js";
-import { getSlopeFronts } from "./slopeCabinet.js";
+import { getSlopeFronts, getSlopeGeometry } from "./slopeCabinet.js";
 import { recalculateLayout } from "./layout.js";
 import { drawerSystems } from "./drawerSystems.js";
 import { num, round1 } from "../utils/math.js";
@@ -284,17 +284,19 @@ function rawBoxesOf(mod, project) {
     if (!system || !system.woodenBox) return [];
     return getSlopeFronts(mod, project)
       .filter((fr) => fr.type === "szuflada" && fr.drawer && fr.drawer.comps && fr.drawer.comps.woodenBox && fr.drawer.fits !== false)
-      .map((fr) => ({ comps: fr.drawer.comps, system, isB: fr.drawer.boxType === "B", box: fr.drawer.box }));
+      .map((fr) => ({ comps: fr.drawer.comps, system, isB: fr.drawer.boxType === "B", box: fr.drawer.box, frontId: fr.el.id }));
   }
   recalculateLayout(mod);
   return (mod.elements || [])
     .filter((el) => el.typ === "front" && (el.subtype || "").includes("szuflada"))
-    .map((el) => getDrawerBoxInfo(mod, el, project))
-    .filter((info) => info && info.comps.woodenBox && info.comps.fits !== false)
-    .map((info) => ({ comps: info.comps, system: drawerSystems[info.system], isB: false }));
+    .map((el) => ({ el, info: getDrawerBoxInfo(mod, el, project) }))
+    .filter(({ info }) => info && info.comps.woodenBox && info.comps.fits !== false)
+    .map(({ el, info }) => ({ comps: info.comps, system: drawerSystems[info.system], isB: false, frontId: el.id }));
 }
 
-// Wszystkie skrzynki drewniane projektu, identyczne scalone: [{ ...box, qty, modules[] }].
+// Wszystkie skrzynki drewniane projektu, identyczne scalone: [{ ...box, qty, modules[],
+// locations: [{ modId, modName, frontIds[] }] }] - locations mówi, które szuflady w których
+// szafkach mają tę skrzynkę (rysunek "gdzie w szafce" przy instrukcji).
 export function collectDrawerBoxes(project) {
   const settings = getDrawerBoxSettings(project);
   const map = new Map();
@@ -302,11 +304,39 @@ export function collectDrawerBoxes(project) {
     rawBoxesOf(mod, project).forEach((raw) => {
       const box = buildDrawerBox(raw, settings);
       const key = boxKey(box);
-      if (!map.has(key)) map.set(key, { ...box, qty: 0, modules: [] });
+      if (!map.has(key)) map.set(key, { ...box, qty: 0, modules: [], locations: [] });
       const e = map.get(key);
       e.qty += 1;
       if (!e.modules.includes(mod.name)) e.modules.push(mod.name);
+      let loc = e.locations.find((l) => l.modId === mod.id);
+      if (!loc) e.locations.push(loc = { modId: mod.id, modName: mod.name, frontIds: [] });
+      if (raw.frontId) loc.frontIds.push(raw.frontId);
     });
   });
   return [...map.values()];
+}
+
+// Widok szafki od frontu do rysunku "gdzie w szafce": obrys korpusu i fronty w mm, x od lewej
+// krawędzi korpusu, y od jego spodu (bez nóżek). { W, H, outline: [[x,y]...], fronts: [{ id,
+// subtype, inner, points }] }. Zwykła szafka - prostokąty z recalculateLayout (el.x/y/w/h); szafka
+// pod skos - obrys trapezu/trójkąta i fronty docięte skosem (getSlopeFronts), w prawdziwej
+// orientacji (niska strona po prawej = odbicie). Szuflady wewnętrzne oznaczone inner (za frontem).
+export function cabinetFrontView(mod, project) {
+  recalculateLayout(mod);
+  const W = num(mod.dimensions.width), H = num(mod.dimensions.height);
+  const rect = (x, y, w, h) => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+  if (mod.type === "slope_cabinet") {
+    const th = num(project.materials && project.materials.boardThickness, 18) || 18;
+    const g = getSlopeGeometry(mod, th);
+    const real = (pts) => (g.lowSide === "right" ? pts.map(([x, y]) => [round1(g.W - x), round1(y)]) : pts.map(([x, y]) => [round1(x), round1(y)]));
+    const outline = real(g.isTriangle ? [[0, 0], [g.W, 0], [g.W, g.H]] : [[0, 0], [g.W, 0], [g.W, g.H], [0, g.L]]);
+    const fronts = getSlopeFronts(mod, project)
+      .filter((fr) => fr.type !== "brak")
+      .map((fr) => ({ id: fr.el.id, subtype: fr.subtype, inner: fr.subtype === "szuflada-wewnetrzna", points: real(fr.shape.points) }));
+    return { W: g.W, H: g.H, outline, fronts };
+  }
+  const fronts = (mod.elements || [])
+    .filter((el) => el.typ === "front" && num(el.w) > 0 && num(el.h) > 0)
+    .map((el) => ({ id: el.id, subtype: el.subtype, inner: el.subtype === "szuflada-wewnetrzna", points: rect(round1(num(el.x)), round1(num(el.y)), round1(num(el.w)), round1(num(el.h))) }));
+  return { W, H, outline: rect(0, 0, W, H), fronts };
 }

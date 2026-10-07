@@ -227,6 +227,8 @@ uwaga — Blum podaje je szablonem T65.1000.02, bez wymiarów. Rysunki: `render/
 bez Three.js, żeby się drukował; `assemblyStepsHtml` — kolejność montażu wg sposobu łączenia),
 okno `ui/drawerBoxDrawings.js`, sekcja huba „Skrzynki szuflad”. Rysunki formatek jednej skrzynki są w jednej
 skali (`drawingScale`: 1:4 / 1:5 / 1:10 / 1:20, żeby zmieściły się na A4; wymiary SVG w mm), nie rozciągane do karty.
+Przy każdej skrzynce „Gdzie w szafce”: `box.locations` (szafki + id frontów) i `cabinetFrontView` (obrys i fronty
+szafki od frontu, też skos) rysowane przez `cabinetLocatorSVG` z podświetlonymi, ponumerowanymi szufladami.
 
 **Plan rozkroju**: `engine/nesting.js` — „półkowe” układanie formatek na arkuszach z cięciami na
 wylot (sprawdza kilka orientacji, wybiera najmniej arkuszy), wyświetlane przez

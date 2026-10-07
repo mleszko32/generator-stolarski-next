@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { collectDrawerBoxes, buildDrawerBox, jointCount, jointPositions, getDrawerBoxSettings, holeSpecs, LAMELLO, lamelloGrooveLength, lamelloPositions, lamelloGrooveLen } from "./drawerBoxBuild.js";
+import { collectDrawerBoxes, buildDrawerBox, jointCount, jointPositions, getDrawerBoxSettings, holeSpecs, LAMELLO, lamelloGrooveLength, lamelloPositions, lamelloGrooveLen, cabinetFrontView } from "./drawerBoxBuild.js";
 import { getDrawerComponents } from "./drawerMath.js";
 import { drawerSystems } from "./drawerSystems.js";
 import { buildSlopeElements } from "./slopeCabinet.js";
@@ -220,5 +220,41 @@ describe("skrzynki szuflad - dno połączone z tyłem i przodem", () => {
     expect(p10[0].x).toBe(105);
     const dno = box.panels.find((p) => p.id === "dno").holes.filter((h) => h.to === "tył");
     dno.forEach((h) => expect(h).toMatchObject({ kind: "lamello", face: "gora" }));
+  });
+});
+
+describe("skrzynki szuflad - gdzie w szafce", () => {
+  it("skrzynka pamięta szafki i szuflady, z których pochodzi; widok szafki ma te fronty", () => {
+    const drawerFront = (id, minY, maxY) => fullZoneFront({ id, subtype: "szuflada", baseZone: { minX: 18, maxX: 582, minY, maxY, offsetBottom: 0, offsetTop: 0 } });
+    const m1 = baseModule({ id: "a", name: "Dolna A", elements: [drawerFront("f1", 18, 360), drawerFront("f2", 360, 702)] });
+    const m2 = baseModule({ id: "b", name: "Dolna B", position: { x: 600, y: 0, z: 0 }, elements: [drawerFront("f3", 18, 360), drawerFront("f4", 360, 702)] });
+    const project = freshProject({ modules: [m1, m2] });
+    project.front.drawerSystem = "movento_katalog";
+    setProject(project);
+    const boxes = collectDrawerBoxes(project);
+    const all = boxes.flatMap((b) => b.locations.flatMap((l) => l.frontIds.map((id) => `${l.modId}:${id}`)));
+    expect(all.sort()).toEqual(["a:f1", "a:f2", "b:f3", "b:f4"]);
+    boxes.forEach((b) => expect(b.locations.reduce((n, l) => n + l.frontIds.length, 0)).toBe(b.qty));
+
+    const view = cabinetFrontView(m1, project);
+    expect(view).toMatchObject({ W: 600, H: 720 });
+    expect(view.fronts.map((f) => f.id).sort()).toEqual(["f1", "f2"]);
+    view.fronts.forEach((f) => expect(f.points).toHaveLength(4));
+  });
+
+  it("szafka pod skos: obrys trapezu, przy niskiej stronie po prawej odbity", () => {
+    const mod = {
+      id: "skos", name: "Skos", type: "slope_cabinet",
+      dimensions: { width: 1000, height: 1000, depth: 600 }, position: { x: 0, y: 0, z: 0 },
+      legs: { active: false }, front: {}, slope: { lowSide: "right", lowHeight: 400 }, elements: [],
+    };
+    const project = freshProject({ modules: [mod] });
+    project.front.drawerSystem = "movento_katalog";
+    setProject(project);
+    mod.elements = buildSlopeElements(mod, 18, [], [], 3);
+    const view = cabinetFrontView(mod, project);
+    // niska strona (400) po prawej: wierzchołek (1000, 400), wysoka (0, 1000)
+    expect(view.outline).toEqual(expect.arrayContaining([[1000, 400], [0, 1000]]));
+    expect(view.fronts.length).toBeGreaterThan(0);
   });
 });

@@ -367,3 +367,37 @@ export function assemblyStepsHtml(box) {
   ].filter(Boolean);
   return `<ol class="steps">${steps.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ol>`;
 }
+
+// Szafka od frontu z zaznaczonymi szufladami, których dotyczy instrukcja skrzynki.
+// view - core/drawerBoxBuild.js: cabinetFrontView; highlightIds - fronty z tą skrzynką
+// (numerowane po kolei, od dołu). Szuflady wewnętrzne przerywaną linią (są za frontem).
+export function cabinetLocatorSVG(view, highlightIds, name) {
+  const pad = 30, top = 46;
+  const s = Math.min(260 / view.W, 300 / view.H);       // ok. 260 px szerokości, nie wyżej niż 300
+  const W = view.W * s, H = view.H * s;
+  const P = ([x, y]) => [r1(pad + x * s), r1(top + H - y * s)];
+  const pts = (arr) => arr.map((p) => P(p).join(",")).join(" ");
+  const minY = (f) => Math.min(...f.points.map((p) => p[1]));
+  const hl = view.fronts.filter((f) => highlightIds.includes(f.id)).sort((a, b) => minY(a) - minY(b));
+  let b = text(pad, 16, name, { size: 13, color: C.blue900, weight: "bold", anchor: "start" });
+  b += text(pad, 32, `${fmt(view.W)} × ${fmt(view.H)} mm · widok od frontu`, { size: 10, color: C.slate500, anchor: "start" });
+  b += `<polygon points="${pts(view.outline)}" fill="${C.slate50}" stroke="${C.slate700}" stroke-width="1.5"/>`;
+  view.fronts.forEach((f) => {
+    const on = highlightIds.includes(f.id);
+    const drawer = (f.subtype || "").includes("szuflada");
+    const stroke = on ? C.orange700 : drawer ? C.blue500 : C.green500;
+    const fill = on ? C.orange600 : drawer ? C.blue50 : C.green50;
+    b += `<polygon points="${pts(f.points)}" fill="${fill}" fill-opacity="${on ? 0.35 : 1}" stroke="${stroke}" stroke-width="${on ? 2 : 1}"${f.inner ? ' stroke-dasharray="4,3"' : ""}/>`;
+  });
+  hl.forEach((f, i) => {
+    const cx = f.points.reduce((a, p) => a + p[0], 0) / f.points.length;
+    const cy = f.points.reduce((a, p) => a + p[1], 0) / f.points.length;
+    const [x, y] = P([cx, cy]);
+    b += `<circle cx="${x}" cy="${y}" r="10" fill="${C.white}" stroke="${C.orange700}" stroke-width="1.5"/>`;
+    b += text(x, y + 4, String(i + 1), { size: 11, color: C.orange700, weight: "bold" });
+    if (f.inner) b += text(x, y + 22, "wewn.", { size: 9, color: C.orange700 });
+  });
+  const totalW = W + 2 * pad, totalH = H + top + 24;
+  b += text(pad, totalH - 6, `${hl.length} ${hl.length === 1 ? "szuflada" : hl.length < 5 ? "szuflady" : "szuflad"} z tą skrzynką`, { size: 10, color: C.orange700, anchor: "start" });
+  return `<svg viewBox="0 0 ${r1(totalW)} ${r1(totalH)}" xmlns="http://www.w3.org/2000/svg" font-family="${FONT}" class="locator" style="width:${r1(totalW)}px;height:${r1(totalH)}px"><rect width="${r1(totalW)}" height="${r1(totalH)}" fill="${C.white}"/>${b}</svg>`;
+}
