@@ -23,27 +23,39 @@ export const KIND = {
   zawias: { color: C.teal700, label: "prowadnik zawiasu" },
 };
 
+// Jednostka opisu (U): przy dużych formatkach (słupek) czcionki, odstępy opisów i znaczniki
+// rosną razem z formatką, inaczej na rysunku powiększonym do ekranu byłyby nieczytelne.
+// Rysunek ustawia ją na czas budowania (setUnit) i przywraca 1; małe formatki - zawsze 1.
+let U = 1;
+export const unit = () => U;
+export function setUnit(u) { U = u > 1 ? u : 1; }
+export const unitFor = (maxDim) => Math.max(1, maxDim / 800);
+
 export const text = (x, y, t, { size = 11, color = C.slate700, anchor = "middle", weight = "normal", rotate = 0 } = {}) =>
-  `<text x="${r1(x)}" y="${r1(y)}" font-family="${FONT}" font-size="${size}" fill="${color}" text-anchor="${anchor}" font-weight="${weight}"${rotate ? ` transform="rotate(${rotate} ${r1(x)} ${r1(y)})"` : ""}>${escapeHtml(t)}</text>`;
+  `<text x="${r1(x)}" y="${r1(y)}" font-family="${FONT}" font-size="${r1(size * U)}" fill="${color}" text-anchor="${anchor}" font-weight="${weight}"${rotate ? ` transform="rotate(${rotate} ${r1(x)} ${r1(y)})"` : ""}>${escapeHtml(t)}</text>`;
 export const line = (x1, y1, x2, y2, color = C.slate500, extra = "") =>
-  `<line x1="${r1(x1)}" y1="${r1(y1)}" x2="${r1(x2)}" y2="${r1(y2)}" stroke="${color}" stroke-width="0.8" ${extra}/>`;
+  `<line x1="${r1(x1)}" y1="${r1(y1)}" x2="${r1(x2)}" y2="${r1(y2)}" stroke="${color}" stroke-width="${r1(0.8 * U)}" ${extra}/>`;
 export const dash = 'stroke-dasharray="3,2"';
 
 export function dimH(x1, x2, y, label, color = C.slate600) {
-  return line(x1, y, x2, y, color) + line(x1, y - 4, x1, y + 4, color) + line(x2, y - 4, x2, y + 4, color)
-    + text((x1 + x2) / 2, y - 4, label, { size: 11, color });
+  const t = 4 * U;
+  return line(x1, y, x2, y, color) + line(x1, y - t, x1, y + t, color) + line(x2, y - t, x2, y + t, color)
+    + text((x1 + x2) / 2, y - t, label, { size: 11, color });
 }
 export function dimV(x, y1, y2, label, color = C.slate600) {
-  return line(x, y1, x, y2, color) + line(x - 4, y1, x + 4, y1, color) + line(x - 4, y2, x + 4, y2, color)
-    + text(x - 6, (y1 + y2) / 2, label, { size: 11, color, rotate: -90 });
+  const t = 4 * U;
+  return line(x, y1, x, y2, color) + line(x - t, y1, x + t, y1, color) + line(x - t, y2, x + t, y2, color)
+    + text(x - 6 * U, (y1 + y2) / 2, label, { size: 11, color, rotate: -90 });
 }
 // scale = N dla skali 1:N - rysunek dostaje wymiary w mm (prawdziwa skala na wydruku 100%),
 // zamiast rozciągania na szerokość karty.
+// Na ekranie (styl WORKSHOP_CSS) rysunek ze skalą jest powiększany do szerokości okna, na wydruku
+// dostaje prawdziwe wymiary z --w / --h (skala 1:scale).
 export const wrap = (minX, minY, w, h, body, scale) =>
-  `<svg viewBox="${r1(minX)} ${r1(minY)} ${r1(w)} ${r1(h)}" xmlns="http://www.w3.org/2000/svg" font-family="${FONT}"${scale ? ` class="to-scale" style="width:${r1(w / scale)}mm;height:${r1(h / scale)}mm"` : ""}>`
+  `<svg viewBox="${r1(minX)} ${r1(minY)} ${r1(w)} ${r1(h)}" xmlns="http://www.w3.org/2000/svg" font-family="${FONT}"${scale ? ` class="to-scale" style="--w:${r1(w / scale)}mm;--h:${r1(h / scale)}mm"` : ""}>`
   + `<rect x="${r1(minX)}" y="${r1(minY)}" width="${r1(w)}" height="${r1(h)}" fill="${C.white}"/>${body}</svg>`;
 export const title = (x, y, t, sub) => text(x, y, t.toUpperCase(), { size: 14, color: C.blue900, weight: "bold" })
-  + (sub ? text(x, y + 15, sub, { size: 11, color: C.slate500 }) : "");
+  + (sub ? text(x, y + 15 * U, sub, { size: 11, color: C.slate500 }) : "");
 export const uniq = (arr) => [...new Set(arr.map(r1))].sort((a, b) => a - b);
 
 // Otwór w płaszczyźnie: kółko w prawdziwej średnicy + numer obok.
@@ -53,14 +65,15 @@ export function faceHole(cx, cy, h, n) {
     const [w, l] = h.orient === "h" ? [h.groove, h.d] : [h.d, h.groove];
     return `<rect x="${r1(cx - w / 2)}" y="${r1(cy - l / 2)}" width="${r1(w)}" height="${r1(l)}" rx="1" fill="${k.color}" fill-opacity="0.3" stroke="${k.color}" stroke-width="1"/>`
       + line(cx, cy - 2, cx, cy + 2, k.color) + line(cx - 2, cy, cx + 2, cy, k.color)
-      + text(cx + w / 2 + 2, cy - l / 2 + 8, String(n), { size: 9, color: k.color, anchor: "start", weight: "bold" });
+      + text(cx + w / 2 + 2 * U, cy - l / 2 + 8 * U, String(n), { size: 9, color: k.color, anchor: "start", weight: "bold" });
   }
-  return `<circle cx="${r1(cx)}" cy="${r1(cy)}" r="${r1(h.d / 2)}" fill="${h.depth == null ? C.white : k.color}" stroke="${k.color}" stroke-width="1.2"/>`
-    + text(cx + h.d / 2 + 2, cy - h.d / 2 - 1, String(n), { size: 9, color: k.color, anchor: "start", weight: "bold" });
+  const r = Math.max(h.d / 2, 1.6 * U);
+  return `<circle cx="${r1(cx)}" cy="${r1(cy)}" r="${r1(r)}" fill="${h.depth == null ? C.white : k.color}" stroke="${k.color}" stroke-width="${r1(1.2 * U)}"/>`
+    + text(cx + r + 2 * U, cy - r - U, String(n), { size: 9, color: k.color, anchor: "start", weight: "bold" });
 }
 // Otwór w czole: zarys kanału od krawędzi w głąb płyty (dx, dy - kierunek w głąb).
 export function edgeHole(x, y, dx, dy, h, n) {
-  const k = KIND[h.kind], half = h.d / 2, L = h.depth;
+  const k = KIND[h.kind], half = Math.max(h.d / 2, 1.2 * U), L = h.depth;
   if (h.groove) {
     // Promień łuku z cięciwy (długość rowka) i strzałki (głębokość): R = (c² + g²) / 2g.
     const c = h.groove / 2, R = r1((c * c + L * L) / (2 * L));
@@ -68,13 +81,13 @@ export function edgeHole(x, y, dx, dy, h, n) {
     const [a, b] = dx ? [[x, y - c], [x, y + c]] : [[x - c, y], [x + c, y]];
     const sweep = (dx > 0 || dy < 0) ? 1 : 0;
     return `<path d="M ${r1(a[0])} ${r1(a[1])} A ${R} ${R} 0 0 ${sweep} ${r1(b[0])} ${r1(b[1])} Z" fill="${k.color}" fill-opacity="0.3" stroke="${k.color}" stroke-width="1"/>`
-      + text(x + dx * (L + 3) + (dy ? c + 2 : 0), y + dy * (L + 3) + (dx ? -c + 8 : 9), String(n), { size: 9, color: k.color, anchor: dx < 0 ? "end" : "start", weight: "bold" });
+      + text(x + dx * (L + 3 * U) + (dy ? c + 2 * U : 0), y + dy * (L + 3 * U) + (dx ? -c + 8 * U : 9 * U), String(n), { size: 9, color: k.color, anchor: dx < 0 ? "end" : "start", weight: "bold" });
   }
   const pts = dx
     ? [[x, y - half], [x + dx * L, y - half], [x + dx * L, y + half], [x, y + half]]
     : [[x - half, y], [x - half, y + dy * L], [x + half, y + dy * L], [x + half, y]];
   return `<polygon points="${pts.map((p) => p.map(r1).join(",")).join(" ")}" fill="${k.color}" fill-opacity="0.25" stroke="${k.color}" stroke-width="1"/>`
-    + text(x + dx * (L + 3) + (dy ? half + 2 : 0), y + dy * (L + 3) + (dx ? -half - 1 : 9), String(n), { size: 9, color: k.color, anchor: dx < 0 ? "end" : "start", weight: "bold" });
+    + text(x + dx * (L + 3 * U) + (dy ? half + 2 * U : 0), y + dy * (L + 3 * U) + (dx ? -half - U : 9 * U), String(n), { size: 9, color: k.color, anchor: dx < 0 ? "end" : "start", weight: "bold" });
 }
 
 // ---------------------------------------------------------------------------

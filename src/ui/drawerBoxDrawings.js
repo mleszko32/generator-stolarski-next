@@ -39,10 +39,12 @@ export const WORKSHOP_CSS = `    :root { color-scheme: light; }
     .cols { display: grid; grid-template-columns: minmax(260px, 1fr) 2fr; gap: 14px; align-items: start; }
     .notes { font-size: 12px; color: #475569; line-height: 1.5; display: grid; gap: 6px; }
     .notes div { background: #f8fafc; border-left: 3px solid #93c5fd; padding: 6px 10px; }
-    .grid { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+    /* Ekran: każda formatka na szerokość okna, jedna pod drugą, nie wyżej niż ekran. */
+    .grid { display: flex; flex-direction: column; gap: 16px; align-items: stretch; }
     .card { border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; break-inside: avoid; }
-    .grid .card { flex: 0 0 auto; }
-    svg.to-scale { max-width: none; }
+    .grid .card { flex: 0 0 auto; padding: 6px; }
+    svg.to-scale { width: 100%; height: auto; max-height: 88vh; }
+    .print-only { display: none; }
     svg { width: 100%; height: auto; display: block; }
     table.parts { width: 100%; border-collapse: collapse; font-size: 13px; margin: 6px 0; }
     table.parts th { text-align: left; background: #f1f5f9; padding: 5px 8px; border-bottom: 2px solid #cbd5e1; }
@@ -65,7 +67,12 @@ export const WORKSHOP_CSS = `    :root { color-scheme: light; }
       body { padding: 0; max-width: 100%; }
       .box { page-break-before: always; border-top: none; margin-top: 0; }
       .box:first-of-type { page-break-before: auto; }
-      .grid { gap: 6px; }
+      /* Wydruk: prawdziwa skala (wymiary z --w / --h), kilka formatek obok siebie. */
+      .grid { flex-direction: row; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+      .grid .card { padding: 0; }
+      svg.to-scale { width: var(--w); height: var(--h); max-height: none; }
+      .screen-only { display: none; }
+      .print-only { display: block; }
       .assembly { grid-template-columns: 3fr 2fr; }
     }
 `;
@@ -97,7 +104,7 @@ function boxCard(box, settings, idx) {
     <div class="locators">${locatorsHtml(box)}</div>
     <div class="assembly"><div class="card">${assemblySVG(box)}</div><div><h3>Kolejność montażu</h3>${assemblyStepsHtml(box)}</div></div>
     ${legendHtml(box)}
-    <p class="muted">Rysunki formatek w skali <b>1:${scale}</b> (wszystkie tak samo - prawdziwe proporcje). Na wydruku ustaw skalę 100% / „Rzeczywisty rozmiar”, wtedy 1 cm na papierze = ${scale} cm formatki.</p>
+    <p class="muted">Na ekranie rysunki formatek są powiększone do okna. Na wydruku są w skali <b>1:${scale}</b> (wszystkie tak samo) - ustaw skalę 100% / „Rzeczywisty rozmiar”, wtedy 1 cm na papierze = ${scale} cm formatki.</p>
     <div class="grid">${svgs.map((s) => `<div class="card">${s}</div>`).join("")}</div>
     <h3>Otwory</h3>
     ${holeTableHtml(box, settings)}

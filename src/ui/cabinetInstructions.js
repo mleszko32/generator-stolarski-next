@@ -51,7 +51,7 @@ function cabinetCard(mod, idx, layouts) {
     </div>
     <div class="assembly"><div class="card">${cabinetAssemblySVG(mod, panels, project)}</div><div><h3>Kolejność montażu</h3>${cabinetStepsHtml(cons, panels)}</div></div>
     ${cabinetLegendHtml(panels)}
-    <p class="muted">Rysunki formatek w skali <b>1:${scale}</b> (wszystkie tak samo - prawdziwe proporcje). Na wydruku ustaw skalę 100% / „Rzeczywisty rozmiar”, wtedy 1 cm na papierze = ${scale} cm formatki.</p>
+    <p class="muted">Na ekranie rysunki formatek są powiększone do okna. Na wydruku są w skali <b>1:${scale}</b> (wszystkie tak samo) - ustaw skalę 100% / „Rzeczywisty rozmiar”, wtedy 1 cm na papierze = ${scale} cm formatki.</p>
     <div class="grid">${svgs.map((s) => `<div class="card">${s}</div>`).join("")}</div>
     <h3>Otwory</h3>
     ${cabinetHoleTableHtml(panels, th)}
