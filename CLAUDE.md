@@ -225,7 +225,8 @@ ze względu na sprzęgła i zaczepy MOVENTO pod dnem). Sprzęgła T51.7601 tylko
 uwaga — Blum podaje je szablonem T65.1000.02, bez wymiarów. Rysunki: `render/drawerBoxDrawing2d.js`
 (formatki z otworami + `assemblySVG`: montaż w izometrii, rozstrzelony i złożony, własny rzut w SVG
 bez Three.js, żeby się drukował; `assemblyStepsHtml` — kolejność montażu wg sposobu łączenia),
-okno `ui/drawerBoxDrawings.js`, sekcja huba „Skrzynki szuflad”.
+okno `ui/drawerBoxDrawings.js`, sekcja huba „Skrzynki szuflad”. Rysunki formatek jednej skrzynki są w jednej
+skali (`drawingScale`: 1:4 / 1:5 / 1:10 / 1:20, żeby zmieściły się na A4; wymiary SVG w mm), nie rozciągane do karty.
 
 **Plan rozkroju**: `engine/nesting.js` — „półkowe” układanie formatek na arkuszach z cięciami na
 wylot (sprawdza kilka orientacji, wybiera najmniej arkuszy), wyświetlane przez

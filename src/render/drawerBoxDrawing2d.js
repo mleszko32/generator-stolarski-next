@@ -35,8 +35,10 @@ function dimV(x, y1, y2, label, color = C.slate600) {
   return line(x, y1, x, y2, color) + line(x - 4, y1, x + 4, y1, color) + line(x - 4, y2, x + 4, y2, color)
     + text(x - 6, (y1 + y2) / 2, label, { size: 11, color, rotate: -90 });
 }
-const wrap = (minX, minY, w, h, body) =>
-  `<svg viewBox="${r1(minX)} ${r1(minY)} ${r1(w)} ${r1(h)}" xmlns="http://www.w3.org/2000/svg" font-family="${FONT}">`
+// scale = N dla skali 1:N - rysunek dostaje wymiary w mm (prawdziwa skala na wydruku 100%),
+// zamiast rozciągania na szerokość karty.
+const wrap = (minX, minY, w, h, body, scale) =>
+  `<svg viewBox="${r1(minX)} ${r1(minY)} ${r1(w)} ${r1(h)}" xmlns="http://www.w3.org/2000/svg" font-family="${FONT}"${scale ? ` class="to-scale" style="width:${r1(w / scale)}mm;height:${r1(h / scale)}mm"` : ""}>`
   + `<rect x="${r1(minX)}" y="${r1(minY)}" width="${r1(w)}" height="${r1(h)}" fill="${C.white}"/>${body}</svg>`;
 const title = (x, y, t, sub) => text(x, y, t.toUpperCase(), { size: 14, color: C.blue900, weight: "bold" })
   + (sub ? text(x, y + 15, sub, { size: 11, color: C.slate500 }) : "");
@@ -74,10 +76,21 @@ function edgeHole(x, y, dx, dy, h, n) {
 }
 
 // Bok widziany od wewnątrz skrzynki: przód po lewej, wymiary od przodu i od spodu.
-export function sideSVG(box, panel, startNo = 1) {
+// Jedna skala dla wszystkich rysunków formatek skrzynki (prawdziwe proporcje między nimi):
+// najmniejsza z 1:4 / 1:5 / 1:10 / 1:20, przy której każdy rysunek mieści się na A4
+// (ok. 185 × 250 mm pola wydruku). Rozmiary jak w wrap() poszczególnych rysunków.
+const SCALES = [4, 5, 10, 20];
+export function drawingScale(box) {
+  const sizes = box.panels.map((p) => (p.kind === "bok" ? [p.length + 120, p.width + 112]
+    : p.kind === "dno" ? [p.length + 150, p.width + 112] : [p.length + 140, p.width + 114]));
+  return SCALES.find((n) => sizes.every(([w, h]) => w / n <= 185 && h / n <= 250)) || SCALES[SCALES.length - 1];
+}
+const scaleNote = (scale) => (scale ? ` · skala 1:${scale}` : "");
+
+export function sideSVG(box, panel, startNo = 1, scale = null) {
   const L = panel.length, H = panel.width, t = box.t, r = box.recess;
   const Y = (y) => H - y;
-  let b = title(L / 2, -58, `${panel.name} — widok od wewnątrz`, `${fmt(L)} × ${fmt(H)} × ${fmt(t)} mm · ${panel.qty} szt.`);
+  let b = title(L / 2, -58, `${panel.name} — widok od wewnątrz`, `${fmt(L)} × ${fmt(H)} × ${fmt(t)} mm · ${panel.qty} szt.${scaleNote(scale)}`);
   b += `<rect x="0" y="0" width="${r1(L)}" height="${r1(H)}" fill="${C.slate50}" stroke="${C.slate700}" stroke-width="1.5"/>`;
   // Gdzie stoją sąsiednie formatki (cienko, przerywane).
   b += `<rect x="0" y="0" width="${t}" height="${r1(H - r - t)}" fill="none" stroke="${C.slate400}" ${dash}/>`;
@@ -97,13 +110,13 @@ export function sideSVG(box, panel, startNo = 1) {
     b += line(L, Y(y), L + 32, Y(y), C.slate300, dash) + text(L + 36, Y(y) + 4, fmt(y), { size: 10, color: C.slate600, anchor: "start" });
   });
   b += dimH(0, L, H + 18, fmt(L)) + dimV(-22, 0, H, fmt(H));
-  return wrap(-40, -80, L + 120, H + 112, b);
+  return wrap(-40, -80, L + 120, H + 112, b, scale);
 }
 
 // Dno w rzucie z góry: przód po lewej, lewy bok u góry. Otwory w czołach (krawędziach).
-export function bottomSVG(box, panel, startNo = 1) {
+export function bottomSVG(box, panel, startNo = 1, scale = null) {
   const L = panel.length, W = panel.width;
-  let b = title(L / 2, -58, `${panel.name} — rzut z góry`, `${fmt(L)} × ${fmt(W)} × ${fmt(box.t)} mm · ${panel.qty} szt.`);
+  let b = title(L / 2, -58, `${panel.name} — rzut z góry`, `${fmt(L)} × ${fmt(W)} × ${fmt(box.t)} mm · ${panel.qty} szt.${scaleNote(scale)}`);
   b += `<rect x="0" y="0" width="${r1(L)}" height="${r1(W)}" fill="${C.slate50}" stroke="${C.slate700}" stroke-width="1.5"/>`;
   b += text(-8, W / 2, "PRZÓD", { size: 10, color: C.slate400, weight: "bold", rotate: -90 });
   b += text(L + 14, W / 2, "TYŁ", { size: 10, color: C.slate400, weight: "bold", rotate: -90 });
@@ -125,15 +138,15 @@ export function bottomSVG(box, panel, startNo = 1) {
     b += line(L, x, L + 62, x, C.slate300, dash) + text(L + 66, x + 4, fmt(x), { size: 10, color: C.slate600, anchor: "start" });
   });
   b += dimH(0, L, W + 18, fmt(L)) + dimV(-22, 0, W, fmt(W));
-  return wrap(-40, -80, L + 150, W + 112, b);
+  return wrap(-40, -80, L + 150, W + 112, b, scale);
 }
 
 // Tył / czoło wewnętrzne widziane od wewnątrz skrzynki (niski bok po lewej w skrzynce B).
-export function plateSVG(box, panel, startNo = 1) {
+export function plateSVG(box, panel, startNo = 1, scale = null) {
   const W = panel.length, H = panel.width;
   const Y = (y) => H - y;
   const pts = panel.points.map(([x, y]) => `${r1(x)},${r1(Y(y))}`).join(" ");
-  let b = title(W / 2, -40, `${panel.name}`, `${fmt(W)} × ${fmt(H)} × ${fmt(box.t)} mm · ${panel.qty} szt.${box.isB ? " · niski bok po lewej" : ""}`);
+  let b = title(W / 2, -40, `${panel.name}`, `${fmt(W)} × ${fmt(H)} × ${fmt(box.t)} mm · ${panel.qty} szt.${box.isB ? " · niski bok po lewej" : ""}${scaleNote(scale)}`);
   b += `<polygon points="${pts}" fill="${C.slate50}" stroke="${C.slate700}" stroke-width="1.5"/>`;
   panel.holes.forEach((h, i) => {
     b += h.edge === "lico" ? faceHole(h.x, Y(h.y), h, startNo + i)
@@ -151,7 +164,7 @@ export function plateSVG(box, panel, startNo = 1) {
     b += line(x, H, x, H + 10, C.slate300) + text(x, H + 21, fmt(x), { size: 10, color: C.slate600 });
   });
   b += dimH(0, W, H + 40, fmt(W));
-  return wrap(-70, -62, W + 140, H + 114, b);
+  return wrap(-70, -62, W + 140, H + 114, b, scale);
 }
 
 // Legenda rodzajów otworów obecnych w skrzynce.
