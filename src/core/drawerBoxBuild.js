@@ -22,6 +22,14 @@
 //   T65.1000.02 - Blum nie podaje współrzędnych, więc tu tylko uwaga, bez otworów.
 // - Łączniki (kołek 8×30, wkręt 4×50, konfirmat 7×50): poradniki stolarskie (woodweb,
 //   kabus.pl, phu-gral.eu), nie katalog - dlatego odstępy są ustawieniami projektu.
+// - Lamello P-System (frezarka Zeta P2): rowek frezem Ø100,4 × 7 mm, głębokość 10 (P-10)
+//   albo 14 (P-14) w obu łączonych formatkach, oś rowka w połowie grubości płyty; długość
+//   rowka na powierzchni = cięciwa koła frezu 2·√(50,2² − (50,2 − g)²) (≈60 / ≈70 mm);
+//   rozstaw maks. 300 mm, oś min. 32 (P-10) / 37 (P-14) mm od końca formatki; Clamex:
+//   otwór Ø6 na klucz od lica formatki z rowkiem w czole, oś 5,5 (P-10) / 7,5 (P-14) mm od
+//   krawędzi. Min. grubości (płaszczyzna / krawędź). Źródła: Lamello - karta Clamex P-14
+//   (Bedienungsanleitung_Clamex_P14.pdf), broszura P-System EN, opis makra Biesse P-System;
+//   grubości z kart produktów dystrybutorów (dane Lamello).
 import { getDrawerBoxInfo } from "./drawerBoxes.js";
 import { getSlopeFronts } from "./slopeCabinet.js";
 import { recalculateLayout } from "./layout.js";
@@ -33,7 +41,33 @@ export const JOIN_METHODS = {
   konfirmat: "Konfirmat",
   kolki: "Kołki + klej",
   wkrety: "Wkręty + klej",
+  tenso_p10: "Lamello Tenso P-10 (na klej, niewidoczne)",
+  tenso_p14: "Lamello Tenso P-14 (na klej, niewidoczne)",
+  clamex_p10: "Lamello Clamex P-10 (rozbieralne)",
+  clamex_p14: "Lamello Clamex P-14 (rozbieralne)",
 };
+
+// Łączniki Lamello P (patrz ŹRÓDŁA wyżej). minFace / minEdge - min. grubość płyty z rowkiem
+// w płaszczyźnie / w krawędzi.
+export const LAMELLO = {
+  tenso_p10: { name: "Tenso P-10", depth: 10, endMin: 32, minFace: 9, minEdge: 12, clamex: false },
+  tenso_p14: { name: "Tenso P-14", depth: 14, endMin: 37, minFace: 11, minEdge: 12, clamex: false },
+  clamex_p10: { name: "Clamex P-10", depth: 10, endMin: 32, minFace: 11, minEdge: 12, clamex: true, keyFromEdge: 5.5 },
+  clamex_p14: { name: "Clamex P-14", depth: 14, endMin: 37, minFace: 15, minEdge: 12, clamex: true, keyFromEdge: 7.5 },
+};
+const LAMELLO_CUTTER_R = 50.2;      // promień freza Zeta P2 (Ø100,4)
+const LAMELLO_MAX_SPACING = 300;
+// Długość rowka P na powierzchni płyty (cięciwa koła freza na głębokości g).
+export const lamelloGrooveLength = (g) => round1(2 * Math.sqrt(LAMELLO_CUTTER_R ** 2 - (LAMELLO_CUTTER_R - g) ** 2));
+
+// Pozycje łączników Lamello na odcinku 0..h: oś min. endMin od końców, rozstaw maks. 300;
+// gdy dwa rowki by się nie zmieściły - jeden na środku.
+export function lamelloPositions(h, lam) {
+  const e = lam.endMin, len = lamelloGrooveLength(lam.depth);
+  if (h - 2 * e < len + 10) return [round1(h / 2)];
+  const n = Math.ceil((h - 2 * e) / LAMELLO_MAX_SPACING) + 1;
+  return Array.from({ length: n }, (_, i) => round1(e + (h - 2 * e) * i / (n - 1)));
+}
 
 const DEFAULTS = {
   join: "kolek_wkret",
@@ -60,6 +94,13 @@ export function holeSpecs(settings, t) {
     konfirmat: { side: { d: 7, depth: null, note: "przelot, pogłębienie Ø10" }, edge: { d: 5, depth: round1(sl - t + 2) }, label: `konfirmat 7×${sl}` },
     kolek: { side: { d: 8, depth: sideDowel }, edge: { d: 8, depth: round1(dl - sideDowel + 1) }, label: `kołek 8×${dl}` },
     zaczep: { edge: { d: 6, depth: 10 }, label: "zaczep tylny prowadnicy (Blum)" },
+    ...(LAMELLO[settings.join] ? (() => {
+      const lam = LAMELLO[settings.join], g = { d: 7, depth: lam.depth, groove: lamelloGrooveLength(lam.depth) };
+      return {
+        lamello: { side: g, edge: g, label: `Lamello ${lam.name}` },
+        klucz: { face: { d: 6, depth: null, note: "do rowka" }, label: "otwór na klucz Clamex" },
+      };
+    })() : {}),
   };
 }
 
@@ -86,12 +127,14 @@ export function jointPositions(h, edge, n) {
 }
 
 function jointsOn(h, settings) {
+  if (LAMELLO[settings.join]) return lamelloPositions(h, LAMELLO[settings.join]).map((p) => ({ p, kind: "lamello" }));
   const n = settings.join === "kolek_wkret" ? Math.max(2, jointCount(h)) : jointCount(h);
   const kinds = kindsFor(settings.join, n);
   return jointPositions(h, settings.edge, n).map((p, i) => ({ p, kind: kinds[i] }));
 }
 
 function bottomJoints(L, settings) {
+  if (LAMELLO[settings.join]) return lamelloPositions(L, LAMELLO[settings.join]).map((p) => ({ p, kind: "lamello" }));
   const e = Math.min(settings.bottomEdge, L / 4);
   const n = Math.max(2, Math.ceil((L - 2 * e) / Math.max(50, settings.bottomSpacing)) + 1);
   const kinds = kindsFor(settings.join, n);
@@ -122,21 +165,41 @@ export function buildDrawerBox(raw, settings) {
 
   // Bok widziany od wewnątrz skrzynki, x od przodu (0) do tyłu (L), y od dołu boku.
   const sideHoles = (joints) => [
-    ...joints.map((j) => ({ x: round1(t / 2), y: yOnSide(j.p), kind: j.kind, ...spec[j.kind].side, to: "czoło wewn." })),
-    ...joints.map((j) => ({ x: round1(L - t / 2), y: yOnSide(j.p), kind: j.kind, ...spec[j.kind].side, to: "tył" })),
-    ...jBottom.map((j) => ({ x: j.p, y: round1(r + t / 2), kind: j.kind, ...spec[j.kind].side, to: "dno" })),
+    ...joints.map((j) => ({ x: round1(t / 2), y: yOnSide(j.p), kind: j.kind, ...spec[j.kind].side, to: "czoło wewn.", orient: "v" })),
+    ...joints.map((j) => ({ x: round1(L - t / 2), y: yOnSide(j.p), kind: j.kind, ...spec[j.kind].side, to: "tył", orient: "v" })),
+    ...jBottom.map((j) => ({ x: j.p, y: round1(r + t / 2), kind: j.kind, ...spec[j.kind].side, to: "dno", orient: "h" })),
   ];
   // Tył/czoło: otwory w czołach (lewe x = 0, prawe x = w), y od spodu formatki.
+  const lam = LAMELLO[settings.join];
+  const key = lam && lam.clamex ? lam.keyFromEdge : null;
   const endHoles = (joinsL, joinsR) => [
     ...joinsL.map((j) => ({ edge: "lewe", x: 0, y: j.p, kind: j.kind, ...spec[j.kind].edge })),
     ...joinsR.map((j) => ({ edge: "prawe", x: w, y: j.p, kind: j.kind, ...spec[j.kind].edge })),
+    ...(key ? [
+      ...joinsL.map((j) => ({ edge: "lico", x: key, y: j.p, kind: "klucz", ...spec.klucz.face })),
+      ...joinsR.map((j) => ({ edge: "lico", x: round1(w - key), y: j.p, kind: "klucz", ...spec.klucz.face })),
+    ] : []),
   ];
   // Dno (rzut z góry): x w poprzek (0 = lewy bok), z od przodu (0) do tyłu (L).
   const bottomHoles = [
     ...jBottom.map((j) => ({ edge: "lewe", x: 0, z: j.p, y: round1(t / 2), kind: j.kind, ...spec[j.kind].edge })),
     ...jBottom.map((j) => ({ edge: "prawe", x: w, z: j.p, y: round1(t / 2), kind: j.kind, ...spec[j.kind].edge })),
     ...[7, round1(w - 7)].map((x) => ({ edge: "tylne", x, z: L, y: 11, kind: "zaczep", ...spec.zaczep.edge })),
+    // Clamex w dnie: klucz od góry (od spodu dna przy bokach leżą prowadnice MOVENTO).
+    ...(key ? jBottom.flatMap((j) => [
+      { edge: "lico", x: key, z: j.p, kind: "klucz", ...spec.klucz.face },
+      { edge: "lico", x: round1(w - key), z: j.p, kind: "klucz", ...spec.klucz.face },
+    ]) : []),
   ];
+
+  // Ostrzeżenia Lamello: za cienka płyta albo za krótka formatka na rowek.
+  const warnings = [];
+  if (lam) {
+    if (t < lam.minFace) warnings.push(`${lam.name}: rowek w płaszczyźnie boku wymaga płyty min. ${lam.minFace} mm (jest ${t} mm).`);
+    if (t < lam.minEdge) warnings.push(`${lam.name}: rowek w krawędzi wymaga płyty min. ${lam.minEdge} mm (jest ${t} mm).`);
+    const minH = Math.min(hLeft, hRight);
+    if (minH < 2 * lam.endMin) warnings.push(`${lam.name}: tył/czoło ma ${round1(minH)} mm wysokości - za mało na rowek (oś min. ${lam.endMin} mm od końca, czyli min. ${2 * lam.endMin} mm).`);
+  }
 
   const sides = B
     ? [
@@ -158,13 +221,13 @@ export function buildDrawerBox(raw, settings) {
     name: `Skrzynka ${tag} (SKW ${round1(w)})${B ? ", ścięta pod skos" : ""}`,
     system: c.systemName, nl: c.nominalLength,
     lw: round1(w + num(system.innerWidthDeduct, 42)), skw: round1(w), skl: round1(L),
-    t, recess: r, isB: !!B, join: settings.join, panels,
+    t, recess: r, isB: !!B, join: settings.join, lamello: lam || null, warnings, panels,
   };
 }
 
 // Klucz tożsamości skrzynki - identyczne formatki i otwory = ta sama skrzynka.
 function boxKey(box) {
-  return JSON.stringify(box.panels.map((p) => [p.id, p.length, p.width, p.points || null, p.holes.map((h) => [h.x, h.y, h.z ?? null, h.kind])]));
+  return JSON.stringify(box.panels.map((p) => [p.id, p.length, p.width, p.points || null, p.holes.map((h) => [h.x, h.y, h.z ?? null, h.kind, h.edge ?? null])]));
 }
 
 // Surowe skrzynki drewniane modułu: [{ comps, system, isB, box }].

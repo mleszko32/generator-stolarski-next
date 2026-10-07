@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { collectDrawerBoxes, buildDrawerBox, jointCount, jointPositions, getDrawerBoxSettings, holeSpecs } from "./drawerBoxBuild.js";
+import { collectDrawerBoxes, buildDrawerBox, jointCount, jointPositions, getDrawerBoxSettings, holeSpecs, LAMELLO, lamelloGrooveLength, lamelloPositions } from "./drawerBoxBuild.js";
 import { getDrawerComponents } from "./drawerMath.js";
 import { drawerSystems } from "./drawerSystems.js";
 import { buildSlopeElements } from "./slopeCabinet.js";
@@ -114,5 +114,47 @@ describe("skrzynki szuflad MOVENTO - zbieranie z projektu", () => {
     const backJoints = (p) => p.holes.filter((h) => h.to === "tył").length;
     expect(backJoints(high)).toBeGreaterThan(backJoints(low));
     expect(box.panels.find((p) => p.id === "tyl").points.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe("skrzynki szuflad - Lamello P (Zeta P2)", () => {
+  const lamBox = (join, sideHeight = 150) => buildDrawerBox({ comps: comps(sideHeight), system: movento, isB: false }, getDrawerBoxSettings({ drawerBox: { join } }));
+
+  it("długość rowka na powierzchni z koła freza Ø100,4", () => {
+    expect(lamelloGrooveLength(10)).toBeCloseTo(60.1, 1);
+    expect(lamelloGrooveLength(14)).toBeCloseTo(69.6, 1);
+  });
+
+  it("rozmieszczenie: oś min. 32/37 mm od końca, rozstaw maks. 300 mm, za mało miejsca - jeden na środku", () => {
+    expect(lamelloPositions(80, LAMELLO.tenso_p10)).toEqual([40]);
+    expect(lamelloPositions(200, LAMELLO.tenso_p14)).toEqual([37, 163]);
+    const long = lamelloPositions(490, LAMELLO.clamex_p14);
+    expect(long[0]).toBe(37);
+    expect(long[long.length - 1]).toBe(453);
+    for (let i = 1; i < long.length; i++) expect(long[i] - long[i - 1]).toBeLessThanOrEqual(300);
+  });
+
+  it("Tenso: rowki w boku (pionowo przy tyle, poziomo przy dnie) i w czołach, bez otworów na klucz", () => {
+    const box = lamBox("tenso_p14");
+    const side = box.panels.find((p) => p.id === "bok");
+    const tyl = side.holes.filter((h) => h.to === "tył");
+    tyl.forEach((h) => expect(h).toMatchObject({ kind: "lamello", d: 7, depth: 14, orient: "v", groove: 69.6 }));
+    side.holes.filter((h) => h.to === "dno").forEach((h) => expect(h.orient).toBe("h"));
+    expect(box.panels.flatMap((p) => p.holes).some((h) => h.kind === "klucz")).toBe(false);
+    expect(box.warnings).toEqual([]);
+  });
+
+  it("Clamex: otwór Ø6 na klucz od lica tyłu, 7,5 mm od krawędzi (P-14), 5,5 mm (P-10)", () => {
+    const k14 = lamBox("clamex_p14").panels.find((p) => p.id === "tyl").holes.filter((h) => h.kind === "klucz");
+    expect(k14.length).toBeGreaterThan(0);
+    expect(new Set(k14.map((h) => h.x))).toEqual(new Set([7.5, lamBox("clamex_p14").skw - 7.5]));
+    k14.forEach((h) => expect(h).toMatchObject({ d: 6, edge: "lico" }));
+    const k10 = lamBox("clamex_p10").panels.find((p) => p.id === "dno").holes.filter((h) => h.kind === "klucz");
+    expect(new Set(k10.map((h) => h.x))).toEqual(new Set([5.5, lamBox("clamex_p10").skw - 5.5]));
+  });
+
+  it("ostrzeżenie, gdy tył za niski na rowek", () => {
+    const box = lamBox("clamex_p14", 90);   // tył 90 - 13 - 16 = 61 mm < 2 × 37
+    expect(box.warnings.some((w) => w.includes("za mało na rowek"))).toBe(true);
   });
 });

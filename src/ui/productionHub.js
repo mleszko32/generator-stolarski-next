@@ -28,7 +28,7 @@ import { openCsvExport } from "./csvEditor.js";
 import { printHardwareList } from "./hardwareList.js";
 import { openTechnicalDrawing } from "./technicalDrawing.js";
 import { mountKosztorys } from "./kosztorysModal.js";
-import { collectDrawerBoxes, getDrawerBoxSettings, JOIN_METHODS } from "../core/drawerBoxBuild.js";
+import { collectDrawerBoxes, getDrawerBoxSettings, JOIN_METHODS, LAMELLO } from "../core/drawerBoxBuild.js";
 import { openDrawerBoxDrawings } from "./drawerBoxDrawings.js";
 
 const SECTIONS = [
@@ -380,11 +380,11 @@ function renderSkrzynki(el) {
       <div class="field"><label>Łączenie skrzynki</label><select id="db-join">${Object.entries(JOIN_METHODS).map(([k, l]) => `<option value="${k}" ${s.join === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
       ${DB_FIELDS.map(([k, l]) => `<div class="field"><label>${l}</label><input type="number" class="db-f" data-k="${k}" value="${s[k]}" min="0"></div>`).join('')}
     </div>
-    <p class="hub-sub">Odstępy i liczba łączników to wartości z poradników stolarskich, nie z katalogu — dopasuj je do swojego warsztatu. Wymiary skrzynki i zaczep tylny prowadnicy są wg Blum.</p>
+    <p class="hub-sub">${LAMELLO[s.join] ? `Lamello ${LAMELLO[s.join].name}: rowki frezarką Zeta P2 (głębokość ${LAMELLO[s.join].depth} mm), rozmieszczenie wg zasad Lamello (rozstaw maks. 300 mm, oś min. ${LAMELLO[s.join].endMin} mm od końca) - pola odstępów obok nie mają tu zastosowania.` : "Odstępy i liczba łączników to wartości z poradników stolarskich, nie z katalogu — dopasuj je do swojego warsztatu."} Wymiary skrzynki i zaczep tylny prowadnicy są wg Blum.</p>
     ${boxes.length ? `<table class="hub-table">
       <thead><tr><th>Skrzynka</th><th class="num">Szt.</th><th>Formatki</th><th>Szafki</th></tr></thead>
       <tbody>${boxes.map(b => `<tr>
-        <td><div class="hub-strong">${escapeHtml(b.name)}</div><div class="hub-sub">${escapeHtml(b.system)}</div></td>
+        <td><div class="hub-strong">${escapeHtml(b.name)}</div><div class="hub-sub">${escapeHtml(b.system)}</div>${(b.warnings || []).map(w => `<div class="notice-warn fs-xs">${escapeHtml(w)}</div>`).join("")}</td>
         <td class="num">${b.qty}</td>
         <td class="hub-sub">${b.panels.map(pn => `${escapeHtml(pn.name)} ${fmt(pn.length)}×${fmt(pn.width)}${pn.qty > 1 ? ` ×${pn.qty}` : ''}`).join('<br>')}</td>
         <td>${escapeHtml(b.modules.join(', '))}</td>

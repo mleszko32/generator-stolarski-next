@@ -17,6 +17,8 @@ const KIND = {
   konfirmat: { color: C.violet600, label: "konfirmat" },
   kolek: { color: C.green600, label: "kołek" },
   zaczep: { color: C.sky600, label: "zaczep prowadnicy" },
+  lamello: { color: C.orange600, label: "rowek Lamello P" },
+  klucz: { color: C.red600, label: "otwór na klucz Clamex" },
 };
 
 const text = (x, y, t, { size = 11, color = C.slate700, anchor = "middle", weight = "normal", rotate = 0 } = {}) =>
@@ -43,12 +45,26 @@ const uniq = (arr) => [...new Set(arr.map(r1))].sort((a, b) => a - b);
 // Otwór w płaszczyźnie: kółko w prawdziwej średnicy + numer obok.
 function faceHole(cx, cy, h, n) {
   const k = KIND[h.kind];
+  if (h.groove) {
+    const [w, l] = h.orient === "h" ? [h.groove, h.d] : [h.d, h.groove];
+    return `<rect x="${r1(cx - w / 2)}" y="${r1(cy - l / 2)}" width="${r1(w)}" height="${r1(l)}" rx="1" fill="${k.color}" fill-opacity="0.3" stroke="${k.color}" stroke-width="1"/>`
+      + line(cx, cy - 2, cx, cy + 2, k.color) + line(cx - 2, cy, cx + 2, cy, k.color)
+      + text(cx + w / 2 + 2, cy - l / 2 + 8, String(n), { size: 9, color: k.color, anchor: "start", weight: "bold" });
+  }
   return `<circle cx="${r1(cx)}" cy="${r1(cy)}" r="${r1(h.d / 2)}" fill="${h.depth == null ? C.white : k.color}" stroke="${k.color}" stroke-width="1.2"/>`
     + text(cx + h.d / 2 + 2, cy - h.d / 2 - 1, String(n), { size: 9, color: k.color, anchor: "start", weight: "bold" });
 }
 // Otwór w czole: zarys kanału od krawędzi w głąb płyty (dx, dy - kierunek w głąb).
 function edgeHole(x, y, dx, dy, h, n) {
   const k = KIND[h.kind], half = h.d / 2, L = h.depth;
+  if (h.groove) {
+    const c = h.groove / 2, R = 50.2;
+    // Końce cięciwy wzdłuż krawędzi, łuk o promieniu freza sięgający głębokości L.
+    const [a, b] = dx ? [[x, y - c], [x, y + c]] : [[x - c, y], [x + c, y]];
+    const sweep = (dx > 0 || dy < 0) ? 1 : 0;
+    return `<path d="M ${r1(a[0])} ${r1(a[1])} A ${R} ${R} 0 0 ${sweep} ${r1(b[0])} ${r1(b[1])} Z" fill="${k.color}" fill-opacity="0.3" stroke="${k.color}" stroke-width="1"/>`
+      + text(x + dx * (L + 3) + (dy ? c + 2 : 0), y + dy * (L + 3) + (dx ? -c + 8 : 9), String(n), { size: 9, color: k.color, anchor: dx < 0 ? "end" : "start", weight: "bold" });
+  }
   const pts = dx
     ? [[x, y - half], [x + dx * L, y - half], [x + dx * L, y + half], [x, y + half]]
     : [[x - half, y], [x - half, y + dy * L], [x + half, y + dy * L], [x + half, y]];
@@ -93,11 +109,12 @@ export function bottomSVG(box, panel, startNo = 1) {
   b += text(L / 2, 14, "lewy bok", { size: 9, color: C.slate400 });
   b += text(L / 2, W - 6, "prawy bok", { size: 9, color: C.slate400 });
   panel.holes.forEach((h, i) => {
-    if (h.edge === "lewe") b += edgeHole(h.z, 0, 0, 1, h, startNo + i);
+    if (h.edge === "lico") b += faceHole(h.z, h.x, h, startNo + i);
+    else if (h.edge === "lewe") b += edgeHole(h.z, 0, 0, 1, h, startNo + i);
     else if (h.edge === "prawe") b += edgeHole(h.z, W, 0, -1, h, startNo + i);
     else b += edgeHole(L, h.x, -1, 0, h, startNo + i);
   });
-  uniq(panel.holes.filter((h) => h.edge !== "tylne").map((h) => h.z)).forEach((z, i) => {
+  uniq(panel.holes.filter((h) => h.edge === "lewe" || h.edge === "prawe").map((h) => h.z)).forEach((z, i) => {
     b += line(z, 0, z, -8 - (i % 2) * 12, C.slate300) + text(z, -11 - (i % 2) * 12, fmt(z), { size: 10, color: C.slate600 });
   });
   uniq(panel.holes.filter((h) => h.edge === "tylne").map((h) => h.x)).forEach((x) => {
@@ -115,7 +132,8 @@ export function plateSVG(box, panel, startNo = 1) {
   let b = title(W / 2, -40, `${panel.name}`, `${fmt(W)} × ${fmt(H)} × ${fmt(box.t)} mm · ${panel.qty} szt.${box.isB ? " · niski bok po lewej" : ""}`);
   b += `<polygon points="${pts}" fill="${C.slate50}" stroke="${C.slate700}" stroke-width="1.5"/>`;
   panel.holes.forEach((h, i) => {
-    b += h.edge === "lewe" ? edgeHole(0, Y(h.y), 1, 0, h, startNo + i) : edgeHole(W, Y(h.y), -1, 0, h, startNo + i);
+    b += h.edge === "lico" ? faceHole(h.x, Y(h.y), h, startNo + i)
+      : h.edge === "lewe" ? edgeHole(0, Y(h.y), 1, 0, h, startNo + i) : edgeHole(W, Y(h.y), -1, 0, h, startNo + i);
   });
   uniq(panel.holes.filter((h) => h.edge === "lewe").map((h) => h.y)).forEach((y) => {
     b += line(0, Y(y), -26, Y(y), C.slate300, dash) + text(-30, Y(y) + 4, fmt(y), { size: 10, color: C.slate600, anchor: "end" });
@@ -141,12 +159,14 @@ export function holeTableHtml(box, settings) {
   const rows = box.panels.flatMap((p) => p.holes.map((h) => {
     n++;
     const where = p.kind === "bok"
-      ? `płaszczyzna (od wewnątrz) → ${h.to}`
+      ? `płaszczyzna (od wewnątrz) → ${h.to}${h.groove ? (h.orient === "h" ? ", rowek poziomo" : ", rowek pionowo") : ""}`
+      : h.edge === "lico" ? (p.kind === "dno" ? "lico od góry (wnętrze szuflady), do rowka" : "lico od wewnątrz skrzynki, do rowka")
       : `czoło ${h.edge}${h.kind === "zaczep" ? ", od tyłu" : ""}`;
     const pos = p.kind === "bok" ? `${fmt(h.x)} od przodu, ${fmt(h.y)} od spodu`
-      : p.kind === "dno" ? (h.edge === "tylne" ? `${fmt(h.x)} od boku, ${fmt(h.y)} nad spodem dna` : `${fmt(h.z)} od przodu, w osi grubości`)
-      : `${fmt(h.y)} od spodu, w osi grubości`;
-    const size = h.depth == null ? `Ø${fmt(h.d)} przelot${h.note && h.note !== "przelot" ? ` (${h.note.replace(/^przelot,?\s*/, "")})` : ""}` : `Ø${fmt(h.d)} × ${fmt(h.depth)}`;
+      : p.kind === "dno" ? (h.edge === "tylne" ? `${fmt(h.x)} od boku, ${fmt(h.y)} nad spodem dna`
+        : h.edge === "lico" ? `${fmt(h.z)} od przodu, ${fmt(Math.min(h.x, p.width - h.x))} od krawędzi bocznej` : `${fmt(h.z)} od przodu, w osi grubości`)
+      : h.edge === "lico" ? `${fmt(h.y)} od spodu, ${fmt(Math.min(h.x, p.length - h.x))} od krawędzi` : `${fmt(h.y)} od spodu, w osi grubości`;
+    const size = h.groove ? `rowek ${fmt(h.d)} × ${fmt(h.groove)}, gł. ${fmt(h.depth)} (Zeta P2)` : h.depth == null ? `Ø${fmt(h.d)} przelot${h.note && h.note !== "przelot" ? ` (${h.note.replace(/^przelot,?\s*/, "")})` : ""}` : `Ø${fmt(h.d)} × ${fmt(h.depth)}`;
     return `<tr><td>${n}</td><td>${escapeHtml(p.name)}</td><td><i class="dot" style="background:${KIND[h.kind].color}"></i>${escapeHtml(spec[h.kind].label)}</td><td>${size}</td><td>${escapeHtml(where)}</td><td>${pos}</td></tr>`;
   }));
   return `<table class="parts holes"><thead><tr><th>Nr</th><th>Formatka</th><th>Łącznik</th><th>Otwór [mm]</th><th>Gdzie</th><th>Położenie [mm]</th></tr></thead><tbody>${rows.join("")}</tbody></table>`;
@@ -290,6 +310,22 @@ export function assemblySVG(box) {
 
 // Kolejność montażu zależna od sposobu łączenia.
 export function assemblyStepsHtml(box) {
+  if (box.lamello) {
+    const lam = box.lamello;
+    const steps = [
+      `Ustaw Zeta P2 na głębokość ${lam.depth} (${lam.name}); przy płycie ${fmt(box.t)} mm oś rowka w połowie grubości (płytka 2 mm dla 16 mm). Frezuj oba elementy połączenia od tej samej strony bazowej - wtedy rowki się pokrywają.`,
+      "Rowki w czołach tyłu (4), czoła wewnętrznego (5) i dna (3) oraz pasujące rowki w płaszczyźnie boków (1, 2) wg rysunków - pozycje od przodu / od spodu.",
+      lam.clamex
+        ? `Wywierć otwory Ø6 na klucz (przyrząd Lamello do Clamex P), ${fmt(lam.keyFromEdge)} mm od krawędzi, od strony wnętrza skrzynki, aż do rowka.`
+        : null,
+      lam.clamex
+        ? `Wsuń łączniki ${lam.name} (część z dźwignią w formatkę z otworem), złóż skrzynkę i dociągnij kluczem imbusowym przez otwory Ø6. Połączenie jest rozbieralne; otwory można zakryć zaślepkami.`
+        : `Wsuń łączniki ${lam.name} z kroplą kleju (klej podnosi wytrzymałość), złóż skrzynkę - łączniki same dociągną połączenie, ścisków nie trzeba. Połączenie jest nierozbieralne i niewidoczne.`,
+      "Sprawdź przekątne skrzynki (kąt prosty).",
+      "Przykręć sprzęgła T51.7601 pod dnem z przodu (wg szablonu Blum T65.1000.02), potem front od środka przez czoło wewnętrzne.",
+    ].filter(Boolean);
+    return `<ol class="steps">${steps.map((st) => `<li>${escapeHtml(st)}</li>`).join("")}</ol>`;
+  }
   const dowels = box.join === "kolek_wkret" || box.join === "kolki";
   const glue = box.join !== "konfirmat";
   const fix = { kolek_wkret: "wkręty", konfirmat: "konfirmaty", kolki: "ścisk (kołki na klej)", wkrety: "wkręty" }[box.join];

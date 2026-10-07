@@ -22,6 +22,7 @@ function boxCard(box, settings, idx) {
     <h2>${idx + 1}. ${escapeHtml(box.name)} <span class="qty">× ${box.qty}</span></h2>
     <p class="lead">${escapeHtml(box.system)} · NL ${box.nl} · światło korpusu LW ${fmt(box.lw)} → szerokość skrzynki SKW = LW − ${fmt(box.lw - box.skw)} = <b>${fmt(box.skw)}</b> · długość SKL = NL − 10 = <b>${fmt(box.skl)}</b> · płyta ${fmt(box.t)} mm, dno podniesione o ${fmt(box.recess)} mm · łączenie: <b>${escapeHtml(JOIN_METHODS[box.join])}</b></p>
     <p class="muted">Szafki: ${box.modules.map(escapeHtml).join(", ")}</p>
+    ${(box.warnings || []).map((w) => `<div class="warn">${escapeHtml(w)}</div>`).join("")}
     <div class="cols">
       <table class="parts"><thead><tr><th>Formatka</th><th>Szt.</th><th>Wymiar [mm]</th></tr></thead><tbody>${partsRows}</tbody></table>
       <div class="notes">
@@ -75,6 +76,7 @@ export function openDrawerBoxDrawings(boxes, settings, projectName = "") {
     .assembly h3 { margin-top: 0; }
     .steps { font-size: 13px; color: #334155; line-height: 1.5; padding-left: 20px; margin: 0; }
     .steps li { margin-bottom: 6px; }
+    .warn { background: #fee2e2; color: #991b1b; padding: 8px 12px; border-radius: 6px; font-size: 13px; margin: 8px 0; }
     .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: #475569; margin: 10px 0; }
     .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
     .legend i.open { background: #fff; border: 1.5px solid; }

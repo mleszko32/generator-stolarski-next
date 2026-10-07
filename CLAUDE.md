@@ -213,7 +213,9 @@ Stare dane (`slope.columns`/`dividers`/`shelves`) zamienia `migrateSlopeModule` 
 **Skrzynki szuflad (MOVENTO)**: `core/drawerBoxBuild.js` (czyste, z testami) zbiera skrzynki
 drewniane z całego projektu (zwykłe szafki przez `getDrawerBoxInfo`, skos przez `getSlopeFronts`, też
 skrzynka B), scala identyczne i liczy otwory: łączniki wg `project.drawerBox` (domyślnie kołek +
-wkręt na przemian; konfirmat / kołki / wkręty; odstępy to ustawienia, bo pochodzą z poradników) oraz
+wkręt na przemian; konfirmat / kołki / wkręty; odstępy to ustawienia, bo pochodzą z poradników;
+albo Lamello P z frezarki Zeta P2 — `LAMELLO`: Tenso/Clamex P-10/P-14, rowek = cięciwa freza Ø100,4,
+rozmieszczenie wg zasad producenta, Clamex z otworem Ø6 na klucz od wnętrza skrzynki) oraz
 zaczep tylny prowadnicy Ø6×10 w tylnej krawędzi dna (Blum TD-132/1). Sprzęgła T51.7601 tylko jako
 uwaga — Blum podaje je szablonem T65.1000.02, bez wymiarów. Rysunki: `render/drawerBoxDrawing2d.js`
 (formatki z otworami + `assemblySVG`: montaż w izometrii, rozstrzelony i złożony, własny rzut w SVG
