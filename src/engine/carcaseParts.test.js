@@ -91,23 +91,23 @@ describe("getCorpusHoles", () => {
   it("boki przelotowe, pełny wieniec: wkręt + kołek 32 mm dalej, z przodu i z tyłu, środkowy zestaw przy głębokości > 250 mm odstępu, dół i góra", () => {
     const holes = holesOf(baseModule(), config());
     expect(holes).toHaveLength(12);
-    // dół: w osi płyty (18/2); głęb. 513 -> skrajne 37 / 476, odstęp 439 > 250 -> środkowy w rastrze 32 (261)
+    // dół: w osi płyty (18/2); głęb. wieńca 510 -> skrajne 37 / 473, odstęp 439 > 250 -> środkowy w rastrze 32 (261)
     expect(holes.filter((h) => h.y === 9)).toEqual([
       { y: 9, xFromFront: 37, holeType: "screw" },
       { y: 9, xFromFront: 69, holeType: "dowel" },
       { y: 9, xFromFront: 261, holeType: "screw" },
       { y: 9, xFromFront: 293, holeType: "dowel" },
-      { y: 9, xFromFront: 476, holeType: "screw" },
-      { y: 9, xFromFront: 444, holeType: "dowel" },
+      { y: 9, xFromFront: 473, holeType: "screw" },
+      { y: 9, xFromFront: 441, holeType: "dowel" },
     ]);
     expect(holes.filter((h) => h.y === 711)).toHaveLength(6);
   });
 
   it("płytka szafka (wisząca 320): tylko dwa skrajne zestawy; trawers poziomy: jeden zestaw", () => {
     const shallow = holesOf(baseModule({ dimensions: { width: 600, height: 720, depth: 320 } }), config());
-    expect(shallow.filter((h) => h.y === 9 && h.holeType === "screw").map((h) => h.xFromFront)).toEqual([37, 283]);
+    expect(shallow.filter((h) => h.y === 9 && h.holeType === "screw").map((h) => h.xFromFront)).toEqual([37, 280]);
     const trav = holesOf(baseModule(), config({ topType: "trawersy_poziom" }));
-    expect(trav.filter((h) => h.y === 711 && h.holeType === "screw").map((h) => h.xFromFront)).toEqual([37, 476]);
+    expect(trav.filter((h) => h.y === 711 && h.holeType === "screw").map((h) => h.xFromFront)).toEqual([37, 473]);
   });
 
   it("trawersy pionowe: otwory na górze boku w osi trawersu, pionowo", () => {
@@ -116,8 +116,8 @@ describe("getCorpusHoles", () => {
     expect(top).toEqual([
       { y: 683, xFromFront: 9, holeType: "screw" },
       { y: 651, xFromFront: 9, holeType: "dowel" },
-      { y: 683, xFromFront: 504, holeType: "screw" },
-      { y: 651, xFromFront: 504, holeType: "dowel" },
+      { y: 683, xFromFront: 501, holeType: "screw" },
+      { y: 651, xFromFront: 501, holeType: "dowel" },
     ]);
   });
 

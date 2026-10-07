@@ -244,6 +244,15 @@ okno `ui/cabinetInstructions.js`, sekcja huba „Instrukcje montażu”. Wspóln
 wymiary, izometria, widok szafki od frontu) są w `render/workshopDrawing.js`, style okien w `WORKSHOP_CSS`
 (`ui/drawerBoxDrawings.js`) — skrzynki szuflad i szafki wyglądają tak samo. Narożna i skos: jeszcze bez instrukcji.
 
+**Stół RC System** (rcsystem.pl, ręczny stół do nawiercania): `core/rcSystem.js` (czyste, z testami) — otwory bazowe
+w blacie (`RC_BASES`, mm od osi wiertła) + piny +0,5…+2 (`baseAndPin`), ustawienia `project.rcSystem` (włączony, tylna
+wiertarka „pin” w szynie co 16 mm albo „zderzak” 37 mm, kalibracja: głębokość boku + tylny otwór od tyłu) i
+`rcRearScrew` — położenie tylnego wkrętu; gdy pewne (zderzak / pin po kalibracji), `jointSetsFor` w `carcaseParts.js`
+przesuwa tylny zestaw łączników wszędzie (rysunek 2D, instrukcje, okucia). `rcPanelSetups` grupuje otwory boku wg
+ustawienia (krawędź do pinów + otwór bazowy, pozycje wzdłuż, pary co 32 mm = jedno wiercenie) — karta „Wiercenie na
+stole RC System” w instrukcji szafki, ustawienia w hubie „Instrukcje montażu”. Łączniki wieńców / półek stałych liczą
+się od głębokości połączenia `jointDepthOf` (głębokość wieńca), tylny rząd podpórek 37 mm od tyłu boku.
+
 **Plan rozkroju**: `engine/nesting.js` — „półkowe” układanie formatek na arkuszach z cięciami na
 wylot (sprawdza kilka orientacji, wybiera najmniej arkuszy), wyświetlane przez
 `ui/cutPlanModal.js`.

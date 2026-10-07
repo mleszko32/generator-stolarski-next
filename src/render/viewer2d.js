@@ -6,7 +6,7 @@ import { fmtMm, round1 } from '../utils/math.js';
 import { state } from '../core/state.js';
 import { escapeHtml } from '../utils/dom.js';
 import { C, FONT, FONT_UI } from './drawingPalette.js';
-import { jointSetPositions, jointSpacingOf } from '../engine/carcaseParts.js';
+import { jointSetsFor, jointDepthOf } from '../engine/carcaseParts.js';
 
 export const formatVal = (val) => Number(Number(val).toFixed(1));
 
@@ -295,7 +295,7 @@ function drawSideDetails(ctx) {
                       let rScrew = 1.5; 
                       let rDowel = 4.0; 
                       // Zestawy jak przy wieńcach (engine/carcaseParts.js: jointSetPositions).
-                      jointSetPositions(depth, jointSpacingOf(mod, state.project)).forEach((set, i) => {
+                      jointSetsFor(mod, state.project, jointDepthOf(mod, state.project)).forEach((set, i) => {
                           svg += `<circle cx="${getSvgX(set.screw)}" cy="${svgY - el.h/2}" r="${rScrew}" fill="${baseColor}" />`;
                           svg += `<circle cx="${getSvgX(set.dowel)}" cy="${svgY - el.h/2}" r="${rDowel}" fill="${baseColor}" />`;
                           if (i === 0) corpusYs.add(calcY + el.h/2);

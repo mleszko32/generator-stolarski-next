@@ -3,6 +3,7 @@
 // Formatki i wiercenia korpusu prostokątnej szafki (boki, wieńce, trawersy, plecy) -
 // wydzielone z engine/cabinet.js. Używane też przez engine/cornerParts.js.
 import { getTraverseConfig } from "../core/layout.js";
+import { rcRearOverride } from "../core/rcSystem.js";
 
 // Zestawy łączników korpusu (wkręt + kołek) na połączeniu o długości `depth` (wieniec / półka
 // stała / przegroda z bokiem): skrajne - wkręt 37 mm od przodu i od tyłu, kołek 32 mm dalej w
@@ -11,10 +12,14 @@ import { getTraverseConfig } from "../core/layout.js";
 // do rastra 32 mm liczonego od przedniego wkrętu (siatka wiertarki wielowrzecionowej).
 // Bardzo płytki element - jeden zestaw. Zwraca [{ screw, dowel }] (mm od przodu), od przodu.
 export const DEFAULT_JOINT_SPACING = 250;
-export function jointSetPositions(depth, maxSpacing = DEFAULT_JOINT_SPACING) {
+// rearScrew - położenie tylnego wkrętu narzucone przez stół RC System (core/rcSystem.js:
+// tylna wiertarka na pinie szyny co 16 mm); bez niego tylny wkręt 37 mm od tyłu.
+export function jointSetPositions(depth, maxSpacing = DEFAULT_JOINT_SPACING, rearScrew = null) {
   const D = parseFloat(depth) || 0;
   const max = Math.max(64, parseFloat(maxSpacing) || DEFAULT_JOINT_SPACING);
-  const front = 37, rear = D - 37;
+  const front = 37;
+  const rr = parseFloat(rearScrew);
+  const rear = Number.isFinite(rr) && rr > front + 32 && rr <= D - 37 ? rr : D - 37;
   if (rear - front < 64) return [{ screw: front, dowel: front + 32 }];
   const sets = [{ screw: front, dowel: front + 32 }];
   const mid = Math.max(0, Math.ceil((rear - front) / max) - 1);
@@ -26,19 +31,34 @@ export function jointSetPositions(depth, maxSpacing = DEFAULT_JOINT_SPACING) {
   sets.push({ screw: rear, dowel: rear - 32 });
   return sets;
 }
+// Zestawy dla formatki o głębokości depth w danej szafce (rozstaw z konstrukcji, tylny
+// otwór wg stołu RC System, jeśli włączony i skalibrowany / na zderzaku).
+export const jointSetsFor = (mod, config, depth) => jointSetPositions(depth, jointSpacingOf(mod, config), rcRearOverride(depth, config));
+// Głębokość połączenia wieniec / półka stała z bokiem = głębokość wieńca (bez pleców, przy
+// plecach w nucie także bez odsunięcia nutu). Od niej liczą się zestawy łączników - tylny
+// zestaw 37 mm od tyłu WIEŃCA, a nie od tyłu szafki (wcześniej od głębokości szafki: przy
+// plecach nakładanych wypadał 34 mm od tyłu boku, przy nucie 14 mm od końca wieńca).
+export function jointDepthOf(mod, config) {
+  const D = parseFloat(mod.dimensions.depth) || 0;
+  const backThick = parseFloat(config.materials && config.materials.backThickness) || 3;
+  const backP = { type: 'nakladane', offset: 16, ...((config && config.backPanel) || {}), ...(mod.backPanel || {}) };
+  return backP.type === 'nut' ? D - (parseFloat(backP.offset) || 16) - backThick : D - backThick;
+}
+
 export const jointSpacingOf = (mod, config) => {
   const cons = { ...((config && config.construction) || {}), ...((mod && mod.construction) || {}) };
   return parseFloat(cons.jointSpacing) || DEFAULT_JOINT_SPACING;
 };
 
 export function getCorpusHoles(mod, config) {
-  const { height, depth } = mod.dimensions;
+  const { height } = mod.dimensions;
   const th = config.materials.boardThickness || 18;
   const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(config.construction || {}), ...(mod.construction || {}) };
   const trav = getTraverseConfig(cons);
 
   const holes = [];
-  const sets = jointSetPositions(depth, jointSpacingOf(mod, config));
+  const jointDepth = jointDepthOf(mod, config);
+  const sets = jointSetsFor(mod, config, jointDepth);
   const frontSet = sets[0], rearSet = sets[sets.length - 1];
 
   const addSet = (y, set) => {
@@ -64,8 +84,8 @@ export function getCorpusHoles(mod, config) {
           holes.push({ y: height - 69, xFromFront: th / 2, holeType: 'dowel' });
         }
         if (trav.rear.active) {
-          holes.push({ y: height - 37, xFromFront: depth - th / 2, holeType: 'screw' });
-          holes.push({ y: height - 69, xFromFront: depth - th / 2, holeType: 'dowel' });
+          holes.push({ y: height - 37, xFromFront: jointDepth - th / 2, holeType: 'screw' });
+          holes.push({ y: height - 69, xFromFront: jointDepth - th / 2, holeType: 'dowel' });
         }
      }
   } else {
@@ -124,7 +144,7 @@ export function getPionMountHoles(mod, config) {
   const addHoles = (panelKey, panelLabel, panelWidth, panelOffsetX, pionCenterX) => {
     if (!byPanel[panelKey]) byPanel[panelKey] = { type: 'wieniec-mount', panelKey, panelLabel, panelWidth, panelDepth: topBottomDepth, holes: [] };
     const x = pionCenterX - panelOffsetX;
-    jointSetPositions(topBottomDepth, jointSpacingOf(mod, config)).forEach((set) => {
+    jointSetsFor(mod, config, topBottomDepth).forEach((set) => {
       byPanel[panelKey].holes.push(
         { x, zFromFront: topBottomDepth - set.screw, holeType: 'screw' },
         { x, zFromFront: topBottomDepth - set.dowel, holeType: 'dowel' }

@@ -17,7 +17,7 @@
 //   formatki, z od przodu; otwory w czołach mają edge 'lewe' / 'prawe' / 'przednie' / 'tylne'.
 import { calculateModuleParts } from "./cabinet.js";
 import { recalculateLayout, getTraverseConfig } from "../core/layout.js";
-import { jointSetPositions, jointSpacingOf } from "./carcaseParts.js";
+import { jointSetsFor } from "./carcaseParts.js";
 import { num, round1 } from "../utils/math.js";
 
 const SHELF_PIN_DROP = 2.5;
@@ -55,8 +55,7 @@ export function getCabinetPanels(mod, project) {
   const tbDepth = backP.type === "nut" ? D - num(backP.offset, 16) - backThick : D - backThick;
   const tbW = isFull ? W : W - 2 * th;
   const spec = cabinetHoleSpecs(th);
-  const spacing = jointSpacingOf(mod, project);
-  const setsToKinds = (depth) => jointSetPositions(depth, spacing).flatMap((s) => [[s.screw, "wkret"], [s.dowel, "kolek"]]).sort((a, b) => a[0] - b[0]);
+  const setsToKinds = (depth) => jointSetsFor(mod, project, depth).flatMap((s) => [[s.screw, "wkret"], [s.dowel, "kolek"]]).sort((a, b) => a[0] - b[0]);
   const { mountingData, parts } = calculateModuleParts(mod);
   const calcY = (y) => (isFull ? y - th : y);             // y w układzie modułu -> od dołu boku
   const els = mod.elements || [];
@@ -78,13 +77,13 @@ export function getCabinetPanels(mod, project) {
       const cy = calcY(el.y);
       if (!inPanel(cy)) return;
       if (el.isStructural) {
-        jointSetPositions(D, spacing).forEach((set) => {
+        jointSetsFor(mod, project, tbDepth).forEach((set) => {
           const y = round1(cy + el.h / 2 - y0);
           holes.push({ x: set.screw, y, kind: "wkret", ...face("wkret"), to: "półka stała" });
           holes.push({ x: set.dowel, y, kind: "kolek", ...face("kolek"), to: "półka stała" });
         });
       } else {
-        [37, D - 37].forEach((hx) => [-32, 0, 32].forEach((dy) => {
+        [37, sideD - 37].forEach((hx) => [-32, 0, 32].forEach((dy) => {
           holes.push({ x: hx, y: round1(cy - SHELF_PIN_DROP + dy - y0), kind: "podporka", ...face("podporka"), to: "półka ruchoma", center: dy === 0 });
         }));
       }
@@ -116,7 +115,7 @@ export function getCabinetPanels(mod, project) {
   const corpusOnSide = isFull ? [] : corpus.map((h) => ({ x: round1(h.xFromFront), y: round1(calcY(h.y)), kind: HOLE_KIND[h.holeType], ...face(HOLE_KIND[h.holeType]), to: h.y < H / 2 ? "wieniec dolny" : "wieniec / trawers górny" }));
 
   // Wieńce przelotowe: boki stoją między wieńcami, łączniki wchodzą w ich czoła dolne i górne.
-  const fullJointsSide = setsToKinds(D);
+  const fullJointsSide = setsToKinds(tbDepth);
   const topJointsSide = cons.topType === "pelny" ? fullJointsSide
     : cons.topType === "trawersy_poziom" ? fullJointsSide.filter(([z]) => (z < D / 2 ? getTraverseConfig(cons).front.active : getTraverseConfig(cons).rear.active))
     : [];
@@ -155,7 +154,7 @@ export function getCabinetPanels(mod, project) {
     }
     return ["lewe", "prawe"].flatMap((ed) => zs.map(([z, kind]) => ({ edge: ed, x: ed === "lewe" ? 0 : round1(tbW), z: round1(z), kind, ...edge(kind), to: ed === "lewe" ? "bok lewy" : "bok prawy" })));
   };
-  const fullJoints = setsToKinds(D);
+  const fullJoints = setsToKinds(tbDepth);
   panels.push({ id: "wieniec-dolny", kind: "poziom", name: "Wieniec dolny", qty: 1, length: round1(tbW), width: round1(tbDepth), thickness: th,
     holes: [...sideJoints(fullJoints), ...pionHolesFor("wieniec-dolny")] });
   const trav = getTraverseConfig(cons);
@@ -163,10 +162,10 @@ export function getCabinetPanels(mod, project) {
     panels.push({ id: "wieniec-gorny", kind: "poziom", name: "Wieniec górny", qty: 1, length: round1(tbW), width: round1(tbDepth), thickness: th,
       holes: [...sideJoints(fullJoints), ...pionHolesFor("wieniec-gorny")] });
   } else if (cons.topType === "trawersy_poziom") {
-    [["front", "Trawers przedni (poziomy)", 0, [[37, "wkret"], [69, "kolek"]]], ["rear", "Trawers tylny (poziomy)", null, [[D - 69, "kolek"], [D - 37, "wkret"]]]].forEach(([key, name, z0, zs]) => {
+    [["front", "Trawers przedni (poziomy)", 0, [[37, "wkret"], [69, "kolek"]]], ["rear", "Trawers tylny (poziomy)", null, [[tbDepth - 69, "kolek"], [tbDepth - 37, "wkret"]]]].forEach(([key, name, z0, zs]) => {
       if (!trav[key].active) return;
       const tw = num(trav[key].width, 100);
-      const start = z0 === null ? D - tw : 0;
+      const start = z0 === null ? tbDepth - tw : 0;
       panels.push({ id: `trawers-${key}`, kind: "poziom", name, qty: 1, length: round1(tbW), width: round1(tw), thickness: th,
         holes: sideJoints(zs.map(([z, k]) => [z - start, k])) });
     });
