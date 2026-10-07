@@ -223,7 +223,7 @@ function boxSolids(box, explode) {
   const sides = box.panels.filter((p) => p.kind === "bok");
   const lowSide = sides[0], highSide = sides[1] || sides[0];
   const bottom = box.panels.find((p) => p.id === "dno");
-  const back = box.panels.find((p) => p.id === "tyl");
+  const back = box.panels.find((p) => p.id === "tyl-przod");
   const L = bottom.length, w = bottom.width, Wo = w + 2 * t;
   const plate = back.points.map(([x, y]) => [t + x, r + t + y]);
   const rect = (u0, v0, u1, v1) => [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
@@ -231,8 +231,8 @@ function boxSolids(box, explode) {
     { no: 1, name: sides.length > 1 ? lowSide.name : "Bok lewy", solid: prism(rect(0, 0, L, lowSide.width), "x", 0, t), shift: [-explode, 0, 0], tone: C.stone200 },
     { no: 2, name: sides.length > 1 ? highSide.name : "Bok prawy", solid: prism(rect(0, 0, L, highSide.width), "x", Wo - t, t), shift: [explode, 0, 0], tone: C.stone200 },
     { no: 3, name: "Dno", solid: prism(rect(t, 0, t + w, L), "y", r, t), shift: [0, 0, 0], tone: C.slate200 },
-    { no: 4, name: "Tył", solid: prism(plate, "z", L - t, t), shift: [0, 0, 0], tone: C.blue100 },
-    { no: 5, name: "Czoło wewnętrzne", solid: prism(plate, "z", 0, t), shift: [0, 0, 0], tone: C.blue100 },
+    { no: 4, name: "Tył/Przód (2 szt.)", solid: prism(plate, "z", L - t, t), shift: [0, 0, 0], tone: C.blue100, off: [34, -30] },
+    { no: 4, name: "Tył/Przód (2 szt.)", solid: prism(plate, "z", 0, t), shift: [0, 0, 0], tone: C.blue100, off: [-34, -30] },
   ];
 }
 
@@ -291,10 +291,11 @@ export function assemblySVG(box) {
   });
 
   // Numery formatek z odnośnikami (kółko z numerem obok środka bryły).
-  const OFF = { 1: [-40, -24], 2: [40, -24], 3: [0, 40], 4: [34, -30], 5: [-34, -30] };
+  const OFF = { 1: [-40, -24], 2: [40, -24], 3: [0, 40] };
   exploded.forEach((s) => {
     const c = E.P(s.solid.center, s.shift);
-    const lx = c[0] + OFF[s.no][0], ly = c[1] + OFF[s.no][1];
+    const off = s.off || OFF[s.no];
+    const lx = c[0] + off[0], ly = c[1] + off[1];
     body += line(c[0], c[1], lx, ly, C.slate500);
     body += `<circle cx="${r1(lx)}" cy="${r1(ly)}" r="9" fill="${C.white}" stroke="${C.blue900}" stroke-width="1.2"/>`;
     body += text(lx, ly + 4, String(s.no), { size: 11, color: C.blue900, weight: "bold" });
@@ -304,7 +305,7 @@ export function assemblySVG(box) {
   const f0 = E.P([Wo / 2, 0, 0], [0, 0, 0]);
   body += text(f0[0] - 20, f0[1] + 30, "↙ PRZÓD", { size: 10, color: C.slate500, weight: "bold" });
 
-  body += text(pad, H - 10, exploded.map((s) => `${s.no} — ${s.name}`).join("    "), { size: 10, color: C.slate600, anchor: "start" });
+  body += text(pad, H - 10, [...new Set(exploded.map((s) => `${s.no} — ${s.name}`))].join("    "), { size: 10, color: C.slate600, anchor: "start" });
   return `<svg viewBox="0 0 ${W} ${r1(H)}" xmlns="http://www.w3.org/2000/svg" font-family="${FONT}"><rect width="${W}" height="${r1(H)}" fill="${C.white}"/>${body}</svg>`;
 }
 
@@ -314,7 +315,7 @@ export function assemblyStepsHtml(box) {
     const lam = box.lamello;
     const steps = [
       `Ustaw Zeta P2 na głębokość ${lam.depth} (${lam.name}); przy płycie ${fmt(box.t)} mm oś rowka w połowie grubości (płytka 2 mm dla 16 mm). Frezuj oba elementy połączenia od tej samej strony bazowej - wtedy rowki się pokrywają.`,
-      "Rowki w czołach tyłu (4), czoła wewnętrznego (5) i dna (3) oraz pasujące rowki w płaszczyźnie boków (1, 2) wg rysunków - pozycje od przodu / od spodu.",
+      "Rowki w czołach formatek tył/przód (4) i dna (3) oraz pasujące rowki w płaszczyźnie boków (1, 2) wg rysunków - pozycje od przodu / od spodu.",
       lam.clamex
         ? `Wywierć otwory Ø6 na klucz (przyrząd Lamello do Clamex P), ${fmt(lam.keyFromEdge)} mm od krawędzi, od strony wnętrza skrzynki, aż do rowka.`
         : null,
@@ -331,8 +332,8 @@ export function assemblyStepsHtml(box) {
   const fix = { kolek_wkret: "wkręty", konfirmat: "konfirmaty", kolki: "ścisk (kołki na klej)", wkrety: "wkręty" }[box.join];
   const steps = [
     "Nawierć formatki wg rysunków i tabeli otworów (zaczepy tylne w dnie i sprzęgła można wiercić szablonem Blum T65.1000.02).",
-    dowels ? "Wklej kołki w czoła dna (3), tyłu (4) i czoła wewnętrznego (5)." : null,
-    `Połóż bok ${box.isB ? "niski" : "lewy"} (1) wewnętrzną stroną do góry, wstaw w niego dno (3), a na dnie tył (4) i czoło wewnętrzne (5)${glue ? " — połączenia na klej" : ""}.`,
+    dowels ? "Wklej kołki w czoła dna (3) i obu formatek tył/przód (4)." : null,
+    `Połóż bok ${box.isB ? "niski" : "lewy"} (1) wewnętrzną stroną do góry, wstaw w niego dno (3), a na dnie tył i przód (4)${glue ? " — połączenia na klej" : ""}.`,
     `Nałóż drugi bok (2) i skręć całość: ${fix}. Tył i czoło górą równo z bokami, dno ${fmt(box.recess)} mm nad spodem boków.`,
     "Sprawdź przekątne skrzynki (kąt prosty) i zetrzyj nadmiar kleju.",
     "Przykręć sprzęgła T51.7601 pod dnem z przodu (wg szablonu), potem front od środka przez czoło wewnętrzne.",

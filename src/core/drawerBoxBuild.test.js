@@ -25,7 +25,7 @@ describe("skrzynki szuflad MOVENTO - łączniki", () => {
     const s = getDrawerBoxSettings({});
     expect(s.join).toBe("kolek_wkret");
     const box = buildDrawerBox({ comps: comps(90), system: movento, isB: false }, s);
-    const tyl = box.panels.find((p) => p.id === "tyl");
+    const tyl = box.panels.find((p) => p.id === "tyl-przod");
     const left = tyl.holes.filter((h) => h.edge === "lewe").map((h) => h.kind);
     expect(left).toEqual(["wkret", "kolek"]);
   });
@@ -48,7 +48,7 @@ describe("skrzynki szuflad MOVENTO - formatki i otwory", () => {
     expect(box.lw - box.skw).toBe(42);
     expect(box.skl).toBe(box.nl - 10);
     expect(panel("bok")).toMatchObject({ qty: 2, length: box.skl, width: 150 });
-    expect(panel("tyl")).toMatchObject({ length: box.skw, width: 150 - 13 - 16 });
+    expect(panel("tyl-przod")).toMatchObject({ length: box.skw, width: 150 - 13 - 16, qty: 2 });
   });
 
   it("bok: łączniki tyłu i czoła w osi ich grubości, łączniki dna w osi dna", () => {
@@ -107,13 +107,13 @@ describe("skrzynki szuflad MOVENTO - zbieranie z projektu", () => {
     const [box] = collectDrawerBoxes(project);
     expect(box.isB).toBe(true);
     const ids = box.panels.map((p) => p.id);
-    expect(ids).toEqual(["bok-niski", "bok-wysoki", "dno", "tyl", "czolo"]);
+    expect(ids).toEqual(["bok-niski", "bok-wysoki", "dno", "tyl-przod"]);
     const low = box.panels[0], high = box.panels[1];
     expect(high.width).toBeGreaterThan(low.width);
     // wysoki bok ma więcej łączników tyłu niż niski
     const backJoints = (p) => p.holes.filter((h) => h.to === "tył").length;
     expect(backJoints(high)).toBeGreaterThan(backJoints(low));
-    expect(box.panels.find((p) => p.id === "tyl").points.length).toBeGreaterThanOrEqual(4);
+    expect(box.panels.find((p) => p.id === "tyl-przod").points.length).toBeGreaterThanOrEqual(4);
   });
 });
 
@@ -145,7 +145,7 @@ describe("skrzynki szuflad - Lamello P (Zeta P2)", () => {
   });
 
   it("Clamex: otwór Ø6 na klucz od lica tyłu, 7,5 mm od krawędzi (P-14), 5,5 mm (P-10)", () => {
-    const k14 = lamBox("clamex_p14").panels.find((p) => p.id === "tyl").holes.filter((h) => h.kind === "klucz");
+    const k14 = lamBox("clamex_p14").panels.find((p) => p.id === "tyl-przod").holes.filter((h) => h.kind === "klucz");
     expect(k14.length).toBeGreaterThan(0);
     expect(new Set(k14.map((h) => h.x))).toEqual(new Set([7.5, lamBox("clamex_p14").skw - 7.5]));
     k14.forEach((h) => expect(h).toMatchObject({ d: 6, edge: "lico" }));

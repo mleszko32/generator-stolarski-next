@@ -210,8 +210,8 @@ export function buildDrawerBox(raw, settings) {
   const panels = [
     ...sides.map((p) => ({ ...p, kind: "bok", thickness: t })),
     { id: "dno", kind: "dno", name: "Dno", qty: 1, length: L, width: w, thickness: t, holes: bottomHoles },
-    { id: "tyl", kind: "plyta", name: "Tył", qty: 1, length: w, width: Math.max(hLeft, hRight, ...backPts.map((q) => q[1])), thickness: t, points: backPts, holes: endHoles(jLeft, jRight) },
-    { id: "czolo", kind: "plyta", name: "Czoło wewnętrzne", qty: 1, length: w, width: Math.max(hLeft, hRight, ...backPts.map((q) => q[1])), thickness: t, points: backPts, holes: endHoles(jLeft, jRight) },
+    // Tył i przód (czoło wewnętrzne) - ta sama formatka z tymi samymi otworami.
+    { id: "tyl-przod", kind: "plyta", name: "Tył/Przód", qty: 2, length: w, width: Math.max(hLeft, hRight, ...backPts.map((q) => q[1])), thickness: t, points: backPts, holes: endHoles(jLeft, jRight) },
   ];
 
   const tag = B

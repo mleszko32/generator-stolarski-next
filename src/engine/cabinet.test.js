@@ -300,7 +300,7 @@ describe("Szuflada Blum MOVENTO (skrzynka drewniana)", () => {
     id: "f0", typ: "front", subtype: "szuflada", frontIndex: 0, gap: 3, distribution: "1", baseZone: { ...zone }, ...extra,
   });
 
-  it("formatki: 2 boki, dno, tył i czoło wewn. z wpisaną wysokością boku", () => {
+  it("formatki: 2 boki, dno i tył/przód × 2 z wpisaną wysokością boku", () => {
     const mod = baseModule({ front: { drawerSystem: "movento_katalog" }, elements: [drawer({ drawerSideHeight: 150 })] });
     setProject(freshProject({ modules: [mod] }));
     const { parts } = calculateParts();
@@ -308,8 +308,9 @@ describe("Szuflada Blum MOVENTO (skrzynka drewniana)", () => {
     // LW = 564, NL = 500 (głębokość wieńca 510 - 5) -> SKW 522, SKL 490
     expect(p("Bok szuflady")).toMatchObject({ length: 490, width: 150, qty: 2, category: "Szuflada" });
     expect(p("Dno szuflady")).toMatchObject({ length: 490, width: 522, qty: 1 });
-    expect(p("Tył szuflady")).toMatchObject({ length: 522, width: 121, qty: 1 });
-    expect(p("Czoło wewn. szuflady")).toMatchObject({ length: 522, width: 121, qty: 1 });
+    // tył i czoło wewnętrzne to ta sama formatka - jeden wiersz "Tył/Przód" × 2
+    expect(p("Tył/Przód szuflady")).toMatchObject({ length: 522, width: 121, qty: 2 });
+    expect(p("Czoło wewn.")).toBeUndefined();
   });
 
   it("okucia: komplet prowadnic MOVENTO z sprzęgłami zamiast kompletu szuflady", () => {

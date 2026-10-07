@@ -445,9 +445,9 @@ export function getSlopeShapes(mod, config) {
     if (fr.type === 'brak') return;
     if (fr.shape.kind !== 'prostokat') add(frontName(fr), 'Front', fr.shape.points);
     if (fr.drawer && fr.drawer.boxType === 'B') {
-      const { back, inner } = drawerBNames(fr, g);
-      add(back, 'Szuflada', fr.drawer.box.backPoints);
-      add(inner, 'Szuflada', fr.drawer.box.backPoints);
+      const { plate } = drawerBNames(fr, g);
+      add(plate, 'Szuflada', fr.drawer.box.backPoints);   // tył i przód (czoło wewn.) - × 2
+      add(plate, 'Szuflada', fr.drawer.box.backPoints);
     }
   });
   const back = g.isTriangle ? [[0, 0], [g.W, 0], [g.W, g.H]] : [[0, 0], [g.W, 0], [g.W, g.H], [0, g.L]];
@@ -464,7 +464,7 @@ function drawerBNames(fr, g) {
   const shape = b.backFlat > 0
     ? `ścięty róg, ${low} ${r1(b.backLow)}, płasko ${r1(b.backFlat)}`
     : `trapez, ${low} ${r1(b.backLow)}`;
-  return { tag, back: `Tył szuflady skos ${tag} (${shape})`, inner: `Czoło wewn. szuflady skos ${tag} (${shape})` };
+  return { tag, plate: `Tył/Przód szuflady skos ${tag} (${shape})` };
 }
 
 // Formatki frontów, blend i skrzynek szuflad szafki pod skos.
@@ -485,13 +485,12 @@ export function getSlopeFrontParts(mod, config) {
     }
     // Skrzynka B (ścięta pod skos): boki różnej wysokości, tył i czoło trapezowe.
     const c = d.comps, b = d.box;
-    const { tag, back, inner } = drawerBNames(fr, g);
+    const { tag, plate } = drawerBNames(fr, g);
     parts.push(
       { name: `Bok szuflady ${tag} (niski)`, length: r1(c.sides.length), width: r1(b.sideLow), qty: 1, category: 'Szuflada' },
       { name: `Bok szuflady ${tag} (wysoki)`, length: r1(c.sides.length), width: r1(b.sideHigh), qty: 1, category: 'Szuflada' },
       { name: `Dno szuflady ${tag}`, length: r1(c.bottom.length), width: r1(c.bottom.width), qty: 1, category: 'Szuflada' },
-      { name: back, length: r1(c.back.width), width: r1(b.backHigh), qty: 1, category: 'Szuflada' },
-      { name: inner, length: r1(c.innerFront.width), width: r1(b.backHigh), qty: 1, category: 'Szuflada' },
+      { name: plate, length: r1(c.back.width), width: r1(b.backHigh), qty: 2, category: 'Szuflada' },
     );
   });
   return parts;

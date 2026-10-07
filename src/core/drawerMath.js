@@ -207,13 +207,13 @@ export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick
 export function drawerComponentsToParts(comps) {
   const r1 = (v) => parseFloat((v || 0).toFixed(1));
   if (comps.woodenBox) {
-    // MOVENTO: cała skrzynka z płyty.
+    // MOVENTO: cała skrzynka z płyty. Tył i czoło wewnętrzne mają ten sam wymiar, więc to
+    // jedna formatka "Tył/Przód" × 2.
     const tag = `NL${comps.nominalLength} H${comps.sideHeight}`;
     return [
       { name: `Bok szuflady ${tag}`, length: r1(comps.sides.length), width: r1(comps.sides.height), qty: 2, category: "Szuflada" },
       { name: `Dno szuflady ${tag}`, length: r1(comps.bottom.length), width: r1(comps.bottom.width), qty: 1, category: "Szuflada" },
-      { name: `Tył szuflady ${tag}`, length: r1(comps.back.width), width: r1(comps.back.height), qty: 1, category: "Szuflada" },
-      { name: `Czoło wewn. szuflady ${tag}`, length: r1(comps.innerFront.width), width: r1(comps.innerFront.height), qty: 1, category: "Szuflada" },
+      { name: `Tył/Przód szuflady ${tag}`, length: r1(comps.back.width), width: r1(comps.back.height), qty: 2, category: "Szuflada" },
     ];
   }
   return [

@@ -104,7 +104,9 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
   wcześniej z tego wynikły. Blum MOVENTO (`movento_katalog` / `movento_forum`) to
   skrzynka drewniana (`woodenBox: true`): bez wariantów, wysokość boku wpisywana przy
   szufladzie (`front.drawerSideHeight`), formatki 2 boki + dno między bokami + tył +
-  czoło wewn. (`getDrawerComponents` zwraca wtedy też `sides`/`innerFront`). Wiercenie
+  czoło wewn. (`getDrawerComponents` zwraca wtedy też `sides`/`innerFront`); na liście formatek
+  tył i czoło wewn. to jedna formatka „Tył/Przód szuflady …” × 2 (ten sam wymiar). Nazwy formatek
+  szuflad nie zawierają szerokości szafki, żeby jednakowe formatki z różnych szafek się sumowały. Wiercenie
   prowadnic MOVENTO wg karty Blum: wkręty 38 mm nad wieńcem/półką pod szufladą
   (`calculateDrawerHoles(..., nl, zoneBottom)`), w poziomie `moventoRunnerHoles(system, nl)`.
 - `drawerMath.js` — dobór długości nominalnej, dobór wariantu wysokości do dostępnego miejsca,

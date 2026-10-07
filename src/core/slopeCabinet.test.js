@@ -202,7 +202,7 @@ describe("szafka pod skos - fronty i szuflady z wnętrza", () => {
     const parts = getSlopeFrontParts(fusion({ drawerBox: "B" }), cfg());
     expect(parts.find((p) => p.name === "Bok szuflady NL580 H438-459 (niski)")).toMatchObject({ width: 438, qty: 1 });
     expect(parts.find((p) => p.name === "Bok szuflady NL580 H438-459 (wysoki)")).toMatchObject({ width: 459, qty: 1 });
-    expect(parts.find((p) => p.name.startsWith("Tył szuflady skos NL580 H438-459"))).toMatchObject({ length: 608, width: 430 });
+    expect(parts.find((p) => p.name.startsWith("Tył/Przód szuflady skos NL580 H438-459"))).toMatchObject({ length: 608, width: 430, qty: 2 });
     expect(parts.find((p) => p.name === "Bok szuflady NL580 H459")).toMatchObject({ qty: 2 });
   });
 
@@ -491,8 +491,8 @@ describe("szafka pod skos - skrzynka B: tył i czoło idą równolegle do skosu 
   it("nazwa formatki opisuje ścięty róg, rysunki cięcia dostają kształt tyłu", () => {
     const m = fusion();
     const parts = getSlopeFrontParts(m, cfg());
-    expect(parts.some((p) => p.name.startsWith("Tył szuflady skos") && p.name.includes("ścięty róg"))).toBe(true);
+    expect(parts.some((p) => p.name.startsWith("Tył/Przód szuflady skos") && p.name.includes("ścięty róg"))).toBe(true);
     const shapes = getSlopeShapes(m, cfg()).filter((s) => s.category === "Szuflada");
-    expect(shapes.some((s) => s.name.startsWith("Tył szuflady skos") && s.points.length === 5)).toBe(true);
+    expect(shapes.some((s) => s.name.startsWith("Tył/Przód szuflady skos") && s.points.length === 5 && s.qty === 2)).toBe(true);
   });
 });
