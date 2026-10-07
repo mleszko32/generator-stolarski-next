@@ -121,8 +121,11 @@ export function bottomSVG(box, panel, startNo = 1) {
   uniq(panel.holes.filter((h) => h.edge === "tylne").map((h) => h.x)).forEach((x) => {
     b += line(L, x, L + 32, x, C.slate300, dash) + text(L + 36, x + 4, fmt(x), { size: 10, color: C.sky600, anchor: "start" });
   });
+  uniq(panel.holes.filter((h) => h.edge === "lico" && h.to).map((h) => h.x)).forEach((x) => {
+    b += line(L, x, L + 62, x, C.slate300, dash) + text(L + 66, x + 4, fmt(x), { size: 10, color: C.slate600, anchor: "start" });
+  });
   b += dimH(0, L, W + 18, fmt(L)) + dimV(-22, 0, W, fmt(W));
-  return wrap(-40, -80, L + 120, W + 112, b);
+  return wrap(-40, -80, L + 150, W + 112, b);
 }
 
 // Tył / czoło wewnętrzne widziane od wewnątrz skrzynki (niski bok po lewej w skrzynce B).
@@ -134,6 +137,7 @@ export function plateSVG(box, panel, startNo = 1) {
   b += `<polygon points="${pts}" fill="${C.slate50}" stroke="${C.slate700}" stroke-width="1.5"/>`;
   panel.holes.forEach((h, i) => {
     b += h.edge === "lico" ? faceHole(h.x, Y(h.y), h, startNo + i)
+      : h.edge === "dolne" ? edgeHole(h.x, Y(0), 0, -1, h, startNo + i)
       : h.edge === "lewe" ? edgeHole(0, Y(h.y), 1, 0, h, startNo + i) : edgeHole(W, Y(h.y), -1, 0, h, startNo + i);
   });
   uniq(panel.holes.filter((h) => h.edge === "lewe").map((h) => h.y)).forEach((y) => {
@@ -142,8 +146,12 @@ export function plateSVG(box, panel, startNo = 1) {
   uniq(panel.holes.filter((h) => h.edge === "prawe").map((h) => h.y)).forEach((y) => {
     b += line(W, Y(y), W + 26, Y(y), C.slate300, dash) + text(W + 30, Y(y) + 4, fmt(y), { size: 10, color: C.slate600, anchor: "start" });
   });
-  b += dimH(0, W, H + 18, fmt(W));
-  return wrap(-70, -62, W + 140, H + 92, b);
+  // Położenia łączników w dolnej krawędzi (od lewej) - pod formatką.
+  uniq(panel.holes.filter((h) => h.edge === "dolne").map((h) => h.x)).forEach((x) => {
+    b += line(x, H, x, H + 10, C.slate300) + text(x, H + 21, fmt(x), { size: 10, color: C.slate600 });
+  });
+  b += dimH(0, W, H + 40, fmt(W));
+  return wrap(-70, -62, W + 140, H + 114, b);
 }
 
 // Legenda rodzajów otworów obecnych w skrzynce.
@@ -161,11 +169,16 @@ export function holeTableHtml(box, settings) {
     n++;
     const where = p.kind === "bok"
       ? `płaszczyzna (od wewnątrz) → ${h.to}${h.groove ? (h.orient === "h" ? ", rowek poziomo" : ", rowek pionowo") : ""}`
-      : h.edge === "lico" ? (p.kind === "dno" ? "lico od góry (wnętrze szuflady), do rowka" : "lico od wewnątrz skrzynki, do rowka")
+      : h.edge === "lico" && h.kind !== "klucz" ? `lico od ${h.face === "spod" ? "spodu" : "góry"} → ${h.to}${h.groove ? ", rowek w poprzek" : ""}`
+      : h.edge === "lico" ? (p.kind === "dno" ? "lico od góry (wnętrze szuflady), do rowka" : `lico od wewnątrz skrzynki, do rowka${h.to ? " przy dnie" : ""}`)
+      : h.edge === "dolne" ? "czoło dolne → dno"
       : `czoło ${h.edge}${h.kind === "zaczep" ? ", od tyłu" : ""}`;
     const pos = p.kind === "bok" ? `${fmt(h.x)} od przodu, ${fmt(h.y)} od spodu`
       : p.kind === "dno" ? (h.edge === "tylne" ? `${fmt(h.x)} od boku, ${fmt(h.y)} nad spodem dna`
+        : h.edge === "lico" && h.to ? `${fmt(h.x)} od lewego boku, ${fmt(h.z)} od przodu (oś ${h.to === "tył" ? "tyłu" : "przodu"})`
         : h.edge === "lico" ? `${fmt(h.z)} od przodu, ${fmt(Math.min(h.x, p.width - h.x))} od krawędzi bocznej` : `${fmt(h.z)} od przodu, w osi grubości`)
+      : h.edge === "dolne" ? `${fmt(h.x)} od lewej, w osi grubości`
+      : h.edge === "lico" && h.to ? `${fmt(h.x)} od lewej, ${fmt(h.y)} od spodu`
       : h.edge === "lico" ? `${fmt(h.y)} od spodu, ${fmt(Math.min(h.x, p.length - h.x))} od krawędzi` : `${fmt(h.y)} od spodu, w osi grubości`;
     const size = h.groove ? `rowek ${fmt(h.d)} × ${fmt(h.groove)}, gł. ${fmt(h.depth)} (Zeta P2)` : h.depth == null ? `Ø${fmt(h.d)} przelot${h.note && h.note !== "przelot" ? ` (${h.note.replace(/^przelot,?\s*/, "")})` : ""}` : `Ø${fmt(h.d)} × ${fmt(h.depth)}`;
     return `<tr><td>${n}</td><td>${escapeHtml(p.name)}</td><td><i class="dot" style="background:${KIND[h.kind].color}"></i>${escapeHtml(spec[h.kind].label)}</td><td>${size}</td><td>${escapeHtml(where)}</td><td>${pos}</td></tr>`;
@@ -316,7 +329,7 @@ export function assemblyStepsHtml(box) {
     const lam = box.lamello;
     const steps = [
       `Ustaw Zeta P2 na głębokość ${lam.depth} (${lam.name}); przy płycie ${fmt(box.t)} mm oś rowka w połowie grubości (płytka 2 mm dla 16 mm). Frezuj oba elementy połączenia od tej samej strony bazowej - wtedy rowki się pokrywają.`,
-      "Rowki w czołach formatek tył/przód (4) i dna (3) oraz pasujące rowki w płaszczyźnie boków (1, 2) wg rysunków - pozycje od przodu / od spodu.",
+      "Rowki w czołach formatek tył/przód (4) i dna (3) oraz pasujące rowki w płaszczyźnie boków (1, 2), a także rowki w licu dna (od góry) i w dolnej krawędzi tył/przód - wg rysunków.",
       lam.clamex
         ? `Wywierć otwory Ø6 na klucz (przyrząd Lamello do Clamex P), ${fmt(lam.keyFromEdge)} mm od krawędzi, od strony wnętrza skrzynki, aż do rowka.`
         : null,
@@ -333,8 +346,8 @@ export function assemblyStepsHtml(box) {
   const fix = { kolek_wkret: "wkręty", konfirmat: "konfirmaty", kolki: "ścisk (kołki na klej)", wkrety: "wkręty" }[box.join];
   const steps = [
     "Nawierć formatki wg rysunków i tabeli otworów (zaczepy tylne w dnie i sprzęgła można wiercić szablonem Blum T65.1000.02).",
-    dowels ? "Wklej kołki w czoła dna (3) i obu formatek tył/przód (4)." : null,
-    `Połóż bok ${box.isB ? "niski" : "lewy"} (1) wewnętrzną stroną do góry, wstaw w niego dno (3), a na dnie tył i przód (4)${glue ? " — połączenia na klej" : ""}.`,
+    dowels ? "Wklej kołki w czoła dna (3) i obu formatek tył/przód (4) oraz w lico dna pod tył i przód." : null,
+    `Połóż bok ${box.isB ? "niski" : "lewy"} (1) wewnętrzną stroną do góry, wstaw w niego dno (3), a na dnie tył i przód (4) — tył i przód połącz od razu z dnem${box.join === "kolki" ? "" : " (wkręty od spodu dna)"}${glue ? " — połączenia na klej" : ""}.`,
     `Nałóż drugi bok (2) i skręć całość: ${fix}. Tył i czoło górą równo z bokami, dno ${fmt(box.recess)} mm nad spodem boków.`,
     "Sprawdź przekątne skrzynki (kąt prosty) i zetrzyj nadmiar kleju.",
     "Przykręć sprzęgła T51.7601 pod dnem z przodu (wg szablonu), potem front od środka przez czoło wewnętrzne.",

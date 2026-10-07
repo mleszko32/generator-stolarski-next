@@ -145,7 +145,7 @@ describe("skrzynki szuflad - Lamello P (Zeta P2)", () => {
   });
 
   it("Clamex: otwór Ø6 na klucz od lica tyłu, 7,5 mm od krawędzi (P-14), 5,5 mm (P-10)", () => {
-    const k14 = lamBox("clamex_p14").panels.find((p) => p.id === "tyl-przod").holes.filter((h) => h.kind === "klucz");
+    const k14 = lamBox("clamex_p14").panels.find((p) => p.id === "tyl-przod").holes.filter((h) => h.kind === "klucz" && !h.to);
     expect(k14.length).toBeGreaterThan(0);
     expect(new Set(k14.map((h) => h.x))).toEqual(new Set([7.5, lamBox("clamex_p14").skw - 7.5]));
     k14.forEach((h) => expect(h).toMatchObject({ d: 6, edge: "lico" }));
@@ -185,5 +185,35 @@ describe("skrzynki szuflad - Lamello: długość rowka", () => {
     // 60 + 37,5 = 97,5 z każdej strony + 10 mm odstępu -> od 205 mm dwa rowki
     expect(lamelloPositions(200, LAMELLO.tenso_p14, 60, 75)).toEqual([100]);
     expect(lamelloPositions(210, LAMELLO.tenso_p14, 60, 75)).toEqual([60, 150]);
+  });
+});
+
+describe("skrzynki szuflad - dno połączone z tyłem i przodem", () => {
+  const boxWith = (join) => buildDrawerBox({ comps: comps(150), system: movento, isB: false }, getDrawerBoxSettings({ drawerBox: { join } }));
+
+  it("kołek + wkręt: wkręty od spodu dna, kołki od góry, min. 80 mm od boków (sprzęgła / zaczepy MOVENTO)", () => {
+    const box = boxWith("kolek_wkret");
+    const dno = box.panels.find((p) => p.id === "dno").holes.filter((h) => h.to === "tył" || h.to === "przód");
+    expect(dno.filter((h) => h.to === "tył")).toHaveLength(dno.length / 2);
+    dno.forEach((h) => {
+      expect(h.x).toBeGreaterThanOrEqual(80);
+      expect(h.x).toBeLessThanOrEqual(box.skw - 80);
+      expect(h.face).toBe(h.kind === "wkret" ? "spod" : "gora");
+    });
+    // oś tyłu / przodu w połowie ich grubości
+    expect(new Set(dno.map((h) => h.z))).toEqual(new Set([8, box.skl - 8]));
+    // te same pozycje w dolnej krawędzi tył/przód
+    const tp = box.panels.find((p) => p.id === "tyl-przod").holes.filter((h) => h.edge === "dolne").map((h) => h.x);
+    expect(tp).toEqual(dno.filter((h) => h.to === "tył").map((h) => h.x));
+  });
+
+  it("Lamello: rowki w licu dna i w dolnej krawędzi tył/przód, 60 mm od boków; Clamex z kluczem nad dnem", () => {
+    const box = boxWith("clamex_p14");
+    const tp = box.panels.find((p) => p.id === "tyl-przod").holes;
+    const bottomEdge = tp.filter((h) => h.edge === "dolne");
+    expect(bottomEdge[0]).toMatchObject({ kind: "lamello", x: 60, groove: 75 });
+    expect(tp.filter((h) => h.kind === "klucz" && h.to === "dno").map((h) => h.y)).toContain(7.5);
+    const dno = box.panels.find((p) => p.id === "dno").holes.filter((h) => h.to === "tył");
+    dno.forEach((h) => expect(h).toMatchObject({ kind: "lamello", face: "gora" }));
   });
 });

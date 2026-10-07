@@ -219,7 +219,9 @@ wkręt na przemian; konfirmat / kołki / wkręty; odstępy to ustawienia, bo poc
 albo Lamello P z frezarki Zeta P2 — `LAMELLO`: Tenso/Clamex P-10/P-14, rowek na powierzchni
 75 mm dla P-14 i 60 mm dla P-10 (pomiary z warsztatu), oś łącznika 60 mm od końca formatki
 (`lamelloEdge`, min. producenta 32/37), rozstaw maks. 300, Clamex z otworem Ø6 na klucz od wnętrza skrzynki) oraz
-zaczep tylny prowadnicy Ø6×10 w tylnej krawędzi dna (Blum TD-132/1). Sprzęgła T51.7601 tylko jako
+zaczep tylny prowadnicy Ø6×10 w tylnej krawędzi dna (Blum TD-132/1). Dno łączy się z bokami i z tyłem/przodem
+(`frontBackJoints`: wkręty od spodu dna / kołki i rowki Lamello od góry, kołki/wkręty min. 80 mm od boków
+ze względu na sprzęgła i zaczepy MOVENTO pod dnem). Sprzęgła T51.7601 tylko jako
 uwaga — Blum podaje je szablonem T65.1000.02, bez wymiarów. Rysunki: `render/drawerBoxDrawing2d.js`
 (formatki z otworami + `assemblySVG`: montaż w izometrii, rozstrzelony i złożony, własny rzut w SVG
 bez Three.js, żeby się drukował; `assemblyStepsHtml` — kolejność montażu wg sposobu łączenia),

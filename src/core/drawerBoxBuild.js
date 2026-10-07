@@ -150,6 +150,21 @@ function bottomJoints(L, settings) {
   return Array.from({ length: n }, (_, i) => ({ p: round1(e + (L - 2 * e) * i / (n - 1)), kind: kinds[i] }));
 }
 
+// Łączniki dna z tyłem i przodem (stoją na dnie), w poprzek szerokości w. Kołki/wkręty:
+// skrajne min. 80 mm od boków - pod dnem przy bokach siedzą z przodu sprzęgła MOVENTO
+// (strefa 75 mm wg Blum TD-132/1), z tyłu zaczepy prowadnic; rozstaw jak dno-bok.
+// Lamello: rowki od góry dna, oś lamelloEdge od boków, rozstaw maks. 300.
+export const FRONT_BACK_SIDE_CLEAR = 80;
+function frontBackJoints(w, settings) {
+  const lam = LAMELLO[settings.join];
+  if (lam) return lamelloPositions(w, lam, settings.lamelloEdge, lamelloGrooveLen(lam, settings)).map((p) => ({ p, kind: "lamello" }));
+  const e = Math.min(Math.max(FRONT_BACK_SIDE_CLEAR, num(settings.bottomEdge, 50)), w / 2);
+  const n = w - 2 * e < 40 ? 1 : Math.max(2, Math.ceil((w - 2 * e) / Math.max(50, settings.bottomSpacing)) + 1);
+  const kinds = kindsFor(settings.join, n);
+  const ps = n === 1 ? [round1(w / 2)] : Array.from({ length: n }, (_, i) => round1(e + (w - 2 * e) * i / (n - 1)));
+  return ps.map((p, i) => ({ p, kind: kinds[i] }));
+}
+
 // Jedna skrzynka z jej formatkami i otworami.
 // raw = { comps, system, isB, box? (skrzynka B z core/slopeCabinet.js) }.
 export function buildDrawerBox(raw, settings) {
@@ -170,6 +185,7 @@ export function buildDrawerBox(raw, settings) {
 
   const jLeft = jointsOn(hLeft, settings), jRight = jointsOn(hRight, settings);
   const jBottom = bottomJoints(L, settings);
+  const jFB = frontBackJoints(w, settings);
   const yOnSide = (p) => round1(r + t + p);          // wys. łącznika tyłu/czoła na boku
 
   // Bok widziany od wewnątrz skrzynki, x od przodu (0) do tyłu (L), y od dołu boku.
@@ -184,7 +200,9 @@ export function buildDrawerBox(raw, settings) {
   const endHoles = (joinsL, joinsR) => [
     ...joinsL.map((j) => ({ edge: "lewe", x: 0, y: j.p, kind: j.kind, ...spec[j.kind].edge })),
     ...joinsR.map((j) => ({ edge: "prawe", x: w, y: j.p, kind: j.kind, ...spec[j.kind].edge })),
+    ...jFB.map((j) => ({ edge: "dolne", x: j.p, y: 0, kind: j.kind, ...spec[j.kind].edge, to: "dno" })),
     ...(key ? [
+      ...jFB.map((j) => ({ edge: "lico", x: j.p, y: key, kind: "klucz", ...spec.klucz.face, to: "dno" })),
       ...joinsL.map((j) => ({ edge: "lico", x: key, y: j.p, kind: "klucz", ...spec.klucz.face })),
       ...joinsR.map((j) => ({ edge: "lico", x: round1(w - key), y: j.p, kind: "klucz", ...spec.klucz.face })),
     ] : []),
@@ -194,6 +212,10 @@ export function buildDrawerBox(raw, settings) {
     ...jBottom.map((j) => ({ edge: "lewe", x: 0, z: j.p, y: round1(t / 2), kind: j.kind, ...spec[j.kind].edge })),
     ...jBottom.map((j) => ({ edge: "prawe", x: w, z: j.p, y: round1(t / 2), kind: j.kind, ...spec[j.kind].edge })),
     ...[7, round1(w - 7)].map((x) => ({ edge: "tylne", x, z: L, y: 11, kind: "zaczep", ...spec.zaczep.edge })),
+    ...[[round1(t / 2), "przód"], [round1(L - t / 2), "tył"]].flatMap(([z, to]) => jFB.map((j) => ({
+      edge: "lico", face: (j.kind === "wkret" || j.kind === "konfirmat") ? "spod" : "gora",
+      x: j.p, z, kind: j.kind, ...spec[j.kind].side, to, orient: "v",
+    }))),
     // Clamex w dnie: klucz od góry (od spodu dna przy bokach leżą prowadnice MOVENTO).
     ...(key ? jBottom.flatMap((j) => [
       { edge: "lico", x: key, z: j.p, kind: "klucz", ...spec.klucz.face },
