@@ -58,7 +58,8 @@ function faceHole(cx, cy, h, n) {
 function edgeHole(x, y, dx, dy, h, n) {
   const k = KIND[h.kind], half = h.d / 2, L = h.depth;
   if (h.groove) {
-    const c = h.groove / 2, R = 50.2;
+    // Promień łuku z cięciwy (długość rowka) i strzałki (głębokość): R = (c² + g²) / 2g.
+    const c = h.groove / 2, R = r1((c * c + L * L) / (2 * L));
     // Końce cięciwy wzdłuż krawędzi, łuk o promieniu freza sięgający głębokości L.
     const [a, b] = dx ? [[x, y - c], [x, y + c]] : [[x - c, y], [x + c, y]];
     const sweep = (dx > 0 || dy < 0) ? 1 : 0;

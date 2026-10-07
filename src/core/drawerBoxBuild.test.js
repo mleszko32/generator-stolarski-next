@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { collectDrawerBoxes, buildDrawerBox, jointCount, jointPositions, getDrawerBoxSettings, holeSpecs, LAMELLO, lamelloGrooveLength, lamelloPositions } from "./drawerBoxBuild.js";
+import { collectDrawerBoxes, buildDrawerBox, jointCount, jointPositions, getDrawerBoxSettings, holeSpecs, LAMELLO, lamelloGrooveLength, lamelloPositions, lamelloGrooveLen } from "./drawerBoxBuild.js";
 import { getDrawerComponents } from "./drawerMath.js";
 import { drawerSystems } from "./drawerSystems.js";
 import { buildSlopeElements } from "./slopeCabinet.js";
@@ -125,12 +125,12 @@ describe("skrzynki szuflad - Lamello P (Zeta P2)", () => {
     expect(lamelloGrooveLength(14)).toBeCloseTo(69.6, 1);
   });
 
-  it("rozmieszczenie: oś min. 32/37 mm od końca, rozstaw maks. 300 mm, za mało miejsca - jeden na środku", () => {
+  it("rozmieszczenie: oś 60 mm od końca (domyślnie), rozstaw maks. 300 mm, za mało miejsca - jeden na środku", () => {
     expect(lamelloPositions(80, LAMELLO.tenso_p10)).toEqual([40]);
-    expect(lamelloPositions(200, LAMELLO.tenso_p14)).toEqual([37, 163]);
+    expect(lamelloPositions(210, LAMELLO.tenso_p14)).toEqual([60, 150]);
     const long = lamelloPositions(490, LAMELLO.clamex_p14);
-    expect(long[0]).toBe(37);
-    expect(long[long.length - 1]).toBe(453);
+    expect(long[0]).toBe(60);
+    expect(long[long.length - 1]).toBe(430);
     for (let i = 1; i < long.length; i++) expect(long[i] - long[i - 1]).toBeLessThanOrEqual(300);
   });
 
@@ -138,7 +138,7 @@ describe("skrzynki szuflad - Lamello P (Zeta P2)", () => {
     const box = lamBox("tenso_p14");
     const side = box.panels.find((p) => p.id === "bok");
     const tyl = side.holes.filter((h) => h.to === "tył");
-    tyl.forEach((h) => expect(h).toMatchObject({ kind: "lamello", d: 7, depth: 14, orient: "v", groove: 69.6 }));
+    tyl.forEach((h) => expect(h).toMatchObject({ kind: "lamello", d: 7, depth: 14, orient: "v", groove: 75 }));
     side.holes.filter((h) => h.to === "dno").forEach((h) => expect(h.orient).toBe("h"));
     expect(box.panels.flatMap((p) => p.holes).some((h) => h.kind === "klucz")).toBe(false);
     expect(box.warnings).toEqual([]);
@@ -156,5 +156,34 @@ describe("skrzynki szuflad - Lamello P (Zeta P2)", () => {
   it("ostrzeżenie, gdy tył za niski na rowek", () => {
     const box = lamBox("clamex_p14", 90);   // tył 90 - 13 - 16 = 61 mm < 2 × 37
     expect(box.warnings.some((w) => w.includes("za mało na rowek"))).toBe(true);
+  });
+});
+
+describe("skrzynki szuflad - Lamello: odsunięcie od końca formatki", () => {
+  it("ustawienie lamelloEdge zmienia odsunięcie, ale nie schodzi poniżej minimum producenta", () => {
+    expect(lamelloPositions(300, LAMELLO.tenso_p14, 80)).toEqual([80, 220]);
+    expect(lamelloPositions(300, LAMELLO.tenso_p14, 10)).toEqual([37, 263]);
+  });
+
+  it("w skrzynce: łączniki dna i tyłu/przodu 60 mm od końców", () => {
+    const box = buildDrawerBox({ comps: getDrawerComponents("movento_katalog", 564, 500, 400, "auto", 250), system: movento, isB: false }, getDrawerBoxSettings({ drawerBox: { join: "tenso_p14" } }));
+    const dno = box.panels.find((p) => p.id === "dno").holes.filter((h) => h.edge === "lewe").map((h) => h.z);
+    expect(dno[0]).toBe(60);
+    expect(dno[dno.length - 1]).toBe(box.skl - 60);
+    const tp = box.panels.find((p) => p.id === "tyl-przod").holes.filter((h) => h.edge === "lewe").map((h) => h.y);
+    expect(tp[0]).toBe(60);
+  });
+});
+
+describe("skrzynki szuflad - Lamello: długość rowka", () => {
+  it("domyślnie P-14 75 mm, P-10 60 mm (pomiary z Zeta P2); ustawienie nadpisuje", () => {
+    expect(lamelloGrooveLen(LAMELLO.clamex_p14, {})).toBe(75);
+    expect(lamelloGrooveLen(LAMELLO.tenso_p10, { lamelloGroove: 0 })).toBe(60);
+    expect(lamelloGrooveLen(LAMELLO.tenso_p14, { lamelloGroove: 78 })).toBe(78);
+  });
+  it("dwa rowki po 60 mm od końców mieszczą się dopiero, gdy nie zachodzą na siebie", () => {
+    // 60 + 37,5 = 97,5 z każdej strony + 10 mm odstępu -> od 205 mm dwa rowki
+    expect(lamelloPositions(200, LAMELLO.tenso_p14, 60, 75)).toEqual([100]);
+    expect(lamelloPositions(210, LAMELLO.tenso_p14, 60, 75)).toEqual([60, 150]);
   });
 });

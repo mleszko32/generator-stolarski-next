@@ -216,8 +216,9 @@ Stare dane (`slope.columns`/`dividers`/`shelves`) zamienia `migrateSlopeModule` 
 drewniane z całego projektu (zwykłe szafki przez `getDrawerBoxInfo`, skos przez `getSlopeFronts`, też
 skrzynka B), scala identyczne i liczy otwory: łączniki wg `project.drawerBox` (domyślnie kołek +
 wkręt na przemian; konfirmat / kołki / wkręty; odstępy to ustawienia, bo pochodzą z poradników;
-albo Lamello P z frezarki Zeta P2 — `LAMELLO`: Tenso/Clamex P-10/P-14, rowek = cięciwa freza Ø100,4,
-rozmieszczenie wg zasad producenta, Clamex z otworem Ø6 na klucz od wnętrza skrzynki) oraz
+albo Lamello P z frezarki Zeta P2 — `LAMELLO`: Tenso/Clamex P-10/P-14, rowek na powierzchni
+75 mm dla P-14 i 60 mm dla P-10 (pomiary z warsztatu), oś łącznika 60 mm od końca formatki
+(`lamelloEdge`, min. producenta 32/37), rozstaw maks. 300, Clamex z otworem Ø6 na klucz od wnętrza skrzynki) oraz
 zaczep tylny prowadnicy Ø6×10 w tylnej krawędzi dna (Blum TD-132/1). Sprzęgła T51.7601 tylko jako
 uwaga — Blum podaje je szablonem T65.1000.02, bez wymiarów. Rysunki: `render/drawerBoxDrawing2d.js`
 (formatki z otworami + `assemblySVG`: montaż w izometrii, rozstrzelony i złożony, własny rzut w SVG

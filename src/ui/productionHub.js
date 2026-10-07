@@ -364,6 +364,8 @@ const DB_FIELDS = [
   ['bottomSpacing', 'Maks. rozstaw łączników dna [mm]'],
   ['screwLength', 'Długość wkrętu / konfirmatu [mm]'],
   ['dowelLength', 'Długość kołka Ø8 [mm]'],
+  ['lamelloEdge', 'Lamello: oś łącznika od końca formatki [mm]'],
+  ['lamelloGroove', 'Lamello: długość rowka [mm] (0 = P-14 75, P-10 60)'],
 ];
 function renderSkrzynki(el) {
   const p = state.project;
@@ -380,7 +382,7 @@ function renderSkrzynki(el) {
       <div class="field"><label>Łączenie skrzynki</label><select id="db-join">${Object.entries(JOIN_METHODS).map(([k, l]) => `<option value="${k}" ${s.join === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
       ${DB_FIELDS.map(([k, l]) => `<div class="field"><label>${l}</label><input type="number" class="db-f" data-k="${k}" value="${s[k]}" min="0"></div>`).join('')}
     </div>
-    <p class="hub-sub">${LAMELLO[s.join] ? `Lamello ${LAMELLO[s.join].name}: rowki frezarką Zeta P2 (głębokość ${LAMELLO[s.join].depth} mm), rozmieszczenie wg zasad Lamello (rozstaw maks. 300 mm, oś min. ${LAMELLO[s.join].endMin} mm od końca) - pola odstępów obok nie mają tu zastosowania.` : "Odstępy i liczba łączników to wartości z poradników stolarskich, nie z katalogu — dopasuj je do swojego warsztatu."} Wymiary skrzynki i zaczep tylny prowadnicy są wg Blum.</p>
+    <p class="hub-sub">${LAMELLO[s.join] ? `Lamello ${LAMELLO[s.join].name}: rowki frezarką Zeta P2 (głębokość ${LAMELLO[s.join].depth} mm), oś łącznika ${Math.max(LAMELLO[s.join].endMin, s.lamelloEdge)} mm od końca formatki (pole „Lamello: oś łącznika od końca”, min. producenta ${LAMELLO[s.join].endMin} mm), rozstaw maks. 300 mm - pozostałe pola odstępów dotyczą kołków, wkrętów i konfirmatów.` : "Odstępy i liczba łączników to wartości z poradników stolarskich, nie z katalogu — dopasuj je do swojego warsztatu."} Wymiary skrzynki i zaczep tylny prowadnicy są wg Blum.</p>
     ${boxes.length ? `<table class="hub-table">
       <thead><tr><th>Skrzynka</th><th class="num">Szt.</th><th>Formatki</th><th>Szafki</th></tr></thead>
       <tbody>${boxes.map(b => `<tr>
@@ -391,7 +393,7 @@ function renderSkrzynki(el) {
       </tr>`).join('')}</tbody>
     </table>` : '<p class="hub-empty">Brak skrzynek szuflad drewnianych. Rysunki dotyczą szuflad Blum MOVENTO — wybierz ten system szuflad w szafce (Szuflady → System szuflad) albo w ustawieniach projektu.</p>'}`;
   el.querySelector('#db-join').addEventListener('change', e => save({ join: e.target.value }));
-  el.querySelectorAll('.db-f').forEach(i => i.addEventListener('change', () => { const v = parseFloat(i.value); if (v > 0) save({ [i.dataset.k]: v }); }));
+  el.querySelectorAll('.db-f').forEach(i => i.addEventListener('change', () => { const v = parseFloat(i.value); if (v > 0 || (i.dataset.k === 'lamelloGroove' && v === 0)) save({ [i.dataset.k]: v }); }));
   el.querySelector('#db-open')?.addEventListener('click', () => openDrawerBoxDrawings(boxes, s, p.name));
 }
 

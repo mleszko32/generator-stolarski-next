@@ -24,8 +24,9 @@
 //   kabus.pl, phu-gral.eu), nie katalog - dlatego odstępy są ustawieniami projektu.
 // - Lamello P-System (frezarka Zeta P2): rowek frezem Ø100,4 × 7 mm, głębokość 10 (P-10)
 //   albo 14 (P-14) w obu łączonych formatkach, oś rowka w połowie grubości płyty; długość
-//   rowka na powierzchni = cięciwa koła frezu 2·√(50,2² − (50,2 − g)²) (≈60 / ≈70 mm);
-//   rozstaw maks. 300 mm, oś min. 32 (P-10) / 37 (P-14) mm od końca formatki; Clamex:
+//   rowka na powierzchni wg pomiarów z warsztatu ≈75 mm (P-14) / ≈60 mm (P-10), patrz lamelloGrooveLen;
+//   rozstaw maks. 300 mm, oś min. 32 (P-10) / 37 (P-14) mm od końca formatki (warsztatowo
+//   60 mm - ustawienie lamelloEdge); Clamex:
 //   otwór Ø6 na klucz od lica formatki z rowkiem w czole, oś 5,5 (P-10) / 7,5 (P-14) mm od
 //   krawędzi. Min. grubości (płaszczyzna / krawędź). Źródła: Lamello - karta Clamex P-14
 //   (Bedienungsanleitung_Clamex_P14.pdf), broszura P-System EN, opis makra Biesse P-System;
@@ -50,20 +51,26 @@ export const JOIN_METHODS = {
 // Łączniki Lamello P (patrz ŹRÓDŁA wyżej). minFace / minEdge - min. grubość płyty z rowkiem
 // w płaszczyźnie / w krawędzi.
 export const LAMELLO = {
-  tenso_p10: { name: "Tenso P-10", depth: 10, endMin: 32, minFace: 9, minEdge: 12, clamex: false },
-  tenso_p14: { name: "Tenso P-14", depth: 14, endMin: 37, minFace: 11, minEdge: 12, clamex: false },
-  clamex_p10: { name: "Clamex P-10", depth: 10, endMin: 32, minFace: 11, minEdge: 12, clamex: true, keyFromEdge: 5.5 },
-  clamex_p14: { name: "Clamex P-14", depth: 14, endMin: 37, minFace: 15, minEdge: 12, clamex: true, keyFromEdge: 7.5 },
+  tenso_p10: { name: "Tenso P-10", depth: 10, groove: 60, endMin: 32, minFace: 9, minEdge: 12, clamex: false },
+  tenso_p14: { name: "Tenso P-14", depth: 14, groove: 75, endMin: 37, minFace: 11, minEdge: 12, clamex: false },
+  clamex_p10: { name: "Clamex P-10", depth: 10, groove: 60, endMin: 32, minFace: 11, minEdge: 12, clamex: true, keyFromEdge: 5.5 },
+  clamex_p14: { name: "Clamex P-14", depth: 14, groove: 75, endMin: 37, minFace: 15, minEdge: 12, clamex: true, keyFromEdge: 7.5 },
 };
 const LAMELLO_CUTTER_R = 50.2;      // promień freza Zeta P2 (Ø100,4)
 const LAMELLO_MAX_SPACING = 300;
-// Długość rowka P na powierzchni płyty (cięciwa koła freza na głębokości g).
+// Długość rowka P na powierzchni płyty. Teoretycznie to cięciwa koła freza na głębokości g
+// (lamelloGrooveLength: ≈70 dla 14, ≈60 dla 10), ale rowek z Zeta P2 zmierzony w warsztacie
+// ma ≈75 mm przy P-14 i ≈60 mm przy P-10. Dlatego LAMELLO[].groove: P-14 75, P-10 60
+// (pomiary z warsztatu). Ustawienie
+// lamelloGroove > 0 nadpisuje obie.
+export const lamelloGrooveLen = (lam, settings) => (num(settings && settings.lamelloGroove, 0) > 0 ? num(settings.lamelloGroove) : lam.groove);
 export const lamelloGrooveLength = (g) => round1(2 * Math.sqrt(LAMELLO_CUTTER_R ** 2 - (LAMELLO_CUTTER_R - g) ** 2));
 
-// Pozycje łączników Lamello na odcinku 0..h: oś min. endMin od końców, rozstaw maks. 300;
-// gdy dwa rowki by się nie zmieściły - jeden na środku.
-export function lamelloPositions(h, lam) {
-  const e = lam.endMin, len = lamelloGrooveLength(lam.depth);
+// Pozycje łączników Lamello na odcinku 0..h: oś `edge` mm od końców formatki (warsztatowo
+// 60 mm - ustawienie lamelloEdge; nigdy mniej niż minimum producenta endMin), rozstaw maks.
+// 300; gdy dwa rowki by się nie zmieściły - jeden na środku.
+export function lamelloPositions(h, lam, edge = DEFAULTS.lamelloEdge, len = lam.groove) {
+  const e = Math.max(lam.endMin, num(edge, DEFAULTS.lamelloEdge));
   if (h - 2 * e < len + 10) return [round1(h / 2)];
   const n = Math.ceil((h - 2 * e) / LAMELLO_MAX_SPACING) + 1;
   return Array.from({ length: n }, (_, i) => round1(e + (h - 2 * e) * i / (n - 1)));
@@ -76,6 +83,8 @@ const DEFAULTS = {
   bottomSpacing: 150, // maks. rozstaw łączników dna [mm]
   screwLength: 50,   // wkręt / konfirmat [mm]
   dowelLength: 30,   // kołek Ø8 [mm]
+  lamelloEdge: 60,   // Lamello: oś łącznika od końca formatki [mm] (min. producenta 32/37)
+  lamelloGroove: 0,  // Lamello: długość rowka na powierzchni [mm]; 0 = wg łącznika (75 / 60)
 };
 
 export function getDrawerBoxSettings(project) {
@@ -95,7 +104,7 @@ export function holeSpecs(settings, t) {
     kolek: { side: { d: 8, depth: sideDowel }, edge: { d: 8, depth: round1(dl - sideDowel + 1) }, label: `kołek 8×${dl}` },
     zaczep: { edge: { d: 6, depth: 10 }, label: "zaczep tylny prowadnicy (Blum)" },
     ...(LAMELLO[settings.join] ? (() => {
-      const lam = LAMELLO[settings.join], g = { d: 7, depth: lam.depth, groove: lamelloGrooveLength(lam.depth) };
+      const lam = LAMELLO[settings.join], g = { d: 7, depth: lam.depth, groove: lamelloGrooveLen(lam, settings) };
       return {
         lamello: { side: g, edge: g, label: `Lamello ${lam.name}` },
         klucz: { face: { d: 6, depth: null, note: "do rowka" }, label: "otwór na klucz Clamex" },
@@ -127,14 +136,14 @@ export function jointPositions(h, edge, n) {
 }
 
 function jointsOn(h, settings) {
-  if (LAMELLO[settings.join]) return lamelloPositions(h, LAMELLO[settings.join]).map((p) => ({ p, kind: "lamello" }));
+  if (LAMELLO[settings.join]) return lamelloPositions(h, LAMELLO[settings.join], settings.lamelloEdge, lamelloGrooveLen(LAMELLO[settings.join], settings)).map((p) => ({ p, kind: "lamello" }));
   const n = settings.join === "kolek_wkret" ? Math.max(2, jointCount(h)) : jointCount(h);
   const kinds = kindsFor(settings.join, n);
   return jointPositions(h, settings.edge, n).map((p, i) => ({ p, kind: kinds[i] }));
 }
 
 function bottomJoints(L, settings) {
-  if (LAMELLO[settings.join]) return lamelloPositions(L, LAMELLO[settings.join]).map((p) => ({ p, kind: "lamello" }));
+  if (LAMELLO[settings.join]) return lamelloPositions(L, LAMELLO[settings.join], settings.lamelloEdge, lamelloGrooveLen(LAMELLO[settings.join], settings)).map((p) => ({ p, kind: "lamello" }));
   const e = Math.min(settings.bottomEdge, L / 4);
   const n = Math.max(2, Math.ceil((L - 2 * e) / Math.max(50, settings.bottomSpacing)) + 1);
   const kinds = kindsFor(settings.join, n);
