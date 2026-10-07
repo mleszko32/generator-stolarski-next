@@ -4,6 +4,33 @@
 // wydzielone z engine/cabinet.js. Używane też przez engine/cornerParts.js.
 import { getTraverseConfig } from "../core/layout.js";
 
+// Zestawy łączników korpusu (wkręt + kołek) na połączeniu o długości `depth` (wieniec / półka
+// stała / przegroda z bokiem): skrajne - wkręt 37 mm od przodu i od tyłu, kołek 32 mm dalej w
+// głąb (System 32); gdy odstęp między skrajnymi wkrętami przekracza maks. rozstaw (domyślnie
+// 250 mm, construction.jointSpacing), dochodzą zestawy środkowe - rozłożone równo i dociągnięte
+// do rastra 32 mm liczonego od przedniego wkrętu (siatka wiertarki wielowrzecionowej).
+// Bardzo płytki element - jeden zestaw. Zwraca [{ screw, dowel }] (mm od przodu), od przodu.
+export const DEFAULT_JOINT_SPACING = 250;
+export function jointSetPositions(depth, maxSpacing = DEFAULT_JOINT_SPACING) {
+  const D = parseFloat(depth) || 0;
+  const max = Math.max(64, parseFloat(maxSpacing) || DEFAULT_JOINT_SPACING);
+  const front = 37, rear = D - 37;
+  if (rear - front < 64) return [{ screw: front, dowel: front + 32 }];
+  const sets = [{ screw: front, dowel: front + 32 }];
+  const mid = Math.max(0, Math.ceil((rear - front) / max) - 1);
+  for (let i = 1; i <= mid; i++) {
+    const ideal = front + ((rear - front) * i) / (mid + 1);
+    const screw = front + Math.round((ideal - front) / 32) * 32;
+    sets.push({ screw, dowel: screw + 32 });
+  }
+  sets.push({ screw: rear, dowel: rear - 32 });
+  return sets;
+}
+export const jointSpacingOf = (mod, config) => {
+  const cons = { ...((config && config.construction) || {}), ...((mod && mod.construction) || {}) };
+  return parseFloat(cons.jointSpacing) || DEFAULT_JOINT_SPACING;
+};
+
 export function getCorpusHoles(mod, config) {
   const { height, depth } = mod.dimensions;
   const th = config.materials.boardThickness || 18;
@@ -11,26 +38,26 @@ export function getCorpusHoles(mod, config) {
   const trav = getTraverseConfig(cons);
 
   const holes = [];
+  const sets = jointSetPositions(depth, jointSpacingOf(mod, config));
+  const frontSet = sets[0], rearSet = sets[sets.length - 1];
 
-  const addJoint = (y, distFromFront, reverse = false) => {
-     const screwDist = distFromFront;
-     const dowelDist = reverse ? distFromFront - 32 : distFromFront + 32;
-     holes.push({ y: y, xFromFront: screwDist, holeType: 'screw' });
-     holes.push({ y: y, xFromFront: dowelDist, holeType: 'dowel' });
+  const addSet = (y, set) => {
+     holes.push({ y: y, xFromFront: set.screw, holeType: 'screw' });
+     holes.push({ y: y, xFromFront: set.dowel, holeType: 'dowel' });
   };
+  // Pełny wieniec: wszystkie zestawy; trawers poziomy: tylko jego skrajny zestaw.
+  const addJoint = (y) => sets.forEach((set) => addSet(y, set));
 
   if (cons.joinType === 'boki_przelotowe') {
      const bottomY = th / 2;
-     addJoint(bottomY, 37); 
-     addJoint(bottomY, depth - 37, true); 
-     
+     addJoint(bottomY);
+
      const topY = height - th / 2;
      if (cons.topType === 'pelny') {
-        addJoint(topY, 37);
-        addJoint(topY, depth - 37, true);
+        addJoint(topY);
      } else if (cons.topType === 'trawersy_poziom') {
-        if (trav.front.active) addJoint(topY, 37);
-        if (trav.rear.active) addJoint(topY, depth - 37, true);
+        if (trav.front.active) addSet(topY, frontSet);
+        if (trav.rear.active) addSet(topY, rearSet);
      } else if (cons.topType === 'trawersy_pion') {
         if (trav.front.active) {
           holes.push({ y: height - 37, xFromFront: th / 2, holeType: 'screw' });
@@ -44,15 +71,13 @@ export function getCorpusHoles(mod, config) {
   } else {
      const bottomY = 0;
      const topY = height;
-     addJoint(bottomY, 37);
-     addJoint(bottomY, depth - 37, true);
+     addJoint(bottomY);
 
      if (cons.topType === 'pelny') {
-        addJoint(topY, 37);
-        addJoint(topY, depth - 37, true);
+        addJoint(topY);
      } else if (cons.topType === 'trawersy_poziom') {
-        if (trav.front.active) addJoint(topY, 37);
-        if (trav.rear.active) addJoint(topY, depth - 37, true);
+        if (trav.front.active) addSet(topY, frontSet);
+        if (trav.rear.active) addSet(topY, rearSet);
      }
   }
 
@@ -98,15 +123,13 @@ export function getPionMountHoles(mod, config) {
   const byPanel = {};
   const addHoles = (panelKey, panelLabel, panelWidth, panelOffsetX, pionCenterX) => {
     if (!byPanel[panelKey]) byPanel[panelKey] = { type: 'wieniec-mount', panelKey, panelLabel, panelWidth, panelDepth: topBottomDepth, holes: [] };
-    const frontZ = topBottomDepth - 37;
-    const rearZ = 37;
     const x = pionCenterX - panelOffsetX;
-    byPanel[panelKey].holes.push(
-      { x, zFromFront: frontZ, holeType: 'screw' },
-      { x, zFromFront: frontZ - 32, holeType: 'dowel' },
-      { x, zFromFront: rearZ, holeType: 'screw' },
-      { x, zFromFront: rearZ + 32, holeType: 'dowel' }
-    );
+    jointSetPositions(topBottomDepth, jointSpacingOf(mod, config)).forEach((set) => {
+      byPanel[panelKey].holes.push(
+        { x, zFromFront: topBottomDepth - set.screw, holeType: 'screw' },
+        { x, zFromFront: topBottomDepth - set.dowel, holeType: 'dowel' }
+      );
+    });
   };
 
   piony.forEach(p => {
@@ -135,8 +158,8 @@ export function getCorpusParts(mod, config) {
   const { width, height, depth } = mod.dimensions;
   const board = config.materials.boardThickness;
   const backThick = config.materials.backThickness;
-  const backP = mod.backPanel || { type: 'nakladane', offset: 16 }; 
-  
+  const backP = mod.backPanel || { type: 'nakladane', offset: 16 };
+
   const construction = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(config.construction || {}), ...(mod.construction || {}) };
   const isTopBottomFullWidth = construction.joinType === 'wience_przelotowe';
 
@@ -175,15 +198,15 @@ export function getBackPanelParts(mod, config) {
   const { width, height } = mod.dimensions;
   const board = config.materials.boardThickness;
   const backP = mod.backPanel || { type: 'nakladane', grooveDepth: 6, clearance: 2, nutBuild: 'all' };
-  
+
   let hdfWidth, hdfHeight;
-  const totalClearance = backP.clearance !== undefined ? backP.clearance * 2 : 4; 
+  const totalClearance = backP.clearance !== undefined ? backP.clearance * 2 : 4;
   const currentNutBuild = backP.nutBuild || 'all';
 
   if (backP.type === 'nut') {
-    hdfWidth = (currentNutBuild === 'all' || currentNutBuild === 'sides') 
+    hdfWidth = (currentNutBuild === 'all' || currentNutBuild === 'sides')
       ? width - (board * 2) + (backP.grooveDepth * 2) - totalClearance : width - 4;
-    hdfHeight = (currentNutBuild === 'all' || currentNutBuild === 'top_bottom') 
+    hdfHeight = (currentNutBuild === 'all' || currentNutBuild === 'top_bottom')
       ? height - (board * 2) + (backP.grooveDepth * 2) - totalClearance : height - 4;
   } else {
     hdfWidth = width - 4; hdfHeight = height - 4;

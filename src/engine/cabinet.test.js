@@ -221,12 +221,21 @@ describe("front.forceVariant wymusza realny wariant systemu (klucz katalogu, nie
 });
 
 describe("calculateProjectHardware", () => {
-  it("liczy nóżki (4/szafkę) i złącza korpusowe (8/szafkę)", () => {
+  it("liczy nóżki (4/szafkę) i faktyczne zestawy złączy korpusowych", () => {
     setProject(freshProject({ modules: [baseModule()] }));
     const hw = calculateProjectHardware();
 
     expect(hw.find((h) => h.name.startsWith("Nóżka regulowana"))).toMatchObject({ qty: 4 });
-    expect(hw.find((h) => h.name.startsWith("Złącze korpusowe"))).toMatchObject({ qty: 8 });
+    // głęb. 513: 3 zestawy na połączenie (37 / 261 / 476) x 2 boki x 2 wieńce = 12
+    expect(hw.find((h) => h.name.startsWith("Złącze korpusowe"))).toMatchObject({ qty: 12 });
+  });
+
+  it("półka stała dokłada swoje zestawy złączy, płytka szafka ma ich mniej", () => {
+    const shelf = { id: "s1", typ: "poziom", x: 18, w: 564, y: 300, h: 18, isStructural: true };
+    setProject(freshProject({ modules: [baseModule({ elements: [shelf] })] }));
+    expect(calculateProjectHardware().find((h) => h.name.startsWith("Złącze korpusowe"))).toMatchObject({ qty: 18 });
+    setProject(freshProject({ modules: [baseModule({ dimensions: { width: 600, height: 720, depth: 320 } })] }));
+    expect(calculateProjectHardware().find((h) => h.name.startsWith("Złącze korpusowe"))).toMatchObject({ qty: 8 });
   });
 
   it("nóżka z ręcznie nadpisaną wysokością liczy się osobno od pozostałych trzech", () => {
@@ -278,7 +287,7 @@ describe("nawierty kołek+wkręt przegrody pionowej (isStructural) w wieńcach",
     // środek przegrody (x=291, w=18) -> 300, wieniec "wpuszczony" między boki
     // (domyślny joinType) zaczyna się od X=th(18), więc względem NIEGO to 282.
     expect(bottom.holes[0].x).toBeCloseTo(282);
-    expect(bottom.holes).toHaveLength(4); // 2x (screw+dowel) - przód i tył
+    expect(bottom.holes).toHaveLength(6); // 3x (screw+dowel) - przód, środek (głęb. > 250 mm odstępu), tył
   });
 
   it("nie generuje nawiertów, gdy przegroda nie jest oznaczona jako isStructural", () => {

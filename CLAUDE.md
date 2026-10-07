@@ -88,7 +88,10 @@ bez Three.js.
 - `calculateAllProjectParts()` — cały projekt, zagregowana lista formatek, w tym scalone
   odcinki cokołu przez sąsiednie szafki dolne.
 
-Obok, w `src/engine/`: `carcaseParts.js` (formatki i wiercenia korpusu prostokątnego),
+Obok, w `src/engine/`: `carcaseParts.js` (formatki i wiercenia korpusu prostokątnego; `jointSetPositions` —
+jedyne miejsce rozmieszczenia zestawów kołek + wkręt dla wieńców, półek stałych i przegród: skrajne 37 mm od przodu
+i tyłu, środkowe gdy odstęp > `construction.jointSpacing` (domyślnie 250 mm), w rastrze 32 mm; z niego korzystają
+rysunek boku 2D, instrukcje montażu i lista okuć, która liczy faktyczne zestawy zamiast ryczałtu),
 `cornerParts.js` (wszystko o szafce narożnej, też dla rysunków 2D i 3D), `hardware.js`
 (`calculateProjectHardware()` — okucia: nóżki, złącza, komplety szuflad, zawiasy, okleina) i
 `cost.js` (`calculateProjectCost()` — kosztorys). Zależności idą w jedną stronę: `hardware`/`cost`

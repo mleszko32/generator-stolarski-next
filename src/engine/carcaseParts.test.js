@@ -1,7 +1,7 @@
 // Formatki i wiercenia korpusu prostokątnej szafki (engine/carcaseParts.js). Wartości
 // oczekiwane policzone ręcznie dla szafki 600×720×513, płyta 18, plecy 3.
 import { describe, it, expect } from "vitest";
-import { getCorpusParts, getBackPanelParts, getCorpusHoles, getPionMountHoles } from "./carcaseParts.js";
+import { getCorpusParts, getBackPanelParts, getCorpusHoles, getPionMountHoles, jointSetPositions } from "./carcaseParts.js";
 import { freshProject, baseModule } from "../test/fixtures.js";
 
 const config = (construction = {}) => {
@@ -88,17 +88,26 @@ describe("getBackPanelParts", () => {
 describe("getCorpusHoles", () => {
   const holesOf = (mod, cfg) => getCorpusHoles(mod, cfg)[0].holes;
 
-  it("boki przelotowe, pełny wieniec: wkręt + kołek 32 mm dalej, z przodu i z tyłu, dół i góra", () => {
+  it("boki przelotowe, pełny wieniec: wkręt + kołek 32 mm dalej, z przodu i z tyłu, środkowy zestaw przy głębokości > 250 mm odstępu, dół i góra", () => {
     const holes = holesOf(baseModule(), config());
-    expect(holes).toHaveLength(8);
-    // dół: w osi płyty (18/2)
+    expect(holes).toHaveLength(12);
+    // dół: w osi płyty (18/2); głęb. 513 -> skrajne 37 / 476, odstęp 439 > 250 -> środkowy w rastrze 32 (261)
     expect(holes.filter((h) => h.y === 9)).toEqual([
       { y: 9, xFromFront: 37, holeType: "screw" },
       { y: 9, xFromFront: 69, holeType: "dowel" },
+      { y: 9, xFromFront: 261, holeType: "screw" },
+      { y: 9, xFromFront: 293, holeType: "dowel" },
       { y: 9, xFromFront: 476, holeType: "screw" },
       { y: 9, xFromFront: 444, holeType: "dowel" },
     ]);
-    expect(holes.filter((h) => h.y === 711)).toHaveLength(4);
+    expect(holes.filter((h) => h.y === 711)).toHaveLength(6);
+  });
+
+  it("płytka szafka (wisząca 320): tylko dwa skrajne zestawy; trawers poziomy: jeden zestaw", () => {
+    const shallow = holesOf(baseModule({ dimensions: { width: 600, height: 720, depth: 320 } }), config());
+    expect(shallow.filter((h) => h.y === 9 && h.holeType === "screw").map((h) => h.xFromFront)).toEqual([37, 283]);
+    const trav = holesOf(baseModule(), config({ topType: "trawersy_poziom" }));
+    expect(trav.filter((h) => h.y === 711 && h.holeType === "screw").map((h) => h.xFromFront)).toEqual([37, 476]);
   });
 
   it("trawersy pionowe: otwory na górze boku w osi trawersu, pionowo", () => {
@@ -133,9 +142,12 @@ describe("getPionMountHoles", () => {
     expect(bottom.panelWidth).toBe(564);
     expect(bottom.panelDepth).toBe(510);
     // środek przegrody 300 od lewego boku, wieniec zaczyna się za bokiem (18) -> 282
+    // głęb. wieńca 510: zestawy 37 / 261 / 473 od przodu (zFromFront liczony od tyłu płyty)
     expect(bottom.holes).toEqual([
       { x: 282, zFromFront: 473, holeType: "screw" },
       { x: 282, zFromFront: 441, holeType: "dowel" },
+      { x: 282, zFromFront: 249, holeType: "screw" },
+      { x: 282, zFromFront: 217, holeType: "dowel" },
       { x: 282, zFromFront: 37, holeType: "screw" },
       { x: 282, zFromFront: 69, holeType: "dowel" },
     ]);
@@ -147,5 +159,23 @@ describe("getPionMountHoles", () => {
     const panels = getPionMountHoles(mod, config());
     expect(panels.map((p) => p.panelKey)).toEqual(["polka-s1-gora", "wieniec-gorny"]);
     expect(panels[0].holes[0].x).toBe(282);
+  });
+});
+
+describe("jointSetPositions - zestawy kołek + wkręt", () => {
+  it("skrajne 37 mm od przodu i tyłu, środkowe co maks. 250 mm w rastrze 32", () => {
+    expect(jointSetPositions(320)).toEqual([{ screw: 37, dowel: 69 }, { screw: 283, dowel: 251 }]);
+    expect(jointSetPositions(510).map((s) => s.screw)).toEqual([37, 261, 473]);
+    expect(jointSetPositions(560).map((s) => s.screw)).toEqual([37, 293, 523]);
+    expect(jointSetPositions(600).map((s) => s.screw)).toEqual([37, 197, 389, 563]);
+    // środkowe zawsze w rastrze 32 od przedniego wkrętu
+    jointSetPositions(900).slice(1, -1).forEach((s) => expect((s.screw - 37) % 32).toBe(0));
+    // odstępy nie większe niż ~250 (+ pół rastra po dociągnięciu)
+    const s9 = jointSetPositions(900).map((s) => s.screw);
+    for (let i = 1; i < s9.length; i++) expect(s9[i] - s9[i - 1]).toBeLessThanOrEqual(250 + 16);
+  });
+  it("bardzo płytki element - jeden zestaw; własny rozstaw z ustawień", () => {
+    expect(jointSetPositions(120)).toEqual([{ screw: 37, dowel: 69 }]);
+    expect(jointSetPositions(510, 150).length).toBe(4);
   });
 });

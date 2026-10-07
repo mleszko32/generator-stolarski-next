@@ -9,6 +9,7 @@ import { getSlopeDrawerHardware, getSlopeFronts } from "../core/slopeCabinet.js"
 import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "./edgeBanding.js";
 import { recalculateAllLayouts } from "../core/layout.js";
 import { calculateAllProjectParts } from "./cabinet.js";
+import { getCabinetPanels } from "./cabinetDrillings.js";
 
 export function calculateProjectHardware() {
   recalculateAllLayouts();
@@ -47,7 +48,16 @@ export function calculateProjectHardware() {
 
     const joinKey = `Złącze korpusowe (Kołek 8x30 + Konfirmat)`;
     if (!hardwareList[joinKey]) hardwareList[joinKey] = { name: joinKey, qty: 0, unit: 'kpl.' };
-    hardwareList[joinKey].qty += 8; 
+    // Faktyczna liczba zestawów z otworów korpusu (engine/cabinetDrillings.js - wieńce, trawersy,
+    // półki stałe, mocowanie przegród; rozstaw wg engine/carcaseParts.js: jointSetPositions).
+    // Każdy zestaw ma jeden wkręt, liczony raz - w formatce poziomej (czoło / lico) albo trawersie
+    // pionowym. Szafka narożna i pod skos nie mają jeszcze tych danych - po staremu 8.
+    const corpusPanels = getCabinetPanels(mod, config);
+    const joinSets = corpusPanels.length
+      ? corpusPanels.filter((pn) => pn.kind === "poziom" || pn.kind === "polka" || pn.kind === "trawers-pion")
+          .reduce((n, pn) => n + pn.holes.filter((h) => h.kind === "wkret").length, 0)
+      : 8;
+    hardwareList[joinKey].qty += joinSets;
 
     // Szafka pod skos: fronty z mod.elements przycięte skosem (core/slopeCabinet.js) -
     // szuflady liczą miejsce pod skosem, trójkąty to blendy bez okuć.
