@@ -234,7 +234,9 @@ szafki od frontu, też skos) rysowane przez `cabinetLocatorSVG` z podświetlonym
 (boki, przegrody, wieńce/trawersy, półki, plecy) z otworami per formatka, z tych samych danych co rysunek boku 2D
 (`calculateModuleParts(mod)` w `engine/cabinet.js` — to samo co `calculateParts()`, ale dla dowolnej szafki: mountingData
 łączników korpusu, prowadnic, zawiasów, przegród + półki z `mod.elements`). Rysunki `render/cabinetDrawing2d.js`
-(formatki w jednej skali, tabela otworów, montaż w izometrii, kolejność kroków, „Gdzie w projekcie” z `computeWallLayouts`),
+(formatki w jednej skali, pionowo i wymiarowane jak bok na rysunku 2D — kolumny `dimText` „DÓŁ/GÓRA (druga)”,
+[Rc], rozstaw oś-oś półek, wieniec „… mm od lewej”; bez numerów otworów i bez tabeli otworów, rozmiary otworów
+w legendzie; montaż w izometrii, kolejność kroków, „Gdzie w projekcie” z `computeWallLayouts`),
 okno `ui/cabinetInstructions.js`, sekcja huba „Instrukcje montażu”. Wspólne klocki rysunków instrukcji (otwory, rowki,
 wymiary, izometria, widok szafki od frontu) są w `render/workshopDrawing.js`, style okien w `WORKSHOP_CSS`
 (`ui/drawerBoxDrawings.js`) — skrzynki szuflad i szafki wyglądają tak samo. Narożna i skos: jeszcze bez instrukcji.

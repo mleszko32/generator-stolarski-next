@@ -7,7 +7,7 @@
 import { escapeHtml } from "../utils/dom.js";
 import { JOIN_METHODS, cabinetFrontView } from "../core/drawerBoxBuild.js";
 import { state } from "../core/state.js";
-import { cabinetLocatorSVG, drawingScale, sideSVG, bottomSVG, plateSVG, legendHtml, holeTableHtml, panelStartNumbers, assemblySVG, assemblyStepsHtml } from "../render/drawerBoxDrawing2d.js";
+import { cabinetLocatorSVG, drawingScale, sideSVG, bottomSVG, plateSVG, legendHtml, assemblySVG, assemblyStepsHtml } from "../render/drawerBoxDrawing2d.js";
 
 const fmt = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
 
@@ -43,8 +43,7 @@ export const WORKSHOP_CSS = `    :root { color-scheme: light; }
     .grid { display: flex; flex-direction: column; gap: 16px; align-items: stretch; }
     .card { border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; break-inside: avoid; }
     .grid .card { flex: 0 0 auto; padding: 6px; }
-    svg.to-scale { width: 100%; height: auto; max-height: 88vh; }
-    .print-only { display: none; }
+    svg.to-scale { width: 100%; height: auto; max-height: 96vh; }
     svg { width: 100%; height: auto; display: block; }
     table.parts { width: 100%; border-collapse: collapse; font-size: 13px; margin: 6px 0; }
     table.parts th { text-align: left; background: #f1f5f9; padding: 5px 8px; border-bottom: 2px solid #cbd5e1; }
@@ -71,20 +70,17 @@ export const WORKSHOP_CSS = `    :root { color-scheme: light; }
       .grid { flex-direction: row; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
       .grid .card { padding: 0; }
       svg.to-scale { width: var(--w); height: var(--h); max-height: none; }
-      .screen-only { display: none; }
-      .print-only { display: block; }
       .assembly { grid-template-columns: 3fr 2fr; }
     }
 `;
 
 function boxCard(box, settings, idx) {
-  const starts = panelStartNumbers(box);
   // Wszystkie rysunki formatek tej skrzynki w jednej skali - prawdziwe proporcje.
   const scale = drawingScale(box);
   const svgs = box.panels.map((p, i) => {
-    if (p.kind === "bok") return sideSVG(box, p, starts[i], scale);
-    if (p.kind === "dno") return bottomSVG(box, p, starts[i], scale);
-    return plateSVG(box, p, starts[i], scale);
+    if (p.kind === "bok") return sideSVG(box, p, 1, scale);
+    if (p.kind === "dno") return bottomSVG(box, p, 1, scale);
+    return plateSVG(box, p, 1, scale);
   });
   const partsRows = box.panels.map((p) => `<tr><td><b>${escapeHtml(p.name)}</b></td><td>${p.qty}</td><td>${fmt(p.length)} × ${fmt(p.width)} × ${fmt(p.thickness)}</td></tr>`).join("");
   return `<section class="box" id="box-${idx}">
@@ -103,11 +99,9 @@ function boxCard(box, settings, idx) {
     <h3>Gdzie w szafce</h3>
     <div class="locators">${locatorsHtml(box)}</div>
     <div class="assembly"><div class="card">${assemblySVG(box)}</div><div><h3>Kolejność montażu</h3>${assemblyStepsHtml(box)}</div></div>
-    ${legendHtml(box)}
+    ${legendHtml(box, settings)}
     <p class="muted">Na ekranie rysunki formatek są powiększone do okna. Na wydruku są w skali <b>1:${scale}</b> (wszystkie tak samo) - ustaw skalę 100% / „Rzeczywisty rozmiar”, wtedy 1 cm na papierze = ${scale} cm formatki.</p>
     <div class="grid">${svgs.map((s) => `<div class="card">${s}</div>`).join("")}</div>
-    <h3>Otwory</h3>
-    ${holeTableHtml(box, settings)}
   </section>`;
 }
 

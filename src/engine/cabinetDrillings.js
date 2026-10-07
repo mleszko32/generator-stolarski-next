@@ -82,7 +82,7 @@ export function getCabinetPanels(mod, project) {
         });
       } else {
         [37, D - 37].forEach((hx) => [-32, 0, 32].forEach((dy) => {
-          holes.push({ x: hx, y: round1(cy - SHELF_PIN_DROP + dy - y0), kind: "podporka", ...face("podporka"), to: "półka ruchoma" });
+          holes.push({ x: hx, y: round1(cy - SHELF_PIN_DROP + dy - y0), kind: "podporka", ...face("podporka"), to: "półka ruchoma", center: dy === 0 });
         }));
       }
     });
@@ -102,7 +102,7 @@ export function getCabinetPanels(mod, project) {
       (d.hinges || []).filter((hg) => hg.isLocal !== false).forEach((hg) => {
         const cy = calcY(hg.y);
         if (!inPanel(cy)) return;
-        [-16, 16].forEach((dy) => holes.push({ x: 37, y: round1(cy + dy - y0), kind: "zawias", ...face("zawias"), to: "prowadnik zawiasu" }));
+        [-16, 16].forEach((dy) => holes.push({ x: 37, y: round1(cy + dy - y0), kind: "zawias", ...face("zawias"), to: "prowadnik zawiasu", hingeY: round1(cy - y0) }));
       });
     });
     return holes;

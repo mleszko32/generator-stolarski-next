@@ -56,23 +56,36 @@ export const wrap = (minX, minY, w, h, body, scale) =>
   + `<rect x="${r1(minX)}" y="${r1(minY)}" width="${r1(w)}" height="${r1(h)}" fill="${C.white}"/>${body}</svg>`;
 export const title = (x, y, t, sub) => text(x, y, t.toUpperCase(), { size: 14, color: C.blue900, weight: "bold" })
   + (sub ? text(x, y + 15 * U, sub, { size: 11, color: C.slate500 }) : "");
+// Opis wysokości otworu jak na rysunku boku 2D (render/viewer2d.js: getDimText): odległość od
+// bliższej krawędzi (DÓŁ/GÓRA) wyróżniona, druga w nawiasie; addRc - [Rc: y - 32] dla łączników
+// i podpórek. Zwraca zawartość <text> (tspany), czcionki skalowane jednostką opisu.
+export function dimText(localY, panelH, color, addRc = false) {
+  const primary = Math.min(localY, panelH - localY), secondary = Math.max(localY, panelH - localY);
+  const bottom = localY <= panelH / 2;
+  const fs = (v) => r1(v * U);
+  const rc = addRc ? `<tspan fill="${C.emerald600}" font-size="${fs(9)}"> [Rc: ${fmt(localY - 32)}]</tspan> ` : " ";
+  return `<tspan fill="${color}" font-size="${fs(11)}">${fmt(primary)}</tspan> `
+    + `<tspan fill="${color}" font-size="${fs(9)}">${bottom ? "DÓŁ" : "GÓRA"}</tspan>` + rc
+    + `<tspan fill="${C.slate400}" font-size="${fs(9)}">(${fmt(secondary)} ${bottom ? "GÓRA" : "DÓŁ"})</tspan>`;
+}
+export const dimTextAt = (x, y, content, anchor = "start") =>
+  `<text x="${r1(x)}" y="${r1(y)}" font-family="${FONT}" text-anchor="${anchor}">${content}</text>`;
 export const uniq = (arr) => [...new Set(arr.map(r1))].sort((a, b) => a - b);
 
-// Otwór w płaszczyźnie: kółko w prawdziwej średnicy + numer obok.
-export function faceHole(cx, cy, h, n) {
+// Otwór w płaszczyźnie: kółko w prawdziwej średnicy (rowek Lamello - prostokąt). Bez numerów -
+// położenia opisują kolumny wymiarów i tabela otworów.
+export function faceHole(cx, cy, h) {
   const k = KIND[h.kind];
   if (h.groove) {
     const [w, l] = h.orient === "h" ? [h.groove, h.d] : [h.d, h.groove];
     return `<rect x="${r1(cx - w / 2)}" y="${r1(cy - l / 2)}" width="${r1(w)}" height="${r1(l)}" rx="1" fill="${k.color}" fill-opacity="0.3" stroke="${k.color}" stroke-width="1"/>`
-      + line(cx, cy - 2, cx, cy + 2, k.color) + line(cx - 2, cy, cx + 2, cy, k.color)
-      + text(cx + w / 2 + 2 * U, cy - l / 2 + 8 * U, String(n), { size: 9, color: k.color, anchor: "start", weight: "bold" });
+      + line(cx, cy - 2, cx, cy + 2, k.color) + line(cx - 2, cy, cx + 2, cy, k.color);
   }
   const r = Math.max(h.d / 2, 1.6 * U);
-  return `<circle cx="${r1(cx)}" cy="${r1(cy)}" r="${r1(r)}" fill="${h.depth == null ? C.white : k.color}" stroke="${k.color}" stroke-width="${r1(1.2 * U)}"/>`
-    + text(cx + r + 2 * U, cy - r - U, String(n), { size: 9, color: k.color, anchor: "start", weight: "bold" });
+  return `<circle cx="${r1(cx)}" cy="${r1(cy)}" r="${r1(r)}" fill="${h.depth == null ? C.white : k.color}" stroke="${k.color}" stroke-width="${r1(1.2 * U)}"/>`;
 }
 // Otwór w czole: zarys kanału od krawędzi w głąb płyty (dx, dy - kierunek w głąb).
-export function edgeHole(x, y, dx, dy, h, n) {
+export function edgeHole(x, y, dx, dy, h) {
   const k = KIND[h.kind], half = Math.max(h.d / 2, 1.2 * U), L = h.depth;
   if (h.groove) {
     // Promień łuku z cięciwy (długość rowka) i strzałki (głębokość): R = (c² + g²) / 2g.
@@ -80,14 +93,12 @@ export function edgeHole(x, y, dx, dy, h, n) {
     // Końce cięciwy wzdłuż krawędzi, łuk o promieniu freza sięgający głębokości L.
     const [a, b] = dx ? [[x, y - c], [x, y + c]] : [[x - c, y], [x + c, y]];
     const sweep = (dx > 0 || dy < 0) ? 1 : 0;
-    return `<path d="M ${r1(a[0])} ${r1(a[1])} A ${R} ${R} 0 0 ${sweep} ${r1(b[0])} ${r1(b[1])} Z" fill="${k.color}" fill-opacity="0.3" stroke="${k.color}" stroke-width="1"/>`
-      + text(x + dx * (L + 3 * U) + (dy ? c + 2 * U : 0), y + dy * (L + 3 * U) + (dx ? -c + 8 * U : 9 * U), String(n), { size: 9, color: k.color, anchor: dx < 0 ? "end" : "start", weight: "bold" });
+    return `<path d="M ${r1(a[0])} ${r1(a[1])} A ${R} ${R} 0 0 ${sweep} ${r1(b[0])} ${r1(b[1])} Z" fill="${k.color}" fill-opacity="0.3" stroke="${k.color}" stroke-width="1"/>`;
   }
   const pts = dx
     ? [[x, y - half], [x + dx * L, y - half], [x + dx * L, y + half], [x, y + half]]
     : [[x - half, y], [x - half, y + dy * L], [x + half, y + dy * L], [x + half, y]];
-  return `<polygon points="${pts.map((p) => p.map(r1).join(",")).join(" ")}" fill="${k.color}" fill-opacity="0.25" stroke="${k.color}" stroke-width="1"/>`
-    + text(x + dx * (L + 3 * U) + (dy ? half + 2 * U : 0), y + dy * (L + 3 * U) + (dx ? -half - U : 9 * U), String(n), { size: 9, color: k.color, anchor: dx < 0 ? "end" : "start", weight: "bold" });
+  return `<polygon points="${pts.map((p) => p.map(r1).join(",")).join(" ")}" fill="${k.color}" fill-opacity="0.25" stroke="${k.color}" stroke-width="1"/>`;
 }
 
 // ---------------------------------------------------------------------------

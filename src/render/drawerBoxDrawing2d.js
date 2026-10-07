@@ -37,7 +37,7 @@ export function sideSVG(box, panel, startNo = 1, scale = null) {
   b += text(L / 2, Y(r + t) + t / 2 + 3, "dno", { size: 9, color: C.slate400 });
   b += text(-8, H / 2, "PRZÓD", { size: 10, color: C.slate400, weight: "bold", rotate: -90 });
   b += text(L + 14, H / 2, "TYŁ", { size: 10, color: C.slate400, weight: "bold", rotate: -90 });
-  panel.holes.forEach((h, i) => { b += faceHole(h.x, Y(h.y), h, startNo + i); });
+  panel.holes.forEach((h, i) => { b += faceHole(h.x, Y(h.y), h); });
   // Odległości od przodu nad bokiem, wysokości w kolumnie po prawej.
   uniq(panel.holes.map((h) => h.x)).forEach((x, i) => {
     b += line(x, 0, x, -8 - (i % 2) * 12, C.slate300) + text(x, -11 - (i % 2) * 12, fmt(x), { size: 10, color: C.slate600 });
@@ -59,10 +59,10 @@ export function bottomSVG(box, panel, startNo = 1, scale = null) {
   b += text(L / 2, 14, "lewy bok", { size: 9, color: C.slate400 });
   b += text(L / 2, W - 6, "prawy bok", { size: 9, color: C.slate400 });
   panel.holes.forEach((h, i) => {
-    if (h.edge === "lico") b += faceHole(h.z, h.x, h, startNo + i);
-    else if (h.edge === "lewe") b += edgeHole(h.z, 0, 0, 1, h, startNo + i);
-    else if (h.edge === "prawe") b += edgeHole(h.z, W, 0, -1, h, startNo + i);
-    else b += edgeHole(L, h.x, -1, 0, h, startNo + i);
+    if (h.edge === "lico") b += faceHole(h.z, h.x, h);
+    else if (h.edge === "lewe") b += edgeHole(h.z, 0, 0, 1, h);
+    else if (h.edge === "prawe") b += edgeHole(h.z, W, 0, -1, h);
+    else b += edgeHole(L, h.x, -1, 0, h);
   });
   uniq(panel.holes.filter((h) => h.edge === "lewe" || h.edge === "prawe").map((h) => h.z)).forEach((z, i) => {
     b += line(z, 0, z, -8 - (i % 2) * 12, C.slate300) + text(z, -11 - (i % 2) * 12, fmt(z), { size: 10, color: C.slate600 });
@@ -85,9 +85,9 @@ export function plateSVG(box, panel, startNo = 1, scale = null) {
   let b = title(W / 2, -40, `${panel.name}`, `${fmt(W)} × ${fmt(H)} × ${fmt(box.t)} mm · ${panel.qty} szt.${box.isB ? " · niski bok po lewej" : ""}${scaleNote(scale)}`);
   b += `<polygon points="${pts}" fill="${C.slate50}" stroke="${C.slate700}" stroke-width="1.5"/>`;
   panel.holes.forEach((h, i) => {
-    b += h.edge === "lico" ? faceHole(h.x, Y(h.y), h, startNo + i)
-      : h.edge === "dolne" ? edgeHole(h.x, Y(0), 0, -1, h, startNo + i)
-      : h.edge === "lewe" ? edgeHole(0, Y(h.y), 1, 0, h, startNo + i) : edgeHole(W, Y(h.y), -1, 0, h, startNo + i);
+    b += h.edge === "lico" ? faceHole(h.x, Y(h.y), h)
+      : h.edge === "dolne" ? edgeHole(h.x, Y(0), 0, -1, h)
+      : h.edge === "lewe" ? edgeHole(0, Y(h.y), 1, 0, h) : edgeHole(W, Y(h.y), -1, 0, h);
   });
   uniq(panel.holes.filter((h) => h.edge === "lewe").map((h) => h.y)).forEach((y) => {
     b += line(0, Y(y), -26, Y(y), C.slate300, dash) + text(-30, Y(y) + 4, fmt(y), { size: 10, color: C.slate600, anchor: "end" });
@@ -103,42 +103,18 @@ export function plateSVG(box, panel, startNo = 1, scale = null) {
   return wrap(-70, -62, W + 140, H + 114, b, scale);
 }
 
-// Legenda rodzajów otworów obecnych w skrzynce.
-export function legendHtml(box) {
-  const kinds = [...new Set(box.panels.flatMap((p) => p.holes.map((h) => h.kind)))];
-  return `<div class="legend">${kinds.map((k) => `<span><i style="background:${KIND[k].color}"></i>${KIND[k].label}</span>`).join("")}
-    <span><i class="open" style="border-color:${C.slate600}"></i>przelot</span></div>`;
-}
-
-// Tabela otworów: numer, formatka, rodzaj, Ø × głębokość, gdzie, położenie.
-export function holeTableHtml(box, settings) {
+// Legenda: kolor, łącznik i rozmiary otworów (w płaszczyźnie / w czole) - zastępuje tabelę otworów.
+export function legendHtml(box, settings) {
   const spec = holeSpecs(settings, box.t);
-  let n = 0;
-  const rows = box.panels.flatMap((p) => p.holes.map((h) => {
-    n++;
-    const where = p.kind === "bok"
-      ? `płaszczyzna (od wewnątrz) → ${h.to}${h.groove ? (h.orient === "h" ? ", rowek poziomo" : ", rowek pionowo") : ""}`
-      : h.edge === "lico" && h.kind !== "klucz" ? `lico od ${h.face === "spod" ? "spodu" : "góry"} → ${h.to}${h.groove ? ", rowek w poprzek" : ""}`
-      : h.edge === "lico" ? (p.kind === "dno" ? "lico od góry (wnętrze szuflady), do rowka" : `lico od wewnątrz skrzynki, do rowka${h.to ? " przy dnie" : ""}`)
-      : h.edge === "dolne" ? "czoło dolne → dno"
-      : `czoło ${h.edge}${h.kind === "zaczep" ? ", od tyłu" : ""}`;
-    const pos = p.kind === "bok" ? `${fmt(h.x)} od przodu, ${fmt(h.y)} od spodu`
-      : p.kind === "dno" ? (h.edge === "tylne" ? `${fmt(h.x)} od boku, ${fmt(h.y)} nad spodem dna`
-        : h.edge === "lico" && h.to ? `${fmt(h.x)} od lewego boku, ${fmt(h.z)} od przodu (oś ${h.to === "tył" ? "tyłu" : "przodu"})`
-        : h.edge === "lico" ? `${fmt(h.z)} od przodu, ${fmt(Math.min(h.x, p.width - h.x))} od krawędzi bocznej` : `${fmt(h.z)} od przodu, w osi grubości`)
-      : h.edge === "dolne" ? `${fmt(h.x)} od lewej, w osi grubości`
-      : h.edge === "lico" && h.to ? `${fmt(h.x)} od lewej, ${fmt(h.y)} od spodu`
-      : h.edge === "lico" ? `${fmt(h.y)} od spodu, ${fmt(Math.min(h.x, p.length - h.x))} od krawędzi` : `${fmt(h.y)} od spodu, w osi grubości`;
-    const size = h.groove ? `rowek ${fmt(h.d)} × ${fmt(h.groove)}, gł. ${fmt(h.depth)} (Zeta P2)` : h.depth == null ? `Ø${fmt(h.d)} przelot${h.note && h.note !== "przelot" ? ` (${h.note.replace(/^przelot,?\s*/, "")})` : ""}` : `Ø${fmt(h.d)} × ${fmt(h.depth)}`;
-    return `<tr><td>${n}</td><td>${escapeHtml(p.name)}</td><td><i class="dot" style="background:${KIND[h.kind].color}"></i>${escapeHtml(spec[h.kind].label)}</td><td>${size}</td><td>${escapeHtml(where)}</td><td>${pos}</td></tr>`;
-  }));
-  return `<table class="parts holes"><thead><tr><th>Nr</th><th>Formatka</th><th>Łącznik</th><th>Otwór [mm]</th><th>Gdzie</th><th>Położenie [mm]</th></tr></thead><tbody>${rows.join("")}</tbody></table>`;
-}
-
-// Kolejne numery otworów: formatki numerowane po kolei, jak w tabeli.
-export function panelStartNumbers(box) {
-  let n = 1;
-  return box.panels.map((p) => { const s = n; n += p.holes.length; return s; });
+  const size = (o) => (o.groove ? `rowek ${fmt(o.d)} × ${fmt(o.groove)}, gł. ${fmt(o.depth)}` : o.depth == null ? `Ø${fmt(o.d)} przelot` : `Ø${fmt(o.d)} × ${fmt(o.depth)}`);
+  const panels = box.panels;
+  const kinds = [...new Set(panels.flatMap((p) => p.holes.map((h) => h.kind)))];
+  return `<div class="legend">${kinds.map((k) => {
+    const sp = spec[k] || {};
+    const parts = [sp.side || sp.face ? `płaszczyzna ${size(sp.side || sp.face)}` : null, sp.edge ? `czoło ${size(sp.edge)}` : null].filter(Boolean);
+    return `<span><i style="background:${KIND[k].color}"></i><b>${escapeHtml(sp.label || KIND[k].label)}</b>${parts.length ? ` - ${parts.join(", ")}` : ""}</span>`;
+  }).join("")}
+    <span><i class="open" style="border-color:${C.slate600}"></i>pusty znacznik = otwór przelotowy</span></div>`;
 }
 
 // ---------------------------------------------------------------------------

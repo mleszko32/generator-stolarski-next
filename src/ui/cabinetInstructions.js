@@ -10,7 +10,7 @@ import { state } from "../core/state.js";
 import { computeWallLayouts } from "../core/walls.js";
 import { getCabinetPanels, getCabinetConstruction } from "../engine/cabinetDrillings.js";
 import {
-  cabinetDrawingScale, panelSVGs, cabinetLegendHtml, cabinetHoleTableHtml,
+  cabinetDrawingScale, panelSVGs, cabinetLegendHtml,
   cabinetAssemblySVG, cabinetStepsHtml, projectLocatorSVG,
 } from "../render/cabinetDrawing2d.js";
 import { WORKSHOP_CSS } from "./drawerBoxDrawings.js";
@@ -50,11 +50,9 @@ function cabinetCard(mod, idx, layouts) {
       </div>
     </div>
     <div class="assembly"><div class="card">${cabinetAssemblySVG(mod, panels, project)}</div><div><h3>Kolejność montażu</h3>${cabinetStepsHtml(cons, panels)}</div></div>
-    ${cabinetLegendHtml(panels)}
+    ${cabinetLegendHtml(panels, th)}
     <p class="muted">Na ekranie rysunki formatek są powiększone do okna. Na wydruku są w skali <b>1:${scale}</b> (wszystkie tak samo) - ustaw skalę 100% / „Rzeczywisty rozmiar”, wtedy 1 cm na papierze = ${scale} cm formatki.</p>
     <div class="grid">${svgs.map((s) => `<div class="card">${s}</div>`).join("")}</div>
-    <h3>Otwory</h3>
-    ${cabinetHoleTableHtml(panels, th)}
   </section>`;
 }
 

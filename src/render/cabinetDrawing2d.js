@@ -8,13 +8,17 @@
 import { C, FONT } from "./drawingPalette.js";
 import { escapeHtml } from "../utils/dom.js";
 import { cabinetHoleSpecs } from "../engine/cabinetDrillings.js";
-import { r1, fmt, KIND, text, line, dash, dimH, dimV, wrap, title, uniq, faceHole, edgeHole, proj, move, prism, solidsSvg, setUnit, unitFor } from "./workshopDrawing.js";
+import { r1, fmt, KIND, text, line, dash, dimH, dimV, wrap, title, uniq, faceHole, edgeHole, proj, move, prism, solidsSvg, setUnit, unitFor, unit, dimText } from "./workshopDrawing.js";
 
 // Formatki z otworami (pozostałe - plecy, półki ruchome - są tylko w tabeli formatek).
 export const drawnPanels = (panels) => panels.filter((p) => p.holes.length > 0);
 
 // Rozmiar rysunku (jednostki = mm) - musi się zgadzać z wrap() w funkcjach niżej.
-const drawSize = (p) => { const u = unitFor(Math.max(p.length, p.width)); return [p.length + 130 * u, p.width + 112 * u]; };
+const drawSize = (p) => {
+  const u = unitFor(Math.max(p.length, p.width));
+  const vertical = p.kind === "bok" || p.kind === "przegroda" || p.kind === "trawers-pion";
+  return vertical ? [p.length + 50 * u + (40 + 3 * 150 + 40) * u, p.width + 112 * u] : [p.length + 130 * u, p.width + 112 * u];
+};
 
 // Jedna skala dla wszystkich formatek szafki: najmniejsza z listy, przy której każdy rysunek
 // mieści się na A4 (ok. 185 × 250 mm).
@@ -25,98 +29,140 @@ export function cabinetDrawingScale(panels) {
 }
 const scaleNote = (scale) => (scale ? ` · skala 1:${scale}` : "");
 
-// Formatka pionowa (bok, przegroda, trawers pionowy) - widok płaszczyzny. Bok prawy rysowany
-// z przodem po prawej (jak na rysunku 2D z wierceniami), reszta z przodem po lewej.
+// Formatka pionowa (bok, przegroda, trawers pionowy) - zawsze pionowo, wymiarowana jak bok na
+// rysunku 2D z wierceniami (render/viewer2d.js: drawSideDetails): kolumny opisów wysokości po
+// stronie tyłu - podpórki półek (z rozstawem oś-oś, [Rc]), prowadnice szuflad, łączniki
+// konstrukcyjne ([Rc]) - każdy opis "odległość od bliższej krawędzi DÓŁ/GÓRA (druga)", zawiasy
+// opisane przy otworach, odległości od przodu nad formatką. Bok prawy z przodem po prawej.
 // side - tylko otwory tej strony przegrody ('lewa' / 'prawa'), czoła zawsze.
-// landscape - formatka leżąco (dół formatki po lewej, przód u dołu; bok prawy: przód u góry):
-// na ekranie wysoki bok słupka mieści się wtedy na szerokość okna z czytelnymi opisami.
-export function verticalPanelSVG(panel, startNo = 1, scale = null, side = null, landscape = false) {
+const COL_W = 150;
+const verticalBox = (L, u, cols) => {
+  const labelsW = (40 + Math.max(cols, 1) * COL_W + 40) * u;
+  return { labelsW, width: L + 50 * u + labelsW };
+};
+export function verticalPanelSVG(panel, startNo = 1, scale = null, side = null) {
   const L = panel.length, H = panel.width;
-  const u = landscape ? Math.max(1, Math.max(L, H) / 650) : unitFor(Math.max(L, H));
+  const u = unitFor(Math.max(L, H));
   setUnit(u);
   const rev = !!panel.frontOnRight;
-  const SW = landscape ? H : L, SH = landscape ? L : H;    // wymiary rysunku formatki
-  // Punkt formatki (x od przodu, y od dołu) -> współrzędne rysunku.
-  const P = landscape
-    ? (x, y) => [y, rev ? x : L - x]
-    : (x, y) => [rev ? L - x : x, H - y];
+  const X = (x) => (rev ? L - x : x);
+  const Y = (y) => H - y;
   const isTrav = panel.kind === "trawers-pion";
   const label = side ? `${panel.name} — strona ${side}` : panel.kind === "bok" ? `${panel.name} — widok od wewnątrz` : panel.name;
-  let b = title(SW / 2, -58 * u, label, `${fmt(L)} × ${fmt(H)} × ${fmt(panel.thickness)} mm · ${panel.qty} szt.${landscape ? " · rysunek leżąco" : scaleNote(scale)}`);
-  b += `<rect x="0" y="0" width="${r1(SW)}" height="${r1(SH)}" fill="${C.slate50}" stroke="${C.slate700}" stroke-width="${r1(1.5 * u)}"/>`;
+  let b = title(L / 2, -58 * u, label, `${fmt(L)} × ${fmt(H)} × ${fmt(panel.thickness)} mm · ${panel.qty} szt.${scaleNote(scale)}`);
+  b += `<rect x="0" y="0" width="${r1(L)}" height="${r1(H)}" fill="${C.white}" stroke="${C.slate600}" stroke-width="${r1(1.5 * u)}"/>`;
   if (!isTrav) {
-    const lab = { size: 10, color: C.slate400, weight: "bold" };
-    if (landscape) {
-      const frontY = rev ? 12 * u : SH - 6 * u, backY = rev ? SH - 6 * u : 12 * u;
-      b += text(SW / 2, frontY, "PRZÓD", lab) + text(SW / 2, backY, "TYŁ", lab);
-      b += text(-8 * u, SH / 2, "DÓŁ", { ...lab, rotate: -90 }) + text(SW + 14 * u, SH / 2, "GÓRA", { ...lab, rotate: -90 });
-    } else {
-      b += text(rev ? L + 8 * u : -8 * u, H / 2, "PRZÓD", { ...lab, rotate: -90 });
-      b += text(rev ? -14 * u : L + 14 * u, H / 2, "TYŁ", { ...lab, rotate: -90 });
-    }
+    [[X(15 * u), "PRZÓD"], [X(L - 15 * u), "TYŁ"]].forEach(([x, t]) => {
+      b += text(x, H / 2, t, { size: 11, color: C.slate400, weight: "bold", rotate: -90 });
+    });
   }
-  panel.holes.forEach((h, i) => {
-    const n = startNo + i;
-    if (side && h.side && h.side !== side) return;
-    if (h.edge === "dolne") {
-      const [sx, sy] = P(h.x, 0);
-      b += landscape ? edgeHole(0, sy, 1, 0, h, n) : edgeHole(sx, H, 0, -1, h, n);
-    } else if (h.edge === "gorne") {
-      const [sx, sy] = P(h.x, H);
-      b += landscape ? edgeHole(SW, sy, -1, 0, h, n) : edgeHole(sx, 0, 0, 1, h, n);
-    } else if (h.edge === "lewe") b += edgeHole(0, H - h.y, 1, 0, h, n);
-    else if (h.edge === "prawe") b += edgeHole(L, H - h.y, -1, 0, h, n);
-    else { const [sx, sy] = P(h.x, h.y); b += faceHole(sx, sy, h, n); }
-  });
   const visible = panel.holes.filter((h) => !side || !h.side || h.side === side);
-  // Położenia: od przodu (x) i od spodu (y). Pionowo: x nad formatką, y w kolumnie po stronie
-  // tyłu. Leżąco: y nad formatką, x w kolumnie po prawej.
-  const xs = uniq(visible.filter((h) => h.edge !== "lewe" && h.edge !== "prawe").map((h) => h.x));
-  const ys = uniq(visible.filter((h) => h.edge !== "dolne" && h.edge !== "gorne").map((h) => h.y));
-  const topVals = landscape ? ys.map((y) => [P(0, y)[0], y]) : xs.map((x) => [P(x, 0)[0], x]);
-  const sideVals = landscape ? xs.map((x) => [P(x, 0)[1], x]) : ys.map((y) => [P(0, y)[1], y]);
-  topVals.forEach(([sx, v], i) => {
-    b += line(sx, 0, sx, (-8 - (i % 2) * 12) * u, C.slate300) + text(sx, (-11 - (i % 2) * 12) * u, fmt(v), { size: 10, color: C.slate600 });
+  visible.forEach((h) => {
+    if (h.edge === "dolne") b += edgeHole(X(h.x), H, 0, -1, h);
+    else if (h.edge === "gorne") b += edgeHole(X(h.x), 0, 0, 1, h);
+    else if (h.edge === "lewe") b += edgeHole(0, Y(h.y), 1, 0, h);
+    else if (h.edge === "prawe") b += edgeHole(L, Y(h.y), -1, 0, h);
+    else b += faceHole(X(h.x), Y(h.y), h);
   });
-  const left = !landscape && rev;
-  const colX = left ? -6 * u : SW + 6 * u;
-  sideVals.forEach(([sy, v]) => {
-    b += line(left ? 0 : SW, sy, left ? colX - 26 * u : colX + 26 * u, sy, C.slate300, dash)
-      + text(left ? colX - 30 * u : colX + 30 * u, sy + 4 * u, fmt(v), { size: 10, color: C.slate600, anchor: left ? "end" : "start" });
+
+  // Kolumny opisów po stronie tyłu (jak rysunek 2D).
+  const face = visible.filter((h) => !h.edge);
+  const backEdge = rev ? 0 : L;
+  const sgn = rev ? -1 : 1;
+  const col = { x: backEdge + sgn * 40 * u, anchor: rev ? "end" : "start", off: sgn * 8 * u };
+  let cols = 0;
+  const writeCol = (ys, color, rc, opacityFor = () => 1) => {
+    ys.forEach((y) => {
+      b += `<line x1="${r1(backEdge)}" y1="${r1(Y(y))}" x2="${r1(col.x)}" y2="${r1(Y(y))}" stroke="${color}" stroke-width="${r1(0.5 * u)}" stroke-dasharray="${r1(2 * u)},${r1(2 * u)}"/>`;
+      b += `<text x="${r1(col.x + col.off)}" y="${r1(Y(y) + 4 * u)}" font-family="${FONT}" text-anchor="${col.anchor}" opacity="${opacityFor(y)}">${dimText(y, H, color, rc)}</text>`;
+    });
+    col.x += sgn * COL_W * u;
+    cols++;
+  };
+  const pins = face.filter((h) => h.kind === "podporka");
+  if (pins.length) {
+    const centers = uniq(pins.filter((h) => h.center).map((h) => h.y));
+    // Rozstaw półek oś-oś tuż przy krawędzi tyłu (osobny łańcuszek, jak na rysunku 2D).
+    const px = backEdge + sgn * 22 * u;
+    for (let i = 0; i < centers.length - 1; i++) {
+      const yA = Y(centers[i]), yB = Y(centers[i + 1]);
+      b += line(px, yA, px, yB, C.orange700) + line(px - 4 * u, yA, px + 4 * u, yA, C.orange700) + line(px - 4 * u, yB, px + 4 * u, yB, C.orange700);
+      const tx = px + sgn * 10 * u, ty = (yA + yB) / 2;
+      b += `<text x="${r1(tx)}" y="${r1(ty)}" font-family="${FONT}" font-size="${r1(12 * u)}" fill="${C.orange700}" text-anchor="middle" transform="rotate(-90 ${r1(tx)} ${r1(ty)})">${fmt(centers[i + 1] - centers[i])}<tspan font-size="${r1(9 * u)}"> oś-oś</tspan></text>`;
+    }
+    writeCol(uniq(pins.map((h) => h.y)), KIND.podporka.color, true, (y) => (centers.includes(r1(y)) ? 1 : 0.6));
+  }
+  const runners = face.filter((h) => h.kind === "prowadnica");
+  if (runners.length) writeCol(uniq(runners.map((h) => h.y)), KIND.prowadnica.color, false);
+  const joints = face.filter((h) => h.kind === "wkret");
+  if (joints.length) writeCol(uniq(joints.map((h) => h.y)), KIND.wkret.color, true);
+  // Zawiasy: opis przy otworach (środek pary prowadnika).
+  uniq(face.filter((h) => h.kind === "zawias").map((h) => h.hingeY)).forEach((hy) => {
+    b += `<text x="${r1(X(37) + (rev ? -8 : 8) * u)}" y="${r1(Y(hy) + 4 * u)}" font-family="${FONT}" text-anchor="${rev ? "end" : "start"}">${dimText(hy, H, KIND.zawias.color)}</text>`;
   });
-  if (landscape) b += text(SW / 2, (-11 - 24) * u, "położenia: nad formatką od spodu, z boku od przodu", { size: 9, color: C.slate400 });
-  b += dimH(0, SW, SH + 18 * u, fmt(SW)) + dimV(left ? SW + 22 * u : -22 * u, 0, SH, fmt(SH));
-  const svg = left ? wrap(-90 * u, -80 * u, SW + 130 * u, SH + 112 * u, b, scale) : wrap(-40 * u, -80 * u, SW + 130 * u, SH + 112 * u, b, landscape ? null : scale);
+
+  // Odległości od przodu nad formatką.
+  uniq(visible.filter((h) => h.edge !== "lewe" && h.edge !== "prawe").map((h) => h.x)).forEach((x, i) => {
+    b += text(X(x), (-6 - (i % 2) * 11) * u, fmt(x), { size: 9, color: C.slate500 });
+  });
+  b += dimH(0, L, H + 18 * u, fmt(L)) + dimV(rev ? L + 22 * u : -22 * u, 0, H, fmt(H));
+  b += legendRow(visible, rev ? -verticalBox(L, u, cols).labelsW : -40 * u, H + 44 * u);
+  const { labelsW } = verticalBox(L, u, cols);
+  const minX = rev ? -labelsW : -50 * u;
+  const maxX = rev ? L + 50 * u : L + labelsW;
+  const svg = wrap(minX, -80 * u, maxX - minX, H + 112 * u, b, scale);
   setUnit(1);
   return svg;
 }
 
-// Formatka pozioma (wieniec, półka, trawers poziomy) - rzut z góry: x w prawo od lewej
-// krawędzi, przód u dołu. Otwory w czołach lewym / prawym i w licu (od góry).
+// Legenda kolorów otworów pod formatką (jak na rysunku 2D).
+function legendRow(holes, x, y) {
+  let out = "";
+  const u = unit();
+  [...new Set(holes.map((h) => h.kind))].forEach((k) => {
+    const st = KIND[k];
+    out += `<circle cx="${r1(x + 4 * u)}" cy="${r1(y - 4 * u)}" r="${r1(3 * u)}" fill="${st.color}"/>`;
+    out += text(x + 12 * u, y, st.label, { size: 10, color: C.slate600, anchor: "start" });
+    x += (22 + st.label.length * 6) * u;
+  });
+  return out;
+}
+
+// Formatka pozioma (wieniec, półka, trawers poziomy) - rzut z góry jak widok wieńca na rysunku 2D
+// (render/viewer2d.js: drawPionMountViews): przód u góry, tył u dołu; łączniki w licu (przegrody,
+// boki przy wieńcach przelotowych) opisane pod formatką "… mm od lewej" (linia od lewej krawędzi),
+// łączniki w czołach (do boków) - odległość od przodu w kolumnie z boku.
 export function horizontalPanelSVG(panel, startNo = 1, scale = null) {
   const L = panel.length, Dd = panel.width;
   const u = unitFor(Math.max(L, Dd));
   setUnit(u);
-  const Z = (z) => Dd - z;                                // przód (z = 0) u dołu rysunku
-  let b = title(L / 2, -58 * u, `${panel.name} — rzut z góry`, `${fmt(L)} × ${fmt(Dd)} × ${fmt(panel.thickness)} mm · ${panel.qty} szt.${scaleNote(scale)}`);
-  b += `<rect x="0" y="0" width="${r1(L)}" height="${r1(Dd)}" fill="${C.slate50}" stroke="${C.slate700}" stroke-width="1.5"/>`;
-  b += text(L / 2, Dd - 6 * u, "PRZÓD", { size: 10, color: C.slate400, weight: "bold" });
-  b += text(L / 2, 14 * u, "TYŁ", { size: 10, color: C.slate400, weight: "bold" });
-  panel.holes.forEach((h, i) => {
-    const n = startNo + i;
-    if (h.edge === "lewe") b += edgeHole(0, Z(h.z), 1, 0, h, n);
-    else if (h.edge === "prawe") b += edgeHole(L, Z(h.z), -1, 0, h, n);
-    else b += faceHole(h.x, Z(h.z), { ...h, orient: "v" }, n);
+  const Z = (z) => z;                                     // przód (z = 0) u góry rysunku, jak w 2D
+  let b = title(L / 2, -58 * u, `${panel.name} — widok z góry`, `${fmt(L)} × ${fmt(Dd)} × ${fmt(panel.thickness)} mm · ${panel.qty} szt.${scaleNote(scale)}`);
+  b += `<rect x="0" y="0" width="${r1(L)}" height="${r1(Dd)}" fill="${C.white}" stroke="${C.slate600}" stroke-width="${r1(1.5 * u)}"/>`;
+  b += text(L / 2, -10 * u, "PRZÓD", { size: 11, color: C.slate400, weight: "bold" });
+  b += text(L / 2, Dd + 20 * u, "TYŁ", { size: 11, color: C.slate400, weight: "bold" });
+  panel.holes.forEach((h) => {
+    if (h.edge === "lewe") b += edgeHole(0, Z(h.z), 1, 0, h);
+    else if (h.edge === "prawe") b += edgeHole(L, Z(h.z), -1, 0, h);
+    else b += faceHole(h.x, Z(h.z), { ...h, orient: "v" });
   });
-  uniq(panel.holes.filter((h) => h.edge === "lico").map((h) => h.x)).forEach((x, i) => {
-    b += line(x, 0, x, (-8 - (i % 2) * 12) * u, C.slate300) + text(x, (-11 - (i % 2) * 12) * u, fmt(x), { size: 10, color: C.slate600 });
+  // Łączniki w licu: "… mm od lewej" pod formatką (jak w 2D).
+  const lico = panel.holes.filter((h) => h.edge === "lico");
+  uniq(lico.map((h) => h.x)).forEach((x, i) => {
+    const color = KIND[(lico.find((h) => r1(h.x) === x) || {}).kind || "wkret"].color;
+    const yL = Dd + (32 + i * 16) * u;
+    b += `<line x1="${r1(x)}" y1="${r1(Dd)}" x2="${r1(x)}" y2="${r1(yL)}" stroke="${color}" stroke-width="${r1(0.75 * u)}" stroke-dasharray="${r1(2 * u)},${r1(2 * u)}"/>`;
+    b += line(0, yL, x, yL, color) + `<circle cx="0" cy="${r1(yL)}" r="${r1(2 * u)}" fill="${color}"/>`;
+    b += text(x + 4 * u, yL + 12 * u, `${fmt(x)} mm od lewej`, { size: 10, color, anchor: "start", weight: "bold" });
   });
+  // Łączniki w czołach i pozostałe: odległość od przodu w kolumnie po prawej.
   uniq(panel.holes.map((h) => h.z)).forEach((z) => {
-    b += line(L, Z(z), L + 32 * u, Z(z), C.slate300, dash) + text(L + 36 * u, Z(z) + 4 * u, fmt(z), { size: 10, color: C.slate600, anchor: "start" });
+    b += line(L, Z(z), L + 32 * u, Z(z), C.slate300, dash) + text(L + 36 * u, Z(z) + 4 * u, `${fmt(z)}`, { size: 10, color: C.slate600, anchor: "start" });
   });
-  b += text(L + 36 * u, Dd + 12 * u, "od przodu", { size: 9, color: C.slate400, anchor: "start" });
-  b += dimH(0, L, Dd + 18 * u, fmt(L)) + dimV(-22 * u, 0, Dd, fmt(Dd));
-  const svg = wrap(-40 * u, -80 * u, L + 130 * u, Dd + 112 * u, b, scale);
+  b += text(L + 36 * u, -10 * u, "od przodu", { size: 9, color: C.slate400, anchor: "start" });
+  const below = Dd + (32 + Math.max(0, uniq(lico.map((h) => h.x)).length) * 16 + 20) * u;
+  b += dimH(0, L, below, fmt(L)) + dimV(-22 * u, 0, Dd, fmt(Dd));
+  const svg = wrap(-40 * u, -80 * u, L + 130 * u, below + 30 * u + 80 * u, b, scale);
   setUnit(1);
   return svg;
 }
@@ -128,40 +174,24 @@ export function panelSVGs(panels, scale) {
     const start = n;
     n += p.holes.length;
     if (!p.holes.length) return;
-    // Wysoka formatka pionowa: na ekranie leżąco (czytelna na szerokość okna), na wydruku pionowo w skali.
-    const vertical = (side) => (p.width > 1.4 * p.length && p.kind !== "trawers-pion"
-      ? `<div class="screen-only">${verticalPanelSVG(p, start, scale, side, true)}</div><div class="print-only">${verticalPanelSVG(p, start, scale, side)}</div>`
-      : verticalPanelSVG(p, start, scale, side));
-    if (p.kind === "przegroda") out.push(vertical("lewa"), vertical("prawa"));
-    else if (p.kind === "bok" || p.kind === "trawers-pion") out.push(vertical(null));
+    if (p.kind === "przegroda") out.push(verticalPanelSVG(p, start, scale, "lewa"), verticalPanelSVG(p, start, scale, "prawa"));
+    else if (p.kind === "bok" || p.kind === "trawers-pion") out.push(verticalPanelSVG(p, start, scale));
     else out.push(horizontalPanelSVG(p, start, scale));
   });
   return out;
 }
 
-export function cabinetLegendHtml(panels) {
-  const kinds = [...new Set(panels.flatMap((p) => p.holes.map((h) => h.kind)))];
-  return `<div class="legend">${kinds.map((k) => `<span><i style="background:${KIND[k].color}"></i>${KIND[k].label}</span>`).join("")}
-    <span><i class="open" style="border-color:${C.slate600}"></i>przelot</span></div>`;
-}
-
-export function cabinetHoleTableHtml(panels, th) {
+// Legenda: kolor, łącznik i rozmiary otworów (w płaszczyźnie / w czole) - zastępuje tabelę otworów.
+export function cabinetLegendHtml(panels, th) {
   const spec = cabinetHoleSpecs(th);
-  let n = 0;
-  const EDGE = { lewe: "czoło lewe", prawe: "czoło prawe", dolne: "czoło dolne", gorne: "czoło górne" };
-  const rows = panels.flatMap((p) => p.holes.map((h) => {
-    n++;
-    const vertical = p.kind === "bok" || p.kind === "przegroda" || p.kind === "trawers-pion";
-    const where = h.edge && h.edge !== "lico" ? `${EDGE[h.edge]} → ${h.to}`
-      : h.edge === "lico" ? `lico od wewnątrz → ${h.to}`
-      : `płaszczyzna${h.side ? ` (strona ${h.side})` : " (od wewnątrz)"} → ${h.to}`;
-    const pos = vertical
-      ? (h.edge === "lewe" || h.edge === "prawe" ? `${fmt(h.y)} od spodu, w osi grubości` : h.edge ? `${fmt(h.x)} od przodu, w osi grubości` : `${fmt(h.x)} od przodu, ${fmt(h.y)} od spodu`)
-      : (h.edge === "lico" ? `${fmt(h.x)} od lewej, ${fmt(h.z)} od przodu` : `${fmt(h.z)} od przodu, w osi grubości`);
-    const size = h.depth == null ? `Ø${fmt(h.d)} przelot${h.note ? ` (${h.note.replace(/^przelot\s*\+?\s*/, "")})` : ""}` : `Ø${fmt(h.d)} × ${fmt(h.depth)}`;
-    return `<tr><td>${n}</td><td>${escapeHtml(p.name)}</td><td><i class="dot" style="background:${KIND[h.kind].color}"></i>${escapeHtml(spec[h.kind].label)}</td><td>${size}</td><td>${escapeHtml(where)}</td><td>${pos}</td></tr>`;
-  }));
-  return `<table class="parts holes"><thead><tr><th>Nr</th><th>Formatka</th><th>Łącznik</th><th>Otwór [mm]</th><th>Gdzie</th><th>Położenie [mm]</th></tr></thead><tbody>${rows.join("")}</tbody></table>`;
+  const size = (o) => (o.groove ? `rowek ${fmt(o.d)} × ${fmt(o.groove)}, gł. ${fmt(o.depth)}` : o.depth == null ? `Ø${fmt(o.d)} przelot` : `Ø${fmt(o.d)} × ${fmt(o.depth)}`);
+  const kinds = [...new Set(panels.flatMap((p) => p.holes.map((h) => h.kind)))];
+  return `<div class="legend">${kinds.map((k) => {
+    const sp = spec[k] || {};
+    const parts = [sp.side || sp.face ? `płaszczyzna ${size(sp.side || sp.face)}` : null, sp.edge ? `czoło ${size(sp.edge)}` : null].filter(Boolean);
+    return `<span><i style="background:${KIND[k].color}"></i><b>${escapeHtml(sp.label || KIND[k].label)}</b>${parts.length ? ` - ${parts.join(", ")}` : ""}</span>`;
+  }).join("")}
+    <span><i class="open" style="border-color:${C.slate600}"></i>pusty znacznik = otwór przelotowy</span></div>`;
 }
 
 // ---------------------------------------------------------------------------
