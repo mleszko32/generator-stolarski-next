@@ -79,7 +79,7 @@ export function lamelloPositions(h, lam, edge = DEFAULTS.lamelloEdge, len = lam.
 const DEFAULTS = {
   join: "kolek_wkret",
   edge: 25,          // oś skrajnego łącznika tyłu/czoła od górnej i dolnej krawędzi [mm]
-  bottomEdge: 50,    // oś skrajnego łącznika dna od przodu i tyłu [mm]
+  bottomEdge: 80,    // oś skrajnego łącznika dna od przodu i tyłu [mm] (min. 80 - strefa sprzęgieł/zaczepów MOVENTO)
   bottomSpacing: 150, // maks. rozstaw łączników dna [mm]
   screwLength: 50,   // wkręt / konfirmat [mm]
   dowelLength: 30,   // kołek Ø8 [mm]
@@ -142,22 +142,35 @@ function jointsOn(h, settings) {
   return jointPositions(h, settings.edge, n).map((p, i) => ({ p, kind: kinds[i] }));
 }
 
+// Łączniki dna z bokami wzdłuż długości L - z dala od strefy sprzęgieł (przód) i zaczepów
+// (tył) MOVENTO: patrz movingZoneEdge niżej.
 function bottomJoints(L, settings) {
-  if (LAMELLO[settings.join]) return lamelloPositions(L, LAMELLO[settings.join], settings.lamelloEdge, lamelloGrooveLen(LAMELLO[settings.join], settings)).map((p) => ({ p, kind: "lamello" }));
-  const e = Math.min(settings.bottomEdge, L / 4);
+  const lam = LAMELLO[settings.join];
+  if (lam) {
+    const len = lamelloGrooveLen(lam, settings);
+    return lamelloPositions(L, lam, lamelloZoneEdge(lam, settings, len), len).map((p) => ({ p, kind: "lamello" }));
+  }
+  const e = Math.min(Math.max(FRONT_BACK_SIDE_CLEAR, num(settings.bottomEdge, 50)), L / 4);
   const n = Math.max(2, Math.ceil((L - 2 * e) / Math.max(50, settings.bottomSpacing)) + 1);
   const kinds = kindsFor(settings.join, n);
   return Array.from({ length: n }, (_, i) => ({ p: round1(e + (L - 2 * e) * i / (n - 1)), kind: kinds[i] }));
 }
 
-// Łączniki dna z tyłem i przodem (stoją na dnie), w poprzek szerokości w. Kołki/wkręty:
-// skrajne min. 80 mm od boków - pod dnem przy bokach siedzą z przodu sprzęgła MOVENTO
-// (strefa 75 mm wg Blum TD-132/1), z tyłu zaczepy prowadnic; rozstaw jak dno-bok.
-// Lamello: rowki od góry dna, oś lamelloEdge od boków, rozstaw maks. 300.
+// Strefa sprzęgieł (przód) i zaczepów (tył) MOVENTO pod dnem przy bokach: 75 mm (Blum TD-132/1).
+// Kołki/wkręty dna: oś min. 80 mm od boku / od przodu i tyłu. Lamello: cały rowek poza strefą,
+// czyli oś 75 mm + połowa długości rowka (P-14: 112,5, P-10: 105) - rowek ma 14 mm w dnie 16 mm,
+// wkręty sprzęgła by w niego trafiły.
+export const MOVENTO_ZONE = 75;
 export const FRONT_BACK_SIDE_CLEAR = 80;
+const lamelloZoneEdge = (lam, settings, len) => Math.max(num(settings.lamelloEdge, DEFAULTS.lamelloEdge), MOVENTO_ZONE + len / 2);
+
+// Łączniki dna z tyłem i przodem (stoją na dnie), w poprzek szerokości w; rozstaw jak dno-bok.
 function frontBackJoints(w, settings) {
   const lam = LAMELLO[settings.join];
-  if (lam) return lamelloPositions(w, lam, settings.lamelloEdge, lamelloGrooveLen(lam, settings)).map((p) => ({ p, kind: "lamello" }));
+  if (lam) {
+    const len = lamelloGrooveLen(lam, settings);
+    return lamelloPositions(w, lam, lamelloZoneEdge(lam, settings, len), len).map((p) => ({ p, kind: "lamello" }));
+  }
   const e = Math.min(Math.max(FRONT_BACK_SIDE_CLEAR, num(settings.bottomEdge, 50)), w / 2);
   const n = w - 2 * e < 40 ? 1 : Math.max(2, Math.ceil((w - 2 * e) / Math.max(50, settings.bottomSpacing)) + 1);
   const kinds = kindsFor(settings.join, n);

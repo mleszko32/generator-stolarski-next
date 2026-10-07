@@ -360,7 +360,7 @@ function renderRysunki(el) {
 // w jedną pozycję i rysunki warsztatowe z otworami (ui/drawerBoxDrawings.js).
 const DB_FIELDS = [
   ['edge', 'Łącznik tyłu/czoła od krawędzi [mm]'],
-  ['bottomEdge', 'Łącznik dna od przodu i tyłu [mm]'],
+  ['bottomEdge', 'Łącznik dna od przodu i tyłu [mm] (min. 80)'],
   ['bottomSpacing', 'Maks. rozstaw łączników dna [mm]'],
   ['screwLength', 'Długość wkrętu / konfirmatu [mm]'],
   ['dowelLength', 'Długość kołka Ø8 [mm]'],

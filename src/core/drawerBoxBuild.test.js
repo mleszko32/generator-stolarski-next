@@ -67,10 +67,10 @@ describe("skrzynki szuflad MOVENTO - formatki i otwory", () => {
     z.forEach((x) => expect(x).toMatchObject({ d: 6, depth: 10, y: 11, edge: "tylne", z: box.skl }));
   });
 
-  it("dno: łączniki co najwyżej co 150 mm, 50 mm od końców", () => {
+  it("dno: łączniki co najwyżej co 150 mm, min. 80 mm od końców (strefa sprzęgieł i zaczepów)", () => {
     const zs = panel("dno").holes.filter((x) => x.edge === "lewe").map((x) => x.z);
-    expect(zs[0]).toBe(50);
-    expect(zs[zs.length - 1]).toBe(box.skl - 50);
+    expect(zs[0]).toBe(80);
+    expect(zs[zs.length - 1]).toBe(box.skl - 80);
     for (let i = 1; i < zs.length; i++) expect(zs[i] - zs[i - 1]).toBeLessThanOrEqual(150);
   });
 });
@@ -165,11 +165,11 @@ describe("skrzynki szuflad - Lamello: odsunięcie od końca formatki", () => {
     expect(lamelloPositions(300, LAMELLO.tenso_p14, 10)).toEqual([37, 263]);
   });
 
-  it("w skrzynce: łączniki dna i tyłu/przodu 60 mm od końców", () => {
+  it("w skrzynce: tył/przód 60 mm od końców, dno z bokami poza strefą sprzęgieł (75 + pół rowka)", () => {
     const box = buildDrawerBox({ comps: getDrawerComponents("movento_katalog", 564, 500, 400, "auto", 250), system: movento, isB: false }, getDrawerBoxSettings({ drawerBox: { join: "tenso_p14" } }));
     const dno = box.panels.find((p) => p.id === "dno").holes.filter((h) => h.edge === "lewe").map((h) => h.z);
-    expect(dno[0]).toBe(60);
-    expect(dno[dno.length - 1]).toBe(box.skl - 60);
+    expect(dno[0]).toBe(112.5);
+    expect(dno[dno.length - 1]).toBe(box.skl - 112.5);
     const tp = box.panels.find((p) => p.id === "tyl-przod").holes.filter((h) => h.edge === "lewe").map((h) => h.y);
     expect(tp[0]).toBe(60);
   });
@@ -207,12 +207,17 @@ describe("skrzynki szuflad - dno połączone z tyłem i przodem", () => {
     expect(tp).toEqual(dno.filter((h) => h.to === "tył").map((h) => h.x));
   });
 
-  it("Lamello: rowki w licu dna i w dolnej krawędzi tył/przód, 60 mm od boków; Clamex z kluczem nad dnem", () => {
+  it("Lamello: rowki w licu dna i w dolnej krawędzi tył/przód, cały rowek poza strefą sprzęgieł (75 mm); Clamex z kluczem nad dnem", () => {
     const box = boxWith("clamex_p14");
     const tp = box.panels.find((p) => p.id === "tyl-przod").holes;
     const bottomEdge = tp.filter((h) => h.edge === "dolne");
-    expect(bottomEdge[0]).toMatchObject({ kind: "lamello", x: 60, groove: 75 });
+    expect(bottomEdge[0]).toMatchObject({ kind: "lamello", x: 112.5, groove: 75 });
+    // rowek (oś ± 37,5) zaczyna się dopiero za strefą 75 mm od boku, po obu stronach
+    bottomEdge.forEach((h) => { expect(h.x - h.groove / 2).toBeGreaterThanOrEqual(75); expect(h.x + h.groove / 2).toBeLessThanOrEqual(box.skw - 75); });
     expect(tp.filter((h) => h.kind === "klucz" && h.to === "dno").map((h) => h.y)).toContain(7.5);
+    // P-10: rowek 60 mm -> oś 105 mm od boku
+    const p10 = boxWith("tenso_p10").panels.find((p) => p.id === "tyl-przod").holes.filter((h) => h.edge === "dolne");
+    expect(p10[0].x).toBe(105);
     const dno = box.panels.find((p) => p.id === "dno").holes.filter((h) => h.to === "tył");
     dno.forEach((h) => expect(h).toMatchObject({ kind: "lamello", face: "gora" }));
   });
