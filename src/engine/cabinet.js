@@ -18,7 +18,13 @@ export function calculateParts() {
   const activeModuleId = state.activeModuleId;
   const mod = state.project.modules.find(m => m.id === activeModuleId);
   if (!mod) return { parts: [], mountingData: [] };
+  return calculateModuleParts(mod);
+}
 
+// Formatki i dane wierceń (mountingData) jednej, dowolnej szafki - to samo co calculateParts()
+// dla aktywnej, używane też przez instrukcje montażu (core/cabinetDrillings.js). Wymaga
+// aktualnego layoutu (recalculateAllLayouts / recalculateLayout).
+export function calculateModuleParts(mod) {
   const config = state.project;
   let rawParts = [];
   let mountingData = [];

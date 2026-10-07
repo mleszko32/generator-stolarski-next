@@ -30,12 +30,14 @@ import { openTechnicalDrawing } from "./technicalDrawing.js";
 import { mountKosztorys } from "./kosztorysModal.js";
 import { collectDrawerBoxes, getDrawerBoxSettings, JOIN_METHODS, LAMELLO } from "../core/drawerBoxBuild.js";
 import { openDrawerBoxDrawings } from "./drawerBoxDrawings.js";
+import { openCabinetInstructions, supportsInstructions } from "./cabinetInstructions.js";
 
 const SECTIONS = [
   { id: 'formatki', label: 'Formatki', icon: 'ti-list-details' },
   { id: 'rozkroj', label: 'Rozkrój i etykiety', icon: 'ti-cut' },
   { id: 'rysunki', label: 'Rysunki 2D', icon: 'ti-ruler-2' },
   { id: 'skrzynki', label: 'Skrzynki szuflad', icon: 'ti-box' },
+  { id: 'instrukcje', label: 'Instrukcje montażu', icon: 'ti-tools' },
   { id: 'sciany', label: 'Rzuty ścian', icon: 'ti-wall' },
   { id: 'blaty', label: 'Blaty', icon: 'ti-layout-board' },
   { id: 'okucia', label: 'Okucia i okleina', icon: 'ti-shopping-cart' },
@@ -397,6 +399,34 @@ function renderSkrzynki(el) {
   el.querySelector('#db-open')?.addEventListener('click', () => openDrawerBoxDrawings(boxes, s, p.name));
 }
 
+// Instrukcje montażu szafek (ui/cabinetInstructions.js): ta sama forma co skrzynki szuflad -
+// lista szafek, otwarcie jednej albo wszystkich naraz (jedna szafka na stronę wydruku).
+function renderInstrukcje(el) {
+  const p = state.project;
+  const mods = p.modules || [];
+  const ok = mods.filter(supportsInstructions);
+  el.innerHTML = `
+    <div class="hub-bar"><div><h3>Instrukcje montażu</h3>
+      <div class="hub-sub">Dla każdej szafki: gdzie stoi w projekcie, lista formatek, montaż w 3D z kolejnością kroków, formatki korpusu z ponumerowanymi otworami (jedna skala) i tabela otworów - w tej samej formie co instrukcje skrzynek szuflad.</div></div>
+      ${ok.length ? `<button type="button" class="btn btn-primary" id="in-all"><i class="ti ti-printer" aria-hidden="true"></i> Otwórz wszystkie (${ok.length})</button>` : ''}
+    </div>
+    ${mods.length === 0 ? '<p class="hub-empty">Projekt nie ma jeszcze szafek.</p>' : `
+    <table class="hub-table">
+      <thead><tr><th>Szafka</th><th>Wymiary</th><th></th></tr></thead>
+      <tbody>${mods.map(m => {
+        const l = moduleLabel(m);
+        const can = supportsInstructions(m);
+        return `<tr>
+          <td><div class="hub-strong" style="font-size:13px;">${escapeHtml(l.name)}</div><div class="hub-sub">${escapeHtml(l.type)}${can ? '' : ' · instrukcja jeszcze niedostępna dla tego typu szafki'}</div></td>
+          <td>${escapeHtml(l.dims)}</td>
+          <td class="num" style="width:150px;">${can ? `<button type="button" class="btn btn-sm in-open" data-id="${m.id}">Otwórz instrukcję</button>` : ''}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`}`;
+  el.querySelector('#in-all')?.addEventListener('click', () => openCabinetInstructions(ok, p.name));
+  el.querySelectorAll('.in-open').forEach(btn => btn.addEventListener('click', () => openCabinetInstructions(mods.filter(m => m.id === btn.dataset.id), p.name)));
+}
+
 let showEmptyWalls = false;
 // Tryb wymiarowania rzutów - globalny dla całego wydruku (patrz
 // render/wallElevations.js: dimMode), nie per ściana: 'fronts' (domyślny) =
@@ -523,6 +553,7 @@ const RENDERERS = {
   rozkroj: renderRozkroj,
   rysunki: renderRysunki,
   skrzynki: renderSkrzynki,
+  instrukcje: renderInstrukcje,
   sciany: renderSciany,
   blaty: renderBlaty,
   okucia: renderOkucia,

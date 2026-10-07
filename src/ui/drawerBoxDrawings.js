@@ -20,48 +20,8 @@ function locatorsHtml(box) {
   }).join("");
 }
 
-function boxCard(box, settings, idx) {
-  const starts = panelStartNumbers(box);
-  // Wszystkie rysunki formatek tej skrzynki w jednej skali - prawdziwe proporcje.
-  const scale = drawingScale(box);
-  const svgs = box.panels.map((p, i) => {
-    if (p.kind === "bok") return sideSVG(box, p, starts[i], scale);
-    if (p.kind === "dno") return bottomSVG(box, p, starts[i], scale);
-    return plateSVG(box, p, starts[i], scale);
-  });
-  const partsRows = box.panels.map((p) => `<tr><td><b>${escapeHtml(p.name)}</b></td><td>${p.qty}</td><td>${fmt(p.length)} × ${fmt(p.width)} × ${fmt(p.thickness)}</td></tr>`).join("");
-  return `<section class="box" id="box-${idx}">
-    <h2>${idx + 1}. ${escapeHtml(box.name)} <span class="qty">× ${box.qty}</span></h2>
-    <p class="lead">${escapeHtml(box.system)} · NL ${box.nl} · światło korpusu LW ${fmt(box.lw)} → szerokość skrzynki SKW = LW − ${fmt(box.lw - box.skw)} = <b>${fmt(box.skw)}</b> · długość SKL = NL − 10 = <b>${fmt(box.skl)}</b> · płyta ${fmt(box.t)} mm, dno podniesione o ${fmt(box.recess)} mm · łączenie: <b>${escapeHtml(JOIN_METHODS[box.join])}</b></p>
-    <p class="muted">Szafki: ${box.modules.map(escapeHtml).join(", ")}</p>
-    ${(box.warnings || []).map((w) => `<div class="warn">${escapeHtml(w)}</div>`).join("")}
-    <div class="cols">
-      <table class="parts"><thead><tr><th>Formatka</th><th>Szt.</th><th>Wymiar [mm]</th></tr></thead><tbody>${partsRows}</tbody></table>
-      <div class="notes">
-        <div>Tył i czoło wewnętrzne stoją <b>na dnie</b>, między bokami; dno między bokami na całą długość (wariant Blum bez wycięcia w tyle).</div>
-        <div><b>Sprzęgła T51.7601</b> (przód, pod dnem): wkręty pod kątem 75°, otwory Ø2,5 × 10 — położenie wg szablonu Blum <b>T65.1000.02</b> (Blum nie podaje wymiarów).</div>
-        <div><b>Zaczep tylny</b> Ø6 × 10 w tylnej krawędzi dna, 7 mm od boku, 11 mm nad spodem dna (Blum TD-132/1 str. 5 — dla wariantu z wycięciem w tyle; tu przeniesione na dno). Można wiercić szablonem T65.1000.02.</div>
-      </div>
-    </div>
-    <h3>Gdzie w szafce</h3>
-    <div class="locators">${locatorsHtml(box)}</div>
-    <div class="assembly"><div class="card">${assemblySVG(box)}</div><div><h3>Kolejność montażu</h3>${assemblyStepsHtml(box)}</div></div>
-    ${legendHtml(box)}
-    <p class="muted">Rysunki formatek w skali <b>1:${scale}</b> (wszystkie tak samo - prawdziwe proporcje). Na wydruku ustaw skalę 100% / „Rzeczywisty rozmiar”, wtedy 1 cm na papierze = ${scale} cm formatki.</p>
-    <div class="grid">${svgs.map((s) => `<div class="card">${s}</div>`).join("")}</div>
-    <h3>Otwory</h3>
-    ${holeTableHtml(box, settings)}
-  </section>`;
-}
-
-export function openDrawerBoxDrawings(boxes, settings, projectName = "") {
-  const html = `<!DOCTYPE html>
-<html lang="pl">
-<head>
-  <meta charset="UTF-8">
-  <title>Skrzynki szuflad${projectName ? ` - ${escapeHtml(projectName)}` : ""}</title>
-  <style>
-    :root { color-scheme: light; }
+// Style okien instrukcji (skrzynki szuflad, szafki - ui/cabinetInstructions.js), jeden zestaw.
+export const WORKSHOP_CSS = `    :root { color-scheme: light; }
     html { background: #fff; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 0 30px 30px; color: #1e293b; max-width: 1200px; margin: 0 auto; background: #fff; }
     .toolbar { position: sticky; top: 0; z-index: 5; background: #fff; border-bottom: 2px solid #cbd5e1; display: flex; gap: 8px; align-items: center; padding: 10px 0; flex-wrap: wrap; }
@@ -108,7 +68,50 @@ export function openDrawerBoxDrawings(boxes, settings, projectName = "") {
       .grid { gap: 6px; }
       .assembly { grid-template-columns: 3fr 2fr; }
     }
-  </style>
+`;
+
+function boxCard(box, settings, idx) {
+  const starts = panelStartNumbers(box);
+  // Wszystkie rysunki formatek tej skrzynki w jednej skali - prawdziwe proporcje.
+  const scale = drawingScale(box);
+  const svgs = box.panels.map((p, i) => {
+    if (p.kind === "bok") return sideSVG(box, p, starts[i], scale);
+    if (p.kind === "dno") return bottomSVG(box, p, starts[i], scale);
+    return plateSVG(box, p, starts[i], scale);
+  });
+  const partsRows = box.panels.map((p) => `<tr><td><b>${escapeHtml(p.name)}</b></td><td>${p.qty}</td><td>${fmt(p.length)} × ${fmt(p.width)} × ${fmt(p.thickness)}</td></tr>`).join("");
+  return `<section class="box" id="box-${idx}">
+    <h2>${idx + 1}. ${escapeHtml(box.name)} <span class="qty">× ${box.qty}</span></h2>
+    <p class="lead">${escapeHtml(box.system)} · NL ${box.nl} · światło korpusu LW ${fmt(box.lw)} → szerokość skrzynki SKW = LW − ${fmt(box.lw - box.skw)} = <b>${fmt(box.skw)}</b> · długość SKL = NL − 10 = <b>${fmt(box.skl)}</b> · płyta ${fmt(box.t)} mm, dno podniesione o ${fmt(box.recess)} mm · łączenie: <b>${escapeHtml(JOIN_METHODS[box.join])}</b></p>
+    <p class="muted">Szafki: ${box.modules.map(escapeHtml).join(", ")}</p>
+    ${(box.warnings || []).map((w) => `<div class="warn">${escapeHtml(w)}</div>`).join("")}
+    <div class="cols">
+      <table class="parts"><thead><tr><th>Formatka</th><th>Szt.</th><th>Wymiar [mm]</th></tr></thead><tbody>${partsRows}</tbody></table>
+      <div class="notes">
+        <div>Tył i czoło wewnętrzne stoją <b>na dnie</b>, między bokami; dno między bokami na całą długość (wariant Blum bez wycięcia w tyle).</div>
+        <div><b>Sprzęgła T51.7601</b> (przód, pod dnem): wkręty pod kątem 75°, otwory Ø2,5 × 10 — położenie wg szablonu Blum <b>T65.1000.02</b> (Blum nie podaje wymiarów).</div>
+        <div><b>Zaczep tylny</b> Ø6 × 10 w tylnej krawędzi dna, 7 mm od boku, 11 mm nad spodem dna (Blum TD-132/1 str. 5 — dla wariantu z wycięciem w tyle; tu przeniesione na dno). Można wiercić szablonem T65.1000.02.</div>
+      </div>
+    </div>
+    <h3>Gdzie w szafce</h3>
+    <div class="locators">${locatorsHtml(box)}</div>
+    <div class="assembly"><div class="card">${assemblySVG(box)}</div><div><h3>Kolejność montażu</h3>${assemblyStepsHtml(box)}</div></div>
+    ${legendHtml(box)}
+    <p class="muted">Rysunki formatek w skali <b>1:${scale}</b> (wszystkie tak samo - prawdziwe proporcje). Na wydruku ustaw skalę 100% / „Rzeczywisty rozmiar”, wtedy 1 cm na papierze = ${scale} cm formatki.</p>
+    <div class="grid">${svgs.map((s) => `<div class="card">${s}</div>`).join("")}</div>
+    <h3>Otwory</h3>
+    ${holeTableHtml(box, settings)}
+  </section>`;
+}
+
+export function openDrawerBoxDrawings(boxes, settings, projectName = "") {
+  const html = `<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Skrzynki szuflad${projectName ? ` - ${escapeHtml(projectName)}` : ""}</title>
+  <style>
+${WORKSHOP_CSS}  </style>
 </head>
 <body>
   <div class="toolbar"><h1>Skrzynki szuflad (${boxes.reduce((n, b) => n + b.qty, 0)} szt.)</h1><span class="spacer"></span><button class="pbtn" onclick="window.print()">🖨️ Drukuj</button></div>

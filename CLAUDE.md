@@ -230,6 +230,15 @@ skali (`drawingScale`: 1:4 / 1:5 / 1:10 / 1:20, żeby zmieściły się na A4; wy
 Przy każdej skrzynce „Gdzie w szafce”: `box.locations` (szafki + id frontów) i `cabinetFrontView` (obrys i fronty
 szafki od frontu, też skos) rysowane przez `cabinetLocatorSVG` z podświetlonymi, ponumerowanymi szufladami.
 
+**Instrukcje montażu szafek**: `engine/cabinetDrillings.js` (czyste, z testami) — formatki korpusu zwykłej szafki
+(boki, przegrody, wieńce/trawersy, półki, plecy) z otworami per formatka, z tych samych danych co rysunek boku 2D
+(`calculateModuleParts(mod)` w `engine/cabinet.js` — to samo co `calculateParts()`, ale dla dowolnej szafki: mountingData
+łączników korpusu, prowadnic, zawiasów, przegród + półki z `mod.elements`). Rysunki `render/cabinetDrawing2d.js`
+(formatki w jednej skali, tabela otworów, montaż w izometrii, kolejność kroków, „Gdzie w projekcie” z `computeWallLayouts`),
+okno `ui/cabinetInstructions.js`, sekcja huba „Instrukcje montażu”. Wspólne klocki rysunków instrukcji (otwory, rowki,
+wymiary, izometria, widok szafki od frontu) są w `render/workshopDrawing.js`, style okien w `WORKSHOP_CSS`
+(`ui/drawerBoxDrawings.js`) — skrzynki szuflad i szafki wyglądają tak samo. Narożna i skos: jeszcze bez instrukcji.
+
 **Plan rozkroju**: `engine/nesting.js` — „półkowe” układanie formatek na arkuszach z cięciami na
 wylot (sprawdza kilka orientacji, wybiera najmniej arkuszy), wyświetlane przez
 `ui/cutPlanModal.js`.
