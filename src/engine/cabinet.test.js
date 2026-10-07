@@ -112,12 +112,12 @@ describe("integracja layout -> drawerMath -> lista formatek", () => {
     expect(front.name).toBe("Front szuflady");
     expect(front.length).toBeGreaterThan(700); // ~715 mm na pełną wnękę
 
-    const dno = parts.find((p) => p.name.startsWith("Dno W600 NL"));
-    expect(dno.name).toBe("Dno W600 NL500"); // głęb. wnętrza 510 -> NL 500
+    const dno = parts.find((p) => p.name.startsWith("Dno szuflady NL"));
+    expect(dno.name).toBe("Dno szuflady NL500"); // głęb. wnętrza 510 -> NL 500
     expect(dno).toMatchObject({ length: 474, width: 513 });
 
-    const tyl = parts.find((p) => p.name.startsWith("Tył W600"));
-    expect(tyl.name).toBe("Tył W600 (E)"); // wariant wysoki
+    const tyl = parts.find((p) => p.name.startsWith("Tył szuflady"));
+    expect(tyl.name).toBe("Tył szuflady (E)"); // wariant wysoki
     expect(tyl).toMatchObject({ length: 513, width: 184 });
   });
 });
@@ -214,8 +214,8 @@ describe("front.forceVariant wymusza realny wariant systemu (klucz katalogu, nie
     // I samo wymuszenie faktycznie dotarło do getDrawerComponents (a nie zostało
     // po drodze odrzucone jako "za mało miejsca") - tył szuflady ma wysokość
     // bardzoniskiego wariantu antaro (typ N, 69mm), a nie auto-dobranego wyższego.
-    const tyl = parts.find((p) => p.name.startsWith("Tył W600"));
-    expect(tyl.name).toBe("Tył W600 (N)");
+    const tyl = parts.find((p) => p.name.startsWith("Tył szuflady"));
+    expect(tyl.name).toBe("Tył szuflady (N)");
     expect(tyl.width).toBe(69);
   });
 });
@@ -339,5 +339,27 @@ describe("Szafka pod skos w liście formatek i okuć projektu", () => {
     const hw = Object.values(calculateProjectHardware());
     const runners = hw.find((h) => h.name.includes("MOVENTO 766H (60 kg) NL-580"));
     expect(runners).toMatchObject({ qty: 3 });
+  });
+});
+
+describe("formatki szuflad z szafek o różnej szerokości się sumują", () => {
+  // Zgłoszony błąd: nazwa zawierała szerokość szafki (Bok szuflady W570... / W581...),
+  // więc identyczne boki 690 × 350 z dwóch szafek nie łączyły się w jeden wiersz.
+  it("boki MOVENTO o tych samych wymiarach w jednym wierszu, niezależnie od szafki", () => {
+    const drawer = (id) => ({
+      id, typ: "front", subtype: "szuflada", frontIndex: 0, gap: 3, distribution: "1",
+      baseZone: { minX: 18, maxX: 0, minY: 18, maxY: 702, offsetBottom: 0, offsetTop: 0, boundLeft: "cab-left", boundRight: "cab-right", boundBottom: "cab-bottom", boundTop: "cab-top" },
+    });
+    const a = baseModule({ id: "a", name: "A", dimensions: { width: 600, height: 720, depth: 513 }, elements: [drawer("fa")] });
+    const b = baseModule({ id: "b", name: "B", position: { x: 600, y: 0, z: 0 }, dimensions: { width: 700, height: 720, depth: 513 }, elements: [drawer("fb")] });
+    a.elements[0].baseZone.maxX = 582;
+    b.elements[0].baseZone.maxX = 682;
+    const project = freshProject({ modules: [a, b] });
+    project.front.drawerSystem = "movento_katalog";
+    setProject(project);
+    const sides = calculateAllProjectParts().filter((p) => p.name.startsWith("Bok szuflady"));
+    expect(sides).toHaveLength(1);
+    expect(sides[0].qty).toBe(4);
+    expect(sides[0].name).not.toMatch(/W\d/);
   });
 });

@@ -42,7 +42,7 @@ describe("getDrawerBoxRect", () => {
 });
 
 // Długość nominalna (NL) skrzynki w 3D / rysunku 2D / karcie MUSI zgadzać się z formatką dna
-// z listy formatek ("Dno W600 NL500") - wcześniej 3D dobierało o stopień krótszą prowadnicę.
+// z listy formatek ("Dno szuflady NL500") - wcześniej 3D dobierało o stopień krótszą prowadnicę.
 import { calculateAllProjectParts } from "../engine/cabinet.js";
 
 describe("NL zgodne z listą formatek", () => {

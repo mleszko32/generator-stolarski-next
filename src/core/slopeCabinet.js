@@ -445,9 +445,7 @@ export function getSlopeShapes(mod, config) {
     if (fr.type === 'brak') return;
     if (fr.shape.kind !== 'prostokat') add(frontName(fr), 'Front', fr.shape.points);
     if (fr.drawer && fr.drawer.boxType === 'B') {
-      const bz = fr.el.baseZone || {};
-      const eqW = Math.round((parseFloat(bz.maxX) || 0) - (parseFloat(bz.minX) || 0) + 2 * th);
-      const { back, inner } = drawerBNames(fr, g, eqW);
+      const { back, inner } = drawerBNames(fr, g);
       add(back, 'Szuflada', fr.drawer.box.backPoints);
       add(inner, 'Szuflada', fr.drawer.box.backPoints);
     }
@@ -459,10 +457,10 @@ export function getSlopeShapes(mod, config) {
 }
 
 // Nazwy formatek skrzynki B (ścięta pod skos) - te same na liście formatek i na rysunkach.
-function drawerBNames(fr, g, eqW) {
+function drawerBNames(fr, g) {
   const c = fr.drawer.comps, b = fr.drawer.box;
   const low = g.lowSide === 'left' ? 'lewa' : 'prawa';
-  const tag = `W${eqW} NL${c.nominalLength} H${b.sideLow}-${b.sideHigh}`;
+  const tag = `NL${c.nominalLength} H${b.sideLow}-${b.sideHigh}`;
   const shape = b.backFlat > 0
     ? `ścięty róg, ${low} ${r1(b.backLow)}, płasko ${r1(b.backFlat)}`
     : `trapez, ${low} ${r1(b.backLow)}`;
@@ -481,15 +479,13 @@ export function getSlopeFrontParts(mod, config) {
     parts.push({ name: frontName(fr), length: r1(fr.shape.h), width: r1(fr.shape.w), qty: 1, category: 'Front', materialId: fr.el.materialId, outline });
     const d = fr.drawer;
     if (!d) return;
-    const bz = fr.el.baseZone || {};
-    const eqW = Math.round((parseFloat(bz.maxX) || 0) - (parseFloat(bz.minX) || 0) + 2 * th);
     if (d.boxType === 'A') {
-      parts.push(...drawerComponentsToParts(d.comps, eqW));
+      parts.push(...drawerComponentsToParts(d.comps));
       return;
     }
     // Skrzynka B (ścięta pod skos): boki różnej wysokości, tył i czoło trapezowe.
     const c = d.comps, b = d.box;
-    const { tag, back, inner } = drawerBNames(fr, g, eqW);
+    const { tag, back, inner } = drawerBNames(fr, g);
     parts.push(
       { name: `Bok szuflady ${tag} (niski)`, length: r1(c.sides.length), width: r1(b.sideLow), qty: 1, category: 'Szuflada' },
       { name: `Bok szuflady ${tag} (wysoki)`, length: r1(c.sides.length), width: r1(b.sideHigh), qty: 1, category: 'Szuflada' },

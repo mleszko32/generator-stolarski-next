@@ -455,7 +455,7 @@ function getFrontsAndDrawers(mod, config) {
         // Podanie tu simulatedSpace gwarantowałoby odrzucenie wymuszenia.
         const drawerComps = getDrawerComponents(sysName, width - (board * 2), availableDepth, availableSpace, userForcedVariant, front.drawerSideHeight);
 
-        if (drawerComps) parts.push(...drawerComponentsToParts(drawerComps, width));
+        if (drawerComps) parts.push(...drawerComponentsToParts(drawerComps));
       }
     } 
   });

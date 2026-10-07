@@ -194,16 +194,16 @@ describe("szafka pod skos - fronty i szuflady z wnętrza", () => {
     const parts = getSlopeFrontParts(fusion(), cfg());
     expect(parts.filter((p) => p.name.startsWith("Front szuflady"))).toHaveLength(3);
     expect(parts.filter((p) => p.name.startsWith("Blenda"))).toHaveLength(3);
-    expect(parts.find((p) => p.name === "Bok szuflady W686 NL580 H438")).toMatchObject({ length: 570, width: 438, qty: 2 });
+    expect(parts.find((p) => p.name === "Bok szuflady NL580 H438")).toMatchObject({ length: 570, width: 438, qty: 2 });
     expect(getSlopeDrawerHardware(fusion(), cfg())).toEqual(Array(3).fill("Prowadnice Blum MOVENTO 766H (60 kg) NL-580 + sprzęgła T51.7601"));
   });
 
   it("skrzynka B: boki różnej wysokości i tył trapezowy; bez skosu - zwykła skrzynka", () => {
     const parts = getSlopeFrontParts(fusion({ drawerBox: "B" }), cfg());
-    expect(parts.find((p) => p.name === "Bok szuflady W686 NL580 H438-459 (niski)")).toMatchObject({ width: 438, qty: 1 });
-    expect(parts.find((p) => p.name === "Bok szuflady W686 NL580 H438-459 (wysoki)")).toMatchObject({ width: 459, qty: 1 });
-    expect(parts.find((p) => p.name.startsWith("Tył szuflady skos W686 NL580 H438-459"))).toMatchObject({ length: 608, width: 430 });
-    expect(parts.find((p) => p.name === "Bok szuflady W686 NL580 H459")).toMatchObject({ qty: 2 });
+    expect(parts.find((p) => p.name === "Bok szuflady NL580 H438-459 (niski)")).toMatchObject({ width: 438, qty: 1 });
+    expect(parts.find((p) => p.name === "Bok szuflady NL580 H438-459 (wysoki)")).toMatchObject({ width: 459, qty: 1 });
+    expect(parts.find((p) => p.name.startsWith("Tył szuflady skos NL580 H438-459"))).toMatchObject({ length: 608, width: 430 });
+    expect(parts.find((p) => p.name === "Bok szuflady NL580 H459")).toMatchObject({ qty: 2 });
   });
 
   it("skrzynka B przy systemie metalowym liczy się jako A", () => {
