@@ -289,6 +289,14 @@ narożniku), otwory na ścianie (z odstępem) i strefa przejścia przed drzwiami
 `distribution` frontów); reszta na blendę (`project.sidePanels`, lico równo z frontami) albo rozciągnięcie szafek.
 `wallToWorld`/`worldToWall` — przeliczenie pas ściany ↔ pokój (oś X szafki zawsze rośnie z `u`).
 
+**Szafka ślepa i okucia narożne**: szafka ślepa to zwykła szafka z `mod.blindCorner = { active, side, frontWidth,
+fitting }` — `core/blindCorner.js` (czyste, z testami): `applyBlindCorner` na końcu `recalculateLayout` przycina
+fronty do otworu drzwi, `getBlindPanel` daje zaślepkę części ślepej (formatka „Zaślepka szafki ślepej”, kategoria
+Front; rysowana w 3D i w rzutach ścian), `blindGeometry().blindReach` = od boku po stronie ślepej do drzwi.
+`core/cornerFittings.js` to **jedyny** katalog okuć narożnych (LeMans, Magic Corner, Cornerstone, karuzele…;
+`kind: 'blind'` dla szafki ślepej, `'corner'` dla `mod.cornerFitting` szafki L) — pozycja na liście okuć
+(`hardware.js`) i ostrzeżenia wymiarów w kontroli projektu. UI: sekcja „Narożnik” (`ui/blindCornerProperties.js`).
+
 **Kontrola projektu**: `core/validate.js` (`validateProject`) zasila sekcję huba „Kontrola
 projektu” (`ui/projectCheck.js`): kolizje, granice pokoju, za szerokie drzwi/półki, formatki
 niemieszczące się w płycie, otwory.

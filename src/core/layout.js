@@ -14,6 +14,7 @@
 import { state, DEFAULT_ROOM } from "./state.js";
 import { assignFront } from "./zoneTree.js";
 import { getSlopeInnerRect } from "./slopeCabinet.js";
+import { applyBlindCorner } from "./blindCorner.js";
 
 // Przelicza layout wszystkich modułów projektu. Wołaj przed każdym liczeniem
 // formatek/okuć całego projektu — fronty z sąsiednich modułów też muszą mieć
@@ -376,6 +377,8 @@ export function recalculateLayout(mod) {
     migrateCornerHingesToSide(mod);
     applyCornerFrontOverlap(mod);
   }
+  // Szafka ślepa (core/blindCorner.js): fronty tylko na otworze części otwieranej.
+  applyBlindCorner(mod, config);
 }
 
 // Fronty dwóch ramion spotykają się w ostrym, wewnętrznym rogu (zgłoszona

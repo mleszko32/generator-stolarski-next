@@ -12,6 +12,7 @@ import { openCornerConfigModal } from "./cornerConfigModal.js";
 import { generateCornerBlankSVG, generateCornerPartsDrawings } from "../render/cornerDrawing2d.js";
 import { initPropertiesPanel } from "./properties.js";
 import { propHeaderHtml, sectionHtml, bindSections, positionRotationHtml, bindModulePosition } from "./propertiesShell.js";
+import { cornerFittingSectionHtml, bindCornerFittingSection } from "./blindCornerProperties.js";
 
 // Prosty, samodzielny widok do druku wykroju L-kształtnej formatki narożnej
 // (Wieniec narożny / Półka narożna, engine/cornerParts.js: getCornerCorpusParts) -
@@ -106,9 +107,12 @@ export function renderCornerModuleProperties(rightSidebar, mod) {
         hint: 'Ramię A biegnie wzdłuż lokalnej osi X, ramię B wzdłuż lokalnej osi Z (przed obrotem).',
       })}
     `)}
+
+    ${cornerFittingSectionHtml(mod)}
   `;
 
   const refresh = () => { update3D(); updateSidebar(); };
+  bindCornerFittingSection(rightSidebar, mod, { refresh, rerender: initPropertiesPanel });
   bindSections(rightSidebar);
   document.getElementById('input-corner-name')?.addEventListener('input', e => { mod.name = e.target.value; refresh(); });
   bindModulePosition(rightSidebar, mod, { prefix: 'input-corner-pos', rotClass: 'btn-corner-rotate', onChange: refresh, rerender: initPropertiesPanel });

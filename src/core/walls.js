@@ -13,6 +13,7 @@
 import { state, DEFAULT_ROOM } from "./state.js";
 import { getWorldFootprint, getCornerDepths } from "./layout.js";
 import { getOpenings } from "./openings.js";
+import { getBlindPanel } from "./blindCorner.js";
 
 export const WALLS = [
   { id: 'tyl', label: 'Ściana tylna' },
@@ -120,6 +121,9 @@ export function computeWallLayouts(project = state.project) {
       const fy0 = y0 + (parseFloat(el.y) || 0);
       return { u0: fu0, u1: fu0 + fw, y0: fy0, y1: fy0 + (parseFloat(el.h) || 0), subtype: el.subtype };
     });
+    // Zaślepka szafki ślepej (core/blindCorner.js) - w rzucie jak gładki front.
+    const blind = getBlindPanel(mod, project);
+    if (blind) fronts.push({ u0: u0 + blind.x, u1: u0 + blind.x + blind.w, y0: y0 + blind.y, y1: y0 + blind.y + blind.h, subtype: 'zaslepka' });
     const shelves = shelvesOf(mod).map(el => {
       const sw = parseFloat(el.w) || 0;
       const su0 = u0 + (parseFloat(el.x) || 0);

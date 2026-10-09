@@ -13,6 +13,8 @@ import { collectProjectParts } from "../engine/cabinet.js";
 import { computeWallLayouts } from "./walls.js";
 import { openingInstrumental, WALL_LOCATIVE } from "./openings.js";
 import { num } from "../utils/math.js";
+import { checkBlindCorner, innerDims } from "./blindCorner.js";
+import { checkCornerFitting, getCornerFitting } from "./cornerFittings.js";
 
 export const MAX_DOOR_WIDTH = 600;   // szersze drzwi się wichrują / zawiasy nie dają rady
 export const MAX_SHELF_SPAN = 800;   // dłuższa półka ugina się pod obciążeniem
@@ -117,6 +119,14 @@ export function validateProject(project = state.project) {
     }
 
     findInteriorCollisions(mod).forEach((msg) => add("error", mod, msg));
+
+    // Szafka ślepa i okucia narożne (core/blindCorner.js, core/cornerFittings.js) -
+    // dane okuć są częściowo od dystrybutorów, więc tylko ostrzeżenia.
+    checkBlindCorner(mod, project).forEach((msg) => add("warn", mod, msg));
+    if (mod.type === "corner_cabinet" && getCornerFitting(mod.cornerFitting)) {
+      checkCornerFitting(mod.cornerFitting, { width: [w, num(d.legB, w)], innerHeight: innerDims(mod, project).innerHeight })
+        .forEach((msg) => add("warn", mod, msg));
+    }
 
     const elements = mod.elements || [];
     if (elements.length === 0) {

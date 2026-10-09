@@ -18,6 +18,7 @@ import { renderCornerModuleProperties } from "./cornerProperties.js";
 import { renderSlopeModuleProperties } from "./slopeProperties.js";
 import { drawerCardsHtml, bindDrawerCards } from "./drawerSettings.js";
 import { propHeaderHtml, sectionHtml, bindSections, setSectionDots, positionRotationHtml } from "./propertiesShell.js";
+import { blindCornerSectionHtml, bindBlindCornerSection } from "./blindCornerProperties.js";
 
 function getSelectedMods() {
     if (state.selectedModules && state.selectedModules.size > 0) {
@@ -350,6 +351,8 @@ export function initPropertiesPanel() {
 
     `)}
 
+    ${blindCornerSectionHtml(activeModule)}
+
     ${tabContent("zawiasy", `
       <div class="prop-box">
         <h3>Wymiary Osi Zawiasów (Lokalne)</h3>
@@ -412,6 +415,7 @@ function setupEventListeners() {
   ];
 
   const updateAll = () => { update3D(); updateSidebar(); };
+  bindBlindCornerSection(rs, getActiveModule(), { refresh: updateAll, rerender: initPropertiesPanel });
   let typingTimer;
 
   // POPRAWKA: W trakcie wpisywania odświeża się tylko widok 3D, panel nie znika!

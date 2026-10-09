@@ -9,6 +9,7 @@ import { recalculateAllLayouts, getWorldFootprint, getCornerDepths } from "../co
 import { getCorpusHoles, getPionMountHoles, getCorpusParts, getBackPanelParts } from "./carcaseParts.js";
 import { getCornerCorpusParts } from "./cornerParts.js";
 import { getSlopeCabinetParts, getSlopeFrontParts } from "../core/slopeCabinet.js";
+import { getBlindPanel } from "../core/blindCorner.js";
 
 export function calculateParts() {
   // Fronty muszą mieć aktualne el.x/y/w/h zanim policzymy z nich formatki.
@@ -338,6 +339,13 @@ function getFrontsAndDrawers(mod, config) {
   const parts = [];
   const mountingData = [];
   const fronts = mod.elements ? mod.elements.filter(el => el.typ === 'front') : [];
+
+  // Szafka ślepa (core/blindCorner.js): zaślepka części ślepej - formatka z płyty frontowej.
+  const blindPanel = getBlindPanel(mod, config);
+  if (blindPanel) {
+    const materialId = blindPanel.materialId ?? (fronts[0] && fronts[0].materialId);
+    parts.push({ name: 'Zaślepka szafki ślepej', length: blindPanel.h, width: blindPanel.w, qty: 1, category: 'Front', materialId });
+  }
 
   if (fronts.length === 0) return { parts, mountingData };
   fronts.sort((a, b) => a.y - b.y);

@@ -22,6 +22,7 @@ import { initPropertiesPanel } from '../ui/properties.js';
 import { mats, worktopMat, disposeObject, createLabelSprite, addBox, addHole, addHardware, isXrayMode, setXrayMode } from './meshBuilders.js';
 import { renderCornerCabinet } from './cornerCabinet3d.js';
 import { renderSlopeCabinet } from './slopeCabinet3d.js';
+import { getBlindPanel } from '../core/blindCorner.js';
 import { initMeasureTool, isMeasureActive, setMeasureButton, toggleMeasureMode, updateMeasureHover, handleMeasureClick, measureHoverMouse } from './measureTool.js';
 import { showAlert } from "../utils/modal.js";
 
@@ -1487,6 +1488,13 @@ export function update3D() {
                   }
               }
           });
+      }
+
+      // Szafka ślepa: zaślepka części ślepej w płaszczyźnie frontów (core/blindCorner.js).
+      const blindPanel = isFrontsVisible ? getBlindPanel(mod, state.project) : null;
+      if (blindPanel) {
+          const zBlind = isInsetFront ? posZ + D - th : posZ + D + 2;
+          addBox(blindPanel.w, blindPanel.h, 18, posX + blindPanel.x, posY + blindPanel.y, zBlind, 'front', isActive, { moduleId: mod.id, type: 'front' }, innerGroup);
       }
 
       if (mod.legs && mod.legs.active) {

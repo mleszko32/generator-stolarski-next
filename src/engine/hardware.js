@@ -12,6 +12,8 @@ import { calculateAllProjectParts } from "./cabinet.js";
 import { getCabinetPanels } from "./cabinetDrillings.js";
 import { getCornerPanels } from "./cornerDrillings.js";
 import { getSlopePanels } from "./slopeDrillings.js";
+import { getBlindCorner } from "../core/blindCorner.js";
+import { getCornerFitting } from "../core/cornerFittings.js";
 
 export function calculateProjectHardware() {
   recalculateAllLayouts();
@@ -63,6 +65,17 @@ export function calculateProjectHardware() {
           .reduce((n, pn) => n + pn.holes.filter((h) => h.kind === "wkret").length, 0)
       : 8;
     hardwareList[joinKey].qty += joinSets;
+
+    // Okucia narożne (core/cornerFittings.js): wysuw szafki ślepej (wersja lewa/prawa
+    // wg strony ślepej) albo karuzela szafki narożnej L.
+    const blind = getBlindCorner(mod);
+    const fitting = blind ? getCornerFitting(blind.fitting)
+      : (mod.type === 'corner_cabinet' ? getCornerFitting(mod.cornerFitting) : null);
+    if (fitting && fitting.kind === (blind ? 'blind' : 'corner')) {
+      const fitKey = blind ? `${fitting.hwName} - strona ślepa ${blind.side === 'left' ? 'lewa' : 'prawa'}` : fitting.hwName;
+      if (!hardwareList[fitKey]) hardwareList[fitKey] = { name: fitKey, qty: 0, unit: 'kpl.' };
+      hardwareList[fitKey].qty += 1;
+    }
 
     // Szafka pod skos: fronty z mod.elements przycięte skosem (core/slopeCabinet.js) -
     // szuflady liczą miejsce pod skosem, trójkąty to blendy bez okuć.
