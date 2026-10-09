@@ -288,6 +288,12 @@ narożniku), otwory na ścianie (z odstępem) i strefa przejścia przed drzwiami
 (katalog szerokości, najmniejsza reszta, potem bliżej 600 mm), `equal`, `fixed` (`600, *, *`), `ratio` (jak
 `distribution` frontów); reszta na blendę (`project.sidePanels`, lico równo z frontami) albo rozciągnięcie szafek.
 `wallToWorld`/`worldToWall` — przeliczenie pas ściany ↔ pokój (oś X szafki zawsze rośnie z `u`).
+Tryb „Kuchnia L/U” w tym samym oknie: `core/kitchenRun.js` (czyste, z testami) — `planKitchenRun` liczy plan na
+kopii projektu (podmienia `state.project` jak `validate.js`): najpierw narożniki (`L` = szafka narożna S×S,
+`blind` = szafka ślepa odsunięta tak, by drzwi minęły lico frontów sąsiedniej ściany + blendę narożną, `dead` =
+zaślepka + blenda), potem `findFreeSegments` + `divideSegment` na każdej ścianie z resztą z dala od narożnika;
+`applyKitchenRun` dokłada gotowe obiekty. Ściany w kolejności zgodnej z zegarem (koniec ściany = początek
+następnej), ostrzeżenie o przejściu w U < 1200 mm.
 
 **Szafka ślepa i okucia narożne**: szafka ślepa to zwykła szafka z `mod.blindCorner = { active, side, frontWidth,
 fitting }` — `core/blindCorner.js` (czyste, z testami): `applyBlindCorner` na końcu `recalculateLayout` przycina

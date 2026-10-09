@@ -129,7 +129,7 @@ export function updateSidebar() {
     <section class="panel-section">
       <div class="panel-head"><h2>Narzędzia</h2></div>
       <div class="btn-stack">
-        <button id="btn-wall-fill" class="btn btn-sm btn-block" title="Wypełnij wolne miejsce na ścianie szafkami: podział, blendy, kolizje z szafkami, oknami i drzwiami"><i class="ti ti-layout-columns" aria-hidden="true"></i> Rozmieść szafki na ścianie</button>
+        <button id="btn-wall-fill" class="btn btn-sm btn-block" title="Wypełnij ścianę albo całą kuchnię L/U szafkami: narożniki, podział, blendy, kolizje z szafkami, oknami i drzwiami"><i class="ti ti-layout-columns" aria-hidden="true"></i> Rozmieść szafki (ściana / L / U)</button>
         <button id="btn-module-library" class="btn btn-sm btn-block" title="Własne szablony szafek: zapisz skonfigurowaną szafkę i wstawiaj ją do projektów"><i class="ti ti-books" aria-hidden="true"></i> Biblioteka szafek</button>
         <button id="btn-import-ai" class="btn btn-sm btn-block"><i class="ti ti-wand" aria-hidden="true"></i> Zbuduj projekt ze zdjęcia (AI)</button>
         <input type="file" id="input-ai-image" accept="image/png, image/jpeg" style="display: none;" />

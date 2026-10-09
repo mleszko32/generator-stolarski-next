@@ -664,3 +664,7 @@ button, input, select, textarea { font-family: inherit; }
 .wf-key-blocked { background: repeating-linear-gradient(45deg, var(--border) 0 2px, transparent 2px 4px); }
 .wf-key-opening { background: var(--info-bg); border-color: var(--info-fg); }
 .wf-key-bad { background: var(--danger-bg); border-color: var(--danger); }
+.wf-preview .wf-cab-blind { stroke-dasharray: 6 3; }
+.wf-corner { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 10px; background: var(--surface-subtle); }
+.wf-corner-head { font-size: var(--fs-md); font-weight: 600; margin-bottom: 8px; color: var(--text-primary); }
+.wf-corner .field-row > .field { min-width: 140px; }
