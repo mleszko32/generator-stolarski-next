@@ -15,6 +15,7 @@ import { openingInstrumental, WALL_LOCATIVE } from "./openings.js";
 import { num } from "../utils/math.js";
 import { checkBlindCorner, innerDims } from "./blindCorner.js";
 import { checkCornerFitting, getCornerFitting } from "./cornerFittings.js";
+import { cornerFrontIssues, footprintBoxes, passageIssues } from "./cornerChecks.js";
 
 export const MAX_DOOR_WIDTH = 600;   // szersze drzwi się wichrują / zawiasy nie dają rady
 export const MAX_SHELF_SPAN = 800;   // dłuższa półka ugina się pod obciążeniem
@@ -92,6 +93,7 @@ export function validateProject(project = state.project) {
     recalculateAllLayouts();
     modules.forEach((mod) => checkModule(mod));
     checkCollisions();
+    checkCorners();
     checkOpenings();
     checkParts();
   } finally {
@@ -162,19 +164,30 @@ export function validateProject(project = state.project) {
     }
   }
 
+  // Szafka narożna L wchodzi jako dwa prostokąty ramion (core/cornerChecks.js), więc
+  // jej pusty "wewnętrzny" kwadrat nie daje fałszywych kolizji.
   function checkCollisions() {
-    const list = modules.filter((m) => m.type !== "corner_cabinet");
-    for (let i = 0; i < list.length; i++) {
-      for (let j = i + 1; j < list.length; j++) {
-        const a = moduleBox(list[i]), b = moduleBox(list[j]);
+    const boxes = footprintBoxes(project);
+    const reported = new Set();
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i], b = boxes[j];
+        if (a.mod === b.mod) continue;
+        const key = a.mod.id + "|" + b.mod.id;
+        if (reported.has(key)) continue;
         const ox = overlap1d(a.x0, a.x1, b.x0, b.x1);
         const oz = overlap1d(a.z0, a.z1, b.z0, b.z1);
         const oy = overlap1d(a.y0, a.y1, b.y0, b.y1);
         if (ox > OVERLAP_TOL && oz > OVERLAP_TOL && oy > STACK_TOL) {
-          add("error", list[i], `Nachodzi na szafkę „${nameOf(list[j])}" (kolizja ${Math.round(ox)} × ${Math.round(oz)} mm w rzucie).`);
+          reported.add(key);
+          add("error", a.mod, `Nachodzi na szafkę „${nameOf(b.mod)}" (kolizja ${Math.round(ox)} × ${Math.round(oz)} mm w rzucie).`);
         }
       }
     }
+  }
+
+  function checkCorners() {
+    [...cornerFrontIssues(project), ...passageIssues(project)].forEach((i) => add(i.level, i.mod, i.message));
   }
 
   // Szafka stojąca przy ścianie, która zasłania okno/drzwi/przeszkodę (nakładanie

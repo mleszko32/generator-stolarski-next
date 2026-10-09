@@ -305,7 +305,9 @@ Front; rysowana w 3D i w rzutach ścian), `blindGeometry().blindReach` = od boku
 
 **Kontrola projektu**: `core/validate.js` (`validateProject`) zasila sekcję huba „Kontrola
 projektu” (`ui/projectCheck.js`): kolizje, granice pokoju, za szerokie drzwi/półki, formatki
-niemieszczące się w płycie, otwory.
+niemieszczące się w płycie, otwory. Narożniki: `core/cornerChecks.js` (czyste, z testami) — front przy narożniku
+vs lico frontów prostopadłego ciągu (błąd, gdy zachodzi; ostrzeżenie < 30 mm), szafka narożna L w kolizjach jako
+dwa ramiona (`footprintBoxes`), przejście między dolnymi ciągami naprzeciw siebie (< 1200 ostrzeżenie, < 1067 błąd).
 
 **Materiały frontów**: fronty mają własny cennik, a nie jedną wspólną cenę jak pozostałe
 kategorie formatek (Korpus/Szuflada/Plecy mają po jednej cenie zł/m²) —

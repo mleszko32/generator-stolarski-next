@@ -65,6 +65,17 @@ describe("planKitchenRun", () => {
     // Na ścianie tylnej nic nie wchodzi w odsunięcie przy ścianie.
     const tyl = plan.walls.find((w) => w.wallId === "tyl");
     expect(tyl.segments[0].u0).toBeGreaterThanOrEqual(1085);
+
+    // Po wstawieniu kontrola projektu nie ma uwag do frontów w narożniku ani kolizji.
+    applyKitchenRun(plan);
+    const { issues } = validateProject();
+    expect(issues.filter((i) => /narożnik|Nachodzi/i.test(i.message) && i.level !== "info")).toEqual([]);
+  });
+
+  it("U z szafkami L: bez uwag do narożników po wstawieniu", () => {
+    applyKitchenRun(planKitchenRun(state.project, { walls: ["lewa", "tyl", "prawa"], corners: [{ kind: "L" }, { kind: "L" }], fill }));
+    const { issues } = validateProject();
+    expect(issues.filter((i) => /narożnik|Nachodzi/i.test(i.message))).toEqual([]);
   });
 
   it("narożnik martwy: zaślepka na jednej ścianie, blenda na drugiej", () => {
