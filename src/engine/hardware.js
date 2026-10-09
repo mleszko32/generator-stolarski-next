@@ -11,6 +11,7 @@ import { recalculateAllLayouts } from "../core/layout.js";
 import { calculateAllProjectParts } from "./cabinet.js";
 import { getCabinetPanels } from "./cabinetDrillings.js";
 import { getCornerPanels } from "./cornerDrillings.js";
+import { getSlopePanels } from "./slopeDrillings.js";
 
 export function calculateProjectHardware() {
   recalculateAllLayouts();
@@ -52,9 +53,11 @@ export function calculateProjectHardware() {
     // Faktyczna liczba zestawów z otworów korpusu (engine/cabinetDrillings.js - wieńce, trawersy,
     // półki stałe, mocowanie przegród; rozstaw wg engine/carcaseParts.js: jointSetPositions).
     // Każdy zestaw ma jeden wkręt, liczony raz - w formatce poziomej (czoło / lico) albo trawersie
-    // pionowym. Szafka narożna: wkręty w czołach wieńców L (engine/cornerDrillings.js). Szafka
-    // pod skos nie ma jeszcze tych danych - po staremu 8.
-    const corpusPanels = mod.type === "corner_cabinet" ? getCornerPanels(mod, config) : getCabinetPanels(mod, config);
+    // pionowym. Szafka narożna: wkręty w czołach wieńców L (engine/cornerDrillings.js), pod skos:
+    // wkręty w dnie, skośnej płycie i czołach półek stałych (engine/slopeDrillings.js).
+    const corpusPanels = mod.type === "corner_cabinet" ? getCornerPanels(mod, config)
+      : mod.type === "slope_cabinet" ? getSlopePanels(mod, config).panels
+      : getCabinetPanels(mod, config);
     const joinSets = corpusPanels.length
       ? corpusPanels.filter((pn) => pn.kind === "poziom" || pn.kind === "polka" || pn.kind === "trawers-pion" || pn.kind === "poziom-L")
           .reduce((n, pn) => n + pn.holes.filter((h) => h.kind === "wkret").length, 0)

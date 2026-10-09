@@ -216,7 +216,8 @@ projektu (`getDrawerBoxInfo` z `core/drawerBoxes.js`, skos przez `getSlopeFronts
 **Instrukcje montażu szafek**: `engine/cabinetDrillings.js` (czyste, z testami) + `render/cabinetDrawing2d.js` +
 okno `ui/cabinetInstructions.js`; dane z `calculateModuleParts(mod)` (to samo co `calculateParts()` dla dowolnej
 szafki). Wspólne klocki rysunków w `render/workshopDrawing.js`. Szafka narożna: `engine/cornerDrillings.js`
-(boki ramion, listwa, wieńce/półki L z otworami z `cornerParts.js`) + `render/cornerInstructions2d.js`. Skos: jeszcze bez instrukcji.
+(boki ramion, listwa, wieńce/półki L z otworami z `cornerParts.js`) + `render/cornerInstructions2d.js`. Skos:
+`engine/slopeDrillings.js` (otwory z `getSlopeDrillings`) + `render/slopeInstructions2d.js`.
 
 **Stół RC System**: `core/rcSystem.js` (czyste, z testami), ustawienia `project.rcSystem`; `rcRearScrew` przesuwa
 tylny zestaw łączników w `jointSetsFor` (`carcaseParts.js`) — wszędzie: rysunek 2D, instrukcje, okucia.

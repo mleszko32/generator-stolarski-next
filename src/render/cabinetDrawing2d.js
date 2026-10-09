@@ -157,7 +157,7 @@ export function horizontalPanelSVG(panel, startNo = 1, scale = null) {
     const yL = Dd + (32 + i * 16) * u;
     b += `<line x1="${r1(x)}" y1="${r1(Dd)}" x2="${r1(x)}" y2="${r1(yL)}" stroke="${color}" stroke-width="${r1(0.75 * u)}" stroke-dasharray="${r1(2 * u)},${r1(2 * u)}"/>`;
     b += line(0, yL, x, yL, color) + `<circle cx="0" cy="${r1(yL)}" r="${r1(2 * u)}" fill="${color}"/>`;
-    b += text(x + 4 * u, yL + 12 * u, `${fmt(x)} mm od lewej`, { size: 10, color, anchor: "start", weight: "bold" });
+    b += text(x + 4 * u, yL + 12 * u, `${fmt(x)} mm ${panel.fromLabel || "od lewej"}`, { size: 10, color, anchor: "start", weight: "bold" });
   });
   // Łączniki w czołach i pozostałe: odległość od przodu w kolumnie po prawej.
   uniq(panel.holes.map((h) => h.z)).forEach((z) => {

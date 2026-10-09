@@ -5,7 +5,8 @@
 // gdzie w projekcie, tabela formatek, montaż w izometrii z kolejnością kroków, formatki z
 // ponumerowanymi otworami w jednej skali i tabela otworów. Jedna szafka na stronę wydruku.
 // Dane: engine/cabinetDrillings.js, rysunki: render/cabinetDrawing2d.js; szafka narożna:
-// engine/cornerDrillings.js + render/cornerInstructions2d.js (formatki L, montaż, kroki).
+// engine/cornerDrillings.js + render/cornerInstructions2d.js (formatki L, montaż, kroki); szafka pod
+// skos: engine/slopeDrillings.js + render/slopeInstructions2d.js.
 import { escapeHtml } from "../utils/dom.js";
 import { state } from "../core/state.js";
 import { computeWallLayouts } from "../core/walls.js";
@@ -16,14 +17,16 @@ import {
 } from "../render/cabinetDrawing2d.js";
 import { getCornerPanels, getCornerConstruction } from "../engine/cornerDrillings.js";
 import { cornerAssemblySVG, cornerStepsHtml } from "../render/cornerInstructions2d.js";
+import { getSlopePanels, getSlopeConstruction } from "../engine/slopeDrillings.js";
+import { slopeAssemblySVG, slopeStepsHtml } from "../render/slopeInstructions2d.js";
 import { WORKSHOP_CSS } from "./drawerBoxDrawings.js";
 import { getRcSettings, rcPanelSetups, rcRearScrew, RC_FRONT_STOP, RC_RAIL_STEP } from "../core/rcSystem.js";
 
 const fmt = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
 const TYPE = { base_cabinet: "Szafka dolna", upper_cabinet: "Szafka wisząca", tall_cabinet: "Słupek", corner_cabinet: "Szafka narożna", slope_cabinet: "Szafka pod skos" };
 
-// Czy dla szafki da się zrobić instrukcję (pod skos - jeszcze nie).
-export const supportsInstructions = (mod) => !!mod && mod.type !== "slope_cabinet";
+// Czy dla szafki da się zrobić instrukcję (wszystkie rodzaje szafek).
+export const supportsInstructions = (mod) => !!mod;
 
 // Karta wiercenia na stole RC System (core/rcSystem.js): ustawienia stołu dla formatek
 // pionowych tej szafki, posortowane wg otworu bazowego (najmniej przestawiania pinów), pary
@@ -76,6 +79,7 @@ function rcCardHtml(panels) {
 
 function cabinetCard(mod, idx, layouts) {
   if (mod.type === "corner_cabinet") return cornerCard(mod, idx, layouts);
+  if (mod.type === "slope_cabinet") return slopeCard(mod, idx, layouts);
   const project = state.project;
   const d = mod.dimensions;
   const panels = getCabinetPanels(mod, project);
@@ -114,13 +118,35 @@ function cornerCard(mod, idx, layouts) {
     extraNote: "Wieńce i półki L wycina się z prostokątnej formatki z listy formatek - naroże do odcięcia pokazuje rysunek formatki (linia przerywana = formatka z rozkroju)." });
 }
 
-function cardHtml({ mod, idx, layouts, panels, th, scale, dims, lead, assembly, steps, extraNote = "" }) {
+// Szafka pod skos: płyty prostokątne z otworami (cięcia pod kątem w opisach formatek), dno i skos
+// z łącznikami w licu (engine/slopeDrillings.js).
+function slopeCard(mod, idx, layouts) {
+  const project = state.project;
+  const { panels, notes } = getSlopePanels(mod, project);
+  const cons = getSlopeConstruction(mod, project);
+  const th = panels[0] ? panels[0].thickness : 18;
+  const consText = [
+    cons.isTriangle ? "trójkąt (skos do dna)" : `niski bok ${fmt(cons.L)} mm`,
+    `skos ${fmt(cons.angle)}°, niska strona ${cons.lowSide === "left" ? "z lewej" : "z prawej"}`,
+    "dno nakładane, boki i przegrody na dnie",
+    "plecy nakładane",
+    cons.legs ? `nóżki ${cons.legsHeight} mm${cons.plinth ? " + cokół" : ""}` : "bez nóżek",
+  ].join(" · ");
+  return cardHtml({ mod, idx, layouts, panels, th, scale: cabinetDrawingScale(panels),
+    dims: `${fmt(cons.W)} × ${fmt(cons.H)} × ${fmt(cons.D)}`,
+    lead: `${escapeHtml(TYPE[mod.type])} · ${escapeHtml(consText)} · płyta ${fmt(th)} mm${cons.drawers ? ` · szuflady: ${cons.drawers}` : ""}${cons.doors ? ` · drzwi: ${cons.doors}` : ""}${cons.blendy ? ` · blendy: ${cons.blendy}` : ""}`,
+    assembly: slopeAssemblySVG(mod, panels, project), steps: slopeStepsHtml(cons, panels), warnings: notes,
+    extraNote: "Płyty z końcami ciętymi pod kątem są tu narysowane jako prostokąty (wymiar = dłuższa krawędź, wysokość boku = strona wewnętrzna) - kąty i obrysy na „Rysunkach cięcia i nawiertów” (przycisk w panelu szafki)." });
+}
+
+function cardHtml({ mod, idx, layouts, panels, th, scale, dims, lead, assembly, steps, extraNote = "", warnings = [] }) {
   const project = state.project;
   const partsRows = panels.map((p, i) => `<tr><td>${i + 1}</td><td><b>${escapeHtml(p.name)}</b>${p.note ? `<div class="muted">${escapeHtml(p.note)}</div>` : ""}</td><td>${p.qty}</td><td>${fmt(p.length)} × ${fmt(p.width)} × ${fmt(p.thickness)}</td></tr>`).join("");
   const svgs = panelSVGs(panels, scale);
   return `<section class="box" id="szafka-${idx}">
     <h2>${idx + 1}. ${escapeHtml(mod.name)} <span class="qty">${dims}</span></h2>
     <p class="lead">${lead}</p>
+    ${warnings.map((w) => `<div class="warn">${escapeHtml(w)}</div>`).join("")}
     <h3>Gdzie w projekcie</h3>
     <div class="locators"><div class="card">${projectLocatorSVG(layouts, project.modules, mod.id, mod.name)}</div></div>
     <div class="cols">

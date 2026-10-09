@@ -50,7 +50,7 @@ szafki od frontu, też skos) rysowane przez `cabinetLocatorSVG` z podświetlonym
 w legendzie; montaż w izometrii, kolejność kroków, „Gdzie w projekcie” z `computeWallLayouts`),
 okno `ui/cabinetInstructions.js`, sekcja huba „Instrukcje montażu”. Wspólne klocki rysunków instrukcji (otwory, rowki,
 wymiary, izometria, widok szafki od frontu) są w `render/workshopDrawing.js`, style okien w `WORKSHOP_CSS`
-(`ui/drawerBoxDrawings.js`) — skrzynki szuflad i szafki wyglądają tak samo. Skos: jeszcze bez instrukcji.
+(`ui/drawerBoxDrawings.js`) — skrzynki szuflad i szafki wyglądają tak samo.
 
 Szafka narożna: `engine/cornerDrillings.js` (czyste, z testami; `getCornerPanels` w tym samym formacie co
 `getCabinetPanels`) — boki ramion (łączniki wieńców z `jointSetsFor`, jak w zwykłej szafce — ten sam rozstaw ma rysunek
@@ -60,6 +60,16 @@ Rysunki `render/cornerInstructions2d.js`: `lPanelSVG` (formatka L z linią przer
 izometrii (z = legB − Z, żeby oba fronty były widoczne), `cornerStepsHtml`. Półki i przegrody w ramionach (`cornerArm`)
 są tylko w tabeli formatek — ich otworów instrukcja jeszcze nie liczy. Lista okuć liczy złącza narożnika z wkrętów w
 czołach wieńców L zamiast ryczałtu 8.
+
+Szafka pod skos: `engine/slopeDrillings.js` (czyste, z testami; `getSlopePanels` zwraca `{ panels, notes }`) — otwory
+z `core/slopeCabinet.js: getSlopeDrillings` (ściany boków i obu stron przegród, rzuty dna i skośnej płyty), uzupełnione
+o czoła: dolne płyt stojących na dnie (kołek + wkręt), górne pod wkręty skośnej płyty, czoła półek stałych. Rozstaw
+łączników z `jointSetsFor` — `getSlopeDrillings(mod, config, { jointSets })` (core/ nie importuje engine/, bez opcji
+skrajne 37/69); te same zestawy dostają rysunki nawiertów skosu (`ui/slopeCutDrawings.js`). Płyty cięte pod kątem są w
+instrukcji prostokątami (dłuższa krawędź, bok = strona wewnętrzna), kąty piły i krótsze krawędzie w opisie formatki.
+Rysunki `render/slopeInstructions2d.js`: montaż w izometrii z wielokątów `getSlopeCabinetPolygons` (kolejność wielokątów
+= kolejność formatek, patrz `slopeSolids`), `slopeStepsHtml`. Ostrzeżenia `notes` (np. brak boku na prowadnicę) na górze
+karty. Lista okuć liczy złącza skosu z otworów (dno, skos, półki stałe) zamiast ryczałtu 8.
 
 ## Stół RC System
 

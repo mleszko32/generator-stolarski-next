@@ -651,7 +651,12 @@ const SHELF_PIN_DROP = 2.5;   // jak w render/viewer2d.js
 // - plans: rzut płyty poziomej/skośnej z łącznikami do płyt pionowych
 //   { name, length, width, holes: [{ x (wzdłuż płyty), z (od frontu), type }] };
 // - notes: ostrzeżenia (np. szuflada bez boku do przykręcenia prowadnicy).
-export function getSlopeDrillings(mod, config) {
+// opts.jointSets(depth) -> [{ screw, dowel }] (mm od frontu) - rozmieszczenie zestawów łączników;
+// wołający z engine/ podaje engine/carcaseParts.js: jointSetsFor (jak w zwykłej szafce), bez niego
+// skrajne zestawy 37 / 69 od frontu i od tyłu (core/ nie importuje engine/).
+const edgeJointSets = (depth) => [{ screw: 37, dowel: 69 }, { screw: depth - 37, dowel: depth - 69 }];
+export function getSlopeDrillings(mod, config, opts = {}) {
+  const jointSets = opts.jointSets || edgeJointSets;
   const th = parseFloat(config.materials?.boardThickness) || 18;
   const backThick = parseFloat(config.materials?.backThickness) || 3;
   const g = getSlopeGeometry(mod, th);
@@ -711,9 +716,9 @@ export function getSlopeDrillings(mod, config) {
       if (!fc) return;
       if (y + th > fc.y0 + fc.height + 0.5) return;   // półka ponad skosem przy tej ścianie
       if (el.isStructural) {
-        [37, depth - 37].forEach((hx) => {
-          put(fc, { x: hx, y: y + th / 2, type: 'screw' });
-          put(fc, { x: hx === 37 ? 69 : depth - 69, y: y + th / 2, type: 'dowel' });
+        jointSets(depth).forEach((set) => {
+          put(fc, { x: set.screw, y: y + th / 2, type: 'screw' });
+          put(fc, { x: set.dowel, y: y + th / 2, type: 'dowel' });
         });
       } else {
         [-32, 0, 32].forEach((dy) => [37, depth - 37].forEach((hx) => put(fc, { x: hx, y: y - SHELF_PIN_DROP + dy, type: 'shelf', center: dy === 0 })));
@@ -725,11 +730,11 @@ export function getSlopeDrillings(mod, config) {
     if (fc.holes.some((h) => h.y > fc.height - 5 || h.y < 5)) notes.push(`${fc.name} (${fc.side}): otwór wychodzi poza płytę - sprawdź wysokości frontów i półek pod skosem.`);
   });
 
-  // Rzuty płyt z łącznikami do płyt pionowych (konfirmat 37 od krawędzi + kołek 32 dalej).
+  // Rzuty płyt z łącznikami do płyt pionowych (zestawy wkręt + kołek wg jointSets).
   const joint = (holes, x, withDowels = true) => {
-    [37, depth - 37].forEach((z) => {
-      holes.push({ x, z, type: 'screw' });
-      if (withDowels) holes.push({ x, z: z === 37 ? 69 : depth - 69, type: 'dowel' });
+    jointSets(depth).forEach((set) => {
+      holes.push({ x, z: set.screw, type: 'screw' });
+      if (withDowels) holes.push({ x, z: set.dowel, type: 'dowel' });
     });
   };
   // Dno nakładane: boki i przegrody stoją na nim - łączniki od spodu dna.

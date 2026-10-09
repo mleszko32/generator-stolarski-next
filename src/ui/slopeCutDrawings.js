@@ -10,6 +10,7 @@ import { state } from "../core/state.js";
 import { escapeHtml } from "../utils/dom.js";
 import { round1 } from "../utils/math.js";
 import { getSlopeBoards, getSlopeShapes, getSlopeGeometry, getSlopeDrillings } from "../core/slopeCabinet.js";
+import { jointSetsFor } from "../engine/carcaseParts.js";
 import { recalculateLayout } from "../core/layout.js";
 import { slopeBoardSVG, slopeShapeSVG, slopeFaceSVG, slopeFacePairSVG, slopePlanSVG } from "../render/slopeDrawing2d.js";
 
@@ -52,7 +53,7 @@ export function openSlopeCutDrawings(mod) {
   const boards = groupBoards(getSlopeBoards(mod, config));
   const angled = boards.filter(({ board: b }) => b.tiltStart || b.tiltEnd);
   const shapes = getSlopeShapes(mod, config);
-  const drill = getSlopeDrillings(mod, config);
+  const drill = getSlopeDrillings(mod, config, { jointSets: (depth) => jointSetsFor(mod, config, depth) });
   // Płyty z nawiertami; przegroda zawsze z obiema stronami (nawet gdy jedna pusta).
   const drilledNames = new Set(drill.faces.filter((fc) => fc.holes.length).map((fc) => fc.name));
   const faces = drill.faces.filter((fc) => drilledNames.has(fc.name));
