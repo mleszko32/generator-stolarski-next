@@ -18,7 +18,7 @@ import { state, addCornerModule, createModuleObject, cloneModuleWithNewIds, ensu
 import { getRoom, wallLength, WALLS } from "./walls.js";
 import { ensureCornerDefaults } from "./layout.js";
 import { buildZoneTree, assignFront } from "./zoneTree.js";
-import { blindGeometry } from "./blindCorner.js";
+import { blindGeometry, blindHingeSide, innerDims } from "./blindCorner.js";
 import { checkCornerFitting, getCornerFitting } from "./cornerFittings.js";
 import {
   MIN_CABINET_WIDTH, WALL_ROTATION, rowProfile, wallToWorld,
@@ -147,11 +147,15 @@ function placeCorner(project, prev, next, c, ctx) {
     mod.dimensions = { ...mod.dimensions, width: Wb };
     // Część ślepa od strony narożnika: na ścianie poprzedniej narożnik jest z prawej.
     const side = onPrev ? "right" : "left";
-    mod.blindCorner = { active: true, side, frontWidth: num(c.frontWidth, 500), fitting: getCornerFitting(c.fitting) ? c.fitting : "" };
+    const fit = getCornerFitting(c.fitting);
+    // Mocowanie drzwi: listwa (zawias równoległy od strony narożnika), chyba że okucie
+    // wymaga innego (Magic Corner - zwykły zawias na boku z dala od narożnika).
+    const mount = fit && fit.mounts && !fit.mounts.includes("listwa") ? fit.mounts[0] : "listwa";
+    mod.blindCorner = { active: true, side, frontWidth: num(c.frontWidth, 500), fitting: fit ? c.fitting : "", mount };
     mod.elements = mod.elements || [];
-    const away = side === "left" ? "right" : "left";
-    if (!mod.elements.some((el) => el.typ === "front")) assignFront(mod, buildZoneTree(mod), "drzwi", { openingSide: away });
-    mod.elements.forEach((el) => { if (el.typ === "front" && el.subtype === "drzwi") el.openingSide = away; });
+    const hingeSide = blindHingeSide(mod);
+    if (!mod.elements.some((el) => el.typ === "front")) assignFront(mod, buildZoneTree(mod), "drzwi", { openingSide: hingeSide });
+    mod.elements.forEach((el) => { if (el.typ === "front" && el.subtype === "drzwi") el.openingSide = hingeSide; });
 
     // Odsunięcie od ściany Y: drzwi muszą zacząć się za licem frontów Y + blendą.
     const reach = blindGeometry(mod, project).blindReach;
@@ -163,7 +167,8 @@ function placeCorner(project, prev, next, c, ctx) {
     if (pull > 0) warnings.push(`Narożnik ${jointLabel}: szafka ślepa odsunięta od ściany o ${pull} mm (część ślepa za krótka na blendę ${F} mm) - wolne miejsce w narożniku zakrywa ciąg z sąsiedniej ściany.`);
     if (pull > 0) reserved[X].push(onPrev ? [Lx - pull, Lx] : [0, pull]);
     if (c.fitting) {
-      checkCornerFitting(c.fitting, { width: Wb, frontWidth: blindGeometry(mod, project).frontWidth, innerDepth: depth - num(project.materials && project.materials.backThickness, 3), innerHeight: row.height - 36 })
+      const g = blindGeometry(mod, project);
+      checkCornerFitting(c.fitting, { width: Wb, frontWidth: g.frontWidth, clearOpening: g.clearOpening, mount: g.mount, ...innerDims(mod, project) })
         .forEach((m) => warnings.push(`Narożnik ${jointLabel}: ${m}`));
     }
     return { reserved, modules, panels };

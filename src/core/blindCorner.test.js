@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { state } from "./state.js";
 import { recalculateLayout } from "./layout.js";
-import { blindGeometry, getBlindPanel, checkBlindCorner, getBlindCorner } from "./blindCorner.js";
+import { blindGeometry, getBlindPanel, checkBlindCorner, getBlindCorner, getBlindStile, blindHingeSide } from "./blindCorner.js";
+import { getCabinetPanels } from "../engine/cabinetDrillings.js";
 import { checkCornerFitting, fittingsOfKind, CORNER_FITTINGS } from "./cornerFittings.js";
 import { calculateModuleParts } from "../engine/cabinet.js";
 import { calculateProjectHardware } from "../engine/hardware.js";
@@ -87,6 +88,103 @@ describe("szafka ślepa - geometria", () => {
     state.project.modules = [blindModule({ fitting: "lemans", frontWidth: 300 })];
     const { issues } = validateProject();
     expect(issues.some((i) => i.level === "warn" && /LeMans II: front 300/.test(i.message))).toBe(true);
+  });
+});
+
+describe("szafka ślepa - mocowanie drzwi i zawiasy", () => {
+  beforeEach(() => setProject(freshProject({ room: { width: 4000, depth: 3000, height: 2600 }, modules: [] })));
+  const setup = (blind) => {
+    const mod = blindModule(blind);
+    state.project.modules = [mod];
+    recalculateLayout(mod);
+    return mod;
+  };
+  const hwNamed = (re) => calculateProjectHardware().find((h) => re.test(h.name));
+
+  it("domyślnie listwa 100 mm między wieńcami, drzwi nakładają się na nią jak na bok", () => {
+    const mod = setup({ side: "left" });
+    const g = blindGeometry(mod, state.project);
+    expect(g.mount).toBe("listwa");
+    // drzwi od 548,5; nakładanie 18 - 1,5 = 16,5 -> krawędź listwy przy otworze 565
+    expect([g.stileX0, g.stileX1]).toEqual([465, 565]);
+    expect(g.clearOpening).toBe(1000 - 18 - 565);
+    expect(getBlindStile(mod, state.project)).toEqual({ x: 465, w: 100, y: 18, h: 684, thickness: 18 });
+    // zaślepka nakłada się na listwę (kończy się przed krawędzią listwy przy otworze)
+    expect(g.panelX1).toBeGreaterThan(g.stileX0);
+    expect(g.panelX1).toBeLessThan(g.stileX1);
+    const { parts } = calculateModuleParts(mod);
+    expect(parts.find((p) => p.name === "Listwa szafki ślepej")).toMatchObject({ length: 684, width: 100, category: "Korpus" });
+  });
+
+  it("listwa: zawiasy od strony narożnika (layout to wymusza), zawias równoległy nakładany Blum", () => {
+    const mod = setup({ side: "left" });
+    expect(blindHingeSide(mod)).toBe("left");
+    expect(mod.elements[0].openingSide).toBe("left"); // w fixture było "right"
+    expect(hwNamed(/79B9950/)).toMatchObject({ qty: 2 });
+    expect(hwNamed(/Zawias meblowy/)).toBeUndefined();
+  });
+
+  it("listwa: prowadniki na listwie (21,5 mm od krawędzi przy drzwiach), nie na boku; łączniki listwy w wieńcach", () => {
+    const mod = setup({ side: "left" });
+    const panels = getCabinetPanels(mod, state.project);
+    const stile = panels.find((p) => p.id === "listwa-slepa");
+    const hinge = stile.holes.filter((h) => h.kind === "zawias");
+    expect(hinge).toHaveLength(4);
+    expect(new Set(hinge.map((h) => h.x))).toEqual(new Set([100 - 21.5]));
+    expect(stile.holes.filter((h) => h.edge === "dolne")).toHaveLength(3);
+    ["bok-lewy", "bok-prawy"].forEach((id) => expect(panels.find((p) => p.id === id).holes.some((h) => h.kind === "zawias")).toBe(false));
+    expect(panels.find((p) => p.id === "wieniec-dolny").holes.filter((h) => h.to === "listwa szafki ślepej")).toHaveLength(3);
+    expect(panels.find((p) => p.id === "wieniec-gorny").holes.filter((h) => h.to === "listwa szafki ślepej")).toHaveLength(3);
+  });
+
+  it("mocowanie na boku: zawiasy z dala od narożnika, zwykły zawias, prowadniki na boku, bez listwy", () => {
+    const mod = setup({ side: "left", mount: "bok" });
+    expect(mod.elements[0].openingSide).toBe("right");
+    expect(getBlindStile(mod, state.project)).toBeNull();
+    expect(hwNamed(/Zawias meblowy/)).toMatchObject({ qty: 2 });
+    const panels = getCabinetPanels(mod, state.project);
+    expect(panels.find((p) => p.id === "bok-prawy").holes.filter((h) => h.kind === "zawias")).toHaveLength(4);
+    expect(panels.some((p) => p.id === "listwa-slepa")).toBe(false);
+  });
+
+  it("mocowanie na zaślepce: zawias równoległy wpuszczany, bez listwy i bez otworów na bokach", () => {
+    const mod = setup({ side: "right", mount: "zaslepka" });
+    expect(mod.elements[0].openingSide).toBe("right");
+    expect(hwNamed(/79B9550/)).toMatchObject({ qty: 2 });
+    const panels = getCabinetPanels(mod, state.project);
+    expect(panels.some((p) => p.holes.some((h) => h.kind === "zawias"))).toBe(false);
+  });
+
+  it("okucie wymaga mocowania: Magic Corner - na boku, LeMans - od strony narożnika", () => {
+    const magic = setup({ fitting: "magicCorner", frontWidth: 450 });
+    expect(checkBlindCorner(magic, state.project).join(" ")).toMatch(/na boku korpusu z dala od narożnika/);
+    const magicOk = setup({ fitting: "magicCorner", frontWidth: 450, mount: "bok" });
+    expect(checkBlindCorner(magicOk, state.project).join(" ")).not.toMatch(/mocowanie/);
+    const lemans = setup({ fitting: "lemans", mount: "bok" });
+    expect(checkBlindCorner(lemans, state.project).join(" ")).toMatch(/od strony ślepej/);
+  });
+
+  it("otwór w świetle za mały dla okucia - ostrzeżenie", () => {
+    const mod = setup({ fitting: "lemans", frontWidth: 450, stileWidth: 100 });
+    expect(checkBlindCorner(mod, state.project)).toEqual([]);
+    expect(checkCornerFitting("lemans", { width: 1000, frontWidth: 450, clearOpening: 400 }).join(" ")).toMatch(/otwór drzwi w świetle 400 mm - okucie wymaga co najmniej 411/);
+  });
+
+  it("drzwi dwuskrzydłowe: ostrzeżenie; skrzydło przycięte do zera bez formatki i bez zawiasów", () => {
+    const mod = blindModule({ side: "left", frontWidth: 300 }, {
+      elements: [
+        { id: "f-L-1", typ: "front", subtype: "drzwi-lp", frontIndex: 0, baseZone: { boundLeft: "cab-left", boundBottom: "cab-bottom", boundTop: "cab-top", maxX: 500, offsetBottom: 0, offsetTop: 0 } },
+        { id: "f-P-1", typ: "front", subtype: "drzwi-lp", frontIndex: 0, baseZone: { minX: 500, boundRight: "cab-right", boundBottom: "cab-bottom", boundTop: "cab-top", offsetBottom: 0, offsetTop: 0 } },
+      ],
+    });
+    state.project.modules = [mod];
+    recalculateLayout(mod);
+    expect(mod.elements.find((e) => e.id === "f-L-1").w).toBe(0);
+    expect(checkBlindCorner(mod, state.project).join(" ")).toMatch(/dwuskrzydłowe/);
+    const { parts } = calculateModuleParts(mod);
+    expect(parts.filter((p) => p.name.startsWith("Drzwi"))).toHaveLength(1);
+    const hinges = calculateProjectHardware().filter((h) => /Zawias/.test(h.name)).reduce((n, h) => n + h.qty, 0);
+    expect(hinges).toBe(2);
   });
 });
 

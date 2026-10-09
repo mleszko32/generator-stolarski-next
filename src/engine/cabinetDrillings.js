@@ -19,6 +19,7 @@ import { calculateModuleParts } from "./cabinet.js";
 import { recalculateLayout, getTraverseConfig } from "../core/layout.js";
 import { jointSetsFor } from "./carcaseParts.js";
 import { num, round1 } from "../utils/math.js";
+import { getBlindStile, blindGeometry, getBlindCorner, PARALLEL_PLATE_INSET } from "../core/blindCorner.js";
 
 const SHELF_PIN_DROP = 2.5;
 const EPS = 2;
@@ -97,7 +98,8 @@ export function getCabinetPanels(mod, project) {
       d.slideSideHoles.forEach((hole) => holes.push({ x: round1(hole.x), y: round1(cy - y0), kind: "prowadnica", ...face("prowadnica"), to: "prowadnica szuflady" }));
     });
     // Zawiasy drzwi zawieszonych na tej ścianie (prowadnik: 2 otwory, 37 mm od przodu, ±16 mm).
-    mountingData.filter((d) => d.type === "door").forEach((d) => {
+    // Drzwi szafki ślepej na listwie / zaślepce (parallelMount) mają prowadniki tam, nie na boku.
+    mountingData.filter((d) => d.type === "door" && !d.parallelMount).forEach((d) => {
       const f = frontOf(d.frontId);
       const ok = rightFace ? d.side === "left" && touches(zoneMinX(f)) : d.side === "right" && touches(zoneMaxX(f));
       if (!ok) return;
@@ -123,6 +125,13 @@ export function getCabinetPanels(mod, project) {
     ...fullJointsSide.map(([z, kind]) => ({ edge: "dolne", x: round1(z), y: 0, kind, ...edge(kind), to: "wieniec dolny" })),
     ...topJointsSide.map(([z, kind]) => ({ edge: "gorne", x: round1(z), y: round1(sideH), kind, ...edge(kind), to: "wieniec / trawers górny" })),
   ] : [];
+
+  // Szafka ślepa: listwa między wieńcami (core/blindCorner.js: getBlindStile).
+  const stile = getBlindStile(mod, project);
+  const stileJoints = stile ? [[25, "kolek"], [stile.w / 2, "wkret"], [stile.w - 25, "kolek"]] : [];
+  const stileWieniecHoles = stile ? stileJoints.map(([sx, kind]) => ({
+    edge: "lico", x: round1(stile.x + sx - (isFull ? 0 : th)), z: round1(tbDepth - th / 2), kind, ...face(kind), to: "listwa szafki ślepej",
+  })) : [];
 
   const panels = [];
   // --- Boki ---
@@ -156,11 +165,11 @@ export function getCabinetPanels(mod, project) {
   };
   const fullJoints = setsToKinds(tbDepth);
   panels.push({ id: "wieniec-dolny", kind: "poziom", name: "Wieniec dolny", qty: 1, length: round1(tbW), width: round1(tbDepth), thickness: th,
-    holes: [...sideJoints(fullJoints), ...pionHolesFor("wieniec-dolny")] });
+    holes: [...sideJoints(fullJoints), ...pionHolesFor("wieniec-dolny"), ...stileWieniecHoles] });
   const trav = getTraverseConfig(cons);
   if (cons.topType === "pelny") {
     panels.push({ id: "wieniec-gorny", kind: "poziom", name: "Wieniec górny", qty: 1, length: round1(tbW), width: round1(tbDepth), thickness: th,
-      holes: [...sideJoints(fullJoints), ...pionHolesFor("wieniec-gorny")] });
+      holes: [...sideJoints(fullJoints), ...pionHolesFor("wieniec-gorny"), ...stileWieniecHoles] });
   } else if (cons.topType === "trawersy_poziom") {
     [["front", "Trawers przedni (poziomy)", 0, [[37, "wkret"], [69, "kolek"]]], ["rear", "Trawers tylny (poziomy)", null, [[tbDepth - 69, "kolek"], [tbDepth - 37, "wkret"]]]].forEach(([key, name, z0, zs]) => {
       if (!trav[key].active) return;
@@ -195,6 +204,24 @@ export function getCabinetPanels(mod, project) {
       length: round1(s.w), width: round1(s.isStructural ? tbDepth : tbDepth - 5), thickness: th, structural: !!s.isStructural, y: round1(s.y), x: round1(s.x), holes });
   });
 
+  // --- Listwa szafki ślepej: łączniki w czołach (do wieńców) + prowadniki zawiasów
+  // równoległych na tylnej płaszczyźnie, 21,5 mm od krawędzi po stronie drzwi (PARALLEL_PLATE_INSET).
+  // x liczone w widoku od frontu (od lewej krawędzi listwy), y od dołu listwy. ---
+  if (stile) {
+    const g = blindGeometry(mod, project);
+    const plateX = g.side === "left" ? round1(stile.w - PARALLEL_PLATE_INSET) : PARALLEL_PLATE_INSET;
+    const hingeHoles = mountingData.filter((d) => d.type === "door" && d.parallelMount === "listwa").flatMap((d) =>
+      (d.hinges || []).filter((hg) => hg.isLocal !== false).flatMap((hg) => [-16, 16].map((dy) => ({
+        x: plateX, y: round1(hg.y - stile.y + dy), kind: "zawias", ...face("zawias"), to: "prowadnik zawiasu równoległego (tył listwy)", hingeY: round1(hg.y - stile.y),
+      }))));
+    panels.push({ id: "listwa-slepa", kind: "przegroda", name: "Listwa szafki ślepej", qty: 1, length: stile.w, width: stile.h, thickness: th,
+      holes: [
+        ...["dolne", "gorne"].flatMap((ed) => stileJoints.map(([sx, kind]) => ({ edge: ed, x: round1(sx), y: ed === "dolne" ? 0 : stile.h, kind, ...edge(kind), to: ed === "dolne" ? "wieniec dolny" : "wieniec / trawers górny" }))),
+        ...hingeHoles,
+      ],
+      note: `między wieńcami, lico równo z czołem korpusu; prowadniki zawiasów na tylnej płaszczyźnie (${PARALLEL_PLATE_INSET} mm od krawędzi przy drzwiach, płytka 3 mm); zaślepkę przykręcić od środka przez listwę` });
+  }
+
   // --- Plecy (bez otworów; sposób montażu w uwadze) ---
   const back = parts.find((p) => p.category === "Plecy");
   if (back) panels.push({ id: "plecy", kind: "plecy", name: "Plecy (HDF)", qty: 1, length: back.length, width: back.width, thickness: backThick, holes: [],
@@ -216,6 +243,7 @@ export function getCabinetConstruction(mod, project) {
     plinth: !!(mod.legs && mod.legs.active && mod.legs.plinth),
     drawers: (mod.elements || []).filter((e) => e.typ === "front" && (e.subtype || "").includes("szuflada")).length,
     doors: (mod.elements || []).filter((e) => e.typ === "front" && (e.subtype || "").includes("drzwi")).length,
+    blindMount: (getBlindCorner(mod) || {}).mount || null,
     movableShelves: (mod.elements || []).filter((e) => e.typ === "poziom" && !e.isStructural).length,
   };
 }

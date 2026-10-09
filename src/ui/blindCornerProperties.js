@@ -5,7 +5,7 @@
 import { state } from "../core/state.js";
 import { recalculateLayout } from "../core/layout.js";
 import { buildZoneTree, assignFront } from "../core/zoneTree.js";
-import { blindGeometry, checkBlindCorner, getBlindCorner, DEFAULT_BLIND_FRONT } from "../core/blindCorner.js";
+import { blindGeometry, checkBlindCorner, getBlindCorner, blindHingeSide, DEFAULT_BLIND_FRONT, BLIND_MOUNTS, DEFAULT_BLIND_MOUNT, DEFAULT_STILE_WIDTH } from "../core/blindCorner.js";
 import { fittingsOfKind, getCornerFitting, checkCornerFitting } from "../core/cornerFittings.js";
 import { escapeHtml } from "../utils/dom.js";
 import { num, fmtMm } from "../utils/math.js";
@@ -41,20 +41,29 @@ export function blindCornerSectionHtml(mod) {
         <input type="number" id="input-blind-front" value="${b.frontWidth}" step="1" min="100"></div>
       <div class="property-group"><label>Okucie narożne:</label>
         <select id="input-blind-fitting">${fittingOptions("blind", b.fitting)}</select></div>
+      <div class="property-group"><label>Mocowanie drzwi:</label>
+        <select id="input-blind-mount">${Object.entries(BLIND_MOUNTS).map(([id, m]) => `<option value="${id}"${id === b.mount ? " selected" : ""}>${escapeHtml(m.label)}</option>`).join("")}</select></div>
+      ${b.mount === "listwa" ? `<div class="property-group"><label>Szerokość listwy (mm):</label>
+        <input type="number" id="input-blind-stile" value="${b.stileWidth}" step="5" min="30"></div>` : ""}
       <div class="prop-info"><div class="info-body">
         <div class="info-row"><span class="info-k">Zaślepka</span><span class="info-v">${fmtMm(Math.max(0, g.panelX1 - g.panelX0))} mm</span></div>
         <div class="info-row"><span class="info-k">Od boku do drzwi</span><span class="info-v">${fmtMm(g.blindReach)} mm</span></div>
+        <div class="info-row"><span class="info-k">Otwór w świetle</span><span class="info-v">${fmtMm(g.clearOpening)} mm</span></div>
+        <div class="info-row"><span class="info-k">Zawiasy</span><span class="info-v">${g.hingeSide === b.side ? "od strony narożnika" : "z dala od narożnika"}</span></div>
       </div></div>
-      <div class="hint mb-8">Od boku po stronie ślepej do drzwi musi być co najmniej: głębokość szafek sąsiedniej ściany + front (ok. 20 mm) + blenda (30–100 mm). Zawiasy dajemy po stronie z dala od narożnika.</div>
+      <div class="hint mb-8">Od boku po stronie ślepej do drzwi musi być co najmniej: odsunięcie od ściany + głębokość szafek sąsiedniej ściany + front + blenda (30–100 mm). LeMans / Cornerstone: drzwi na listwie albo zaślepce (zawias równoległy, otwarcie min. 85°); Magic Corner: zwykłe zawiasy na boku z dala od narożnika.</div>
       ${notesHtml(b.fitting, checkBlindCorner(mod, state.project))}`;
   }
   return sectionHtml("naroznik", body, !!b);
 }
 
-// Drzwi pojedyncze otwierane w stronę wolnego miejsca (zawias z dala od narożnika).
-function setHingesAwayFromBlind(mod, side) {
+// Strona zawiasów drzwi pojedynczych wg mocowania (core/blindCorner.js: blindHingeSide;
+// applyBlindCorner pilnuje tego też przy każdym przeliczeniu układu).
+function setBlindHingeSide(mod) {
+  const side = blindHingeSide(mod);
+  if (!side) return;
   (mod.elements || []).forEach((el) => {
-    if (el.typ === "front" && el.subtype === "drzwi") el.openingSide = side === "left" ? "right" : "left";
+    if (el.typ === "front" && el.subtype === "drzwi") el.openingSide = side;
   });
 }
 
@@ -68,13 +77,15 @@ export function bindBlindCornerSection(root, mod, { refresh, rerender }) {
         side: prev.side || "left",
         frontWidth: prev.frontWidth || (W >= 1000 ? 500 : DEFAULT_BLIND_FRONT),
         fitting: prev.fitting || "",
+        mount: prev.mount || DEFAULT_BLIND_MOUNT,
+        stileWidth: prev.stileWidth || DEFAULT_STILE_WIDTH,
         active: true,
       };
-      setHingesAwayFromBlind(mod, mod.blindCorner.side);
+      setBlindHingeSide(mod);
       // Pusta szafka dostaje od razu drzwi na całą wysokość (przycięte do otworu).
       if (!(mod.elements || []).some((el) => el.typ === "front")) {
         mod.elements = mod.elements || [];
-        assignFront(mod, buildZoneTree(mod), "drzwi", { openingSide: mod.blindCorner.side === "left" ? "right" : "left" });
+        assignFront(mod, buildZoneTree(mod), "drzwi", { openingSide: blindHingeSide(mod) });
       }
     } else if (mod.blindCorner) {
       mod.blindCorner.active = false;
@@ -83,7 +94,7 @@ export function bindBlindCornerSection(root, mod, { refresh, rerender }) {
   });
   root.querySelectorAll(".btn-blind-side").forEach((btn) => btn.addEventListener("click", () => {
     mod.blindCorner.side = btn.dataset.side;
-    setHingesAwayFromBlind(mod, mod.blindCorner.side);
+    setBlindHingeSide(mod);
     refresh(); rerender();
   }));
   root.querySelector("#input-blind-front")?.addEventListener("change", (e) => {
@@ -92,6 +103,19 @@ export function bindBlindCornerSection(root, mod, { refresh, rerender }) {
   });
   root.querySelector("#input-blind-fitting")?.addEventListener("change", (e) => {
     mod.blindCorner.fitting = e.target.value;
+    // Okucie z wymaganym mocowaniem (np. Magic Corner - zawias na boku) ustawia je od razu.
+    const f = getCornerFitting(e.target.value);
+    if (f && f.mounts && !f.mounts.includes(getBlindCorner(mod).mount)) mod.blindCorner.mount = f.mounts[0];
+    setBlindHingeSide(mod);
+    refresh(); rerender();
+  });
+  root.querySelector("#input-blind-mount")?.addEventListener("change", (e) => {
+    mod.blindCorner.mount = e.target.value;
+    setBlindHingeSide(mod);
+    refresh(); rerender();
+  });
+  root.querySelector("#input-blind-stile")?.addEventListener("change", (e) => {
+    mod.blindCorner.stileWidth = Math.max(30, num(e.target.value, DEFAULT_STILE_WIDTH));
     refresh(); rerender();
   });
 }

@@ -12,7 +12,7 @@ import { calculateAllProjectParts } from "./cabinet.js";
 import { getCabinetPanels } from "./cabinetDrillings.js";
 import { getCornerPanels } from "./cornerDrillings.js";
 import { getSlopePanels } from "./slopeDrillings.js";
-import { getBlindCorner } from "../core/blindCorner.js";
+import { getBlindCorner, blindGeometry, BLIND_MOUNTS } from "../core/blindCorner.js";
 import { getCornerFitting } from "../core/cornerFittings.js";
 
 export function calculateProjectHardware() {
@@ -143,6 +143,8 @@ export function calculateProjectHardware() {
           }
         }
         else if (front.subtype.includes('drzwi')) {
+          // Skrzydło szafki ślepej przycięte do zera nie istnieje - bez zawiasów.
+          if (blind && !(front.w >= 1)) return;
           const side = front.subtype === 'drzwi-lp' ? (front.id.includes('-L-') ? 'left' : 'right') : (front.openingSide || 'left');
           const hinges = calculateHinges(front, board, obstacles, side);
           const hingeCount = hinges.length;
@@ -169,7 +171,11 @@ export function calculateProjectHardware() {
             if (hasPartner) return;
           }
 
-          const hingeKey = `Zawias meblowy + prowadnik krzyżakowy (puszka 35mm)`;
+          // Szafka ślepa: drzwi od strony narożnika wiszą na zawiasach równoległych
+          // (listwa - nakładany, zaślepka - wpuszczany), patrz core/blindCorner.js.
+          const bg = blind ? blindGeometry(mod, config) : null;
+          const parallelName = bg && side === bg.side ? BLIND_MOUNTS[bg.mount].hwName : null;
+          const hingeKey = parallelName || `Zawias meblowy + prowadnik krzyżakowy (puszka 35mm)`;
           if (!hardwareList[hingeKey]) hardwareList[hingeKey] = { name: hingeKey, qty: 0, unit: 'kpl.' };
           hardwareList[hingeKey].qty += hingeCount;
         }

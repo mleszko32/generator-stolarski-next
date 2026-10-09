@@ -312,6 +312,7 @@ export function cabinetStepsHtml(cons, panels) {
       ? "Połóż wieniec dolny, wstaw w niego boki (na kołki) i przykręć wkrętami od spodu wieńca."
       : "Połóż bok lewy wewnętrzną stroną do góry, wstaw wieniec dolny i " + (cons.topType === "pelny" ? "górny" : "trawersy") + " na kołki.",
     has("przegroda") ? "Wstaw przegrody między wieniec / półki i przykręć je przez wieńce." : null,
+    has("listwa-slepa") ? "Wstaw listwę szafki ślepej między wieńce (lico równo z czołem korpusu) i przykręć ją przez wieńce." : null,
     fixedShelves ? "Wstaw półki stałe na kołki." : null,
     cons.backType === "nut" ? "Wsuń plecy w nut (przed zamknięciem korpusu drugim bokiem)." : null,
     cons.isFull
@@ -321,7 +322,12 @@ export function cabinetStepsHtml(cons, panels) {
     cons.backType !== "nut" ? "Przybij lub przykręć plecy od tyłu (wyrównują korpus w kącie prostym)." : null,
     cons.legs ? `Przykręć nóżki (${cons.legsHeight} mm)${cons.plinth ? " i zatrzaski cokołu" : ""}.` : null,
     cons.drawers ? "Przykręć prowadnice szuflad w otworach (patrz bok); skrzynki szuflad wg instrukcji „Skrzynki szuflad”." : null,
-    cons.doors ? "Przykręć prowadniki zawiasów w otworach na bokach, zawiasy w puszkach frontów, zawieś drzwi." : null,
+    cons.blindMount ? (cons.blindMount === "listwa"
+      ? "Przykręć zaślepkę od środka przez listwę i do czoła wieńców (zaślepka nakłada się na listwę, szczelina do drzwi jak między frontami)."
+      : "Przykręć zaślepkę od środka kątownikami do czoła wieńców" + (cons.blindMount === "zaslepka" ? " - mocno, bo wiszą na niej drzwi (przy wysokiej dodaj kątownik w połowie)." : ".")) : null,
+    cons.doors ? (cons.blindMount === "listwa" || cons.blindMount === "zaslepka"
+      ? `Prowadniki zawiasów równoległych (płytka 3 mm) przykręć na tylnej płaszczyźnie ${cons.blindMount === "listwa" ? "listwy" : "zaślepki"}, 21,5 mm od krawędzi przy drzwiach; zawiasy w puszkach frontu, zawieś drzwi.`
+      : "Przykręć prowadniki zawiasów w otworach na bokach, zawiasy w puszkach frontów, zawieś drzwi.") : null,
     cons.movableShelves ? "Wciśnij podpórki i połóż półki ruchome." : null,
     cons.drawers || cons.doors ? "Wyreguluj fronty (szczeliny równe)." : null,
   ].filter(Boolean);

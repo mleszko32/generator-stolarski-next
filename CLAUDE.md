@@ -310,6 +310,13 @@ następnej), ostrzeżenie o przejściu w U < 1200 mm.
 fitting }` — `core/blindCorner.js` (czyste, z testami): `applyBlindCorner` na końcu `recalculateLayout` przycina
 fronty do otworu drzwi, `getBlindPanel` daje zaślepkę części ślepej (formatka „Zaślepka szafki ślepej”, kategoria
 Front; rysowana w 3D i w rzutach ścian), `blindGeometry().blindReach` = od boku po stronie ślepej do drzwi.
+Mocowanie drzwi szafki ślepej `blindCorner.mount` (`BLIND_MOUNTS`): `'listwa'` (domyślne) — listwa
+`stileWidth` (100 mm) między wieńcami przy krawędzi otworu, drzwi na zawiasie równoległym nakładanym Blum 79B9950
+(prowadnik na tylnej płaszczyźnie listwy, `PARALLEL_PLATE_INSET` 21,5 mm), zaślepka przykręcona do listwy;
+`'zaslepka'` — zawias równoległy wpuszczany 79B9550 na zaślepce; `'bok'` — zwykły zawias na boku z dala od narożnika
+(Magic Corner). Stronę zawiasów wymusza `applyBlindCorner` (`blindHingeSide`); `mountingData` drzwi na listwie /
+zaślepce ma `parallelMount`, więc otwory prowadników nie trafiają na bok (`cabinetDrillings.js` daje formatkę
+„Listwa szafki ślepej” z otworami). `minOpening`/`mounts` w katalogu okuć → kontrola otworu w świetle i mocowania.
 `core/cornerFittings.js` to **jedyny** katalog okuć narożnych (LeMans, Magic Corner, Cornerstone, karuzele…;
 `kind: 'blind'` dla szafki ślepej, `'corner'` dla `mod.cornerFitting` szafki L) — pozycja na liście okuć
 (`hardware.js`) i ostrzeżenia wymiarów w kontroli projektu. UI: sekcja „Narożnik” (`ui/blindCornerProperties.js`).

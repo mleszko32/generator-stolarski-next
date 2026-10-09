@@ -12,6 +12,10 @@
 // fronts       - nominalne szerokości frontu (lista) albo minFront,
 // minInnerDepth / innerHeight [min, max] - wnętrze korpusu (mm), null = brak danych.
 // hwName       - nazwa pozycji na liście okuć (cena w project.pricing.hardware po nazwie).
+// minOpening   - otwór drzwi w świetle (mm): liczba albo { front: mm } wg szerokości frontu,
+// mounts       - dozwolone mocowania drzwi szafki ślepej (core/blindCorner.js: BLIND_MOUNTS),
+//                np. LeMans: drzwi przy krawędzi otworu od strony ślepej (instrukcje
+//                Kesseböhmer MA 402118 / 405537), Magic Corner: kosze na drzwiach, zawias z dala.
 export const CORNER_FITTINGS = {
   lemans: {
     label: "Kesseböhmer LeMans II",
@@ -20,7 +24,9 @@ export const CORNER_FITTINGS = {
     fronts: [450, 500, 600],
     minInnerDepth: null,
     innerHeight: [650, 800],
-    note: "Drzwi muszą otwierać się co najmniej o 85°. Nośność 25 kg na tacę.",
+    minOpening: { 400: 361, 450: 411, 500: 461, 600: 561 }, // tabela MA 402118: otwór 361–368 / 411–418 / …
+    mounts: ["listwa", "zaslepka"],
+    note: "Drzwi wiszą przy krawędzi otworu od strony ślepej i muszą otwierać się co najmniej o 85° (zawias 95°, nie 83°). Nośność 25 kg na tacę.",
     hwName: "Okucie narożne Kesseböhmer LeMans II (2 tace)",
   },
   magicCorner: {
@@ -30,7 +36,9 @@ export const CORNER_FITTINGS = {
     minFront: 450,
     minInnerDepth: 500,
     innerHeight: [540, null],
-    note: "Kosze przednie na froncie + kosze tylne w części ślepej. Do 32 kg.",
+    minOpening: 395,
+    mounts: ["bok"],
+    note: "Kosze przednie na froncie + kosze tylne w części ślepej - drzwi na zwykłych zawiasach na boku z dala od narożnika. Do 32 kg.",
     hwName: "Okucie narożne Magic Corner (kpl. koszy)",
   },
   cornerstone: {
@@ -40,7 +48,9 @@ export const CORNER_FITTINGS = {
     fronts: [450, 500],
     minInnerDepth: 490,
     innerHeight: [650, 850],
-    note: "Front 450 przy korpusie 900, 500 przy korpusie 1000. 25 kg na półkę.",
+    minOpening: { 400: 361, 450: 411, 500: 461, 600: 561 },
+    mounts: ["listwa", "zaslepka"],
+    note: "Front 450 przy korpusie 900, 500 przy korpusie 1000. Drzwi od strony ślepej, otwarcie min. 85°. 25 kg na półkę.",
     hwName: "Okucie narożne Vauth-Sagel Cornerstone Maxx",
   },
   corFold: {
@@ -117,6 +127,22 @@ export function checkCornerFitting(id, dims) {
     if (f.minFront && fw < f.minFront - FRONT_TOL) {
       out.push(`${f.label}: front ${Math.round(fw)} mm - okucie wymaga frontu co najmniej ${f.minFront} mm.`);
     }
+  }
+  if (f.kind === "blind" && f.minOpening && dims.clearOpening !== undefined) {
+    let need = f.minOpening;
+    if (typeof need === "object") {
+      const keys = Object.keys(need).map(Number);
+      const k = keys.reduce((a, b) => (Math.abs(b - (dims.frontWidth ?? b)) < Math.abs(a - (dims.frontWidth ?? a)) ? b : a), keys[0]);
+      need = need[k];
+    }
+    if (dims.clearOpening < need - 0.5) {
+      out.push(`${f.label}: otwór drzwi w świetle ${Math.round(dims.clearOpening)} mm - okucie wymaga co najmniej ${need} mm.`);
+    }
+  }
+  if (f.kind === "blind" && f.mounts && dims.mount && !f.mounts.includes(dims.mount)) {
+    out.push(f.mounts.includes("bok")
+      ? `${f.label}: drzwi muszą wisieć na boku korpusu z dala od narożnika (kosze jadą razem z drzwiami) - zmień mocowanie drzwi.`
+      : `${f.label}: drzwi muszą wisieć przy krawędzi otworu od strony ślepej (listwa albo zaślepka) - zmień mocowanie drzwi.`);
   }
   if (f.minInnerDepth && dims.innerDepth < f.minInnerDepth) {
     out.push(`${f.label}: głębokość wnętrza ${Math.round(dims.innerDepth)} mm - wymagane co najmniej ${f.minInnerDepth} mm.`);

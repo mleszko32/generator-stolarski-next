@@ -229,6 +229,8 @@ function drawSideDetails(ctx) {
   function getHingesForFace(faceX, isRightFace) {
       return (mountingData || []).filter(d => {
           if (d.type !== 'door') return false;
+          // Drzwi szafki ślepej na listwie / zaślepce - prowadniki nie na boku.
+          if (d.parallelMount) return false;
 
           let front = null;
           state.project.modules.forEach(m => {

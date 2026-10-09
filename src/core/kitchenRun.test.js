@@ -72,6 +72,18 @@ describe("planKitchenRun", () => {
     expect(issues.filter((i) => /narożnik|Nachodzi/i.test(i.message) && i.level !== "info")).toEqual([]);
   });
 
+  it("szafka ślepa: domyślnie listwa i zawias od narożnika; z Magic Corner zawias na boku z dala", () => {
+    const plan = (fitting) => planKitchenRun(state.project, {
+      walls: ["lewa", "tyl"], corners: [{ kind: "blind", blindOn: "next", width: 1000, frontWidth: 500, filler: 50, fitting }], fill,
+    }).modules.find((m) => m.blindCorner);
+    const a = plan("");
+    expect(a.blindCorner.mount).toBe("listwa");
+    expect(a.elements.find((e) => e.subtype === "drzwi").openingSide).toBe("left"); // strona ślepa
+    const b = plan("magicCorner");
+    expect(b.blindCorner.mount).toBe("bok");
+    expect(b.elements.find((e) => e.subtype === "drzwi").openingSide).toBe("right");
+  });
+
   it("U z szafkami L: bez uwag do narożników po wstawieniu", () => {
     applyKitchenRun(planKitchenRun(state.project, { walls: ["lewa", "tyl", "prawa"], corners: [{ kind: "L" }, { kind: "L" }], fill }));
     const { issues } = validateProject();

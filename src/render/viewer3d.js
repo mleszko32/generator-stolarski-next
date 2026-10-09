@@ -22,7 +22,7 @@ import { initPropertiesPanel } from '../ui/properties.js';
 import { mats, worktopMat, disposeObject, createLabelSprite, addBox, addHole, addHardware, isXrayMode, setXrayMode } from './meshBuilders.js';
 import { renderCornerCabinet } from './cornerCabinet3d.js';
 import { renderSlopeCabinet } from './slopeCabinet3d.js';
-import { getBlindPanel } from '../core/blindCorner.js';
+import { getBlindPanel, getBlindStile, blindGeometry, PARALLEL_PLATE_INSET } from '../core/blindCorner.js';
 import { initMeasureTool, isMeasureActive, setMeasureButton, toggleMeasureMode, updateMeasureHover, handleMeasureClick, measureHoverMouse } from './measureTool.js';
 import { showAlert } from "../utils/modal.js";
 
@@ -1480,6 +1480,18 @@ export function update3D() {
 
                               addHole(17.5, 13, posX + cupX, posY + calcY, zForFront + 6.5, 'z', innerGroup);
 
+                              // Szafka ślepa, drzwi od strony narożnika: prowadnik zawiasu równoległego
+                              // na tylnej płaszczyźnie listwy / zaślepki (core/blindCorner.js).
+                              const bg = blindGeometry(mod, state.project);
+                              if (bg && bg.mount !== 'bok' && side === bg.side) {
+                                  const edgeX = bg.mount === 'listwa'
+                                      ? (bg.side === 'left' ? bg.stileX1 - PARALLEL_PLATE_INSET : bg.stileX0 + PARALLEL_PLATE_INSET)
+                                      : (bg.side === 'left' ? bg.panelX1 - PARALLEL_PLATE_INSET : bg.panelX0 + PARALLEL_PLATE_INSET);
+                                  const plateZ = bg.mount === 'listwa' ? posZ + D - th : posZ + D + frontBodyGap(modFront);
+                                  addHole(2.5, 10, posX + edgeX, posY + calcY - 16, plateZ, 'z', innerGroup);
+                                  addHole(2.5, 10, posX + edgeX, posY + calcY + 16, plateZ, 'z', innerGroup);
+                                  return;
+                              }
                               const plateX = isLeft ? posX + el.x - th/2 : posX + el.x + el.w + th/2;
                               addHole(2.5, th, plateX, posY + calcY - 16, posZ + D - 37, 'x', innerGroup);
                               addHole(2.5, th, plateX, posY + calcY + 16, posZ + D - 37, 'x', innerGroup);
@@ -1494,7 +1506,12 @@ export function update3D() {
       const blindPanel = isFrontsVisible ? getBlindPanel(mod, state.project) : null;
       if (blindPanel) {
           const zBlind = isInsetFront ? posZ + D - th : posZ + D + frontBodyGap(modFront);
-          addBox(blindPanel.w, blindPanel.h, 18, posX + blindPanel.x, posY + blindPanel.y, zBlind, 'front', isActive, { moduleId: mod.id, type: 'front' }, innerGroup);
+          addBox(blindPanel.w, blindPanel.h, th, posX + blindPanel.x, posY + blindPanel.y, zBlind, 'front', isActive, { moduleId: mod.id, type: 'front' }, innerGroup);
+      }
+      // Listwa szafki ślepej między wieńcami (mocowanie drzwi i zaślepki).
+      const blindStile = getBlindStile(mod, state.project);
+      if (blindStile) {
+          addBox(blindStile.w, blindStile.h, blindStile.thickness, posX + blindStile.x, posY + blindStile.y, posZ + D - blindStile.thickness, 'corpus', isActive, udCorp, innerGroup);
       }
 
       if (mod.legs && mod.legs.active) {

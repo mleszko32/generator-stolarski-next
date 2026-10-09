@@ -9,7 +9,7 @@ import { recalculateAllLayouts, getWorldFootprint, getCornerDepths } from "../co
 import { getCorpusHoles, getPionMountHoles, getCorpusParts, getBackPanelParts } from "./carcaseParts.js";
 import { getCornerCorpusParts } from "./cornerParts.js";
 import { getSlopeCabinetParts, getSlopeFrontParts } from "../core/slopeCabinet.js";
-import { getBlindPanel } from "../core/blindCorner.js";
+import { getBlindPanel, getBlindStile, blindGeometry, getBlindCorner } from "../core/blindCorner.js";
 import { splitPlinthRun, maxPlinthLength } from "./plinthSplit.js";
 
 export function calculateParts() {
@@ -107,7 +107,10 @@ function getGlobalHingesForModule(targetMod, config) {
 
       if (overlapX > 10 && overlapZ > 10) {
           if (sourceMod.elements) {
-              const fronts = sourceMod.elements.filter(el => el.typ === 'front' && el.subtype.includes('drzwi'));
+              // Drzwi szafki ślepej wiszące od strony narożnika (listwa / zaślepka) mają
+              // prowadniki na listwie albo zaślepce, nie na boku - flaga parallelMount.
+              const blindG = blindGeometry(sourceMod, config);
+              const fronts = sourceMod.elements.filter(el => el.typ === 'front' && el.subtype.includes('drzwi') && !(blindG && !(el.w >= 1)));
               fronts.forEach(front => {
 
                   let obstacles = [];
@@ -144,7 +147,8 @@ function getGlobalHingesForModule(targetMod, config) {
 
                   if (translatedHinges.some(h => h.isLocal) || sourceMod.id === targetMod.id) {
                       let partName = `Drzwi ${side === 'left' ? 'Lewe' : 'Prawe'}`;
-                      mountingData.push({ type: 'door', name: partName, side: side, frontId: front.id, hinges: translatedHinges });
+                      const parallelMount = blindG && blindG.mount !== 'bok' && side === blindG.side ? blindG.mount : null;
+                      mountingData.push({ type: 'door', name: partName, side: side, frontId: front.id, hinges: translatedHinges, ...(parallelMount ? { parallelMount } : {}) });
                   }
               });
           }
@@ -349,7 +353,10 @@ function getInteriorParts(mod, config) {
 function getFrontsAndDrawers(mod, config) {
   const parts = [];
   const mountingData = [];
-  const fronts = mod.elements ? mod.elements.filter(el => el.typ === 'front') : [];
+  // Szafka ślepa: front przycięty do zera (leży w całości w części ślepej) nie istnieje -
+  // bez formatki i bez okuć (kontrola projektu zgłasza go osobno).
+  const isBlind = !!getBlindCorner(mod);
+  const fronts = mod.elements ? mod.elements.filter(el => el.typ === 'front' && !(isBlind && !(el.w >= 1))) : [];
 
   // Szafka ślepa (core/blindCorner.js): zaślepka części ślepej - formatka z płyty frontowej.
   const blindPanel = getBlindPanel(mod, config);
@@ -357,6 +364,9 @@ function getFrontsAndDrawers(mod, config) {
     const materialId = blindPanel.materialId ?? (fronts[0] && fronts[0].materialId);
     parts.push({ name: 'Zaślepka szafki ślepej', length: blindPanel.h, width: blindPanel.w, qty: 1, category: 'Front', materialId });
   }
+  // Listwa między wieńcami (mocowanie drzwi na zawiasie równoległym + zaślepki).
+  const stile = getBlindStile(mod, config);
+  if (stile) parts.push({ name: 'Listwa szafki ślepej', length: stile.h, width: stile.w, qty: 1, category: 'Korpus' });
 
   if (fronts.length === 0) return { parts, mountingData };
   fronts.sort((a, b) => a.y - b.y);
