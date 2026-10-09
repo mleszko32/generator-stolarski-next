@@ -60,6 +60,38 @@ describe('kosztorys - robocizna, montaż, transport, marża, rabat, VAT', () => 
   });
 });
 
+describe('kosztorys - narzut na materiały i marża na pracę osobno', () => {
+  it('narzut liczony od materiałów, cięcia i okuć, marża na pracę od robocizny, lakierni, montażu i transportu', () => {
+    setProject(freshProject({ modules: [baseModule({ elements: [fullZoneFront()] })] }));
+    state.project.pricing = {
+      materials: { Korpus: 100 }, cuttingPerPart: 5, marginPercent: 40, laborMarginPercent: 0,
+      labor: { hours: 10, rate: 150 }, lacquer: { hours: 2, rate: 150 }, assembly: { hours: 4, rate: 150 }, transport: 200, vatPercent: 0,
+    };
+    ensurePricingDefaults(state.project);
+    const c = calculateProjectCost();
+    expect(c.goodsSubtotal).toBeCloseTo(c.materialsSubtotal + c.cuttingCost + c.hardwareSubtotal, 6);
+    expect(c.workSubtotal).toBe(1500 + 300 + 600 + 200);
+    expect(c.goodsMarginAmount).toBeCloseTo(c.goodsSubtotal * 0.4, 6);
+    expect(c.laborMarginAmount).toBe(0);
+    expect(c.net).toBeCloseTo(c.goodsSubtotal * 1.4 + c.workSubtotal, 6);
+  });
+
+  it('osobna marża na pracę', () => {
+    const c = withPricing({ labor: { hours: 10, rate: 100 }, marginPercent: 50, laborMarginPercent: 10, vatPercent: 0 });
+    expect(c.laborMarginAmount).toBe(100);
+    expect(c.net).toBe(1100);
+  });
+
+  it('stary projekt bez pola marży na pracę dostaje tę samą marżę co materiały (cena się nie zmienia)', () => {
+    expect(migratePricingExtras({ marginPercent: 100 }).laborMarginPercent).toBe(100);
+    expect(migratePricingExtras({ marginPercent: 100, laborMarginPercent: 0 }).laborMarginPercent).toBe(0);
+    setProject(freshProject({ modules: [] }));
+    delete state.project.pricing;
+    ensurePricingDefaults(state.project);
+    expect(state.project.pricing.laborMarginPercent).toBe(0);
+  });
+});
+
 describe('kosztorys - cięcie formatek', () => {
   it('liczy formatki płyt, MDF i HDF (bez blatu) × cena za sztukę', () => {
     setProject(freshProject({ modules: [baseModule({ elements: [fullZoneFront()] })] }));

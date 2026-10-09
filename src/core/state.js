@@ -46,6 +46,12 @@ export const DEFAULT_VAT_PERCENT = 23;
 // zostaje zerem. `labor` to warsztat (oklejanie, wiercenie, składanie),
 // `lacquer` osobno czas lakierni, `cuttingPerPart` - cena cięcia jednej
 // formatki w hurtowni (liczbę formatek liczy engine/cost.js z projektu).
+//
+// Marża jest dwuczęściowa: `marginPercent` to narzut na materiały, cięcie i
+// okucia, `laborMarginPercent` - na robociznę, lakiernię, montaż i transport
+// (stawka godzinowa zwykle już zawiera zysk, więc nowe projekty mają tu 0).
+// Starsze projekty miały jedną marżę od całej sumy - brak pola = ta sama
+// wartość co `marginPercent`, żeby ich cena się nie zmieniła.
 function nonNeg(v, fallback = 0) {
   const n = parseFloat(v);
   return Number.isFinite(n) && n >= 0 ? n : fallback;
@@ -57,6 +63,7 @@ export function migratePricingExtras(p) {
   p.assembly = hr(p.assembly);
   p.transport = nonNeg(p.transport);
   p.cuttingPerPart = nonNeg(p.cuttingPerPart);
+  p.laborMarginPercent = p.laborMarginPercent == null ? nonNeg(p.marginPercent) : nonNeg(p.laborMarginPercent);
   p.discountPercent = Math.min(100, nonNeg(p.discountPercent));
   p.vatPercent = nonNeg(p.vatPercent, DEFAULT_VAT_PERCENT);
   return p;
@@ -64,7 +71,7 @@ export function migratePricingExtras(p) {
 
 export function ensurePricingDefaults(project) {
   if (!project.pricing || typeof project.pricing !== 'object') {
-    project.pricing = { materials: {}, marginPercent: 0, hardware: {} };
+    project.pricing = { materials: {}, marginPercent: 0, laborMarginPercent: 0, hardware: {} };
   }
   const p = project.pricing;
 
@@ -213,7 +220,7 @@ export const state = {
     construction: { joinType: "boki_przelotowe", topType: "pelny", traverseWidth: 100 },
     front: { active: true, distribution: "1:1:1", drawerSystem: "merivobox", gap: 3, clearance: { sides: 1.5, top: 5, bottom: 0 } },
     room: { ...DEFAULT_ROOM },
-    pricing: { materials: { Korpus: 0, Front: 0, Szuflada: 0, Plecy: 0 }, marginPercent: 0, hardware: {}, labor: { hours: 0, rate: 0 }, lacquer: { hours: 0, rate: 0 }, assembly: { hours: 0, rate: 0 }, transport: 0, cuttingPerPart: 0, discountPercent: 0, vatPercent: DEFAULT_VAT_PERCENT },
+    pricing: { materials: { Korpus: 0, Front: 0, Szuflada: 0, Plecy: 0 }, marginPercent: 0, laborMarginPercent: 0, hardware: {}, labor: { hours: 0, rate: 0 }, lacquer: { hours: 0, rate: 0 }, assembly: { hours: 0, rate: 0 }, transport: 0, cuttingPerPart: 0, discountPercent: 0, vatPercent: DEFAULT_VAT_PERCENT },
     modules: [],
     sidePanels: []
   }

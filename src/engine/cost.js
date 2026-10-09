@@ -88,10 +88,16 @@ export function calculateProjectCost() {
   const assemblyCost = pricing.assembly.hours * pricing.assembly.rate;
   const transportCost = pricing.transport;
   // suma kosztów = materiały + cięcie + okucia + robocizna + lakiernia + montaż + transport;
-  // marża liczona od sumy kosztów, rabat od ceny po marży, VAT od ceny po rabacie
-  const subtotal = materialsSubtotal + cuttingCost + hardwareSubtotal + laborCost + lacquerCost + assemblyCost + transportCost;
+  // narzut na materiały (z cięciem i okuciami) i marża na pracę (z montażem i
+  // transportem) osobno, rabat od ceny po marży, VAT od ceny po rabacie
+  const goodsSubtotal = materialsSubtotal + cuttingCost + hardwareSubtotal;
+  const workSubtotal = laborCost + lacquerCost + assemblyCost + transportCost;
+  const subtotal = goodsSubtotal + workSubtotal;
   const marginPercent = parseFloat(pricing.marginPercent) || 0;
-  const marginAmount = subtotal * (marginPercent / 100);
+  const laborMarginPercent = pricing.laborMarginPercent;
+  const goodsMarginAmount = goodsSubtotal * (marginPercent / 100);
+  const laborMarginAmount = workSubtotal * (laborMarginPercent / 100);
+  const marginAmount = goodsMarginAmount + laborMarginAmount;
   const priceBeforeDiscount = subtotal + marginAmount;
   const discountAmount = priceBeforeDiscount * (pricing.discountPercent / 100);
   const net = priceBeforeDiscount - discountAmount;
@@ -109,7 +115,12 @@ export function calculateProjectCost() {
     assemblyCost,
     transportCost,
     subtotal,
+    goodsSubtotal,
+    workSubtotal,
     marginPercent,
+    laborMarginPercent,
+    goodsMarginAmount,
+    laborMarginAmount,
     marginAmount,
     priceBeforeDiscount,
     discountPercent: pricing.discountPercent,

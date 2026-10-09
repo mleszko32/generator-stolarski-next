@@ -98,7 +98,8 @@ export function mountKosztorys(root) {
             <section class="cost-section">
                 <h3>Marża, rabat, VAT</h3>
                 <div class="field-row">
-                    <div class="field"><label>Marża (%) - od sumy kosztów</label><input type="number" class="input" id="kosztorys-margin" value="${pricing.marginPercent}" step="1" min="0"></div>
+                    <div class="field"><label>Narzut na materiały i okucia (%)</label><input type="number" class="input" id="kosztorys-margin" value="${pricing.marginPercent}" step="1" min="0"></div>
+                    <div class="field"><label>Marża na robociznę, montaż, transport (%)</label><input type="number" class="input" id="kosztorys-labor-margin" value="${pricing.laborMarginPercent ?? pricing.marginPercent}" step="1" min="0"></div>
                     <div class="field"><label>Rabat (%)</label><input type="number" class="input" id="kosztorys-discount" value="${pricing.discountPercent}" step="any" min="0" max="100"></div>
                     <div class="field"><label>VAT (%)</label><input type="number" class="input" id="kosztorys-vat" value="${pricing.vatPercent}" step="any" min="0"></div>
                 </div>
@@ -112,7 +113,8 @@ export function mountKosztorys(root) {
                 ${foot('Montaż', 'assembly')}
                 ${foot('Transport', 'transport')}
                 ${foot('<b>Suma kosztów</b>', 'subtotal')}
-                <div class="cost-line"><span>Marża (<span id="kosztorys-foot-marginpct">0</span>%)</span><span id="kosztorys-foot-margin">—</span></div>
+                <div class="cost-line"><span>Narzut na materiały i okucia (<span id="kosztorys-foot-marginpct">0</span>%)</span><span id="kosztorys-foot-margin">—</span></div>
+                <div class="cost-line"><span>Marża na pracę (<span id="kosztorys-foot-labormarginpct">0</span>%)</span><span id="kosztorys-foot-labormargin">—</span></div>
                 <div class="cost-line"><span>Rabat (<span id="kosztorys-foot-discpct">0</span>%)</span><span id="kosztorys-foot-discount">—</span></div>
                 ${foot('<b>Cena netto</b>', 'net')}
                 <div class="cost-line"><span>VAT (<span id="kosztorys-foot-vatpct">23</span>%)</span><span id="kosztorys-foot-vat">—</span></div>
@@ -141,6 +143,7 @@ export function mountKosztorys(root) {
             pricing.hardware[name] = parseFloat(input.value) || 0;
         });
         pricing.marginPercent = parseFloat(modal.querySelector('#kosztorys-margin').value) || 0;
+        pricing.laborMarginPercent = Math.max(0, parseFloat(modal.querySelector('#kosztorys-labor-margin').value) || 0);
 
         const num = (id) => Math.max(0, parseFloat(modal.querySelector(id).value) || 0);
         pricing.labor = { hours: num('#kosztorys-labor-hours'), rate: num('#kosztorys-labor-rate') };
@@ -182,8 +185,10 @@ export function mountKosztorys(root) {
         const set = (id, v) => { modal.querySelector(id).textContent = v; };
         set('#kosztorys-foot-plyty', formatPLN(cost.materialsSubtotal));
         set('#kosztorys-foot-okucia', formatPLN(cost.hardwareSubtotal));
-        set('#kosztorys-foot-margin', formatPLN(cost.marginAmount));
+        set('#kosztorys-foot-margin', formatPLN(cost.goodsMarginAmount));
         set('#kosztorys-foot-marginpct', cost.marginPercent);
+        set('#kosztorys-foot-labormargin', formatPLN(cost.laborMarginAmount));
+        set('#kosztorys-foot-labormarginpct', cost.laborMarginPercent);
         set('#kosztorys-cut-count', cost.cutPartsCount + ' szt.');
         set('#kosztorys-cut-cost', formatPLN(cost.cuttingCost));
         set('#kosztorys-foot-cutting', formatPLN(cost.cuttingCost));
@@ -342,5 +347,6 @@ export function mountKosztorys(root) {
     renderHardwareRows();
     recalc();
     modal.querySelector('#kosztorys-margin').addEventListener('input', recalc);
+    modal.querySelector('#kosztorys-labor-margin').addEventListener('input', recalc);
     ['labor-hours','labor-rate','lacquer-hours','lacquer-rate','cutting','assembly-hours','assembly-rate','transport','discount','vat'].forEach(k => modal.querySelector('#kosztorys-' + k).addEventListener('input', recalc));
 }
