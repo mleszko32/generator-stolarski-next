@@ -290,6 +290,15 @@ narożniku), otwory na ścianie (z odstępem) i strefa przejścia przed drzwiami
 (katalog szerokości, najmniejsza reszta, potem bliżej 600 mm), `equal`, `fixed` (`600, *, *`), `ratio` (jak
 `distribution` frontów); reszta na blendę (`project.sidePanels`, lico równo z frontami) albo rozciągnięcie szafek.
 `wallToWorld`/`worldToWall` — przeliczenie pas ściany ↔ pokój (oś X szafki zawsze rośnie z `u`).
+Odsunięcie tyłu szafek od ściany (szczelina na instalacje): `project.wallFill.wallGap` per rząd
+(`getWallGap`/`setWallGap`; bez ustawienia dolne i słupki 50, wiszące 0), pole w oknie. Funkcje `core` dostają je
+jawnie (`opts.wallGap`, domyślnie 0). `rowProfile(..., { wallGap })` daje `gap` i `frontPlane` = odsunięcie +
+korpus z plecami + front (`frontAllowance(project, mod)` = grubość płyty + odsunięcie frontu od korpusu
+`front.bodyGap`, domyślnie 2 mm — `frontBodyGap` w `core/state.js`, pole w zakładce Front; to samo odsunięcie
+rysuje 3D frontów i blend; front wpuszczany = 0) — od `frontPlane` liczą się narożniki L/U (szafka L
+odsunięta od obu ścian, odsunięcie szafki ślepej, blenda, zaślepka, przejście U). Obrys szafek w `findBlocked`
+obejmuje front, więc szafka z prostopadłej ściany odcina pas aż do lica swoich frontów. Blat (`worktops.js`)
+przykrywa szczelinę (dochodzi do ściany) i liczy `overhang` przed frontami; kontrola projektu ostrzega < 15 mm.
 Tryb „Kuchnia L/U” w tym samym oknie: `core/kitchenRun.js` (czyste, z testami) — `planKitchenRun` liczy plan na
 kopii projektu (podmienia `state.project` jak `validate.js`): najpierw narożniki (`L` = szafka narożna S×S,
 `blind` = szafka ślepa odsunięta tak, by drzwi minęły lico frontów sąsiedniej ściany + blendę narożną, `dead` =

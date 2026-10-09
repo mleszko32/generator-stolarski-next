@@ -10,7 +10,7 @@
 // Zakłada przeliczony layout (validate.js woła recalculateAllLayouts).
 import { computeWallLayouts } from "./walls.js";
 import { getWorldFootprint, getCornerDepths } from "./layout.js";
-import { worldToWall, wallToWorld, FRONT_ALLOWANCE } from "./wallFill.js";
+import { worldToWall, wallToWorld, frontAllowance } from "./wallFill.js";
 import { num } from "../utils/math.js";
 
 export const MIN_CORNER_GAP = 30;   // mm między krawędzią frontu a licem frontu prostopadłego (fronty bez uchwytów)
@@ -53,9 +53,9 @@ export function cornerFrontIssues(project) {
           if (overlap1d(it.y0, it.y1, jt.y0, jt.y1) <= 1) return;
           // b0 = od lica ściany X do bliższego boku szafki Y.
           const b0 = end === "start" ? wy.length - jt.u1 : jt.u0;
-          if (b0 > dx + FRONT_ALLOWANCE + NEAR) return;
+          if (b0 > dx + frontAllowance(project, it.mod) + NEAR) return;
           const dy = worldToWall(wy.id, room, moduleBox(jt.mod)).d1;
-          const plane = dy + FRONT_ALLOWANCE; // lico frontów szafki Y od ściany Y
+          const plane = dy + frontAllowance(project, jt.mod); // lico frontów szafki Y od ściany Y
           if (a > plane + REC_CORNER_GAP + NEAR) return;
           const gap = Math.round(a - plane);
           if (a < plane - 1) {
@@ -83,8 +83,10 @@ export function footprintBoxes(project) {
       return;
     }
     const { depthA, depthB } = getCornerDepths(mod);
+    // Ramiona od rzeczywistej odległości szafki od ściany (szczelina na instalacje).
     walls.forEach((w) => w.items.filter((it) => it.mod === mod && it.kind === "corner").forEach((it) => {
-      const b = wallToWorld(w.id, room, it.u0, it.u1 - it.u0, 0, it.arm === "A" ? depthA : depthB);
+      const d0 = Math.max(0, worldToWall(w.id, room, moduleBox(mod)).d0);
+      const b = wallToWorld(w.id, room, it.u0, it.u1 - it.u0, d0, it.arm === "A" ? depthA : depthB);
       out.push({ mod, x0: b.x0, x1: b.x1, z0: b.z0, z1: b.z1, y0, y1 });
     }));
   });
@@ -104,8 +106,8 @@ export function passageIssues(project) {
     base(wa).forEach((ia) => base(wb).forEach((ib) => {
       // u na przeciwległej ścianie biegnie odwrotnie: [L - u1, L - u0].
       if (overlap1d(ia.u0, ia.u1, wb.length - ib.u1, wb.length - ib.u0) <= 1) return;
-      const da = worldToWall(a, room, moduleBox(ia.mod)).d1 + FRONT_ALLOWANCE;
-      const db = worldToWall(b, room, moduleBox(ib.mod)).d1 + FRONT_ALLOWANCE;
+      const da = worldToWall(a, room, moduleBox(ia.mod)).d1 + frontAllowance(project, ia.mod);
+      const db = worldToWall(b, room, moduleBox(ib.mod)).d1 + frontAllowance(project, ib.mod);
       const passage = span - da - db;
       if (!worst || passage < worst.passage) worst = { passage, mod: ia.mod };
     }));

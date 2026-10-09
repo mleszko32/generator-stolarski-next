@@ -1,5 +1,5 @@
 // src/ui/properties.js
-import { state, getActiveModule } from "../core/state.js";
+import { state, getActiveModule, frontBodyGap } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
 import { calculateParts } from "../engine/cabinet.js";
@@ -213,6 +213,7 @@ export function initPropertiesPanel() {
       <div id="group-front-clearance">
         <div class="property-group"><label>Typ frontów:</label><select id="input-front-type"><option value="nakladane" ${(!f.type || f.type === 'nakladane') ? 'selected' : ''}>Nakładane</option><option value="wpuszczane" ${f.type === 'wpuszczane' ? 'selected' : ''}>Wpuszczane</option></select></div>
         <div class="property-group"><label>Przerwa między frontami (mm):</label><input type="number" id="input-front-gap" value="${f.gap ?? 3}" step="0.5" /></div>
+        <div class="property-group"><label title="Odstęp tyłu frontu nakładanego od czoła korpusu (miejsce na domknięcie drzwi). Wliczany do lica frontów przy rozmieszczaniu szafek i w narożnikach.">Odsunięcie frontu od korpusu (mm):</label><input type="number" id="input-front-body-gap" value="${frontBodyGap(f)}" step="0.5" min="0" /></div>
         <div class="property-group"><label>Luz lewy (mm):</label><input type="number" id="input-front-left" value="${fc.left ?? 1.5}" step="0.5" /></div>
         <div class="property-group"><label>Luz prawy (mm):</label><input type="number" id="input-front-right" value="${fc.right ?? 1.5}" step="0.5" /></div>
         <div class="property-group"><label>Luz góra (mm):</label><input type="number" id="input-front-top" value="${fc.top ?? 2}" step="0.5" /></div>
@@ -407,7 +408,7 @@ function setupEventListeners() {
 
   const numberInputs = [
     'pos-x', 'pos-y', 'pos-z', 'traverse-width', 'joint-spacing', 'board-thick', 'width', 'height', 'depth',
-    'front-gap', 'front-left', 'front-right', 'front-top', 'front-bottom', 'back-offset', 'back-groove',
+    'front-gap', 'front-body-gap', 'front-left', 'front-right', 'front-top', 'front-bottom', 'back-offset', 'back-groove',
     'legs-height', 'plinth-offset', 'hinge-top', 'hinge-bottom', 'hinge-margin', 'hinge-count',
     'filler-left-w', 'filler-left-h', 'filler-left-d', 'filler-left-y',
     'filler-right-w', 'filler-right-h', 'filler-right-d', 'filler-right-y',
@@ -718,6 +719,10 @@ function setupEventListeners() {
             if (!mod.front) mod.front = {};
             if (!mod.front.clearance) mod.front.clearance = {};
             if (id === 'front-gap') mod.front.gap = val;
+            if (id === 'front-body-gap') {
+              if (val === null) delete mod.front.bodyGap;
+              else mod.front.bodyGap = Math.max(0, val);
+            }
             if (id === 'front-left') mod.front.clearance.left = val;
             if (id === 'front-right') mod.front.clearance.right = val;
             if (id === 'front-top') mod.front.clearance.top = val;

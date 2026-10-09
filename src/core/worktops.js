@@ -12,6 +12,7 @@
 import { state } from "./state.js";
 import { computeWallLayouts } from "./walls.js";
 import { getWorldFootprint } from "./layout.js";
+import { getWallGap, worldToWall, frontAllowance } from "./wallFill.js";
 
 export const WORKTOP_DEFAULTS = {
   enabled: false,
@@ -28,6 +29,9 @@ export const WORKTOP_DEFAULTS = {
   overrides: {},      // per kawałek: { disabled, length, depth, thickness, start }
   corners: {},        // per narożnik: { through: 'tyl' | ... } - który blat idzie do ściany
 };
+
+// Najmniejszy sensowny nawis blatu przed licem frontów (woda ma kapać przed front).
+export const MIN_WORKTOP_OVERHANG = 15;
 
 export function getWorktopSettings(project = state.project) {
   return { ...WORKTOP_DEFAULTS, ...(project.worktop || {}), overrides: { ...(project.worktop?.overrides || {}) }, corners: { ...(project.worktop?.corners || {}) } };
@@ -92,14 +96,18 @@ export function computeWorktops(project = state.project) {
   const s = getWorktopSettings(project);
   const { room, walls } = computeWallLayouts(project);
   const runsByWall = {};
+  // Szafki stoją odsunięte od ścian (szczelina na instalacje, project.wallFill) - blat
+  // przykrywa szczelinę, więc koniec rzędu bliżej ściany niż odsunięcie + tolerancja
+  // dochodzi do ściany, a bok dokładany w tej odległości wchodzi pod blat.
+  const wallTol = s.gapTolerance + getWallGap(project, 'base_cabinet');
 
   walls.forEach(w => {
     const L = w.length;
-    runsByWall[w.id] = buildRuns(w, s, sidePanelIntervals(project, room, w.id, s.gapTolerance)).map((r, index) => {
+    runsByWall[w.id] = buildRuns(w, s, sidePanelIntervals(project, room, w.id, wallTol)).map((r, index) => {
       let u0 = r.u0 - s.sideStart, u1 = r.u1 + s.sideEnd;
       // blat idzie od ściany na 0: koniec rzędu bliski ścianie dochodzi do ściany
-      if (r.u0 <= s.gapTolerance) u0 = 0;
-      if (L - r.u1 <= s.gapTolerance) u1 = L;
+      if (r.u0 <= wallTol) u0 = 0;
+      if (L - r.u1 <= wallTol) u1 = L;
       u0 = Math.max(0, u0); u1 = Math.min(L, u1);
       return {
         key: `${w.id}:${index}`, wallId: w.id, wallLabel: WALL_LABEL[w.id], wallLength: L,
@@ -187,6 +195,17 @@ export function computeWorktops(project = state.project) {
     }
   }));
   runs.forEach(r => { r.length = Math.max(0, r.u1 - r.u0); });
+
+  // Nawis blatu przed licem frontów zwykłych szafek rzędu (blat liczony od ściany, więc
+  // szczelina przy ścianie zjada nawis). null, gdy rząd ma tylko szafkę narożną.
+  runs.forEach(r => {
+    const planes = r.items.filter(it => !it.panel && it.kind === 'cabinet').map(it => {
+      const { worldW, worldD } = getWorldFootprint(it.mod);
+      const x0 = parseFloat(it.mod.position?.x) || 0, z0 = parseFloat(it.mod.position?.z) || 0;
+      return worldToWall(r.wallId, room, { x0, x1: x0 + worldW, z0, z1: z0 + worldD }).d1 + frontAllowance(project, it.mod);
+    });
+    r.overhang = planes.length ? r.depth - Math.max(...planes) : null;
+  });
 
   const pieces = [];
   runs.forEach(r => {

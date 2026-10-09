@@ -21,7 +21,7 @@ import { buildZoneTree, assignFront } from "./zoneTree.js";
 import { blindGeometry } from "./blindCorner.js";
 import { checkCornerFitting, getCornerFitting } from "./cornerFittings.js";
 import {
-  FRONT_ALLOWANCE, MIN_CABINET_WIDTH, WALL_ROTATION, rowProfile, wallToWorld,
+  MIN_CABINET_WIDTH, WALL_ROTATION, rowProfile, wallToWorld,
   findFreeSegments, divideSegment, buildFillItems, applyFillPlan,
 } from "./wallFill.js";
 import { num } from "../utils/math.js";
@@ -85,7 +85,7 @@ function newCabinet(type, template) {
 }
 
 function placeOnWall(mod, wallId, room, u0, width, depth, row) {
-  const box = wallToWorld(wallId, room, u0, width, 0, depth);
+  const box = wallToWorld(wallId, room, u0, width, row.gap, depth);
   mod.rotation = WALL_ROTATION[wallId];
   mod.position = { x: round2(box.x0), y: row.posY, z: round2(box.z0) };
 }
@@ -94,6 +94,7 @@ function placeOnWall(mod, wallId, room, u0, width, depth, row) {
 // - reserved: odcinki, których nie wypełniamy szafkami, ends: gdzie zaczyna się wolny ciąg przy narożniku.
 function placeCorner(project, prev, next, c, ctx) {
   const { room, row, type, template, warnings } = ctx;
+  const wallGap = row.gap;
   const Lp = wallLength(room, prev);
   const reserved = { [prev]: [], [next]: [] };
   const F = Math.max(0, num(c.filler));
@@ -109,7 +110,8 @@ function placeCorner(project, prev, next, c, ctx) {
     const legs = (template && template.legs) || createModuleObject(type).legs;
     mod.legs = JSON.parse(JSON.stringify(legs));
     if (getCornerFitting(c.cornerFitting)) mod.cornerFitting = c.cornerFitting;
-    const box = wallToWorld(prev, room, Lp - S, S, 0, S);
+    // Odsunięta o szczelinę od obu ścian: zajmuje na każdej ścianie odsunięcie + S.
+    const box = wallToWorld(prev, room, Lp - row.gap - S, S, row.gap, S);
     mod.rotation = CORNER_ROTATION[`${prev}>${next}`] ?? 0;
     mod.position = { x: round2(box.x0), y: row.posY, z: round2(box.z0) };
     ensureCornerDefaults(mod);
@@ -129,10 +131,10 @@ function placeCorner(project, prev, next, c, ctx) {
   const atY = (from, width) => (onPrev ? from : Ly - from - width);
   const modules = [], panels = [];
 
-  // Blenda narożna na ścianie Y, tuż za licem frontów ściany X.
-  const fillerStart = depth + FRONT_ALLOWANCE;
+  // Blenda narożna na ścianie Y, tuż za licem frontów ściany X (odsunięcie + korpus + front).
+  const fillerStart = row.frontPlane;
   if (F > 0) {
-    const r = applyFillPlan({ wallId: Y, items: [{ kind: "blenda", u0: atY(fillerStart, F), width: F, flange: onPrev ? "prawa" : "lewa" }], type, template });
+    const r = applyFillPlan({ wallId: Y, items: [{ kind: "blenda", u0: atY(fillerStart, F), width: F, flange: onPrev ? "prawa" : "lewa" }], type, template, wallGap });
     panels.push(...r.panels);
   }
   // Na Y nic nie stawiamy przed blendą (pas zajęty przez szafkę / pusty narożnik).
@@ -153,7 +155,7 @@ function placeCorner(project, prev, next, c, ctx) {
 
     // Odsunięcie od ściany Y: drzwi muszą zacząć się za licem frontów Y + blendą.
     const reach = blindGeometry(mod, project).blindReach;
-    const need = depth + FRONT_ALLOWANCE + F;
+    const need = row.frontPlane + F;
     const pull = Math.max(0, Math.ceil(need - reach));
     placeOnWall(mod, X, room, atX(pull, Wb), Wb, depth, row);
     project.modules.push(mod);
@@ -161,15 +163,15 @@ function placeCorner(project, prev, next, c, ctx) {
     if (pull > 0) warnings.push(`Narożnik ${jointLabel}: szafka ślepa odsunięta od ściany o ${pull} mm (część ślepa za krótka na blendę ${F} mm) - wolne miejsce w narożniku zakrywa ciąg z sąsiedniej ściany.`);
     if (pull > 0) reserved[X].push(onPrev ? [Lx - pull, Lx] : [0, pull]);
     if (c.fitting) {
-      checkCornerFitting(c.fitting, { width: Wb, frontWidth: blindGeometry(mod, project).frontWidth, innerDepth: depth - 3, innerHeight: row.height - 36 })
+      checkCornerFitting(c.fitting, { width: Wb, frontWidth: blindGeometry(mod, project).frontWidth, innerDepth: depth - num(project.materials && project.materials.backThickness, 3), innerHeight: row.height - 36 })
         .forEach((m) => warnings.push(`Narożnik ${jointLabel}: ${m}`));
     }
     return { reserved, modules, panels };
   }
 
   // 'dead': zaślepka na ścianie X od narożnika do lica frontów Y + blendy.
-  const coverW = depth + FRONT_ALLOWANCE + F;
-  const r = applyFillPlan({ wallId: X, items: [{ kind: "blenda", u0: atX(0, coverW), width: coverW, flange: onPrev ? "lewa" : "prawa" }], type, template });
+  const coverW = row.frontPlane + F;
+  const r = applyFillPlan({ wallId: X, items: [{ kind: "blenda", u0: atX(0, coverW), width: coverW, flange: onPrev ? "lewa" : "prawa" }], type, template, wallGap });
   r.panels.forEach((p) => { p.name = "Zaślepka narożnika " + p.name.replace(/^Blenda /, ""); });
   panels.push(...r.panels);
   return { reserved, modules, panels };
@@ -195,7 +197,8 @@ function subtract(segments, cuts) {
 //   fill: opcje divideSegment (mode, catalog, count, split, restMode, maxFiller, roundTo, fillerSide),
 //   choice: { 'wallId:i': indeks wariantu },
 //   custom: { 'wallId:i': własne szerokości jak w trybie 'fixed', np. "600, 800, *, *" },
-//   openingMargin, doorPassage }
+//   openingMargin, doorPassage,
+//   wallGap - odsunięcie tyłu szafek od ściany (mm, domyślnie 0; okno podaje getWallGap) }
 // Zwraca { walls: [{ wallId, length, segments: [{ key, u0, u1, variants, chosen, items }] }],
 //          modules, panels, warnings } - modules/panels to gotowe obiekty do wstawienia.
 export function planKitchenRun(project, opts) {
@@ -207,7 +210,7 @@ export function planKitchenRun(project, opts) {
   state.project = sim;
   try {
     const room = getRoom(sim);
-    const row = rowProfile(type, template);
+    const row = rowProfile(type, template, { wallGap: opts.wallGap });
     const warnings = [];
     const modules = [], panels = [];
     const reserved = Object.fromEntries(walls.map((w) => [w, []]));
@@ -257,14 +260,14 @@ export function planKitchenRun(project, opts) {
 
     out.forEach((w) => w.segments.forEach((s) => {
       if (!s.items.length) return;
-      const r = applyFillPlan({ wallId: w.wallId, items: s.items, type, template });
+      const r = applyFillPlan({ wallId: w.wallId, items: s.items, type, template, wallGap: row.gap });
       modules.push(...r.modules);
       panels.push(...r.panels);
     }));
 
     if (walls.length === 3 && type !== "upper_cabinet") {
       const span = (walls[0] === "lewa" || walls[0] === "prawa") ? room.width : room.depth;
-      const passage = span - 2 * (row.depth + FRONT_ALLOWANCE);
+      const passage = span - 2 * row.frontPlane;
       if (passage < MIN_PASSAGE_HARD) warnings.push(`Przejście między ramionami U ma tylko ${Math.round(passage)} mm - za mało (minimum ok. ${MIN_PASSAGE_HARD} mm).`);
       else if (passage < MIN_PASSAGE) warnings.push(`Przejście między ramionami U ma ${Math.round(passage)} mm - ciasno (zalecane co najmniej ${MIN_PASSAGE} mm).`);
     }

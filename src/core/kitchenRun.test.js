@@ -115,6 +115,59 @@ describe("planKitchenRun", () => {
     expect(bad.walls[1].segments[0].items).toEqual([]);
   });
 
+  it("odsunięcie 50: szafka L odsunięta od obu ścian, ciągi zaczynają się za nią", () => {
+    const plan = planKitchenRun(state.project, { walls: ["tyl", "prawa"], corners: [{ kind: "L", size: 900 }], fill, wallGap: 50 });
+    const corner = plan.modules.find((m) => m.type === "corner_cabinet");
+    expect(corner.position).toMatchObject({ x: 4000 - 50 - 900, z: 50 });
+    const tyl = plan.walls.find((w) => w.wallId === "tyl");
+    const prawa = plan.walls.find((w) => w.wallId === "prawa");
+    expect(Math.max(...tyl.segments.map((s) => s.u1))).toBe(3050);
+    expect(prawa.segments[0].u0).toBe(950);
+    // Wszystkie zwykłe szafki 50 mm od swojej ściany.
+    plan.modules.filter((m) => m.type === "base_cabinet").forEach((m) => {
+      if (m.rotation === 0) expect(m.position.z).toBe(50);
+      if (m.rotation === 90) expect(m.position.x).toBe(4000 - 50 - 513);
+    });
+    applyKitchenRun(plan);
+    const { issues } = validateProject();
+    expect(issues.filter((i) => /narożnik|Nachodzi/i.test(i.message))).toEqual([]);
+  });
+
+  it("odsunięcie 50: szafka ślepa odsuwa się dalej (135 zamiast 85), blenda za licem 583", () => {
+    const plan = planKitchenRun(state.project, {
+      walls: ["lewa", "tyl"],
+      corners: [{ kind: "blind", blindOn: "next", width: 1000, frontWidth: 500, filler: 50 }],
+      fill, wallGap: 50,
+    });
+    const blind = plan.modules.find((m) => m.blindCorner);
+    // Od boku do drzwi 498,5; potrzeba 50 + 513 + 20 + 50 = 633 -> 135 mm.
+    expect(blind.position).toMatchObject({ x: 135, z: 50 });
+    expect(plan.warnings.some((w) => /odsunięta od ściany o 135 mm/.test(w))).toBe(true);
+    const lewa = plan.walls.find((w) => w.wallId === "lewa");
+    expect(Math.max(...lewa.segments.map((s) => s.u1))).toBeLessThanOrEqual(3000 - 583 - 50);
+    const blenda = plan.panels.find((p) => p.kind === "blenda" && p.rotation === 270);
+    expect(blenda.position.x).toBe(50 + 513 + 2 - 62);
+    applyKitchenRun(plan);
+    const { issues } = validateProject();
+    expect(issues.filter((i) => /narożnik|Nachodzi/i.test(i.message) && i.level !== "info")).toEqual([]);
+  });
+
+  it("odsunięcie 50: zaślepka martwego narożnika szersza o odsunięcie", () => {
+    const plan = planKitchenRun(state.project, { walls: ["tyl", "prawa"], corners: [{ kind: "dead", blindOn: "prev", filler: 50 }], fill, wallGap: 50 });
+    const cover = plan.panels.find((p) => /Zaślepka narożnika/.test(p.name));
+    expect(cover.dimensions.width).toBe(50 + 513 + 20 + 50);
+    const prawa = plan.walls.find((w) => w.wallId === "prawa");
+    expect(prawa.segments[0].u0).toBeGreaterThanOrEqual(633);
+  });
+
+  it("odsunięcie 50: przejście U liczone od lic frontów odsuniętych szafek", () => {
+    setProject(freshProject({ room: { width: 2350, depth: 3000, height: 2600 }, modules: [], sidePanels: [] }));
+    const opts = { walls: ["lewa", "tyl", "prawa"], corners: [{ kind: "L" }, { kind: "L" }], fill };
+    expect(planKitchenRun(state.project, opts).warnings.some((w) => /Przejście/.test(w))).toBe(false); // 1284
+    const plan = planKitchenRun(state.project, { ...opts, wallGap: 50 });
+    expect(plan.warnings.some((w) => /Przejście między ramionami U ma 1184 mm/.test(w))).toBe(true);
+  });
+
   it("wybór wariantu podziału dla odcinka", () => {
     const a = planKitchenRun(state.project, { walls: ["lewa", "tyl"], corners: [{ kind: "L" }], fill });
     const key = a.walls[1].segments[0].key;

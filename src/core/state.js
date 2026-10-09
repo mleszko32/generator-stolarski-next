@@ -158,8 +158,9 @@ export function migrateLegacyFillers(project) {
       const dx = lx - W / 2, dz = lz - D / 2;
       return { x: cx + dx * cos + dz * sin, z: cz - dx * sin + dz * cos };
     };
-    const frontType = (mod.front && mod.front.type) || (project.front && project.front.type) || 'nakladane';
-    const zF = frontType === 'wpuszczane' ? D - th : D + 2;
+    const frontCfg = { ...(project.front || {}), ...(mod.front || {}) };
+    const frontType = frontCfg.type || 'nakladane';
+    const zF = frontType === 'wpuszczane' ? D - th : D + frontBodyGap(frontCfg);
     const baseY = (mod.legs && mod.legs.active) ? (num(mod.legs.height, 100) || 100) : 0;
     const modY = num(mod.position && mod.position.y);
 
@@ -212,6 +213,15 @@ export const state = {
     sidePanels: []
   }
 };
+
+// Odsunięcie frontu nakładanego od czoła korpusu (mm) - miejsce, żeby drzwi na
+// zawiasach domykały się bez ocierania o bok. front.bodyGap, scalane jak reszta
+// ustawień frontu ({ ...project.front, ...mod.front }); domyślnie 2 mm.
+export const DEFAULT_FRONT_BODY_GAP = 2;
+export function frontBodyGap(frontCfg) {
+  const v = parseFloat(frontCfg && frontCfg.bodyGap);
+  return Number.isFinite(v) && v >= 0 ? v : DEFAULT_FRONT_BODY_GAP;
+}
 
 export function getActiveModule() {
   return state.project.modules.find(m => m.id === state.activeModuleId) || null;

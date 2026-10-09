@@ -3,6 +3,7 @@ import { state } from "./state.js";
 import {
   wallToWorld, worldToWall, rowProfile, findBlocked, findFreeSegments, parseSplit,
   divideSegment, buildFillItems, findPlanConflicts, applyFillPlan, describeWidths,
+  getWallGap, setWallGap, frontAllowance,
 } from "./wallFill.js";
 import { computeWallLayouts } from "./walls.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
@@ -42,6 +43,71 @@ describe("rowProfile", () => {
     const t = baseModule({ dimensions: { width: 400, height: 800, depth: 560 }, legs: { active: true, height: 150 } });
     expect(rowProfile("base_cabinet", t)).toMatchObject({ height: 800, depth: 560, y1: 950 });
   });
+
+  it("lico frontów = odsunięcie od ściany + korpus z plecami + front (płyta + 2 mm)", () => {
+    setProject(freshProject({ room, modules: [] }));
+    expect(rowProfile("base_cabinet")).toMatchObject({ gap: 0, front: 20, frontPlane: 533 });
+    expect(rowProfile("base_cabinet", null, { wallGap: 50 })).toMatchObject({ gap: 50, frontPlane: 583 });
+    state.project.materials.boardThickness = 19;
+    expect(rowProfile("base_cabinet", null, { wallGap: 50 })).toMatchObject({ front: 21, frontPlane: 584 });
+  });
+
+  it("odsunięcie frontu od korpusu (front.bodyGap) z projektu albo ze wzoru; wpuszczane = 0", () => {
+    setProject(freshProject({ room, modules: [] }));
+    state.project.front.bodyGap = 3;
+    expect(frontAllowance(state.project)).toBe(21);
+    expect(rowProfile("base_cabinet", null, { wallGap: 50 }).frontPlane).toBe(50 + 513 + 21);
+    const t = baseModule({ front: { bodyGap: 0 } });
+    expect(frontAllowance(state.project, t)).toBe(18);
+    expect(rowProfile("base_cabinet", t).frontPlane).toBe(513 + 18);
+    expect(frontAllowance(state.project, baseModule({ front: { type: "wpuszczane" } }))).toBe(0);
+    state.project.front.bodyGap = "";
+    expect(frontAllowance(state.project)).toBe(20); // puste pole = domyślne 2 mm
+  });
+
+  it("blenda: lico równo z frontami przy zmienionym odsunięciu frontu", () => {
+    setProject(freshProject({ room, modules: [], sidePanels: [] }));
+    state.project.front.bodyGap = 4;
+    const r = applyFillPlan({ wallId: "tyl", items: [{ kind: "blenda", u0: 0, width: 40, flange: "lewa" }], type: "base_cabinet", wallGap: 50 });
+    // lico = z + 80 = 50 + 513 + 4 + 18
+    expect(r.panels[0].position.z + 80).toBe(585);
+  });
+});
+
+describe("odsunięcie od ściany (project.wallFill.wallGap)", () => {
+  beforeEach(() => setProject(freshProject({ room, modules: [], sidePanels: [], openings: [] })));
+
+  it("bez ustawienia: dolne i słupki 50 mm, wiszące 0; ustawienie per rząd", () => {
+    expect(getWallGap(state.project, "base_cabinet")).toBe(50);
+    expect(getWallGap(state.project, "tall_cabinet")).toBe(50);
+    expect(getWallGap(state.project, "upper_cabinet")).toBe(0);
+    setWallGap(state.project, "base_cabinet", 30);
+    expect(getWallGap(state.project, "base_cabinet")).toBe(30);
+    expect(getWallGap(state.project, "tall_cabinet")).toBe(50);
+    setWallGap(state.project, "upper_cabinet", -5);
+    expect(getWallGap(state.project, "upper_cabinet")).toBe(0);
+  });
+
+  it("applyFillPlan stawia szafki i blendę odsunięte od ściany na każdej ścianie", () => {
+    const items = [{ kind: "cabinet", u0: 1000, width: 600 }, { kind: "blenda", u0: 1600, width: 40, flange: "lewa" }];
+    const pos = (w) => {
+      setProject(freshProject({ room, modules: [], sidePanels: [], openings: [] }));
+      const r = applyFillPlan({ wallId: w, items, type: "base_cabinet", wallGap: 50 });
+      return { m: r.modules[0].position, b: r.panels[0].position };
+    };
+    expect(pos("tyl").m).toMatchObject({ x: 1000, z: 50 });
+    expect(pos("prawa").m).toMatchObject({ x: 4000 - 50 - 513, z: 1000 });
+    expect(pos("lewa").m).toMatchObject({ x: 50 });
+    expect(pos("przednia").m).toMatchObject({ z: 3000 - 50 - 513 });
+    // Blenda: lico równo z frontami (583 od ściany), głębokość 80 -> z = 583 - 80 = 503.
+    expect(pos("tyl").b).toMatchObject({ x: 1600, z: 503 });
+  });
+
+  it("pas rzędu sięga lica frontów odsuniętych szafek - blenda przy dużym odsunięciu nadal blokuje", () => {
+    applyFillPlan({ wallId: "tyl", items: [{ kind: "blenda", u0: 1000, width: 50, flange: "lewa" }], type: "base_cabinet", wallGap: 100 });
+    const row = rowProfile("base_cabinet", null, { wallGap: 100 });
+    expect(findFreeSegments(state.project, "tyl", row).segments).toEqual([{ u0: 0, u1: 1000 }, { u0: 1050, u1: 4000 }]);
+  });
 });
 
 describe("wolne odcinki ściany", () => {
@@ -65,10 +131,11 @@ describe("wolne odcinki ściany", () => {
     expect(findFreeSegments(state.project, "tyl", upper).segments).toEqual([{ u0: 0, u1: 4000 }]);
   });
 
-  it("szafka na sąsiedniej ścianie w narożniku odcina koniec ściany", () => {
-    // Lewa ściana, obrót 270: odcisk x 0..513, z 0..600 - przy tylnym narożniku.
+  it("szafka na sąsiedniej ścianie w narożniku odcina koniec ściany razem ze swoim frontem", () => {
+    // Lewa ściana, obrót 270: korpus x 0..513, z 0..600 - przy tylnym narożniku; front
+    // (18 + 2) wystaje do x = 533, więc szafka na tylnej ścianie nie może wejść w ten front.
     state.project.modules = [baseModule({ id: "l", rotation: 270, position: { x: 0, y: 0, z: 0 } })];
-    expect(findFreeSegments(state.project, "tyl", base).segments).toEqual([{ u0: 513, u1: 4000 }]);
+    expect(findFreeSegments(state.project, "tyl", base).segments).toEqual([{ u0: 533, u1: 4000 }]);
   });
 
   it("szafka w głębi pokoju (wyspa) nie blokuje ściany", () => {

@@ -7,7 +7,7 @@ import { state } from "../core/state.js";
 import { WALLS, computeWallLayouts } from "../core/walls.js";
 import {
   ROW_TYPES, STANDARD_WIDTHS, rowProfile, findFreeSegments, divideSegment,
-  buildFillItems, findPlanConflicts, applyFillPlan,
+  buildFillItems, findPlanConflicts, applyFillPlan, getWallGap, setWallGap,
 } from "../core/wallFill.js";
 import { runPresets, planKitchenRun, applyKitchenRun, CORNER_KINDS, defaultCorner } from "../core/kitchenRun.js";
 import { fittingsOfKind } from "../core/cornerFittings.js";
@@ -64,9 +64,10 @@ export function openWallFillModal(onChange) {
 
       <div class="field wf-single"><label>Wolne odcinki</label><div id="wf-segments" class="row" style="flex-wrap:wrap"></div></div>
       <div id="wf-kitchen" class="wf-kitchen-only"></div>
-      <div class="field-row">
+      <div class="field-row" style="flex-wrap:wrap">
         <div class="field wf-single"><label>Od (mm)</label><input type="number" id="wf-u0" step="1"></div>
         <div class="field wf-single"><label>Do (mm)</label><input type="number" id="wf-u1" step="1"></div>
+        <div class="field"><label title="Szczelina między tyłem szafek a ścianą (instalacje); zapisywana w projekcie osobno dla dolnych, wiszących i słupków">Odsunięcie od ściany (mm)</label><input type="number" id="wf-wallgap" min="0" step="5"></div>
         <div class="field"><label title="Odstęp szafek od krawędzi okien i drzwi">Odstęp od otworów (mm)</label><input type="number" id="wf-margin" min="0" step="10"></div>
         <div class="field"><label title="Głębokość wolnej strefy przed drzwiami - blokuje też narożnik sąsiedniej ściany">Strefa przed drzwiami (mm)</label><input type="number" id="wf-passage" min="0" step="50"></div>
       </div>
@@ -104,6 +105,7 @@ export function openWallFillModal(onChange) {
   });
 
   const $ = (sel) => dlg.bodyEl.querySelector(sel);
+  const wallGap = () => getWallGap(state.project, cfg.type);
   const applyBtn = dlg.footEl.querySelector(".btn-primary");
 
   // --- powiązania pól ---
@@ -126,6 +128,7 @@ export function openWallFillModal(onChange) {
   bindSeg("#wf-rest", "rest", (v) => { cfg.restMode = v; cfg.variant = 0; });
   bindNum("#wf-u0", (v) => { cfg.u0 = v; cfg.variant = 0; });
   bindNum("#wf-u1", (v) => { cfg.u1 = v; cfg.variant = 0; });
+  bindNum("#wf-wallgap", (v) => { setWallGap(state.project, cfg.type, v); resetSegment(); cfg.choice = {}; });
   bindNum("#wf-margin", (v) => { cfg.openingMargin = Math.max(0, v); resetSegment(); });
   bindNum("#wf-passage", (v) => { cfg.doorPassage = Math.max(0, v); resetSegment(); });
   bindNum("#wf-maxfiller", (v) => { cfg.maxFiller = Math.max(0, v); cfg.variant = 0; });
@@ -187,13 +190,14 @@ export function openWallFillModal(onChange) {
   function refreshKitchen() {
     const preset = presetOf();
     const template = state.project.modules.find((m) => m.id === cfg.templateId) || null;
-    const row = rowProfile(cfg.type, template);
+    const row = rowProfile(cfg.type, template, { wallGap: wallGap() });
     if (!cfg.corners || cfg.corners.length !== preset.walls.length - 1) {
       cfg.corners = preset.walls.slice(1).map(() => defaultCorner(row));
     }
     const plan = planKitchenRun(state.project, {
       walls: preset.walls, type: cfg.type, template, corners: cfg.corners, armLength: cfg.armLength,
       fill: fillOpts(), choice: cfg.choice, custom: cfg.custom, openingMargin: cfg.openingMargin, doorPassage: cfg.doorPassage,
+      wallGap: wallGap(),
     });
     kcalc = { preset, row, plan };
     renderKitchenSetup();
@@ -283,7 +287,7 @@ export function openWallFillModal(onChange) {
 
   function compute() {
     const template = state.project.modules.find((m) => m.id === cfg.templateId) || null;
-    const row = rowProfile(cfg.type, template);
+    const row = rowProfile(cfg.type, template, { wallGap: wallGap() });
     const free = findFreeSegments(state.project, cfg.wallId, row, { openingMargin: cfg.openingMargin, doorPassage: cfg.doorPassage });
     if (cfg.u0 === null || cfg.u1 === null) {
       // Domyślnie najdłuższy wolny odcinek.
@@ -319,6 +323,7 @@ export function openWallFillModal(onChange) {
       options.map((m) => `<option value="${escapeHtml(m.id)}">Kopia: ${escapeHtml(m.name || "Szafka")} (${fmt(num(m.dimensions.height))} × ${fmt(num(m.dimensions.depth))})</option>`).join("");
     if (!options.some((m) => m.id === cfg.templateId)) cfg.templateId = "";
     tpl.value = cfg.templateId;
+    if (!keepFocus || document.activeElement !== $("#wf-wallgap")) $("#wf-wallgap").value = wallGap();
     renderModeField();
     if (kitchen) { refreshKitchen(); return; }
     calc = compute();
@@ -391,7 +396,7 @@ export function openWallFillModal(onChange) {
       return;
     }
     if (!calc || !calc.items.some((i) => i.kind === "cabinet")) return;
-    applyFillPlan({ wallId: cfg.wallId, items: calc.items, type: cfg.type, template: calc.template });
+    applyFillPlan({ wallId: cfg.wallId, items: calc.items, type: cfg.type, template: calc.template, wallGap: wallGap() });
     close();
     if (onChange) onChange();
   }

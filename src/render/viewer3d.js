@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { state, DEFAULT_ROOM } from '../core/state.js';
+import { state, DEFAULT_ROOM, frontBodyGap } from '../core/state.js';
 
 import { getDrawerComponents, calculateDrawerHoles } from '../core/drawerMath.js';
 import { drawerSystems } from '../core/drawerSystems.js';
@@ -1299,7 +1299,7 @@ export function update3D() {
                       // a nie przed nim jak nakładany — cofnięty o własną grubość (th).
                       zForFront = posZ + D - th;
                   } else {
-                      zForFront = posZ + D + 2;
+                      zForFront = posZ + D + frontBodyGap(modFront);
                   }
                   
                   if (isFrontsVisible || isInternal) {
@@ -1493,7 +1493,7 @@ export function update3D() {
       // Szafka ślepa: zaślepka części ślepej w płaszczyźnie frontów (core/blindCorner.js).
       const blindPanel = isFrontsVisible ? getBlindPanel(mod, state.project) : null;
       if (blindPanel) {
-          const zBlind = isInsetFront ? posZ + D - th : posZ + D + 2;
+          const zBlind = isInsetFront ? posZ + D - th : posZ + D + frontBodyGap(modFront);
           addBox(blindPanel.w, blindPanel.h, 18, posX + blindPanel.x, posY + blindPanel.y, zBlind, 'front', isActive, { moduleId: mod.id, type: 'front' }, innerGroup);
       }
 

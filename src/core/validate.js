@@ -16,6 +16,7 @@ import { num } from "../utils/math.js";
 import { checkBlindCorner, innerDims } from "./blindCorner.js";
 import { checkCornerFitting, getCornerFitting } from "./cornerFittings.js";
 import { cornerFrontIssues, footprintBoxes, passageIssues } from "./cornerChecks.js";
+import { computeWorktops, MIN_WORKTOP_OVERHANG } from "./worktops.js";
 
 export const MAX_DOOR_WIDTH = 600;   // szersze drzwi się wichrują / zawiasy nie dają rady
 export const MAX_SHELF_SPAN = 800;   // dłuższa półka ugina się pod obciążeniem
@@ -95,6 +96,7 @@ export function validateProject(project = state.project) {
     checkCollisions();
     checkCorners();
     checkOpenings();
+    checkWorktops();
     checkParts();
   } finally {
     state.project = prev;
@@ -206,6 +208,19 @@ export function validateProject(project = state.project) {
           }
         });
       });
+    });
+  }
+
+  // Blat liczony od ściany: przy szafkach odsuniętych od ściany zostaje mniej nawisu.
+  function checkWorktops() {
+    const wt = computeWorktops(project);
+    if (!wt.settings.enabled) return;
+    wt.runs.forEach((r) => {
+      if (r.overhang === null || r.overhang >= MIN_WORKTOP_OVERHANG) return;
+      const o = Math.round(r.overhang);
+      add("warn", null, o < 0
+        ? `Blat przy ścianie ${r.wallLabel} (głęb. ${Math.round(r.depth)} mm) kończy się ${-o} mm przed licem frontów - zwiększ głębokość blatu.`
+        : `Blat przy ścianie ${r.wallLabel} wystaje przed fronty tylko ${o} mm (zalecane co najmniej ${MIN_WORKTOP_OVERHANG} mm, typowo 20-40) - zwiększ głębokość blatu.`);
     });
   }
 

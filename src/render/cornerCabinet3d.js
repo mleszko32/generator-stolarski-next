@@ -3,7 +3,7 @@
 // Rysowanie szafki narożnej w 3D - wydzielone z render/viewer3d.js (update3D woła
 // renderCornerCabinet zamiast zwykłej ścieżki prostokątnego modułu).
 import * as THREE from 'three';
-import { state } from '../core/state.js';
+import { state, frontBodyGap } from '../core/state.js';
 import { getCornerDoorHinges } from '../engine/cornerParts.js';
 import { getWorldFootprint, getCornerDepths } from '../core/layout.js';
 import { addBox, addHole, addCornerPanel } from './meshBuilders.js';
@@ -153,8 +153,9 @@ export function renderCornerCabinet(mod, isActive, th, parentGroup) {
   //   wpuszczane - front cofnięty o własną grubość (th), w linii z bokami.
   const frontCfg = { ...(state.project.front || {}), ...(mod.front || {}) };
   const isInsetFront = frontCfg.type === 'wpuszczane';
-  const frontZA = isInsetFront ? depthA - th : depthA + 2; // czoło ramienia A (Z)
-  const frontZB = isInsetFront ? depthB - th : depthB + 2; // czoło ramienia B (X)
+  const bodyGap = frontBodyGap(frontCfg);
+  const frontZA = isInsetFront ? depthA - th : depthA + bodyGap; // czoło ramienia A (Z)
+  const frontZB = isInsetFront ? depthB - th : depthB + bodyGap; // czoło ramienia B (X)
 
   const cornerDoorHinges = new Map(getCornerDoorHinges(mod).map(d => [d.front.id, d]));
 

@@ -58,6 +58,15 @@ describe("szafka narożna L w kolizjach", () => {
     expect(boxes.map((b) => [b.x1 - b.x0, b.z1 - b.z0]).sort()).toEqual([[513, 900], [900, 513]]);
   });
 
+  it("ramiona szafki L odsuniętej od ścian leżą tam, gdzie szafka (nie przy ścianie)", () => {
+    state.project.modules = [{ ...corner(), position: { x: 50, y: 0, z: 50 } }];
+    const boxes = footprintBoxes(state.project);
+    expect(Math.min(...boxes.map((b) => b.x0))).toBe(50);
+    expect(Math.min(...boxes.map((b) => b.z0))).toBe(50);
+    expect(Math.max(...boxes.map((b) => b.x1))).toBe(950);
+    expect(Math.max(...boxes.map((b) => b.z1))).toBe(950);
+  });
+
   it("szafka w pustym wnętrzu L nie koliduje, szafka na ramieniu - koliduje", () => {
     state.project.modules = [corner(), baseModule({ id: "w", name: "W", dimensions: { width: 300, height: 720, depth: 300 }, position: { x: 600, y: 0, z: 600 } })];
     expect(validateProject().issues.some((i) => /Nachodzi/.test(i.message))).toBe(false);

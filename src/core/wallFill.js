@@ -10,7 +10,7 @@
 // (patrząc od środka pokoju), `d` = odległość od lica ściany w głąb pokoju.
 // Lokalna oś X szafki o obrocie danej ściany zawsze rośnie razem z `u`, więc
 // "lewa"/"prawa" w szafce i blendzie to lewa/prawa na rzucie ściany.
-import { state, createModuleObject, cloneModuleWithNewIds, ensureSidePanelsDefaults } from "./state.js";
+import { state, createModuleObject, cloneModuleWithNewIds, ensureSidePanelsDefaults, frontBodyGap } from "./state.js";
 import { getRoom, wallLength } from "./walls.js";
 import { getOpenings, OPENING_KINDS } from "./openings.js";
 import { getWorldFootprint } from "./layout.js";
@@ -28,8 +28,36 @@ export const ROW_TYPES = [
 export const STANDARD_WIDTHS = [300, 400, 450, 500, 600, 800, 900];
 
 // Front nakładany wystaje przed korpus (płyta frontu + szczelina) - pas zajęty
-// przy ścianie jest o tyle głębszy niż sam korpus.
+// przy ścianie jest o tyle głębszy niż sam korpus. FRONT_ALLOWANCE to wartość
+// domyślna (płyta 18 + odsunięcie 2), frontAllowance liczy ją z ustawień: grubość
+// płyty + odsunięcie frontu od korpusu (front.bodyGap) projektu albo szafki.
+// Front wpuszczany nie wystaje przed korpus (0).
 export const FRONT_ALLOWANCE = 20;
+
+export function frontAllowance(project, mod = null) {
+  const frontCfg = { ...((project && project.front) || {}), ...((mod && mod.front) || {}) };
+  if (frontCfg.type === "wpuszczane") return 0;
+  const th = num(project && project.materials && project.materials.boardThickness, 18) || 18;
+  return th + frontBodyGap(frontCfg);
+}
+
+// Odsunięcie tyłu szafek od ściany (szczelina na instalacje), osobno dla rzędu:
+// project.wallFill.wallGap = { base_cabinet, tall_cabinet, upper_cabinet } w mm.
+// Bez ustawienia: praktyka warsztatowa - dolne i słupki 50 mm (lico słupków równo
+// z dolnymi), wiszące na szynie przy ścianie. Funkcje rozmieszczania dostają
+// odsunięcie jawnie (opts.wallGap, domyślnie 0) - tę wartość podaje okno.
+export const DEFAULT_WALL_GAP = { base_cabinet: 50, tall_cabinet: 50, upper_cabinet: 0 };
+
+export function getWallGap(project, type) {
+  const g = project && project.wallFill && project.wallFill.wallGap;
+  if (g && g[type] !== undefined && g[type] !== "") return Math.max(0, num(g[type]));
+  return DEFAULT_WALL_GAP[type] ?? 0;
+}
+
+export function setWallGap(project, type, value) {
+  if (!project.wallFill) project.wallFill = {};
+  project.wallFill.wallGap = { ...DEFAULT_WALL_GAP, ...(project.wallFill.wallGap || {}), [type]: Math.max(0, num(value)) };
+}
 // Reszta mniejsza od tego to zwykły luz montażowy, a nie blenda.
 export const MIN_FILLER = 3;
 export const MIN_CABINET_WIDTH = 150;
@@ -67,22 +95,39 @@ export function worldToWall(wallId, room, box) {
 
 // Wymiary rzędu szafek: z szafki-wzoru albo domyślne dla typu (createModuleObject).
 // y0..y1 = pas zajęty w pionie (od spodu nóżek do góry korpusu).
-export function rowProfile(type, template = null) {
+// gap = odsunięcie tyłu od ściany, frontPlane = lico frontów od ściany
+// (odsunięcie + korpus z plecami + front) - od niego liczy się wszystko w narożnikach.
+export function rowProfile(type, template = null, { wallGap = 0 } = {}) {
   const src = template || createModuleObject(type);
   const legsH = src.legs && src.legs.active ? num(src.legs.height) : 0;
   const height = num(src.dimensions && src.dimensions.height, 720);
   const depth = num(src.dimensions && src.dimensions.depth, 513);
   const posY = num(src.position && src.position.y);
-  return { type: src.type || type, height, depth, posY, legsH, y0: posY, y1: posY + legsH + height };
+  const gap = Math.max(0, num(wallGap));
+  const front = frontAllowance(state.project, src);
+  return { type: src.type || type, height, depth, posY, legsH, y0: posY, y1: posY + legsH + height, gap, front, frontPlane: gap + depth + front };
 }
 
-function moduleWorldBox(mod) {
+// Obrys szafki w pokoju razem z frontem: front wystaje z przodu (strona przeciwna do
+// ściany z obrotu), więc szafka z sąsiedniej ściany zajmuje w narożniku pas aż do
+// lica swoich frontów, a nie tylko do korpusu. Szafka narożna L ma fronty we
+// wnęce między ramionami - jej obrys zostaje bez zmian.
+function moduleWorldBox(mod, project) {
+  const front = frontAllowance(project, mod);
   const { worldW, worldD } = getWorldFootprint(mod);
-  const x0 = num(mod.position && mod.position.x);
-  const z0 = num(mod.position && mod.position.z);
+  let x0 = num(mod.position && mod.position.x);
+  let z0 = num(mod.position && mod.position.z);
+  let x1 = x0 + worldW, z1 = z0 + worldD;
+  if (mod.type !== "corner_cabinet") {
+    const rot = ((num(mod.rotation) % 360) + 360) % 360;
+    if (rot === 0) z1 += front;
+    else if (rot === 90) x0 -= front;
+    else if (rot === 180) z0 -= front;
+    else if (rot === 270) x1 += front;
+  }
   const y0 = num(mod.position && mod.position.y);
   const legs = mod.legs && mod.legs.active ? num(mod.legs.height) : 0;
-  return { x0, x1: x0 + worldW, z0, z1: z0 + worldD, y0, y1: y0 + legs + num(mod.dimensions && mod.dimensions.height) };
+  return { x0, x1, z0, z1, y0, y1: y0 + legs + num(mod.dimensions && mod.dimensions.height) };
 }
 
 // Wszystko, co zajmuje pas rzędu przy ścianie: [{ u0, u1, kind, label, id }].
@@ -95,7 +140,8 @@ function moduleWorldBox(mod) {
 export function findBlocked(project, wallId, row, { openingMargin = 0, doorPassage = 600 } = {}) {
   const room = getRoom(project);
   const L = wallLength(room, wallId);
-  const stripD = row.depth + FRONT_ALLOWANCE;
+  // Pas rzędu: od ściany do lica frontów (razem ze szczeliną przy ścianie).
+  const stripD = row.frontPlane ?? row.depth + FRONT_ALLOWANCE;
   const blocked = [];
   const push = (box, y0, y1, kind, label, id) => {
     const loc = worldToWall(wallId, room, box);
@@ -106,7 +152,7 @@ export function findBlocked(project, wallId, row, { openingMargin = 0, doorPassa
   };
 
   (project.modules || []).forEach((m) => {
-    const b = moduleWorldBox(m);
+    const b = moduleWorldBox(m, project);
     push(b, b.y0, b.y1, "module", m.name || "Szafka", m.id);
   });
   (project.sidePanels || []).forEach((p) => {
@@ -332,11 +378,12 @@ export function findPlanConflicts(items, blocked, wallLen) {
 }
 
 // Wstawia plan do state.project: szafki (kopie wzoru albo nowe domyślne) i blendy
-// przy ścianie wallId. Zwraca { modules, panels }. Wołający odświeża widoki.
-export function applyFillPlan({ wallId, items, type, template = null }) {
+// przy ścianie wallId, odsunięte od niej o wallGap. Zwraca { modules, panels }.
+// Wołający odświeża widoki.
+export function applyFillPlan({ wallId, items, type, template = null, wallGap = 0 }) {
   const project = state.project;
   const room = getRoom(project);
-  const row = rowProfile(type, template);
+  const row = rowProfile(type, template, { wallGap });
   const rotation = WALL_ROTATION[wallId] ?? 0;
   const modules = [];
   const panels = [];
@@ -345,7 +392,7 @@ export function applyFillPlan({ wallId, items, type, template = null }) {
     const fresh = createModuleObject(row.type);
     const mod = template ? cloneModuleWithNewIds(template) : fresh;
     if (template) { delete mod.groupId; mod.name = fresh.name; }
-    const box = wallToWorld(wallId, room, it.u0, it.width, 0, row.depth);
+    const box = wallToWorld(wallId, room, it.u0, it.width, row.gap, row.depth);
     mod.dimensions = { ...mod.dimensions, width: it.width };
     mod.rotation = rotation;
     mod.position = { x: round2(box.x0), y: row.posY, z: round2(box.z0) };
@@ -357,9 +404,10 @@ export function applyFillPlan({ wallId, items, type, template = null }) {
   if (blendas.length) {
     if (!Array.isArray(project.sidePanels)) project.sidePanels = [];
     const th = num(project.materials && project.materials.boardThickness, 18) || 18;
-    const frontType = { ...(project.front || {}), ...((template && template.front) || {}) }.type || "nakladane";
+    const frontCfg = { ...(project.front || {}), ...((template && template.front) || {}) };
+    const frontType = frontCfg.type || "nakladane";
     // Lico blendy równo z licem frontów (jak w migrateLegacyFillers, core/state.js).
-    const zF = frontType === "wpuszczane" ? row.depth - th : row.depth + 2;
+    const zF = row.gap + (frontType === "wpuszczane" ? row.depth - th : row.depth + frontBodyGap(frontCfg));
     const d0 = zF - (BLENDA_DEPTH - th);
     blendas.forEach((it) => {
       const count = project.sidePanels.filter((p) => p.kind === "blenda").length;

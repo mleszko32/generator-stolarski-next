@@ -31,6 +31,26 @@ describe('blaty - wykrywanie rzędów i wymiary', () => {
     expect(p.y).toBe(820); // góra korpusu 100 (nóżki) + 720
   });
 
+  it('szafki odsunięte od ściany: blat dochodzi do ściany bocznej, nawis maleje o odsunięcie', () => {
+    project([base('a', 50, 50), base('b', 650, 50)]);
+    const { runs, pieces } = computeWorktops();
+    expect(pieces[0].u0).toBe(0);                // szczelina 50 przy lewej ścianie przykryta blatem
+    expect(runs[0].overhang).toBe(600 - 583);    // 600 - (50 + 513 + 20)
+    project([base('a', 0, 0)]);
+    expect(computeWorktops().runs[0].overhang).toBe(67);
+  });
+
+  it('kontrola projektu ostrzega o za małym nawisie blatu', async () => {
+    const { validateProject } = await import('./validate.js');
+    const warn = () => validateProject().issues.some(i => i.level === 'warn' && /nawis|wystaje przed fronty|przed licem frontów/.test(i.message));
+    project([base('a', 0, 60)]);
+    expect(warn()).toBe(true);                  // 600 - 593 = 7 mm
+    project([base('a', 0, 60)], { depth: 620 });
+    expect(warn()).toBe(false);                 // 27 mm
+    project([base('a', 0, 0)]);
+    expect(warn()).toBe(false);
+  });
+
   it('szczelina większa niż tolerancja rozdziela blaty, mniejsza je łączy', () => {
     project([base('a', 0, 0), base('b', 700, 0)]);
     expect(computeWorktops().pieces).toHaveLength(2);
