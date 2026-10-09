@@ -52,6 +52,35 @@ describe('kosztorys - robocizna, montaż, transport, marża, rabat, VAT', () => 
   it('podatek 0% zostaje zerem, a nie wraca do 23%', () => {
     expect(withPricing({ vatPercent: 0 }).vatPercent).toBe(0);
   });
+
+  it('lakiernia to osobna pozycja godziny × stawka, wliczana do sumy kosztów', () => {
+    const c = withPricing({ labor: { hours: 10, rate: 100 }, lacquer: { hours: 6, rate: 120 }, vatPercent: 0 });
+    expect(c.lacquerCost).toBe(720);
+    expect(c.subtotal).toBe(1720);
+  });
+});
+
+describe('kosztorys - cięcie formatek', () => {
+  it('liczy formatki płyt, MDF i HDF (bez blatu) × cena za sztukę', () => {
+    setProject(freshProject({ modules: [baseModule({ elements: [fullZoneFront()] })] }));
+    state.project.pricing = { cuttingPerPart: 4.92, vatPercent: 0 };
+    ensurePricingDefaults(state.project);
+    const expected = calculateAllProjectParts()
+      .filter(p => ['Korpus', 'Front', 'Szuflada', 'Plecy'].includes(p.category))
+      .reduce((s, p) => s + p.qty, 0);
+    const c = calculateProjectCost();
+    expect(expected).toBeGreaterThan(0);
+    expect(c.cutPartsCount).toBe(expected);
+    expect(c.cuttingCost).toBeCloseTo(expected * 4.92, 6);
+    expect(c.subtotal).toBeCloseTo(c.materialsSubtotal + c.hardwareSubtotal + c.cuttingCost, 6);
+  });
+
+  it('projekt bez ceny cięcia - koszt cięcia 0', () => {
+    setProject(freshProject({ modules: [baseModule()] }));
+    state.project.pricing = {};
+    ensurePricingDefaults(state.project);
+    expect(calculateProjectCost().cuttingCost).toBe(0);
+  });
 });
 
 describe('kosztorys - materiały frontów (per front, pricing.frontMaterials)', () => {
@@ -126,8 +155,9 @@ describe('migracja pól kosztorysu', () => {
     ]);
     expect(p.marginPercent).toBe(15);
     expect(p.labor).toEqual({ hours: 0, rate: 0 });
+    expect(p.lacquer).toEqual({ hours: 0, rate: 0 });
     expect(p.assembly).toEqual({ hours: 0, rate: 0 });
-    expect([p.transport, p.discountPercent, p.vatPercent]).toEqual([0, 0, 23]);
+    expect([p.transport, p.cuttingPerPart, p.discountPercent, p.vatPercent]).toEqual([0, 0, 0, 23]);
   });
 
   it('projekt z katalogiem "tylko Standard" (utworzony przed dodaniem presetów) dogrywa je jednorazowo, bez zmiany ceny Standard', () => {

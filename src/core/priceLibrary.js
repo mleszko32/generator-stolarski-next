@@ -1,6 +1,7 @@
 // src/core/priceLibrary.js
 //
-// Baza domyślnych cen (materiały płytowe, katalog materiałów frontów, okucia):
+// Baza domyślnych cen (materiały płytowe, katalog materiałów frontów, okucia,
+// cena cięcia formatki):
 // jeden zapisany "zrzut" cennika w localStorage przeglądarki, który można
 // nałożyć na dowolny projekt zamiast wpisywać wszystkie ceny od zera za
 // każdym razem (zgłoszona potrzeba). Jeden slot, nie lista jak biblioteka
@@ -45,6 +46,7 @@ export function savePriceDefaults(pricing) {
     materials: { ...(pricing.materials || {}) },
     frontMaterials: JSON.parse(JSON.stringify(pricing.frontMaterials || [])),
     hardware: { ...(pricing.hardware || {}) },
+    cuttingPerPart: parseFloat(pricing.cuttingPerPart) || 0,
   };
   try {
     ls.setItem(KEY, JSON.stringify(snapshot));
@@ -70,6 +72,7 @@ export function importPriceDefaultsJson(text) {
     materials: data && data.materials,
     frontMaterials: data && data.frontMaterials,
     hardware: data && data.hardware,
+    ...(data && data.cuttingPerPart != null ? { cuttingPerPart: data.cuttingPerPart } : {}),
   };
   if (!isValidSnapshot(snapshot)) return false;
   const ls = storageOrNull();
@@ -105,4 +108,6 @@ export function applyPriceDefaults(pricing, snapshot) {
     });
   });
   pricing.hardware = { ...(pricing.hardware || {}), ...(snapshot.hardware || {}) };
+  // Starsze bazy (sprzed ceny cięcia) nie mają tego pola - wtedy cena w projekcie zostaje.
+  if (snapshot.cuttingPerPart != null) pricing.cuttingPerPart = parseFloat(snapshot.cuttingPerPart) || 0;
 }

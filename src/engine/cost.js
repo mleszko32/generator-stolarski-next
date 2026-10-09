@@ -1,6 +1,6 @@
 // src/engine/cost.js
 //
-// Kosztorys projektu (materiały, okucia, robocizna, marża, rabat, VAT) - wydzielony
+// Kosztorys projektu (materiały, cięcie, okucia, robocizna, lakiernia, marża, rabat, VAT) - wydzielony
 // z engine/cabinet.js.
 import { state, migratePricingExtras } from "../core/state.js";
 import { calculateAllProjectParts } from "./cabinet.js";
@@ -19,6 +19,10 @@ import { calculateProjectHardware } from "./hardware.js";
 // w projekcie trafiają do wyniku (np. projekt bez szuflad nie pokaże
 // pustego wiersza "Szuflada").
 const MATERIAL_CATEGORY_ORDER = ['Korpus', 'Front', 'Szuflada', 'Plecy', 'Blat'];
+
+// Formatki cięte w hurtowni (płyta korpusowa, MDF frontów, HDF pleców) - blat
+// docina się na miejscu, więc nie wchodzi do liczby cięć.
+const CUT_CATEGORIES = ['Korpus', 'Front', 'Szuflada', 'Plecy'];
 
 export function calculateProjectCost() {
   const pricing = migratePricingExtras({ materials: {}, marginPercent: 0, hardware: {}, ...(state.project.pricing || {}) });
@@ -75,12 +79,17 @@ export function calculateProjectCost() {
 
   const materialsSubtotal = materials.reduce((sum, m) => sum + m.cost, 0);
   const hardwareSubtotal = hardwareLines.reduce((sum, l) => sum + l.cost, 0);
+  const cutPartsCount = parts
+    .filter(p => CUT_CATEGORIES.includes(p.category))
+    .reduce((sum, p) => sum + (parseFloat(p.qty) || 0), 0);
+  const cuttingCost = cutPartsCount * pricing.cuttingPerPart;
   const laborCost = pricing.labor.hours * pricing.labor.rate;
+  const lacquerCost = pricing.lacquer.hours * pricing.lacquer.rate;
   const assemblyCost = pricing.assembly.hours * pricing.assembly.rate;
   const transportCost = pricing.transport;
-  // suma kosztów = materiały + okucia + robocizna + montaż + transport;
+  // suma kosztów = materiały + cięcie + okucia + robocizna + lakiernia + montaż + transport;
   // marża liczona od sumy kosztów, rabat od ceny po marży, VAT od ceny po rabacie
-  const subtotal = materialsSubtotal + hardwareSubtotal + laborCost + assemblyCost + transportCost;
+  const subtotal = materialsSubtotal + cuttingCost + hardwareSubtotal + laborCost + lacquerCost + assemblyCost + transportCost;
   const marginPercent = parseFloat(pricing.marginPercent) || 0;
   const marginAmount = subtotal * (marginPercent / 100);
   const priceBeforeDiscount = subtotal + marginAmount;
@@ -93,7 +102,10 @@ export function calculateProjectCost() {
     hardware: hardwareLines,
     materialsSubtotal,
     hardwareSubtotal,
+    cutPartsCount,
+    cuttingCost,
     laborCost,
+    lacquerCost,
     assemblyCost,
     transportCost,
     subtotal,

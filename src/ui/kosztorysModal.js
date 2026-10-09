@@ -74,6 +74,7 @@ export function mountKosztorys(root) {
                 <table class="cost-table">
                     <thead><tr><th>Materiał</th><th class="num">Powierzchnia</th><th class="num">Cena / m²</th><th class="num">Koszt</th><th></th></tr></thead>
                     <tbody id="kosztorys-materials-tbody"></tbody>
+                    <tbody><tr><td>Cięcie formatek (hurtownia)</td><td class="num" id="kosztorys-cut-count">—</td><td class="num">${numField('cutting', pricing.cuttingPerPart, 'zł/szt.')}</td><td class="num" id="kosztorys-cut-cost">—</td><td></td></tr></tbody>
                 </table>
             </section>
             <section class="cost-section">
@@ -84,10 +85,11 @@ export function mountKosztorys(root) {
                 </table>
             </section>
             <section class="cost-section">
-                <h3>Robocizna, montaż, transport</h3>
+                <h3>Robocizna, lakiernia, montaż, transport</h3>
                 <table class="cost-table">
                     <tbody>
                         <tr><td>Robocizna (warsztat)</td><td class="num">${numField('labor-hours', pricing.labor.hours, 'h')}</td><td class="num">${numField('labor-rate', pricing.labor.rate, 'zł/h')}</td><td class="num" id="kosztorys-labor-cost">—</td></tr>
+                        <tr><td>Lakiernia</td><td class="num">${numField('lacquer-hours', pricing.lacquer.hours, 'h')}</td><td class="num">${numField('lacquer-rate', pricing.lacquer.rate, 'zł/h')}</td><td class="num" id="kosztorys-lacquer-cost">—</td></tr>
                         <tr><td>Montaż</td><td class="num">${numField('assembly-hours', pricing.assembly.hours, 'h')}</td><td class="num">${numField('assembly-rate', pricing.assembly.rate, 'zł/h')}</td><td class="num" id="kosztorys-assembly-cost">—</td></tr>
                         <tr><td>Transport</td><td></td><td class="num">${numField('transport', pricing.transport, 'zł')}</td><td></td></tr>
                     </tbody>
@@ -103,8 +105,10 @@ export function mountKosztorys(root) {
             </section>
             <section class="cost-summary">
                 ${foot('Materiały', 'plyty')}
+                ${foot('Cięcie formatek', 'cutting')}
                 ${foot('Okucia', 'okucia')}
                 ${foot('Robocizna', 'labor')}
+                ${foot('Lakiernia', 'lacquer')}
                 ${foot('Montaż', 'assembly')}
                 ${foot('Transport', 'transport')}
                 ${foot('<b>Suma kosztów</b>', 'subtotal')}
@@ -140,6 +144,8 @@ export function mountKosztorys(root) {
 
         const num = (id) => Math.max(0, parseFloat(modal.querySelector(id).value) || 0);
         pricing.labor = { hours: num('#kosztorys-labor-hours'), rate: num('#kosztorys-labor-rate') };
+        pricing.lacquer = { hours: num('#kosztorys-lacquer-hours'), rate: num('#kosztorys-lacquer-rate') };
+        pricing.cuttingPerPart = num('#kosztorys-cutting');
         pricing.assembly = { hours: num('#kosztorys-assembly-hours'), rate: num('#kosztorys-assembly-rate') };
         pricing.transport = num('#kosztorys-transport');
         pricing.discountPercent = Math.min(100, num('#kosztorys-discount'));
@@ -178,7 +184,12 @@ export function mountKosztorys(root) {
         set('#kosztorys-foot-okucia', formatPLN(cost.hardwareSubtotal));
         set('#kosztorys-foot-margin', formatPLN(cost.marginAmount));
         set('#kosztorys-foot-marginpct', cost.marginPercent);
+        set('#kosztorys-cut-count', cost.cutPartsCount + ' szt.');
+        set('#kosztorys-cut-cost', formatPLN(cost.cuttingCost));
+        set('#kosztorys-foot-cutting', formatPLN(cost.cuttingCost));
         set('#kosztorys-labor-cost', formatPLN(cost.laborCost));
+        set('#kosztorys-lacquer-cost', formatPLN(cost.lacquerCost));
+        set('#kosztorys-foot-lacquer', formatPLN(cost.lacquerCost));
         set('#kosztorys-assembly-cost', formatPLN(cost.assemblyCost));
         set('#kosztorys-foot-labor', formatPLN(cost.laborCost));
         set('#kosztorys-foot-assembly', formatPLN(cost.assemblyCost));
@@ -331,5 +342,5 @@ export function mountKosztorys(root) {
     renderHardwareRows();
     recalc();
     modal.querySelector('#kosztorys-margin').addEventListener('input', recalc);
-    ['labor-hours','labor-rate','assembly-hours','assembly-rate','transport','discount','vat'].forEach(k => modal.querySelector('#kosztorys-' + k).addEventListener('input', recalc));
+    ['labor-hours','labor-rate','lacquer-hours','lacquer-rate','cutting','assembly-hours','assembly-rate','transport','discount','vat'].forEach(k => modal.querySelector('#kosztorys-' + k).addEventListener('input', recalc));
 }

@@ -70,6 +70,21 @@ describe("baza cen", () => {
     expect(loadPriceDefaults().materials.Front).toBe(120);
   });
 
+  it("przenosi cenę cięcia formatki; stara baza bez tego pola jej nie zeruje", () => {
+    const snapshot = savePriceDefaults({ ...samplePricing(), cuttingPerPart: 4.92 });
+    const pricing = { materials: {}, frontMaterials: [], hardware: {}, cuttingPerPart: 0 };
+    applyPriceDefaults(pricing, snapshot);
+    expect(pricing.cuttingPerPart).toBe(4.92);
+
+    const { cuttingPerPart: _omit, ...oldSnapshot } = snapshot;
+    const kept = { materials: {}, frontMaterials: [], hardware: {}, cuttingPerPart: 7.38 };
+    applyPriceDefaults(kept, oldSnapshot);
+    expect(kept.cuttingPerPart).toBe(7.38);
+
+    expect(importPriceDefaultsJson(exportPriceDefaultsJson())).toBe(true);
+    expect(loadPriceDefaults().cuttingPerPart).toBe(4.92);
+  });
+
   it("odrzuca niepoprawny plik", () => {
     expect(importPriceDefaultsJson("nie json")).toBe(false);
     expect(importPriceDefaultsJson('{"x":1}')).toBe(false);
