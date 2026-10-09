@@ -42,5 +42,7 @@ Czyste moduły ES, Vite, Three.js, Firebase (Firestore + Auth), Zod, Vitest.
 ## Dokumentacja
 
 - [CLAUDE.md](CLAUDE.md) — architektura, przepływ danych, konwencje i pułapki w kodzie.
+- [docs/szczegoly-funkcji.md](docs/szczegoly-funkcji.md) — szczegóły funkcji warsztatowych
+  (skos, skrzynki MOVENTO, instrukcje montażu, stół RC System, DXF frontów).
 - [FIREBASE.md](FIREBASE.md) — konfiguracja Firebase: logowanie, reguły bazy, dodawanie
   użytkowników.
