@@ -217,8 +217,11 @@ export function getActiveModule() {
   return state.project.modules.find(m => m.id === state.activeModuleId) || null;
 }
 
-export function addModule(type = "base_cabinet") {
-  const newId = 'mod-' + Date.now();
+// Nowy obiekt szafki (dolna / wisząca / słupek) z domyślnymi wymiarami, BEZ dodania
+// do projektu. Wspólne dla addModule i rozmieszczania szafek na ścianie
+// (core/wallFill.js), żeby obie drogi dawały takie same szafki. Id ma losowy
+// przyrostek - przy wstawianiu kilku szafek naraz Date.now() się powtarza.
+export function createModuleObject(type = "base_cabinet") {
   const isUpper = type === 'upper_cabinet';
   const isTall = type === 'tall_cabinet';
 
@@ -242,23 +245,18 @@ export function addModule(type = "base_cabinet") {
     posY = 0;
   }
 
-  let nextX = 0;
-  if (state.project.modules.length > 0) {
-    nextX = Math.max(...state.project.modules.map(m => m.position.x + parseFloat(m.dimensions.width)));
-  }
-  
-  const newModule = {
-    id: newId,
+  return {
+    id: 'mod-' + Date.now() + Math.random().toString(36).substring(2, 6),
     // Numer TYLKO wśród szafek tego samego typu (nie globalny licznik wszystkich
     // szafek w projekcie) - inaczej "Słupek 1"/"Słupek 2" przeskakiwały numery za
     // każdym razem, gdy między nimi dodano inny typ szafki, i nie dało się po
     // nazwie zorientować, która jest która (zgłoszone jako "gubię się w nazwach").
-    // Nowe szafki i tak lądują zawsze najdalej na prawo (nextX niżej), więc numer
+    // Nowe szafki i tak lądują zawsze najdalej na prawo (nextX w addModule), więc numer
     // kolejności dodania pokrywa się w praktyce z kolejnością w pokoju od lewej.
     name: name + ' ' + (state.project.modules.filter(m => m.type === type).length + 1),
     type: type,
     dimensions: { width: 600, height: height, depth: depth },
-    position: { x: nextX, y: posY, z: 0 },
+    position: { x: 0, y: posY, z: 0 },
     rotation: 0, // stopnie: 0/90/180/270 - w którą ścianę "patrzy" front modułu
     backPanel: { type: "nakladane", offset: 20, grooveDepth: 13, nutBuild: "sides", clearance: 2 }, // ustawienia nutu po przełączeniu na plecy w nucie: boki nutowane, wieńce skracane, nut 13 mm
     legs: legs,
@@ -266,10 +264,20 @@ export function addModule(type = "base_cabinet") {
     front: { hinges: { topOffset: 100, bottomOffset: 100, margin: 40 } },
     elements: []
   };
-  
+}
+
+export function addModule(type = "base_cabinet") {
+  const newModule = createModuleObject(type);
+
+  let nextX = 0;
+  if (state.project.modules.length > 0) {
+    nextX = Math.max(...state.project.modules.map(m => m.position.x + parseFloat(m.dimensions.width)));
+  }
+  newModule.position.x = nextX;
+
   state.project.modules.push(newModule);
-  state.activeModuleId = newId; 
-  
+  state.activeModuleId = newModule.id;
+
   return newModule;
 }
 

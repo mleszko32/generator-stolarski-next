@@ -635,3 +635,32 @@ button, input, select, textarea { font-family: inherit; }
   width: 22px; height: 22px; border: none; border-radius: 4px; cursor: pointer;
   background: #0284c7; color: #fff; font-weight: bold;
 }
+
+/* Rozmieszczanie szafek na ścianie (ui/wallFillModal.js) */
+.wf-seg-len { opacity: 0.75; font-weight: 400; }
+.wf-variant { cursor: pointer; margin-bottom: 6px; padding: 8px 12px; }
+.wf-variant.is-selected { border-color: var(--accent); background: var(--surface-panel); box-shadow: inset 3px 0 0 var(--accent); }
+.wf-variant .badge { margin-top: 4px; }
+.wf-preview { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-panel); padding: 8px; }
+.wf-preview svg { display: block; width: 100%; height: auto; max-height: 320px; }
+.wf-preview rect, .wf-preview line { vector-effect: non-scaling-stroke; stroke-width: 1; }
+.wf-preview text { font-family: var(--font); fill: var(--text-primary); }
+.wf-preview text.wf-muted { fill: var(--text-secondary); }
+.wf-preview .wf-wall { fill: var(--surface-subtle); stroke: var(--border-strong); }
+.wf-preview .wf-existing { fill: var(--border); stroke: var(--border-strong); }
+.wf-preview .wf-opening { fill: var(--info-bg); stroke: var(--info-fg); }
+.wf-preview .wf-blocked { fill: url(#wf-hatch); stroke: var(--text-secondary); stroke-dasharray: 2 3; }
+.wf-preview .wf-hatch-line { stroke: var(--text-secondary); stroke-width: 1; opacity: 0.5; }
+.wf-preview .wf-seg { fill: none; stroke: var(--accent); stroke-dasharray: 6 4; stroke-width: 2; }
+.wf-preview .wf-cab { fill: var(--info-bg); stroke: var(--accent); stroke-width: 1.5; }
+.wf-preview .wf-blenda { fill: var(--warn-bg); stroke: var(--color-warning); }
+.wf-preview .wf-bad { fill: var(--danger-bg); stroke: var(--danger); stroke-width: 2; }
+.wf-preview .wf-dim { stroke: var(--text-secondary); }
+.wf-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 6px; font-size: var(--fs-xs); color: var(--text-secondary); }
+.wf-key { display: inline-block; width: 12px; height: 10px; border: 1px solid var(--border-strong); margin-left: 8px; }
+.wf-key:first-child { margin-left: 0; }
+.wf-key-cab { background: var(--info-bg); border-color: var(--accent); }
+.wf-key-blenda { background: var(--warn-bg); border-color: var(--color-warning); }
+.wf-key-blocked { background: repeating-linear-gradient(45deg, var(--border) 0 2px, transparent 2px 4px); }
+.wf-key-opening { background: var(--info-bg); border-color: var(--info-fg); }
+.wf-key-bad { background: var(--danger-bg); border-color: var(--danger); }

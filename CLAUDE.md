@@ -280,6 +280,15 @@ na wartości logiczne `[long1,long2,short1,short2]`. Edytowane kliknięciem kraw
 tabeli Formatki w hubie (`ui/edgeBandingUi.js`); zasila metry w Okuciach/kosztach i etykiety
 planu rozkroju.
 
+**Rozmieszczanie szafek na ścianie**: `core/wallFill.js` (czyste, z testami) + okno `ui/wallFillModal.js`
+(przycisk w Narzędziach). Jeden rząd na raz (dolne / wiszące / słupki, wymiary z `createModuleObject` albo z
+szafki-wzoru, kopiowanej z wnętrzem przez `cloneModuleWithNewIds`). `findFreeSegments` wylicza wolne odcinki ściany
+w pasie rzędu (głębokość + front, wysokość rzędu): blokują szafki/boki/blendy (też z sąsiedniej ściany w
+narożniku), otwory na ścianie (z odstępem) i strefa przejścia przed drzwiami. `divideSegment` — tryby `standard`
+(katalog szerokości, najmniejsza reszta, potem bliżej 600 mm), `equal`, `fixed` (`600, *, *`), `ratio` (jak
+`distribution` frontów); reszta na blendę (`project.sidePanels`, lico równo z frontami) albo rozciągnięcie szafek.
+`wallToWorld`/`worldToWall` — przeliczenie pas ściany ↔ pokój (oś X szafki zawsze rośnie z `u`).
+
 **Kontrola projektu**: `core/validate.js` (`validateProject`) zasila sekcję huba „Kontrola
 projektu” (`ui/projectCheck.js`): kolizje, granice pokoju, za szerokie drzwi/półki, formatki
 niemieszczące się w płycie, otwory.
