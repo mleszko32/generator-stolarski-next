@@ -90,3 +90,22 @@ materiału frontu, zapis DXF R12 (warstwy `ARKUSZ`, `FRONTY_KONTUR`, `OPISY`; te
 znaków). Fronty szafki pod skos niosą prawdziwy obrys w polu `outline` (`getSlopeFrontParts`),
 reszta to prostokąty. Dwa jednakowe trójkąty prostokątne (blendy skosu) `pairTriangles` składa przeciwprostokątnymi w jeden prostokąt (drugi obrócony o 180°, odstęp mierzony prostopadle). Karta pod planem rozkroju: `ui/frontsDxfPanel.js` (rozmiar arkusza z
 `project.cutPlan`, odstęp/obrzeże w `project.frontsDxf`).
+
+## Kosztorys
+
+`engine/cost.js` (`calculateProjectCost`, czysta, z testami), okno `ui/kosztorysModal.js`, pola w
+`project.pricing` (migracja brakujących pól: `migratePricingExtras` w `core/state.js`).
+
+- **Materiały**: cena za m² per kategoria formatki (Korpus/Szuflada/Plecy/Blat), fronty z własnego cennika
+  `frontMaterials`. Cena m² ma zawierać odpad z arkusza — kosztorys liczy powierzchnię formatek, nie arkuszy.
+- **Cięcie formatek** (`cuttingPerPart`, zł/szt.): liczba sztuk z kategorii Korpus, Front, Szuflada, Plecy
+  (blat pomijany — docinany na miejscu) × cena. Hurtownie zwykle liczą za formatkę niezależnie od rodzaju płyty.
+  Cena trafia też do bazy cen (`core/priceLibrary.js`; stara baza bez pola nie zeruje ceny w projekcie).
+- **Praca**: `labor` (warsztat: oklejanie, wiercenie, składanie), `lacquer` (lakiernia), `assembly` (montaż u
+  klienta) — każda godziny × stawka. Godziny to roboczogodziny (suma wszystkich osób), stawka za godzinę osoby.
+- **Dwie marże**: `marginPercent` — narzut na materiały + cięcie + okucia (`goodsSubtotal`);
+  `laborMarginPercent` — marża na robociznę + lakiernię + montaż + transport (`workSubtotal`). Stawka godzinowa
+  zwykle już zawiera zysk, więc nowe projekty mają marżę na pracę 0%. Stary projekt bez pola dostaje
+  `laborMarginPercent = marginPercent` (jedna marża od całej sumy, jak dawniej) — jego cena się nie zmienia.
+- Kolejność: suma kosztów → + narzut i marża → − rabat (`discountPercent`) → + VAT (`vatPercent`; 0 dla
+  zwolnionych z VAT, wtedy ceny zakupu wpisuje się brutto).
