@@ -85,6 +85,30 @@ describe("calculateAllProjectParts — cały projekt", () => {
     const plinths = parts.filter((p) => p.name.startsWith("Cokół dolny"));
     expect(plinths).toHaveLength(2);
   });
+
+  it("dzieli cokół pełnej ściany (6 × 600) na części mieszczące się na arkuszu, na stykach szafek", () => {
+    setProject(
+      freshProject({
+        modules: [0, 1, 2, 3, 4, 5].map((i) => baseModule({ id: `m${i}`, position: { x: i * 600, y: 0, z: 0 } })),
+      })
+    );
+    const parts = calculateAllProjectParts();
+    const plinths = parts.filter((p) => p.name.startsWith("Cokół dolny"));
+    expect(plinths.map((p) => p.length)).toEqual([1800, 1800]);
+    expect(plinths.map((p) => p.name)).toEqual(["Cokół dolny (Odcinek 1, część 1/2)", "Cokół dolny (Odcinek 1, część 2/2)"]);
+  });
+
+  it("dłuższy bok arkusza z project.cutPlan decyduje o podziale", () => {
+    setProject(
+      freshProject({
+        cutPlan: { sheetW: 4100, sheetH: 2070, trim: 10 },
+        modules: [0, 1, 2, 3, 4, 5].map((i) => baseModule({ id: `m${i}`, position: { x: i * 600, y: 0, z: 0 } })),
+      })
+    );
+    const plinths = calculateAllProjectParts().filter((p) => p.name.startsWith("Cokół dolny"));
+    expect(plinths).toHaveLength(1);
+    expect(plinths[0]).toMatchObject({ name: "Cokół dolny (Odcinek 1)", length: 3600 });
+  });
 });
 
 describe("integracja layout -> drawerMath -> lista formatek", () => {

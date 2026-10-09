@@ -86,7 +86,9 @@ bez Three.js.
 - `calculateParts()` — aktywny moduł: `{ parts, mountingData }` (mountingData zasila rysunki
   2D z wierceniami).
 - `calculateAllProjectParts()` — cały projekt, zagregowana lista formatek, w tym scalone
-  odcinki cokołu przez sąsiednie szafki dolne.
+  odcinki cokołu przez sąsiednie szafki dolne. Odcinek dłuższy niż arkusz (`project.cutPlan`,
+  dłuższy bok minus obrzeże) dzieli `engine/plinthSplit.js` na „część i/n” łączone na stykach
+  szafek (najmniej części, potem najrówniejsze). Render 3D rysuje cokół osobno pod każdą szafką.
 
 Obok, w `src/engine/`: `carcaseParts.js` (formatki i wiercenia korpusu prostokątnego; `jointSetPositions` —
 jedyne miejsce rozmieszczenia zestawów kołek + wkręt dla wieńców, półek stałych i przegród: skrajne 37 mm od przodu

@@ -10,6 +10,7 @@ import { getCorpusHoles, getPionMountHoles, getCorpusParts, getBackPanelParts } 
 import { getCornerCorpusParts } from "./cornerParts.js";
 import { getSlopeCabinetParts, getSlopeFrontParts } from "../core/slopeCabinet.js";
 import { getBlindPanel } from "../core/blindCorner.js";
+import { splitPlinthRun, maxPlinthLength } from "./plinthSplit.js";
 
 export function calculateParts() {
   // Fronty muszą mieć aktualne el.x/y/w/h zanim policzymy z nich formatki.
@@ -237,24 +238,34 @@ export function collectProjectParts() {
               let last = plinthRuns[plinthRuns.length - 1];
               if (last.rot === rot && Math.abs((last.along + last.runLen) - along) <= 1 &&
                   last.crossPos === crossPos && last.h === h && last.offset === offset && last.frontCoord === frontCoord) {
+                  // styk = początek dołączanej szafki (względem początku biegu) - tu wolno ciąć
+                  last.joints.push(along - last.along);
                   last.runLen += runLen + (along - (last.along + last.runLen));
                   joined = true;
               }
           }
           if (!joined) {
-              plinthRuns.push({ rot, along, runLen, crossPos, y, h, offset, frontCoord });
+              plinthRuns.push({ rot, along, runLen, crossPos, y, h, offset, frontCoord, joints: [] });
           }
       });
   });
 
+  // Bieg dłuższy niż arkusz (pełna ściana kuchni) dzielimy na części łączone na
+  // stykach szafek - inaczej formatka nie zmieściłaby się w rozkroju.
+  const plinthMax = maxPlinthLength(config.cutPlan);
   plinthRuns.forEach((run, index) => {
-    allParts.push({
-      name: `Cokół dolny (Odcinek ${index + 1})`,
-      length: parseFloat(run.runLen.toFixed(1)),
-      width: parseFloat(run.h.toFixed(1)),
-      qty: 1,
-      category: "Korpus",
-      moduleName: "Elementy zbiorcze"
+    const pieces = splitPlinthRun(run.runLen, run.joints, plinthMax);
+    pieces.forEach((len, i) => {
+      allParts.push({
+        name: pieces.length > 1
+          ? `Cokół dolny (Odcinek ${index + 1}, część ${i + 1}/${pieces.length})`
+          : `Cokół dolny (Odcinek ${index + 1})`,
+        length: parseFloat(len.toFixed(1)),
+        width: parseFloat(run.h.toFixed(1)),
+        qty: 1,
+        category: "Korpus",
+        moduleName: "Elementy zbiorcze"
+      });
     });
   });
 

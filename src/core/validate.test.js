@@ -77,6 +77,14 @@ describe("validateProject", () => {
     expect(levels).toEqual([...levels].sort((a, b) => ({ error: 0, warn: 1, info: 2 }[a] - { error: 0, warn: 1, info: 2 }[b])));
     expect(messages(validateProject()).length).toBeGreaterThan(1);
   });
+
+  it("cokół pełnej ściany 4200 mm nie daje błędu „nie mieści się na arkuszu”", () => {
+    setProject(freshProject({
+      room: { width: 5000, height: 2600, depth: 3000 },
+      modules: [0, 1, 2, 3, 4, 5, 6].map((i) => baseModule({ id: `m${i}`, name: `S${i}`, position: { x: i * 600, y: 0, z: 0 } })),
+    }));
+    expect(has(validateProject(), "error", "nie mieści się na arkuszu")).toBe(false);
+  });
 });
 
 describe("kolizje wnętrza: półka w strefie szuflad", () => {
