@@ -4,7 +4,8 @@
 // montażu") - w tym samym układzie co instrukcja skrzynek szuflad (ui/drawerBoxDrawings.js):
 // gdzie w projekcie, tabela formatek, montaż w izometrii z kolejnością kroków, formatki z
 // ponumerowanymi otworami w jednej skali i tabela otworów. Jedna szafka na stronę wydruku.
-// Dane: engine/cabinetDrillings.js, rysunki: render/cabinetDrawing2d.js.
+// Dane: engine/cabinetDrillings.js, rysunki: render/cabinetDrawing2d.js; szafka narożna:
+// engine/cornerDrillings.js + render/cornerInstructions2d.js (formatki L, montaż, kroki).
 import { escapeHtml } from "../utils/dom.js";
 import { state } from "../core/state.js";
 import { computeWallLayouts } from "../core/walls.js";
@@ -13,14 +14,16 @@ import {
   cabinetDrawingScale, panelSVGs, cabinetLegendHtml,
   cabinetAssemblySVG, cabinetStepsHtml, projectLocatorSVG,
 } from "../render/cabinetDrawing2d.js";
+import { getCornerPanels, getCornerConstruction } from "../engine/cornerDrillings.js";
+import { cornerAssemblySVG, cornerStepsHtml } from "../render/cornerInstructions2d.js";
 import { WORKSHOP_CSS } from "./drawerBoxDrawings.js";
 import { getRcSettings, rcPanelSetups, rcRearScrew, RC_FRONT_STOP, RC_RAIL_STEP } from "../core/rcSystem.js";
 
 const fmt = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
 const TYPE = { base_cabinet: "Szafka dolna", upper_cabinet: "Szafka wisząca", tall_cabinet: "Słupek", corner_cabinet: "Szafka narożna", slope_cabinet: "Szafka pod skos" };
 
-// Czy dla szafki da się zrobić instrukcję (narożna i pod skos mają inną geometrię).
-export const supportsInstructions = (mod) => mod && mod.type !== "corner_cabinet" && mod.type !== "slope_cabinet";
+// Czy dla szafki da się zrobić instrukcję (pod skos - jeszcze nie).
+export const supportsInstructions = (mod) => !!mod && mod.type !== "slope_cabinet";
 
 // Karta wiercenia na stole RC System (core/rcSystem.js): ustawienia stołu dla formatek
 // pionowych tej szafki, posortowane wg otworu bazowego (najmniej przestawiania pinów), pary
@@ -59,10 +62,11 @@ function rcCardHtml(panels) {
       <td>${escapeHtml(row.name)} <span class="muted">× ${row.qty}</span></td>
       <td>od ${row.st.alongFrom === "przód" ? "przodu" : "dołu"}: ${row.st.shots.map((s, i, all) => shotText(row, s, i, all)).join("<br>")}</td>
     </tr>`).join("");
-  const edgePanels = panels.filter((p) => (p.kind === "poziom" || p.kind === "polka") && p.holes.some((h) => h.edge === "lewe" || h.edge === "prawe"));
+  const edgePanels = panels.filter((p) => (p.kind === "poziom" || p.kind === "polka" || p.kind === "poziom-L") && p.holes.some((h) => h.edge === "lewe" || h.edge === "prawe" || h.edge === "koniec-A"));
   const edgeList = edgePanels.map((p) => {
-    const zs = [...new Set(p.holes.filter((h) => h.edge === "lewe").map((h) => h.z))].sort((a, b) => a - b);
-    return `<li><b>${escapeHtml(p.name)}</b> × ${p.qty}: czoła lewe i prawe, w osi grubości, od przodu ${zs.map(fmt).join(" / ")} mm</li>`;
+    const L = p.kind === "poziom-L";
+    const zs = [...new Set(p.holes.filter((h) => h.edge === (L ? "koniec-A" : "lewe")).map((h) => h.z))].sort((a, b) => a - b);
+    return `<li><b>${escapeHtml(p.name)}</b> × ${p.qty}: ${L ? "czoła na końcach obu ramion" : "czoła lewe i prawe"}, w osi grubości, od przodu ${zs.map(fmt).join(" / ")} mm</li>`;
   }).join("");
   return `<h3>Wiercenie na stole RC System</h3>
     <p class="muted">Ustawienia posortowane wg otworu bazowego - wierć wszystkie formatki z jednym ustawieniem, zanim przestawisz piny. Wkręt (Ø3) zawsze od strony krawędzi.</p>
@@ -71,6 +75,7 @@ function rcCardHtml(panels) {
 }
 
 function cabinetCard(mod, idx, layouts) {
+  if (mod.type === "corner_cabinet") return cornerCard(mod, idx, layouts);
   const project = state.project;
   const d = mod.dimensions;
   const panels = getCabinetPanels(mod, project);
@@ -83,11 +88,39 @@ function cabinetCard(mod, idx, layouts) {
     cons.backType === "nut" ? "plecy w nucie" : "plecy nakładane",
     cons.legs ? `nóżki ${cons.legsHeight} mm${cons.plinth ? " + cokół" : ""}` : "bez nóżek",
   ].join(" · ");
+  return cardHtml({ mod, idx, layouts, panels, th, scale,
+    dims: `${fmt(d.width)} × ${fmt(d.height)} × ${fmt(d.depth)}`,
+    lead: `${escapeHtml(TYPE[mod.type] || "Szafka")} · ${escapeHtml(consText)} · płyta ${fmt(th)} mm${cons.drawers ? ` · szuflady: ${cons.drawers}` : ""}${cons.doors ? ` · drzwi: ${cons.doors}` : ""}`,
+    assembly: cabinetAssemblySVG(mod, panels, project), steps: cabinetStepsHtml(cons, panels) });
+}
+
+// Szafka narożna: formatki L (wieńce, półki), boki ramion, listwa narożna (engine/cornerDrillings.js).
+function cornerCard(mod, idx, layouts) {
+  const project = state.project;
+  const panels = getCornerPanels(mod, project);
+  const cons = getCornerConstruction(mod, project);
+  const th = panels[0] ? panels[0].thickness : 18;
+  const consText = [
+    `ramię A ${fmt(cons.legA)} (głęb. ${fmt(cons.depthA)})`,
+    `ramię B ${fmt(cons.legB)} (głęb. ${fmt(cons.depthB)})`,
+    "wieńce L między bokami + listwa narożna",
+    cons.backType === "nut" ? "plecy w nucie" : "plecy nakładane",
+    cons.legs ? `nóżki ${cons.legsHeight} mm × ${cons.legCount}${cons.plinth ? " + cokół" : ""}` : "bez nóżek",
+  ].join(" · ");
+  return cardHtml({ mod, idx, layouts, panels, th, scale: cabinetDrawingScale(panels),
+    dims: `${fmt(cons.legA)} × ${fmt(cons.legB)} × ${fmt(cons.height)}`,
+    lead: `${escapeHtml(TYPE[mod.type])} · ${escapeHtml(consText)} · płyta ${fmt(th)} mm${cons.cornerShelves ? ` · półki L: ${cons.cornerShelves}` : ""}${cons.doors ? ` · drzwi: ${cons.doors}${cons.bifold ? " (front łamany)" : ""}` : ""}`,
+    assembly: cornerAssemblySVG(mod, panels), steps: cornerStepsHtml(cons),
+    extraNote: "Wieńce i półki L wycina się z prostokątnej formatki z listy formatek - naroże do odcięcia pokazuje rysunek formatki (linia przerywana = formatka z rozkroju)." });
+}
+
+function cardHtml({ mod, idx, layouts, panels, th, scale, dims, lead, assembly, steps, extraNote = "" }) {
+  const project = state.project;
   const partsRows = panels.map((p, i) => `<tr><td>${i + 1}</td><td><b>${escapeHtml(p.name)}</b>${p.note ? `<div class="muted">${escapeHtml(p.note)}</div>` : ""}</td><td>${p.qty}</td><td>${fmt(p.length)} × ${fmt(p.width)} × ${fmt(p.thickness)}</td></tr>`).join("");
   const svgs = panelSVGs(panels, scale);
   return `<section class="box" id="szafka-${idx}">
-    <h2>${idx + 1}. ${escapeHtml(mod.name)} <span class="qty">${fmt(d.width)} × ${fmt(d.height)} × ${fmt(d.depth)}</span></h2>
-    <p class="lead">${escapeHtml(TYPE[mod.type] || "Szafka")} · ${escapeHtml(consText)} · płyta ${fmt(th)} mm${cons.drawers ? ` · szuflady: ${cons.drawers}` : ""}${cons.doors ? ` · drzwi: ${cons.doors}` : ""}</p>
+    <h2>${idx + 1}. ${escapeHtml(mod.name)} <span class="qty">${dims}</span></h2>
+    <p class="lead">${lead}</p>
     <h3>Gdzie w projekcie</h3>
     <div class="locators"><div class="card">${projectLocatorSVG(layouts, project.modules, mod.id, mod.name)}</div></div>
     <div class="cols">
@@ -96,10 +129,11 @@ function cabinetCard(mod, idx, layouts) {
         <div>Numery formatek są takie same na rysunku montażu, w tabeli otworów i na rysunkach formatek.</div>
         <div>Fronty, skrzynki szuflad i okucia: lista formatek, sekcja „Skrzynki szuflad” i „Okucia” w hubie Produkcja.</div>
         <div>Otwory w tych samych miejscach co na „Rysunkach 2D” (rysunek boku z wierceniami).</div>
+        ${extraNote ? `<div>${escapeHtml(extraNote)}</div>` : ""}
       </div>
     </div>
     ${rcCardHtml(panels)}
-    <div class="assembly"><div class="card">${cabinetAssemblySVG(mod, panels, project)}</div><div><h3>Kolejność montażu</h3>${cabinetStepsHtml(cons, panels)}</div></div>
+    <div class="assembly"><div class="card">${assembly}</div><div><h3>Kolejność montażu</h3>${steps}</div></div>
     ${cabinetLegendHtml(panels, th)}
     <p class="muted">Na ekranie rysunki formatek są powiększone do okna. Na wydruku są w skali <b>1:${scale}</b> (wszystkie tak samo) - ustaw skalę 100% / „Rzeczywisty rozmiar”, wtedy 1 cm na papierze = ${scale} cm formatki.</p>
     <div class="grid">${svgs.map((s) => `<div class="card">${s}</div>`).join("")}</div>

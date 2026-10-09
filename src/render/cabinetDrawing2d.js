@@ -8,16 +8,19 @@
 import { C, FONT } from "./drawingPalette.js";
 import { escapeHtml } from "../utils/dom.js";
 import { cabinetHoleSpecs } from "../engine/cabinetDrillings.js";
+import { lPanelSVG, lPanelFrame } from "./cornerInstructions2d.js";
 import { r1, fmt, KIND, text, line, dash, dimH, dimV, wrap, title, uniq, faceHole, edgeHole, proj, move, prism, solidsSvg, setUnit, unitFor, unit, dimText } from "./workshopDrawing.js";
 
-// Formatki z otworami (pozostałe - plecy, półki ruchome - są tylko w tabeli formatek).
-export const drawnPanels = (panels) => panels.filter((p) => p.holes.length > 0);
+// Formatki z otworami (pozostałe - plecy, półki ruchome - są tylko w tabeli formatek) oraz
+// formatki w kształcie L szafki narożnej (półka L bez otworów - rysunek pokazuje wycięcia).
+export const drawnPanels = (panels) => panels.filter((p) => p.holes.length > 0 || p.outline);
+const isVertical = (p) => p.kind === "bok" || p.kind === "przegroda" || p.kind === "trawers-pion" || p.kind === "listwa";
 
 // Rozmiar rysunku (jednostki = mm) - musi się zgadzać z wrap() w funkcjach niżej.
 const drawSize = (p) => {
+  if (p.outline) { const fr = lPanelFrame(p); return [fr.w, fr.h]; }
   const u = unitFor(Math.max(p.length, p.width));
-  const vertical = p.kind === "bok" || p.kind === "przegroda" || p.kind === "trawers-pion";
-  return vertical ? [p.length + 50 * u + (40 + 3 * 150 + 40) * u, p.width + 112 * u] : [p.length + 130 * u, p.width + 112 * u];
+  return isVertical(p) ? [p.length + 50 * u + (40 + 3 * 150 + 40) * u, p.width + 112 * u] : [p.length + 130 * u, p.width + 112 * u];
 };
 
 // Jedna skala dla wszystkich formatek szafki: najmniejsza z listy, przy której każdy rysunek
@@ -47,8 +50,9 @@ export function verticalPanelSVG(panel, startNo = 1, scale = null, side = null) 
   const rev = !!panel.frontOnRight;
   const X = (x) => (rev ? L - x : x);
   const Y = (y) => H - y;
-  const isTrav = panel.kind === "trawers-pion";
-  const label = side ? `${panel.name} — strona ${side}` : panel.kind === "bok" ? `${panel.name} — widok od wewnątrz` : panel.name;
+  const isTrav = panel.kind === "trawers-pion" || panel.kind === "listwa";
+  const label = side ? `${panel.name} — strona ${side}` : panel.kind === "bok" ? `${panel.name} — widok od wewnątrz`
+    : panel.kind === "listwa" ? `${panel.name} — od wnętrza, naroże z lewej` : panel.name;
   let b = title(L / 2, -58 * u, label, `${fmt(L)} × ${fmt(H)} × ${fmt(panel.thickness)} mm · ${panel.qty} szt.${scaleNote(scale)}`);
   b += `<rect x="0" y="0" width="${r1(L)}" height="${r1(H)}" fill="${C.white}" stroke="${C.slate600}" stroke-width="${r1(1.5 * u)}"/>`;
   if (!isTrav) {
@@ -173,9 +177,10 @@ export function panelSVGs(panels, scale) {
   panels.forEach((p) => {
     const start = n;
     n += p.holes.length;
+    if (p.outline) { out.push(lPanelSVG(p, scale)); return; }
     if (!p.holes.length) return;
     if (p.kind === "przegroda") out.push(verticalPanelSVG(p, start, scale, "lewa"), verticalPanelSVG(p, start, scale, "prawa"));
-    else if (p.kind === "bok" || p.kind === "trawers-pion") out.push(verticalPanelSVG(p, start, scale));
+    else if (isVertical(p)) out.push(verticalPanelSVG(p, start, scale));
     else out.push(horizontalPanelSVG(p, start, scale));
   });
   return out;

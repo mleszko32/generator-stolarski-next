@@ -50,7 +50,16 @@ szafki od frontu, też skos) rysowane przez `cabinetLocatorSVG` z podświetlonym
 w legendzie; montaż w izometrii, kolejność kroków, „Gdzie w projekcie” z `computeWallLayouts`),
 okno `ui/cabinetInstructions.js`, sekcja huba „Instrukcje montażu”. Wspólne klocki rysunków instrukcji (otwory, rowki,
 wymiary, izometria, widok szafki od frontu) są w `render/workshopDrawing.js`, style okien w `WORKSHOP_CSS`
-(`ui/drawerBoxDrawings.js`) — skrzynki szuflad i szafki wyglądają tak samo. Narożna i skos: jeszcze bez instrukcji.
+(`ui/drawerBoxDrawings.js`) — skrzynki szuflad i szafki wyglądają tak samo. Skos: jeszcze bez instrukcji.
+
+Szafka narożna: `engine/cornerDrillings.js` (czyste, z testami; `getCornerPanels` w tym samym formacie co
+`getCabinetPanels`) — boki ramion (łączniki wieńców z `jointSetsFor`, jak w zwykłej szafce — ten sam rozstaw ma rysunek
+2D narożnika), listwa narożna (podpórki, kołki w czołach pod kołki w licu wieńców), wieńce L dolny i górny (kind
+`poziom-L`, `outline`, otwory w czołach `koniec-A`/`koniec-B` z `z` od przodu), półka L z wycięciem na listwę, plecy.
+Rysunki `render/cornerInstructions2d.js`: `lPanelSVG` (formatka L z linią przerywaną formatki z rozkroju), montaż w
+izometrii (z = legB − Z, żeby oba fronty były widoczne), `cornerStepsHtml`. Półki i przegrody w ramionach (`cornerArm`)
+są tylko w tabeli formatek — ich otworów instrukcja jeszcze nie liczy. Lista okuć liczy złącza narożnika z wkrętów w
+czołach wieńców L zamiast ryczałtu 8.
 
 ## Stół RC System
 

@@ -6,6 +6,7 @@ import { state } from "../core/state.js";
 import { calculateHinges } from "../core/hingeMath.js";
 import { fmtMm } from "../utils/math.js";
 import { recalculateLayout, getCornerDepths } from "../core/layout.js";
+import { jointSetsFor } from "./carcaseParts.js";
 
 // Szafka narożna, kąt prosty (mod.type === 'corner_cabinet', core/
 // state.js: addCornerModule) - korpus i plecy dla modułu o dwóch
@@ -183,7 +184,7 @@ export function getCornerPartsGeometry(mod, config = state.project) {
 // core/shelfMath.js: calculateShelfHoles) - półka L opiera się na OBU bokach
 // (bok ramienia A i bok ramienia B), więc każdy z nich dostaje dwa rzędy
 // (37 mm od przodu i od tyłu) po 3 otwory na każdą półkę. Zwraca opis obu
-// boków w układzie rysunku: x = odległość od tylnej krawędzi boku, y = od dołu.
+// boków w układzie rysunku: x = odległość od PRZEDNIEJ krawędzi boku, y = od dołu.
 export function getCornerShelfHoles(mod, config = state.project) {
   const shelves = (mod.elements || []).filter(el => el.typ === 'poziom-narozny');
   const backThick = parseFloat(config.materials?.backThickness) || 3;
@@ -207,13 +208,15 @@ export function getCornerShelfHoles(mod, config = state.project) {
       });
     });
     // Łączenia z wieńcem dolnym i górnym (jak getCorpusHoles zwykłego
-    // modułu): wkręt 37 mm od przodu/tyłu, kołek 32 mm dalej, w połowie
-    // grubości wieńca. Listwa nie ma ich na płaszczyźnie (idą w jej krawędź).
+    // modułu): zestawy wkręt + kołek z engine/carcaseParts.js: jointSetsFor
+    // (skrajne 37 mm od przodu i tyłu, środkowe przy głębokim boku, tylny wg
+    // stołu RC System), w połowie grubości wieńca; x od przodu boku. Listwa
+    // nie ma ich na płaszczyźnie (idą w jej krawędź).
     const joints = [];
     if (withJoints) {
+      const sets = jointSetsFor(mod, config, sideDepth);
       [th / 2, height - th / 2].forEach(y => {
-        joints.push({ x: 37, y, type: 'screw' }, { x: 37 + 32, y, type: 'dowel' });
-        joints.push({ x: sideDepth - 37, y, type: 'screw' }, { x: sideDepth - 37 - 32, y, type: 'dowel' });
+        sets.forEach(set => joints.push({ x: set.screw, y, type: 'screw' }, { x: set.dowel, y, type: 'dowel' }));
       });
     }
     return { name, depth: sideDepth, height: h, bottom, holes, joints, hingePlates: [] };

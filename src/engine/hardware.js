@@ -10,6 +10,7 @@ import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "./edgeBanding.js";
 import { recalculateAllLayouts } from "../core/layout.js";
 import { calculateAllProjectParts } from "./cabinet.js";
 import { getCabinetPanels } from "./cabinetDrillings.js";
+import { getCornerPanels } from "./cornerDrillings.js";
 
 export function calculateProjectHardware() {
   recalculateAllLayouts();
@@ -51,10 +52,11 @@ export function calculateProjectHardware() {
     // Faktyczna liczba zestawów z otworów korpusu (engine/cabinetDrillings.js - wieńce, trawersy,
     // półki stałe, mocowanie przegród; rozstaw wg engine/carcaseParts.js: jointSetPositions).
     // Każdy zestaw ma jeden wkręt, liczony raz - w formatce poziomej (czoło / lico) albo trawersie
-    // pionowym. Szafka narożna i pod skos nie mają jeszcze tych danych - po staremu 8.
-    const corpusPanels = getCabinetPanels(mod, config);
+    // pionowym. Szafka narożna: wkręty w czołach wieńców L (engine/cornerDrillings.js). Szafka
+    // pod skos nie ma jeszcze tych danych - po staremu 8.
+    const corpusPanels = mod.type === "corner_cabinet" ? getCornerPanels(mod, config) : getCabinetPanels(mod, config);
     const joinSets = corpusPanels.length
-      ? corpusPanels.filter((pn) => pn.kind === "poziom" || pn.kind === "polka" || pn.kind === "trawers-pion")
+      ? corpusPanels.filter((pn) => pn.kind === "poziom" || pn.kind === "polka" || pn.kind === "trawers-pion" || pn.kind === "poziom-L")
           .reduce((n, pn) => n + pn.holes.filter((h) => h.kind === "wkret").length, 0)
       : 8;
     hardwareList[joinKey].qty += joinSets;
