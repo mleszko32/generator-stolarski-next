@@ -193,11 +193,13 @@ function subtract(segments, cuts) {
 //   corners: [ustawienia narożnika dla każdej pary sąsiednich ścian],
 //   armLength: { wallId: mm } - długość ciągu na skrajnych ścianach liczona od narożnika (puste = cała ściana),
 //   fill: opcje divideSegment (mode, catalog, count, split, restMode, maxFiller, roundTo, fillerSide),
-//   choice: { 'wallId:i': indeks wariantu }, openingMargin, doorPassage }
+//   choice: { 'wallId:i': indeks wariantu },
+//   custom: { 'wallId:i': własne szerokości jak w trybie 'fixed', np. "600, 800, *, *" },
+//   openingMargin, doorPassage }
 // Zwraca { walls: [{ wallId, length, segments: [{ key, u0, u1, variants, chosen, items }] }],
 //          modules, panels, warnings } - modules/panels to gotowe obiekty do wstawienia.
 export function planKitchenRun(project, opts) {
-  const { walls, type = "base_cabinet", template = null, corners = [], armLength = {}, fill = {}, choice = {} } = opts;
+  const { walls, type = "base_cabinet", template = null, corners = [], armLength = {}, fill = {}, choice = {}, custom = {} } = opts;
   const sim = JSON.parse(JSON.stringify(project));
   sim.modules = sim.modules || [];
   sim.sidePanels = sim.sidePanels || [];
@@ -241,12 +243,14 @@ export function planKitchenRun(project, opts) {
           const touchesEnd = endCorner && s.u1 === nearEnd;
           const fillerSide = touchesStart && touchesEnd ? (fill.fillerSide || "right")
             : touchesStart ? "right" : touchesEnd ? "left" : (fill.fillerSide || "right");
-          const variants = divideSegment(s.u1 - s.u0, { ...fill, fillerSide });
           const key = `${wallId}:${si}`;
+          // Własne szerokości wpisane dla tego odcinka mają pierwszeństwo przed podziałem ogólnym.
+          const own = String(custom[key] || "").trim();
+          const variants = divideSegment(s.u1 - s.u0, own ? { ...fill, fillerSide, mode: "fixed", split: own } : { ...fill, fillerSide });
           const chosen = Math.min(num(choice[key]), variants.length - 1);
           const v = variants[chosen];
           const items = v && !v.error ? buildFillItems(s, v) : [];
-          return { key, u0: s.u0, u1: s.u1, variants, chosen, items };
+          return { key, u0: s.u0, u1: s.u1, variants, chosen, items, custom: own };
         }),
       };
     });

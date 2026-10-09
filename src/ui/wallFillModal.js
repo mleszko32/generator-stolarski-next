@@ -27,7 +27,7 @@ const MODES = [
 // Ustawienia zostają między otwarciami okna (w obrębie sesji).
 // scope 'kitchen' = zabudowa L/U od narożników (core/kitchenRun.js).
 const cfg = {
-  scope: "wall", presetId: "lewa+tyl", corners: null, armLength: {}, choice: {},
+  scope: "wall", presetId: "lewa+tyl", corners: null, armLength: {}, choice: {}, custom: {},
   wallId: "tyl", type: "base_cabinet", templateId: "",
   u0: null, u1: null,
   openingMargin: 50, doorPassage: 600,
@@ -115,7 +115,7 @@ export function openWallFillModal(onChange) {
   $("#wf-maxfiller").value = cfg.maxFiller;
 
   const resetSegment = () => { cfg.u0 = null; cfg.u1 = null; cfg.variant = 0; cfg.choice = {}; };
-  const resetKitchen = () => { cfg.corners = null; cfg.choice = {}; };
+  const resetKitchen = () => { cfg.corners = null; cfg.choice = {}; cfg.custom = {}; };
   $("#wf-wall").addEventListener("change", (e) => { cfg.wallId = e.target.value; resetSegment(); refresh(); });
   $("#wf-template").addEventListener("change", (e) => { cfg.templateId = e.target.value; resetSegment(); resetKitchen(); refresh(); });
   bindSeg("#wf-type", "type", (v) => { cfg.type = v; cfg.templateId = ""; resetSegment(); resetKitchen(); });
@@ -193,7 +193,7 @@ export function openWallFillModal(onChange) {
     }
     const plan = planKitchenRun(state.project, {
       walls: preset.walls, type: cfg.type, template, corners: cfg.corners, armLength: cfg.armLength,
-      fill: fillOpts(), choice: cfg.choice, openingMargin: cfg.openingMargin, doorPassage: cfg.doorPassage,
+      fill: fillOpts(), choice: cfg.choice, custom: cfg.custom, openingMargin: cfg.openingMargin, doorPassage: cfg.doorPassage,
     });
     kcalc = { preset, row, plan };
     renderKitchenSetup();
@@ -259,7 +259,9 @@ export function openWallFillModal(onChange) {
               const fill = v.fillers.length ? ` · blenda ${v.fillers.map((f) => fmt(f.width)).join(" + ")} mm` : "";
               return `<option value="${i}"${i === s.chosen ? " selected" : ""}>${escapeHtml(v.label)}${fill}${v.warnings.length ? " ⚠" : ""}</option>`;
             }).join("")}</select>`;
-        return `<div class="row-center mb-8"><span class="list-row-sub" style="min-width:150px">${fmt(s.u0)}–${fmt(s.u1)} (${fmt(s.u1 - s.u0)} mm)</span>${pick}</div>`;
+        const own = `<input type="text" class="input wf-own" data-custom="${s.key}" value="${escapeHtml(s.custom || "")}"
+            placeholder="własne szerokości, np. 600, 800, *" title="Szerokości szafek od lewej (patrząc na ścianę), * = podziel resztę. Puste = podział ogólny.">`;
+        return `<div class="row-center mb-8" style="flex-wrap:wrap"><span class="list-row-sub" style="min-width:150px">${fmt(s.u0)}–${fmt(s.u1)} (${fmt(s.u1 - s.u0)} mm)</span>${own}${pick}</div>`;
       }).join("") : `<div class="empty-note">Brak wolnego miejsca.</div>`;
       return `<div class="field"><label>${escapeHtml(wallLabel(w.wallId))}</label>${segs}</div>`;
     }).join("");
@@ -268,6 +270,11 @@ export function openWallFillModal(onChange) {
     el.innerHTML = `${walls}${warn}
       <div class="wf-preview">${planSvg(plan)}</div>
       <div class="modal-sub" style="margin:6px 0 0">Do wstawienia: ${cabinets} szafek, ${panels} blend / zaślepek.</div>`;
+    el.querySelectorAll("[data-custom]").forEach((inp) => inp.addEventListener("change", () => {
+      cfg.custom[inp.dataset.custom] = inp.value.trim();
+      cfg.choice[inp.dataset.custom] = 0;
+      refresh();
+    }));
     el.querySelectorAll("[data-choice]").forEach((sel) => sel.addEventListener("change", () => {
       cfg.choice[sel.dataset.choice] = +sel.value;
       refresh();

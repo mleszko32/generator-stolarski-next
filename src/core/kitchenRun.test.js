@@ -103,6 +103,18 @@ describe("planKitchenRun", () => {
     expect(plan.warnings.some((w) => /Przejście między ramionami U/.test(w))).toBe(true);
   });
 
+  it("własne szerokości dla odcinka mają pierwszeństwo przed podziałem ogólnym", () => {
+    const a = planKitchenRun(state.project, { walls: ["lewa", "tyl"], corners: [{ kind: "L" }], fill });
+    const key = a.walls[1].segments[0].key; // tylna 900-4000 (3100 mm)
+    const b = planKitchenRun(state.project, { walls: ["lewa", "tyl"], corners: [{ kind: "L" }], fill, custom: { [key]: "600, 800, *, *" } });
+    const seg = b.walls[1].segments[0];
+    expect(seg.custom).toBe("600, 800, *, *");
+    expect(seg.items.filter((i) => i.kind === "cabinet").map((i) => i.width)).toEqual([600, 800, 850, 850]);
+    const bad = planKitchenRun(state.project, { walls: ["lewa", "tyl"], corners: [{ kind: "L" }], fill, custom: { [key]: "2000, 2000" } });
+    expect(bad.walls[1].segments[0].variants[0].error).toMatch(/nie mieszczą/);
+    expect(bad.walls[1].segments[0].items).toEqual([]);
+  });
+
   it("wybór wariantu podziału dla odcinka", () => {
     const a = planKitchenRun(state.project, { walls: ["lewa", "tyl"], corners: [{ kind: "L" }], fill });
     const key = a.walls[1].segments[0].key;

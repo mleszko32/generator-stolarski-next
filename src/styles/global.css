@@ -668,3 +668,4 @@ button, input, select, textarea { font-family: inherit; }
 .wf-corner { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 10px; background: var(--surface-subtle); }
 .wf-corner-head { font-size: var(--fs-md); font-weight: 600; margin-bottom: 8px; color: var(--text-primary); }
 .wf-corner .field-row > .field { min-width: 140px; }
+.wf-own { width: 230px; }
