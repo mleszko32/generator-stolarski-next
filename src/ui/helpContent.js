@@ -198,19 +198,15 @@ export const HELP_SECTIONS = [
         <li><b>Rysunki 2D</b> - rysunki formatek z wierceniami (wydruk pojedynczej formatki na A4).</li>
         <li><b>Skrzynki szuflad</b> - rysunki skrzynek drewnianych (MOVENTO) z otworami łączników.</li>
         <li><b>Instrukcje montażu</b> - kolejność składania i rysunki każdej szafki. Po zaznaczeniu
-        „Wiercę na stole RC System” dochodzi karta wiercenia (krawędź do pinów, otwór bazowy z pinem, pozycje
-        otworów). Przód formatki zawsze do zderzaka przedniej wiertarki (37 mm). Tylna wiertarka: zderzakiem do
-        tylnej krawędzi (37 mm od tyłu) albo na pinie w szynie - wtedy otwór wypada w najbliższym otworze szyny
-        (29–45 mm od tyłu). Kalibracja stołu z warsztatu (przednia pin 3, formatka 510 mm, tylna pin 7 → 40 mm
-        od tyłu) jest wpisana domyślnie; karta wiercenia podaje numer tylnego pinu dla każdej głębokości, a pod
-        ustawieniami widać przykłady (np. 521 mm → pin 6). Przestawienie przedniej wiertarki na inny pin nie
-        zmienia położenia otworów - tylny pin przesuwa się razem z nim (przednia 2 zamiast 3 = tylna 6 zamiast 7);
-        wpisz pin, na którym pracujesz, w „Pin przedniej
-        wiertarki przy pracy”. Środkowe łączniki (głębokie boki) wierci tylna wiertarka przesunięta do przodu,
-        przednią stroną do pinu (od pinu do wiertła 37 mm) - karta podaje numer pinu (np. bok 510 mm: 245/277 mm, pin 16 po stronie przedniej wiertarki). Szyna jest numerowana z obu końców,
-        więc karta zawsze mówi, po której stronie liczyć pin (ustawienie „Przednia wiertarka stoi”, domyślnie po lewej). Stół przyjmuje
-        formatki do 650 mm; przy bokach głębszych niż ok. 600 mm tylny pin wychodzi poza szynę - karta każe wtedy
-        dosunąć tylną wiertarkę zderzakiem (37 mm od tyłu).</li>
+        „Wiercę na stole RC System” dochodzi karta wiercenia: która krawędź do pinów, otwór bazowy z pinem
+        i ustawienie wiertarek dla każdego zestawu łączników - z numerem pinu i stroną szyny (np. „pin 7 po prawej”,
+        „od zera prawej listwy, bez pinu”). Przód formatki zawsze do zderzaka przedniej wiertarki (37 mm). Program
+        zna listwę: pin n opiera wiertarkę 16·n mm od zera, pin ma Ø5 mm, od pinu do wiertła jest 37 mm, a między
+        zerami listew 667 mm (z pomiaru: przednia pin 3, formatka 510 mm, tylna pin 7 → 470 mm). Środkowe łączniki
+        wierci tylna wiertarka przesunięta do przodu, przednią stroną do pinu (bok 510 mm: 245/277 mm, pin 16 po
+        lewej). Dla głębokich formatek program sam schodzi z przednią wiertarką na niższy pin; stół przyjmuje
+        formatki do 650 mm. Wpisz pin, na którym zwykle pracujesz, w „Pin przedniej wiertarki przy pracy”
+        (0 = do zera listwy bez pinu), a stronę stołu w „Przednia wiertarka stoi”.</li>
         <li><b>Rzuty ścian</b> - widok każdej ściany z szafkami i otworami.</li>
         <li><b>Blaty</b> - odcinki blatów i łączenia w narożnikach.</li>
         <li><b>Okucia i okleina</b> - lista zakupów (nóżki, łączniki, komplety szuflad, zawiasy, okleina w mb).</li>

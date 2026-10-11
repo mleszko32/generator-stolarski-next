@@ -75,22 +75,18 @@ karty. Lista okuć liczy złącza skosu z otworów (dno, skos, półki stałe) z
 
 **Stół RC System** (rcsystem.pl, ręczny stół do nawiercania): `core/rcSystem.js` (czyste, z testami) — otwory bazowe
 w blacie (`RC_BASES`, mm od osi wiertła) + piny +0,5…+2 (`baseAndPin`), ustawienia `project.rcSystem` (włączony, tylna
-wiertarka „pin” w szynie co 16 mm albo „zderzak” 37 mm, kalibracja: głębokość boku + tylny otwór od tyłu; domyślnie
-pomiar z warsztatu: przednia pin 3, formatka 510 mm, tylna pin 7 → 470 mm od przodu = 40 mm od tyłu, `RC_DEFAULT_CALIB`;
-z numeru pinu przy pomiarze karta wiercenia podaje numer tylnego pinu dla każdej głębokości; pin przedniej wiertarki
-nie zmienia położenia otworów w mm - formatka przesuwa się razem z nią - tylko numer tylnego pinu: oba przesuwają się razem
-(różnica tylny − przedni stała dla danej głębokości, warsztat: 3/7 i 2/6), `rcPinsFor` nie przestawia przedniej; tylny pin za środkową dziurą liczony od strony przedniej wiertarki, a poza szyną
-od tyłu (formatki ok. > 600 mm) — tylna wiertarka zderzakiem, 37 mm od tyłu; stół przyjmuje formatki do `RC_MAX_DEPTH` = 650 mm,
-głębsze boki: ostrzeżenie na karcie wiercenia i w kontroli projektu); środkowe zestawy
-łączników wierci tylna wiertarka przesunięta do przodu, przednią stroną do pinu; od pinu do najbliższego wiertła jest
-z obu stron ok. 37 mm; środek ma własną kalibrację z pomiaru (formatka 510, przednia pin 3, środek pin 16 od przodu →
-245/277; z samej geometrii wychodziło 5 mm mniej) — `rcMidGrid` → `jointSetPositions(..., midGrid)`: wkręt na tylnym
-wrzecionie, kołek 32 mm bliżej przodu; numer pinu (od końca przedniej wiertarki, za środkową dziurą od końca tylnej) na karcie z `rcMidPinForX`; strona szyny w
-opisie pinu z `rcPinSideText` i ustawienia `frontSide` — domyślnie przednia wiertarka po lewej) i
-`rcRearScrew` — położenie tylnego wkrętu (na pinie: najbliższy otwór szyny, czyli 37 ± 8 mm od tyłu, 29…45); gdy pewne (zderzak / pin po kalibracji), `jointSetsFor` w `carcaseParts.js`
-przesuwa tylny zestaw łączników wszędzie (rysunek 2D, instrukcje, okucia). `rcPanelSetups` grupuje otwory boku wg
-ustawienia (krawędź do pinów + otwór bazowy, pozycje wzdłuż, pary co 32 mm = jedno wiercenie) — karta „Wiercenie na
-stole RC System” w instrukcji szafki, ustawienia w hubie „Instrukcje montażu”. Łączniki wieńców / półek stałych liczą
+wiertarka „pin” albo „zderzak” 37 mm, pin przedniej przy pracy, strona stołu `frontSide`, kalibracja). **Model listwy**
+(pomiary w warsztacie): każda listwa ma zero na swoim końcu, pin w otworze n opiera wiertarkę 16·n mm od zera, pin ma
+Ø5 mm, od styku z pinem do najbliższego wiertła 37 mm (którąkolwiek stroną), „pin 0” = do zera bez pinu; przód formatki
+przy zderzaku przedniej wiertarki w 16·f. Odległość między zerami `rcRailLength` = 667 mm wynika z kalibracji
+`RC_DEFAULT_CALIB` (przednia pin 3, formatka 510, tylna pin 7 od tyłu → 470 mm) i zgadza się z resztą pomiarów: środek
+na pinie 16 od przodu → 245/277, największa formatka 667 − 16 ≈ 650 mm (`RC_MAX_DEPTH`). `rcRearScrew` wybiera pin za
+tylną wiertarką najbliższy 37 mm od tyłu (29…45; koniec szyny → zderzak), `rcFrontPinFor` obniża pin przedni dla
+głębokich formatek, `rcMidGrid` / `rcMidPinForX` — środkowe zestawy tylną wiertarką przodem do pinu (wkręt na tylnym
+wiertle, kołek 32 mm bliżej przodu); `jointSetsFor` w `carcaseParts.js` przesuwa wg tego zestawy wszędzie (rysunek 2D,
+instrukcje, okucia). Opis pinu ze stroną szyny: `rcPinSideText`. Bok > 650 mm: ostrzeżenie na karcie i w kontroli
+projektu. `rcPanelSetups` grupuje otwory boku wg ustawienia (krawędź do pinów + otwór bazowy, pozycje wzdłuż, pary co
+32 mm = jedno wiercenie) — karta „Wiercenie na stole RC System” w instrukcji szafki. Łączniki wieńców / półek stałych liczą
 się od głębokości połączenia `jointDepthOf` (głębokość wieńca), tylny rząd podpórek 37 mm od tyłu boku.
 
 ## DXF frontów na CNC

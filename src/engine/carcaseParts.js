@@ -49,7 +49,7 @@ export function jointSetPositions(depth, maxSpacing = DEFAULT_JOINT_SPACING, rea
 }
 // Zestawy dla formatki o głębokości depth w danej szafce (rozstaw z konstrukcji, tylny
 // otwór wg stołu RC System, jeśli włączony i skalibrowany / na zderzaku).
-export const jointSetsFor = (mod, config, depth) => jointSetPositions(depth, jointSpacingOf(mod, config), rcRearOverride(depth, config), rcMidGrid(config));
+export const jointSetsFor = (mod, config, depth) => jointSetPositions(depth, jointSpacingOf(mod, config), rcRearOverride(depth, config), rcMidGrid(config, depth));
 // Głębokość połączenia wieniec / półka stała z bokiem = głębokość wieńca (bez pleców, przy
 // plecach w nucie także bez odsunięcia nutu). Od niej liczą się zestawy łączników - tylny
 // zestaw 37 mm od tyłu WIEŃCA, a nie od tyłu szafki (wcześniej od głębokości szafki: przy
