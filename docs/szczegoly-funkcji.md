@@ -74,12 +74,13 @@ karty. Lista okuć liczy złącza skosu z otworów (dno, skos, półki stałe) z
 ## Stół RC System
 
 **Stół RC System** (rcsystem.pl, ręczny stół do nawiercania): `core/rcSystem.js` (czyste, z testami) — otwory bazowe
-w blacie (`RC_BASES`, mm od osi wiertła) + piny +0,5…+2 (`baseAndPin`), ustawienia `project.rcSystem` (włączony, tylna
-wiertarka „pin” w szynie co 16 mm albo „zderzak” 37 mm, kalibracja: głębokość boku + tylny otwór od tyłu) i
-`rcRearScrew` — położenie tylnego wkrętu; gdy pewne (zderzak / pin po kalibracji), `jointSetsFor` w `carcaseParts.js`
-przesuwa tylny zestaw łączników wszędzie (rysunek 2D, instrukcje, okucia). `rcPanelSetups` grupuje otwory boku wg
-ustawienia (krawędź do pinów + otwór bazowy, pozycje wzdłuż, pary co 32 mm = jedno wiercenie) — karta „Wiercenie na
-stole RC System” w instrukcji szafki, ustawienia w hubie „Instrukcje montażu”. Łączniki wieńców / półek stałych liczą
+w blacie (`RC_BASES`, mm od osi wiertła) + piny +0,5…+2 (`baseAndPin`), ustawienie `project.rcSystem.enabled`. Obie
+wiertarki (przednia i tylna) mają własny zderzak jadący z wiertarką: formatka opiera się o niego krawędzią, więc otwór
+wypada zawsze 37 mm od przodu / od tyłu (`rcRearScrew` = głębokość − 37). Pin w szynie (otwory co 16 mm, numerowane od
+obu końców — sprawdzone pomiarem w warsztacie) tylko blokuje wiertarkę i nie zmienia tej odległości; dawny tryb „pin +
+kalibracja” był błędnym założeniem i został usunięty (stare pola w projektach są ignorowane). `rcPanelSetups` grupuje
+otwory boku wg ustawienia (krawędź do pinów + otwór bazowy, pozycje wzdłuż, pary co 32 mm = jedno wiercenie) — karta
+„Wiercenie na stole RC System” w instrukcji szafki, przełącznik w hubie „Instrukcje montażu”. Łączniki wieńców / półek stałych liczą
 się od głębokości połączenia `jointDepthOf` (głębokość wieńca), tylny rząd podpórek 37 mm od tyłu boku.
 
 ## DXF frontów na CNC

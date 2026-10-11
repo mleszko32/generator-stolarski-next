@@ -242,8 +242,9 @@ szafki). Wspólne klocki rysunków w `render/workshopDrawing.js`. Szafka narożn
 (boki ramion, listwa, wieńce/półki L z otworami z `cornerParts.js`) + `render/cornerInstructions2d.js`. Skos:
 `engine/slopeDrillings.js` (otwory z `getSlopeDrillings`) + `render/slopeInstructions2d.js`.
 
-**Stół RC System**: `core/rcSystem.js` (czyste, z testami), ustawienia `project.rcSystem`; `rcRearScrew` przesuwa
-tylny zestaw łączników w `jointSetsFor` (`carcaseParts.js`) — wszędzie: rysunek 2D, instrukcje, okucia.
+**Stół RC System**: `core/rcSystem.js` (czyste, z testami), ustawienie `project.rcSystem.enabled`. Obie wiertarki
+mają własny zderzak, więc łączniki zawsze 37 mm od przedniej i tylnej krawędzi (pin w szynie co 16 mm tylko blokuje
+wiertarkę); `rcRearScrew` trafia do `jointSetsFor` (`carcaseParts.js`) — rysunek 2D, instrukcje, okucia.
 
 **Plan rozkroju**: `engine/nesting.js` — „półkowe” układanie formatek na arkuszach z cięciami na
 wylot (sprawdza kilka orientacji, wybiera najmniej arkuszy), wyświetlane przez

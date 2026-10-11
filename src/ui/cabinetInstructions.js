@@ -20,7 +20,7 @@ import { cornerAssemblySVG, cornerStepsHtml } from "../render/cornerInstructions
 import { getSlopePanels, getSlopeConstruction } from "../engine/slopeDrillings.js";
 import { slopeAssemblySVG, slopeStepsHtml } from "../render/slopeInstructions2d.js";
 import { WORKSHOP_CSS } from "./drawerBoxDrawings.js";
-import { getRcSettings, rcPanelSetups, rcRearScrew, RC_FRONT_STOP, RC_RAIL_STEP } from "../core/rcSystem.js";
+import { getRcSettings, rcPanelSetups, RC_FRONT_STOP } from "../core/rcSystem.js";
 
 const fmt = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
 const TYPE = { base_cabinet: "Szafka dolna", upper_cabinet: "Szafka wisząca", tall_cabinet: "Słupek", corner_cabinet: "Szafka narożna", slope_cabinet: "Szafka pod skos" };
@@ -32,8 +32,7 @@ export const supportsInstructions = (mod) => !!mod;
 // pionowych tej szafki, posortowane wg otworu bazowego (najmniej przestawiania pinów), pary
 // co 32 mm jako jedno wiercenie; wieńce / półki stałe / przegrody - otwory w czole (nakładka).
 function rcCardHtml(panels) {
-  const rc = getRcSettings(state.project);
-  if (!rc.enabled) return "";
+  if (!getRcSettings(state.project).enabled) return "";
   const vertical = panels.filter((p) => (p.kind === "bok" || p.kind === "przegroda") && p.holes.length);
   const rows = [];
   vertical.forEach((p) => {
@@ -49,14 +48,11 @@ function rcCardHtml(panels) {
     const pos = shot.map((v) => fmt(v)).join(" + ");
     const pair = shot.length === 2 ? " <span class=\"muted\">(1 wiercenie, 2 wrzeciona)</span>" : "";
     if (row.st.alongFrom !== "przód") return `${pos}${pair}`;
-    // Łączniki przy dole / górze: przednia wiertarka od zderzaka, tylna wg trybu, środkowe - pin w szynie.
-    if (i === 0 && Math.abs(shot[0] - RC_FRONT_STOP) < 0.05) return `${pos}${pair} - przednia wiertarka, przód do zderzaka 37`;
-    if (i === all.length - 1 && all.length > 1) {
-      const r = rcRearScrew(row.depth, rc);
-      if (rc.rearMode === "stop") return `${pos}${pair} - tylna wiertarka zderzakiem do tylnej krawędzi`;
-      return r.exact
-        ? `${pos}${pair} - tylna wiertarka na pinie w szynie (${fmt(row.depth - r.x)} mm od tyłu)`
-        : `${pos}${pair} - tylna wiertarka na najbliższym pinie w stronę formatki: otwór ${RC_FRONT_STOP}–${RC_FRONT_STOP + RC_RAIL_STEP - 1} mm od tyłu - <b>sprawdź pierwszą sztukę</b> (dokładnie po kalibracji w hubie)`;
+    // Łączniki przy dole / górze: przednia wiertarka - przód formatki do jej zderzaka, tylna -
+    // tył formatki do jej zderzaka (oba 37 mm), środkowe - pin w szynie.
+    if (i === 0 && Math.abs(shot[0] - RC_FRONT_STOP) < 0.05) return `${pos}${pair} - przednia wiertarka, przód formatki do zderzaka (37)`;
+    if (i === all.length - 1 && all.length > 1 && Math.abs(row.depth - shot[shot.length - 1] - RC_FRONT_STOP) < 0.05) {
+      return `${pos}${pair} - tylna wiertarka, tył formatki do zderzaka (37 od tyłu)`;
     }
     return `${pos}${pair} - wiertarka zablokowana pinem w szynie (${fmt(shot[0])} mm od przodu)`;
   };

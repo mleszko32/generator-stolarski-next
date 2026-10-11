@@ -15,33 +15,17 @@ describe("stół RC System - otwór bazowy + pin", () => {
 });
 
 describe("stół RC System - tylny otwór łączników", () => {
-  it("zderzak do tylnej krawędzi: 37 mm od tyłu", () => {
-    expect(rcRearScrew(510, { rearMode: "stop" })).toEqual({ x: 473, exact: true });
+  // Obie wiertarki mają własny zderzak (pomiar w warsztacie): otwór zawsze 37 mm od krawędzi
+  // opartej o zderzak, niezależnie od pinu w szynie i głębokości formatki.
+  it("tylna wiertarka zderzakiem: zawsze 37 mm od tyłu, dla każdej głębokości", () => {
+    [320, 400, 510, 513, 600].forEach((D) => expect(rcRearScrew(D)).toEqual({ x: D - 37, exact: true }));
   });
 
-  it("pin bez kalibracji: położenie robocze 37 od tyłu + zakres 37…52", () => {
-    expect(rcRearScrew(510, { rearMode: "pin" })).toEqual({ x: 473, exact: false, range: [37, 52] });
-  });
-
-  it("pin z kalibracją (bok 510 -> 45 od tyłu): siatka co 16 mm, zawsze co najmniej 37 od tyłu", () => {
-    const s = { rearMode: "pin", calibDepth: 510, calibRear: 45 };
-    expect(rcRearScrew(510, s).x).toBe(465);                    // 45 od tyłu
-    expect(526 - rcRearScrew(526, s).x).toBe(45);               // +16 mm głębokości -> ta sama odległość od tyłu
-    const r560 = 560 - rcRearScrew(560, s).x;
-    expect(r560).toBeGreaterThanOrEqual(37);
-    expect(r560).toBeLessThan(53);
-    [320, 400, 513, 600].forEach((D) => {
-      const r = D - rcRearScrew(D, s).x;
-      expect(r).toBeGreaterThanOrEqual(37);
-      expect(r).toBeLessThan(53);
-    });
-  });
-
-  it("nadpisanie tylko gdy stół włączony i wynik pewny", () => {
-    expect(rcRearOverride(510, { rcSystem: { enabled: false, rearMode: "stop" } })).toBeNull();
-    expect(rcRearOverride(510, { rcSystem: { enabled: true, rearMode: "pin" } })).toBeNull();
-    expect(rcRearOverride(510, { rcSystem: { enabled: true, rearMode: "pin", calibDepth: 510, calibRear: 45 } })).toBe(465);
-    expect(getRcSettings({}).rearMode).toBe("pin");
+  it("nadpisanie tylko gdy stół włączony; stare ustawienia pin/kalibracja są ignorowane", () => {
+    expect(rcRearOverride(510, { rcSystem: { enabled: false } })).toBeNull();
+    expect(rcRearOverride(510, { rcSystem: { enabled: true } })).toBe(473);
+    expect(rcRearOverride(510, { rcSystem: { enabled: true, rearMode: "pin", calibDepth: 510, calibRear: 45 } })).toBe(473);
+    expect(getRcSettings({})).toEqual({ enabled: false });
   });
 
   it("zestawy łączników z tylnym otworem ze stołu; środkowe dalej w rastrze 32 od przodu", () => {

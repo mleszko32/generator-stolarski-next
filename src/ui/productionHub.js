@@ -415,16 +415,8 @@ function renderInstrukcje(el) {
     </div>
     <div class="field-grid" style="margin:12px 0">
       <label class="hub-sub"><input type="checkbox" id="rc-on" ${rc.enabled ? 'checked' : ''}/> Wiercę na stole RC System (karta wiercenia w instrukcjach)</label>
-      ${rc.enabled ? `
-      <div class="field"><label>Tylna wiertarka</label><select id="rc-rear">
-        <option value="pin" ${rc.rearMode === 'pin' ? 'selected' : ''}>Na pinie w szynie (co 16 mm)</option>
-        <option value="stop" ${rc.rearMode === 'stop' ? 'selected' : ''}>Zderzakiem do tylnej krawędzi (37 mm)</option>
-      </select></div>
-      ${rc.rearMode === 'pin' ? `
-      <div class="field"><label>Kalibracja: głębokość zmierzonego boku [mm]</label><input type="number" class="rc-f" data-k="calibDepth" value="${rc.calibDepth ?? ''}" placeholder="np. 510"></div>
-      <div class="field"><label>Kalibracja: tylny wkręt od tylnej krawędzi [mm]</label><input type="number" class="rc-f" data-k="calibRear" value="${rc.calibRear ?? ''}" placeholder="np. 45" step="0.5"></div>` : ''}` : ''}
+      ${rc.enabled ? '<p class="hub-sub">Obie wiertarki ze zderzakiem: łączniki 37 mm od przedniej i od tylnej krawędzi. Pin w szynie (co 16 mm) tylko blokuje wiertarkę.</p>' : ''}
     </div>
-    ${rc.enabled && rc.rearMode === 'pin' && !(rc.calibDepth > 0 && rc.calibRear >= 37) ? '<p class="notice-warn fs-xs">Bez kalibracji tylny otwór łączników wypada 37–52 mm od tyłu (najbliższy pin szyny w stronę formatki) - rysunki pokazują 37 mm, a karta wiercenia każe sprawdzić pierwszą sztukę. Zmierz raz jeden bok i wpisz dwie liczby wyżej.</p>' : ''}
     ${mods.length === 0 ? '<p class="hub-empty">Projekt nie ma jeszcze szafek.</p>' : `
     <table class="hub-table">
       <thead><tr><th>Szafka</th><th>Wymiary</th><th></th></tr></thead>
@@ -439,8 +431,6 @@ function renderInstrukcje(el) {
       }).join('')}</tbody>
     </table>`}`;
   el.querySelector('#rc-on')?.addEventListener('change', (e) => saveRc({ enabled: e.target.checked }));
-  el.querySelector('#rc-rear')?.addEventListener('change', (e) => saveRc({ rearMode: e.target.value }));
-  el.querySelectorAll('.rc-f').forEach((i) => i.addEventListener('change', () => { const v = parseFloat(i.value); saveRc({ [i.dataset.k]: Number.isFinite(v) && v > 0 ? v : null }); }));
   el.querySelector('#in-all')?.addEventListener('click', () => openCabinetInstructions(ok, p.name));
   el.querySelectorAll('.in-open').forEach(btn => btn.addEventListener('click', () => openCabinetInstructions(mods.filter(m => m.id === btn.dataset.id), p.name)));
 }
