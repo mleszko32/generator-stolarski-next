@@ -137,8 +137,11 @@ function moduleWorldBox(mod, project) {
 // Otwory blokują na swojej ścianie (z odstępem `openingMargin` po bokach), a drzwi
 // dodatkowo strefą przejścia głęboką na `doorPassage` - dzięki temu drzwi na
 // sąsiedniej ścianie tuż przy narożniku odcinają koniec tej ściany.
-export function findBlocked(project, wallId, row, { openingMargin = 0, doorPassage = 600 } = {}) {
+// `ignoreIds` - szafki/blendy pomijane (edycja istniejącego rzędu: jego własne
+// szafki nie blokują miejsca, które zaraz zostanie na nowo podzielone).
+export function findBlocked(project, wallId, row, { openingMargin = 0, doorPassage = 600, ignoreIds = null } = {}) {
   const room = getRoom(project);
+  const ignore = new Set(ignoreIds || []);
   const L = wallLength(room, wallId);
   // Pas rzędu: od ściany do lica frontów (razem ze szczeliną przy ścianie).
   const stripD = row.frontPlane ?? row.depth + FRONT_ALLOWANCE;
@@ -152,10 +155,12 @@ export function findBlocked(project, wallId, row, { openingMargin = 0, doorPassa
   };
 
   (project.modules || []).forEach((m) => {
+    if (ignore.has(m.id)) return;
     const b = moduleWorldBox(m, project);
     push(b, b.y0, b.y1, "module", m.name || "Szafka", m.id);
   });
   (project.sidePanels || []).forEach((p) => {
+    if (ignore.has(p.id)) return;
     const b = getSidePanelBox(p);
     push(b, b.y0, b.y1, "panel", p.name || (p.kind === "blenda" ? "Blenda" : "Bok dokładany"), p.id);
   });
@@ -384,57 +389,165 @@ export function applyFillPlan({ wallId, items, type, template = null, wallGap = 
   const project = state.project;
   const room = getRoom(project);
   const row = rowProfile(type, template, { wallGap });
-  const rotation = WALL_ROTATION[wallId] ?? 0;
-  const modules = [];
-  const panels = [];
-
-  items.filter((it) => it.kind === "cabinet").forEach((it) => {
-    const fresh = createModuleObject(row.type);
-    const mod = template ? cloneModuleWithNewIds(template) : fresh;
-    if (template) { delete mod.groupId; mod.name = fresh.name; }
-    const box = wallToWorld(wallId, room, it.u0, it.width, row.gap, row.depth);
-    mod.dimensions = { ...mod.dimensions, width: it.width };
-    mod.rotation = rotation;
-    mod.position = { x: round2(box.x0), y: row.posY, z: round2(box.z0) };
+  const modules = items.filter((it) => it.kind === "cabinet").map((it) => {
+    const mod = newRowModule(row.type, template);
+    placeOnWall(mod, wallId, room, it, row.gap, row.posY);
     project.modules.push(mod);
-    modules.push(mod);
+    return mod;
   });
+  const panels = addRowBlendas(project, wallId, room, row, template, items);
+  finishRowInsert(project, modules);
+  return { modules, panels };
+}
 
-  const blendas = items.filter((it) => it.kind === "blenda");
-  if (blendas.length) {
-    if (!Array.isArray(project.sidePanels)) project.sidePanels = [];
-    const th = num(project.materials && project.materials.boardThickness, 18) || 18;
-    const frontCfg = { ...(project.front || {}), ...((template && template.front) || {}) };
-    const frontType = frontCfg.type || "nakladane";
-    // Lico blendy równo z licem frontów (jak w migrateLegacyFillers, core/state.js).
-    const zF = row.gap + (frontType === "wpuszczane" ? row.depth - th : row.depth + frontBodyGap(frontCfg));
-    const d0 = zF - (BLENDA_DEPTH - th);
-    blendas.forEach((it) => {
-      const count = project.sidePanels.filter((p) => p.kind === "blenda").length;
-      const box = wallToWorld(wallId, room, it.u0, it.width, d0, BLENDA_DEPTH);
-      const panel = {
-        id: "blenda-" + Date.now() + Math.random().toString(36).slice(2, 7),
-        kind: "blenda",
-        name: "Blenda " + (count + 1),
-        decor: "",
-        flange: it.flange,
-        position: { x: round2(box.x0), y: row.posY + row.legsH, z: round2(box.z0) },
-        rotation,
-        dimensions: { width: it.width, height: row.height, depth: BLENDA_DEPTH },
-      };
-      project.sidePanels.push(panel);
-      panels.push(panel);
-    });
+// Rząd szafek przy ścianie, do którego należy szafka moduleId: sąsiadujące bok w
+// bok szafki tego samego typu, z tym samym obrotem, odsunięciem od ściany i
+// wysokością posadowienia, plus blendy dosunięte do skrajnych szafek. Tak samo
+// rozpoznaje rzędy wstawione oknem rozmieszczania i ustawione ręcznie.
+// Zwraca { wallId, type, moduleIds (od lewej), panelIds, widths, fillers, u0, u1, gap }
+// albo null (szafka narożna/ślepa/skos albo nie stoi przy ścianie).
+export function findRowAround(project, moduleId, { tol = 2 } = {}) {
+  const mods = project.modules || [];
+  const sel = mods.find((m) => m.id === moduleId);
+  if (!sel || !ROW_TYPES.some((r) => r.type === sel.type) || isBlind(sel)) return null;
+  const rot = ((num(sel.rotation) % 360) + 360) % 360;
+  const wallId = Object.keys(WALL_ROTATION).find((w) => WALL_ROTATION[w] === rot);
+  if (!wallId) return null;
+  const room = getRoom(project);
+  const loc = (m) => {
+    const { worldW, worldD } = getWorldFootprint(m);
+    const x0 = num(m.position && m.position.x), z0 = num(m.position && m.position.z);
+    return worldToWall(wallId, room, { x0, x1: x0 + worldW, z0, z1: z0 + worldD });
+  };
+  const s = loc(sel);
+  const posY = num(sel.position && sel.position.y);
+  const cands = mods
+    .filter((m) => m.type === sel.type && !isBlind(m) && ((num(m.rotation) % 360) + 360) % 360 === rot
+      && Math.abs(num(m.position && m.position.y) - posY) <= tol)
+    .map((m) => ({ m, ...loc(m) }))
+    .filter((c) => Math.abs(c.d0 - s.d0) <= tol);
+  const chain = [cands.find((c) => c.m.id === moduleId)];
+  const used = new Set([moduleId]);
+  for (let grow = true; grow;) {
+    grow = false;
+    const l = cands.find((c) => !used.has(c.m.id) && Math.abs(c.u1 - chain[0].u0) <= tol);
+    if (l) { chain.unshift(l); used.add(l.m.id); grow = true; }
+    const r = cands.find((c) => !used.has(c.m.id) && Math.abs(c.u0 - chain[chain.length - 1].u1) <= tol);
+    if (r) { chain.push(r); used.add(r.m.id); grow = true; }
   }
+  let u0 = chain[0].u0, u1 = chain[chain.length - 1].u1;
 
-  // Wzór mógł pochodzić ze starego projektu z mod.fillers - ta sama droga co przy
-  // wstawianiu szablonu z biblioteki.
+  // Blendy dosunięte do końców rzędu, w jego pasie (głębokość z frontem, wysokość).
+  const legs = sel.legs && sel.legs.active ? num(sel.legs.height) : 0;
+  const y0 = posY, y1 = posY + legs + num(sel.dimensions && sel.dimensions.height);
+  const stripD = s.d1 + frontAllowance(project, sel);
+  const blendas = (project.sidePanels || []).filter((p) => p.kind === "blenda"
+    && ((num(p.rotation) % 360) + 360) % 360 === rot).map((p) => {
+    const b = getSidePanelBox(p);
+    return { p, b, ...worldToWall(wallId, room, b) };
+  }).filter((c) => overlap1d(c.b.y0, c.b.y1, y0, y1) > EPS && overlap1d(c.d0, c.d1, s.d0, stripD) > EPS);
+  const left = blendas.find((c) => Math.abs(c.u1 - u0) <= tol);
+  const right = blendas.find((c) => c !== left && Math.abs(c.u0 - u1) <= tol);
+  const fillers = [];
+  if (left) { u0 = left.u0; fillers.push({ side: "left", width: round2(left.u1 - left.u0) }); }
+  if (right) { u1 = right.u1; fillers.push({ side: "right", width: round2(right.u1 - right.u0) }); }
+
+  return {
+    wallId, type: sel.type,
+    moduleIds: chain.map((c) => c.m.id),
+    panelIds: [left, right].filter(Boolean).map((c) => c.p.id),
+    widths: chain.map((c) => num(c.m.dimensions.width)),
+    fillers, u0: round2(u0), u1: round2(u1), gap: round2(Math.max(0, s.d0)),
+  };
+}
+
+// Zmienia istniejący rząd (z findRowAround) według nowego planu `items`, zamiast
+// usuwać go i wstawiać od nowa: szafki rzędu są używane ponownie po kolei od lewej
+// (zostają ich wnętrza, fronty, nazwy - zmienia się szerokość i miejsce), brakujące
+// są kopiami wzoru, nadmiarowe znikają. Blendy rzędu są zastępowane nowymi.
+// Zwraca { modules, panels, removed }.
+export function replaceFillRow(rowInfo, { items, template = null, wallGap = rowInfo.gap }) {
+  const project = state.project;
+  const room = getRoom(project);
+  const row = rowProfile(rowInfo.type, template, { wallGap });
+  const existing = rowInfo.moduleIds.map((id) => project.modules.find((m) => m.id === id)).filter(Boolean);
+  const cabinets = items.filter((it) => it.kind === "cabinet");
+  const modules = cabinets.map((it, i) => {
+    let mod = existing[i];
+    if (!mod) {
+      mod = newRowModule(row.type, template);
+      project.modules.push(mod);
+    }
+    placeOnWall(mod, rowInfo.wallId, room, it, row.gap, existing[i] ? num(mod.position && mod.position.y) : row.posY);
+    return mod;
+  });
+  const removed = existing.slice(cabinets.length).map((m) => m.id);
+  if (removed.length) project.modules = project.modules.filter((m) => !removed.includes(m.id));
+  if (rowInfo.panelIds.length) project.sidePanels = (project.sidePanels || []).filter((p) => !rowInfo.panelIds.includes(p.id));
+  const panels = addRowBlendas(project, rowInfo.wallId, room, row, template, items);
+  finishRowInsert(project, modules);
+  if (state.selectedModules) state.selectedModules = new Set(modules.length ? [modules[0].id] : []);
+  return { modules, panels, removed };
+}
+
+const isBlind = (m) => !!(m.blindCorner && m.blindCorner.active);
+
+// Nowa szafka rzędu: kopia wzoru (z wnętrzem, nowe id) albo domyślna dla typu.
+function newRowModule(type, template) {
+  const fresh = createModuleObject(type);
+  if (!template) return fresh;
+  const mod = cloneModuleWithNewIds(template);
+  delete mod.groupId;
+  delete mod.blindCorner;
+  mod.name = fresh.name;
+  return mod;
+}
+
+// Szafka tyłem do ściany wallId: szerokość it.width od u = it.u0, tył `gap` od ściany.
+function placeOnWall(mod, wallId, room, it, gap, posY) {
+  const box = wallToWorld(wallId, room, it.u0, it.width, gap, num(mod.dimensions && mod.dimensions.depth, 513));
+  mod.dimensions = { ...mod.dimensions, width: it.width };
+  mod.rotation = WALL_ROTATION[wallId] ?? 0;
+  mod.position = { x: round2(box.x0), y: posY, z: round2(box.z0) };
+}
+
+// Blendy planu (lico równo z licem frontów, jak w migrateLegacyFillers, core/state.js).
+function addRowBlendas(project, wallId, room, row, template, items) {
+  const blendas = items.filter((it) => it.kind === "blenda");
+  if (!blendas.length) return [];
+  if (!Array.isArray(project.sidePanels)) project.sidePanels = [];
+  const th = num(project.materials && project.materials.boardThickness, 18) || 18;
+  const frontCfg = { ...(project.front || {}), ...((template && template.front) || {}) };
+  const frontType = frontCfg.type || "nakladane";
+  const zF = row.gap + (frontType === "wpuszczane" ? row.depth - th : row.depth + frontBodyGap(frontCfg));
+  const d0 = zF - (BLENDA_DEPTH - th);
+  const rotation = WALL_ROTATION[wallId] ?? 0;
+  return blendas.map((it) => {
+    const count = project.sidePanels.filter((p) => p.kind === "blenda").length;
+    const box = wallToWorld(wallId, room, it.u0, it.width, d0, BLENDA_DEPTH);
+    const panel = {
+      id: "blenda-" + Date.now() + Math.random().toString(36).slice(2, 7),
+      kind: "blenda",
+      name: "Blenda " + (count + 1),
+      decor: "",
+      flange: it.flange,
+      position: { x: round2(box.x0), y: row.posY + row.legsH, z: round2(box.z0) },
+      rotation,
+      dimensions: { width: it.width, height: row.height, depth: BLENDA_DEPTH },
+    };
+    project.sidePanels.push(panel);
+    return panel;
+  });
+}
+
+// Wzór mógł pochodzić ze starego projektu z mod.fillers - ta sama droga co przy
+// wstawianiu szablonu z biblioteki.
+function finishRowInsert(project, modules) {
   ensureSidePanelsDefaults(project);
   if (modules.length) {
     state.activeModuleId = modules[0].id;
     state.activeSidePanelId = null;
   }
-  return { modules, panels };
 }
 
 const round2 = (v) => Math.round(v * 100) / 100;

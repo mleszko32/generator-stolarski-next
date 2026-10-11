@@ -3,7 +3,7 @@ import { state } from "./state.js";
 import {
   wallToWorld, worldToWall, rowProfile, findBlocked, findFreeSegments, parseSplit,
   divideSegment, buildFillItems, findPlanConflicts, applyFillPlan, describeWidths,
-  getWallGap, setWallGap, frontAllowance,
+  getWallGap, setWallGap, frontAllowance, findRowAround, replaceFillRow,
 } from "./wallFill.js";
 import { computeWallLayouts } from "./walls.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
@@ -292,5 +292,77 @@ describe("applyFillPlan", () => {
     expect(modules[0].elements[0].id).not.toBe("front-1");
     expect(modules[0].position).toEqual({ x: 1000, y: 0, z: 0 });
     expect(modules[0].name).toBe("Szafka dolna 2");
+  });
+});
+
+describe("edycja rzędu (findRowAround / replaceFillRow)", () => {
+  // Rząd 3 × 600 od u = 1000 na ścianie, odsunięty 50 mm, z blendą 40 z prawej.
+  const placeRow = (wallId) => {
+    setProject(freshProject({ room, modules: [], sidePanels: [], openings: [] }));
+    const items = [
+      { kind: "cabinet", u0: 1000, width: 600 }, { kind: "cabinet", u0: 1600, width: 600 },
+      { kind: "cabinet", u0: 2200, width: 600 }, { kind: "blenda", u0: 2800, width: 40, flange: "lewa" },
+    ];
+    return applyFillPlan({ wallId, items, type: "base_cabinet", wallGap: 50 });
+  };
+
+  it("rozpoznaje rząd z każdej szafki, na każdej ścianie, razem z blendą", () => {
+    ["tyl", "prawa", "przednia", "lewa"].forEach((w) => {
+      const r = placeRow(w);
+      const row = findRowAround(state.project, r.modules[1].id);
+      expect(row).toMatchObject({ wallId: w, type: "base_cabinet", widths: [600, 600, 600], u0: 1000, u1: 2840, gap: 50 });
+      expect(row.moduleIds).toEqual(r.modules.map((m) => m.id));
+      expect(row.panelIds).toEqual([r.panels[0].id]);
+      expect(row.fillers).toEqual([{ side: "right", width: 40 }]);
+    });
+  });
+
+  it("nie łączy szafek z przerwą, innego typu ani innej odległości od ściany", () => {
+    const r = placeRow("tyl");
+    state.project.modules.push(baseModule({ id: "daleko", position: { x: 3000, y: 0, z: 50 } }));
+    state.project.modules.push(baseModule({ id: "wysunieta", position: { x: 400, y: 0, z: 120 } }));
+    expect(findRowAround(state.project, r.modules[0].id).moduleIds).toHaveLength(3);
+    expect(findRowAround(state.project, "daleko").moduleIds).toEqual(["daleko"]);
+  });
+
+  it("szafka narożna i ślepa nie tworzą rzędu do edycji", () => {
+    setProject(freshProject({ room, modules: [baseModule({ id: "s", blindCorner: { active: true } })] }));
+    expect(findRowAround(state.project, "s")).toBeNull();
+  });
+
+  it("findFreeSegments z ignoreIds traktuje miejsce rzędu jako wolne", () => {
+    const r = placeRow("tyl");
+    const row = findRowAround(state.project, r.modules[0].id);
+    const prof = rowProfile("base_cabinet", null, { wallGap: 50 });
+    const full = findFreeSegments(state.project, "tyl", prof, { ignoreIds: [...row.moduleIds, ...row.panelIds] });
+    expect(full.segments).toEqual([{ u0: 0, u1: 4000 }]);
+  });
+
+  it("zmienia rząd na miejscu: te same szafki (z wnętrzem) po kolei, nadmiarowe usunięte, nowa blenda", () => {
+    const r = placeRow("prawa");
+    r.modules[0].elements = [{ id: "polka-1", typ: "poziom" }];
+    const row = findRowAround(state.project, r.modules[0].id);
+    const res = replaceFillRow(row, {
+      items: [{ kind: "blenda", u0: 1000, width: 40, flange: "prawa" }, { kind: "cabinet", u0: 1040, width: 900 }, { kind: "cabinet", u0: 1940, width: 900 }],
+      template: r.modules[0], wallGap: 50,
+    });
+    expect(res.modules.map((m) => m.id)).toEqual([r.modules[0].id, r.modules[1].id]);
+    expect(res.removed).toEqual([r.modules[2].id]);
+    expect(state.project.modules).toHaveLength(2);
+    expect(state.project.modules[0].elements).toEqual([{ id: "polka-1", typ: "poziom" }]);
+    expect(state.project.sidePanels.map((p) => p.id)).toEqual([res.panels[0].id]);
+    const again = findRowAround(state.project, res.modules[0].id);
+    expect(again).toMatchObject({ widths: [900, 900], u0: 1000, u1: 2840, gap: 50, fillers: [{ side: "left", width: 40 }] });
+  });
+
+  it("dokłada brakujące szafki jako kopie wzoru z nowymi id", () => {
+    const r = placeRow("tyl");
+    const row = findRowAround(state.project, r.modules[0].id);
+    const items = [0, 1, 2, 3].map((i) => ({ kind: "cabinet", u0: 1000 + i * 460, width: 460 }));
+    const res = replaceFillRow(row, { items, template: r.modules[0], wallGap: 50 });
+    expect(res.modules).toHaveLength(4);
+    expect(new Set(state.project.modules.map((m) => m.id)).size).toBe(4);
+    expect(state.project.sidePanels).toHaveLength(0);
+    expect(findRowAround(state.project, res.modules[3].id).widths).toEqual([460, 460, 460, 460]);
   });
 });

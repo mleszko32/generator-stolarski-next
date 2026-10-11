@@ -8,6 +8,7 @@ import { WALLS, computeWallLayouts } from "../core/walls.js";
 import {
   ROW_TYPES, STANDARD_WIDTHS, rowProfile, findFreeSegments, divideSegment,
   buildFillItems, findPlanConflicts, applyFillPlan, getWallGap, setWallGap,
+  findRowAround, replaceFillRow, describeWidths,
 } from "../core/wallFill.js";
 import { runPresets, planKitchenRun, applyKitchenRun, CORNER_KINDS, defaultCorner } from "../core/kitchenRun.js";
 import { fittingsOfKind } from "../core/cornerFittings.js";
@@ -15,7 +16,7 @@ import { getWorldFootprint } from "../core/layout.js";
 import { getSidePanelBox } from "../core/moduleDrag.js";
 import { num } from "../utils/math.js";
 import { escapeHtml } from "../utils/dom.js";
-import { openModal } from "../utils/modal.js";
+import { openModal, showAlert } from "../utils/modal.js";
 
 const MODES = [
   { id: "standard", label: "Szerokości katalogowe", hint: "Kombinacje typowych szerokości z najmniejszą resztą." },
@@ -26,7 +27,7 @@ const MODES = [
 
 // Ustawienia zostają między otwarciami okna (w obrębie sesji).
 // scope 'kitchen' = zabudowa L/U od narożników (core/kitchenRun.js).
-const cfg = {
+const saved = {
   scope: "wall", presetId: "lewa+tyl", corners: null, armLength: {}, choice: {}, custom: {},
   wallId: "tyl", type: "base_cabinet", templateId: "",
   u0: null, u1: null,
@@ -40,12 +41,35 @@ const cfg = {
 const fmt = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
 
 // onChange: wołane po wstawieniu szafek (odświeżenie widoków).
-export function openWallFillModal(onChange) {
+// editModuleId: tryb "Zmień podział rzędu" - rząd, do którego należy ta szafka
+// (core/wallFill.js: findRowAround), jest dzielony na nowo i zmieniany na miejscu
+// (replaceFillRow) zamiast usuwania i wstawiania od nowa.
+export function openWallFillModal(onChange, { editModuleId = null } = {}) {
   let calc = null;
+  const edit = editModuleId ? findRowAround(state.project, editModuleId) : null;
+  if (editModuleId && !edit) {
+    showAlert("Ta szafka nie stoi w rzędzie przy ścianie (albo to szafka narożna / ślepa), więc nie ma czego dzielić na nowo.");
+    return;
+  }
+  // W trybie edycji ustawienia startują od obecnego układu rzędu: "Stałe + reszta"
+  // z obecnymi szerokościami i blendą po tej samej stronie, więc podgląd na start
+  // pokazuje dokładnie to, co stoi - wystarczy zmienić to, co trzeba. Te ustawienia
+  // nie nadpisują zapamiętanych dla zwykłego rozmieszczania.
+  const cfg = edit ? {
+    ...saved, scope: "wall", wallId: edit.wallId, type: edit.type, u0: edit.u0, u1: edit.u1, variant: 0,
+    mode: "fixed", fixedSplit: edit.widths.join(", "), roundTo: 1,
+    restMode: "blenda",
+    fillerSide: edit.fillers.length === 2 ? "both" : edit.fillers.length ? edit.fillers[0].side : saved.fillerSide,
+    editGap: edit.gap,
+  } : saved;
+  const editTemplate = edit ? state.project.modules.find((m) => m.id === editModuleId) : null;
+  const ignoreIds = edit ? [...edit.moduleIds, ...edit.panelIds] : null;
 
   const dlg = openModal({
-    title: "Rozmieść szafki",
-    subtitle: "Jedna ściana albo cała kuchnia L/U od narożników. Program znajdzie wolne miejsce (bez kolizji z szafkami, oknami i drzwiami) i zaproponuje podział.",
+    title: edit ? "Zmień podział rzędu" : "Rozmieść szafki",
+    subtitle: edit
+      ? `Rząd przy ścianie: ${edit.moduleIds.length} szt. (${describeWidths(edit.widths)}${edit.fillers.length ? ` + blenda ${edit.fillers.map((f) => fmt(f.width)).join(" + ")}` : ""}). Szafki zostaną zmienione na miejscu - wnętrza i ustawienia zostają, dodatkowe szafki są kopią zaznaczonej, nadmiarowe znikają.`
+      : "Jedna ściana albo cała kuchnia L/U od narożników. Program znajdzie wolne miejsce (bez kolizji z szafkami, oknami i drzwiami) i zaproponuje podział.",
     width: 860,
     body: `
       <div class="field"><div class="seg" id="wf-scope">
@@ -100,12 +124,12 @@ export function openWallFillModal(onChange) {
       <div class="wf-kitchen-only" id="wf-kitchen-result"></div>`,
     footer: [
       { label: "Anuluj" },
-      { label: "Wstaw szafki", kind: "primary", icon: "layout-columns", onClick: (close) => apply(close) },
+      { label: edit ? "Zmień rząd" : "Wstaw szafki", kind: "primary", icon: "layout-columns", onClick: (close) => apply(close) },
     ],
   });
 
   const $ = (sel) => dlg.bodyEl.querySelector(sel);
-  const wallGap = () => getWallGap(state.project, cfg.type);
+  const wallGap = () => (edit ? cfg.editGap : getWallGap(state.project, cfg.type));
   const applyBtn = dlg.footEl.querySelector(".btn-primary");
 
   // --- powiązania pól ---
@@ -128,7 +152,11 @@ export function openWallFillModal(onChange) {
   bindSeg("#wf-rest", "rest", (v) => { cfg.restMode = v; cfg.variant = 0; });
   bindNum("#wf-u0", (v) => { cfg.u0 = v; cfg.variant = 0; });
   bindNum("#wf-u1", (v) => { cfg.u1 = v; cfg.variant = 0; });
-  bindNum("#wf-wallgap", (v) => { setWallGap(state.project, cfg.type, v); resetSegment(); cfg.choice = {}; });
+  bindNum("#wf-wallgap", (v) => {
+    if (edit) cfg.editGap = Math.max(0, v);
+    else setWallGap(state.project, cfg.type, v);
+    resetSegment(); cfg.choice = {};
+  });
   bindNum("#wf-margin", (v) => { cfg.openingMargin = Math.max(0, v); resetSegment(); });
   bindNum("#wf-passage", (v) => { cfg.doorPassage = Math.max(0, v); resetSegment(); });
   bindNum("#wf-maxfiller", (v) => { cfg.maxFiller = Math.max(0, v); cfg.variant = 0; });
@@ -286,9 +314,9 @@ export function openWallFillModal(onChange) {
   }
 
   function compute() {
-    const template = state.project.modules.find((m) => m.id === cfg.templateId) || null;
+    const template = edit ? editTemplate : state.project.modules.find((m) => m.id === cfg.templateId) || null;
     const row = rowProfile(cfg.type, template, { wallGap: wallGap() });
-    const free = findFreeSegments(state.project, cfg.wallId, row, { openingMargin: cfg.openingMargin, doorPassage: cfg.doorPassage });
+    const free = findFreeSegments(state.project, cfg.wallId, row, { openingMargin: cfg.openingMargin, doorPassage: cfg.doorPassage, ignoreIds });
     if (cfg.u0 === null || cfg.u1 === null) {
       // Domyślnie najdłuższy wolny odcinek.
       const best = free.segments.slice().sort((a, b) => (b.u1 - b.u0) - (a.u1 - a.u0))[0];
@@ -310,8 +338,14 @@ export function openWallFillModal(onChange) {
     dlg.bodyEl.querySelectorAll("#wf-scope .seg-btn").forEach((b) => b.classList.toggle("active", b.dataset.scope === cfg.scope));
     dlg.bodyEl.querySelectorAll(".wf-single").forEach((el) => { el.style.display = kitchen ? "none" : ""; });
     dlg.bodyEl.querySelectorAll(".wf-kitchen-only").forEach((el) => { el.style.display = kitchen ? "" : "none"; });
-    $("#wf-wall-field").style.display = kitchen ? "none" : "";
+    $("#wf-wall-field").style.display = kitchen || edit ? "none" : "";
     $("#wf-preset-field").style.display = kitchen ? "" : "none";
+    if (edit) {
+      // Ściana, rząd i wzór wynikają z edytowanego rzędu.
+      $("#wf-scope").closest(".field").style.display = "none";
+      $("#wf-type").closest(".field").style.display = "none";
+      $("#wf-template").closest(".field").style.display = "none";
+    }
     dlg.bodyEl.querySelectorAll("#wf-type .seg-btn").forEach((b) => b.classList.toggle("active", b.dataset.type === cfg.type));
     dlg.bodyEl.querySelectorAll("#wf-mode .seg-btn").forEach((b) => b.classList.toggle("active", b.dataset.mode === cfg.mode));
     dlg.bodyEl.querySelectorAll("#wf-rest .seg-btn").forEach((b) => b.classList.toggle("active", b.dataset.rest === cfg.restMode));
@@ -333,7 +367,7 @@ export function openWallFillModal(onChange) {
 
     renderSegments();
     renderVariants();
-    $("#wf-preview").innerHTML = previewSvg(calc);
+    $("#wf-preview").innerHTML = previewSvg(calc, cfg.wallId, ignoreIds);
     renderConflicts();
     applyBtn.disabled = calc.items.filter((i) => i.kind === "cabinet").length === 0;
   }
@@ -396,6 +430,12 @@ export function openWallFillModal(onChange) {
       return;
     }
     if (!calc || !calc.items.some((i) => i.kind === "cabinet")) return;
+    if (edit) {
+      replaceFillRow(edit, { items: calc.items, template: calc.template, wallGap: wallGap() });
+      close();
+      if (onChange) onChange();
+      return;
+    }
     applyFillPlan({ wallId: cfg.wallId, items: calc.items, type: cfg.type, template: calc.template, wallGap: wallGap() });
     close();
     if (onChange) onChange();
@@ -409,9 +449,11 @@ const round1 = (v) => Math.round(v * 10) / 10;
 // Rzut ściany (widok od środka pokoju): istniejące szafki, otwory, zajęte miejsca
 // w pasie rzędu, wybrany odcinek i proponowane szafki/blendy. SVG w oknie
 // aplikacji, więc kolory z tokenów CSS (klasy .wf-* w global.css).
-function previewSvg(calc) {
+// ignoreIds - szafki/blendy edytowanego rzędu: nie rysujemy ich jako istniejących.
+function previewSvg(calc, wallId, ignoreIds = null) {
   const { room, walls } = computeWallLayouts(state.project);
-  const wall = walls.find((w) => w.id === cfg.wallId);
+  const wall = walls.find((w) => w.id === wallId);
+  const ignore = new Set(ignoreIds || []);
   const L = wall.length, H = room.height;
   // Rzut jest ograniczony wysokością okna (max-height), więc font liczony też od wysokości.
   const fs = Math.max(L, H * 1.6) / 55;
@@ -422,6 +464,7 @@ function previewSvg(calc) {
 
   out.push(`<rect class="wf-wall" x="0" y="0" width="${L}" height="${H}"/>`);
   wall.items.forEach((it) => {
+    if (it.mod && ignore.has(it.mod.id)) return;
     out.push(`<rect class="wf-existing" x="${it.u0}" y="${Y(it.y1)}" width="${it.u1 - it.u0}" height="${it.y1 - it.floorY}"/>`);
   });
   (wall.openings || []).forEach((o) => {

@@ -290,6 +290,12 @@ narożniku), otwory na ścianie (z odstępem) i strefa przejścia przed drzwiami
 (katalog szerokości, najmniejsza reszta, potem bliżej 600 mm), `equal`, `fixed` (`600, *, *`), `ratio` (jak
 `distribution` frontów); reszta na blendę (`project.sidePanels`, lico równo z frontami) albo rozciągnięcie szafek.
 `wallToWorld`/`worldToWall` — przeliczenie pas ściany ↔ pokój (oś X szafki zawsze rośnie z `u`).
+Edycja wstawionego rzędu (przycisk „Zmień podział rzędu” w sekcji Wymiary prawego panelu): `findRowAround` rozpoznaje
+rząd geometrycznie (stykające się szafki tego samego typu, obrotu, odsunięcia od ściany i wysokości + blendy na końcach —
+działa też dla rzędów ustawionych ręcznie; bez szafek narożnych/ślepych), okno startuje w trybie „Stałe + reszta” z obecnymi
+szerokościami, a `findFreeSegments(..., { ignoreIds })` nie traktuje szafek rzędu jako przeszkód. `replaceFillRow` zmienia
+rząd na miejscu: szafki używane ponownie po kolei od lewej (wnętrza zostają), brakujące = kopie zaznaczonej, nadmiarowe usuwane,
+blendy rzędu zastępowane nowymi.
 Odsunięcie tyłu szafek od ściany (szczelina na instalacje): `project.wallFill.wallGap` per rząd
 (`getWallGap`/`setWallGap`; bez ustawienia dolne i słupki 50, wiszące 0), pole w oknie. Funkcje `core` dostają je
 jawnie (`opts.wallGap`, domyślnie 0). `rowProfile(..., { wallGap })` daje `gap` i `frontPlane` = odsunięcie +

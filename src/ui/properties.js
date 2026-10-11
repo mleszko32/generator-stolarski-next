@@ -19,6 +19,8 @@ import { renderSlopeModuleProperties } from "./slopeProperties.js";
 import { drawerCardsHtml, bindDrawerCards } from "./drawerSettings.js";
 import { propHeaderHtml, sectionHtml, bindSections, setSectionDots, positionRotationHtml } from "./propertiesShell.js";
 import { blindCornerSectionHtml, bindBlindCornerSection } from "./blindCornerProperties.js";
+import { findRowAround } from "../core/wallFill.js";
+import { openWallFillModal } from "./wallFillModal.js";
 
 function getSelectedMods() {
     if (state.selectedModules && state.selectedModules.size > 0) {
@@ -176,6 +178,10 @@ export function initPropertiesPanel() {
 
   const tabContent = (id, html) => sectionHtml(id, html, overridden[id]);
 
+  // Rząd szafek przy ścianie, do którego należy ta szafka (core/wallFill.js) -
+  // przycisk "Zmień podział rzędu" otwiera okno rozmieszczania w trybie edycji.
+  const wallRow = findRowAround(state.project, activeModule.id);
+
   rightSidebar.innerHTML = `
     ${propHeaderHtml({
       name: activeModule.name,
@@ -198,6 +204,13 @@ export function initPropertiesPanel() {
         prefix: 'input-pos', position: activeModule.position, rotation: activeModule.rotation,
         rotClass: 'btn-rotate', hint: 'Skrót: klawisz R obraca aktywną szafkę o +90°.',
       })}
+
+      ${wallRow ? `
+        <h3>Rząd przy ścianie</h3>
+        <div class="property-group">
+          <button type="button" id="btn-edit-wall-row" class="btn btn-sm btn-block" title="Podziel na nowo cały rząd, w którym stoi ta szafka (inny wariant, szerokości, blenda) - bez usuwania szafek"><i class="ti ti-layout-columns" aria-hidden="true"></i> Zmień podział rzędu (${wallRow.moduleIds.length} szt.)</button>
+        </div>
+      ` : ''}
 
       ${(canCombineIntoGroup || activeModule.groupId) ? `
         <h3>Grupowanie</h3>
@@ -763,6 +776,11 @@ function setupEventListeners() {
       updateAll();
       initPropertiesPanel();
     });
+  });
+
+  document.getElementById('btn-edit-wall-row')?.addEventListener('click', () => {
+    const mod = getActiveModule();
+    if (mod) openWallFillModal(() => { initPropertiesPanel(); updateAll(); }, { editModuleId: mod.id });
   });
 
   const btnGroupCombine = document.getElementById('btn-group-combine');
