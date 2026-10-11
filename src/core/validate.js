@@ -13,6 +13,7 @@ import { collectProjectParts } from "../engine/cabinet.js";
 import { computeWallLayouts } from "./walls.js";
 import { openingInstrumental, WALL_LOCATIVE } from "./openings.js";
 import { num } from "../utils/math.js";
+import { drawerSpec } from "./drawerSpec.js";
 import { checkBlindCorner, innerDims } from "./blindCorner.js";
 import { checkCornerFitting, getCornerFitting } from "./cornerFittings.js";
 import { cornerFrontIssues, footprintBoxes, passageIssues } from "./cornerChecks.js";
@@ -153,6 +154,13 @@ export function validateProject(project = state.project) {
             add("error", mod, `Półka (${Math.round(span)} mm) jest szersza niż wnętrze korpusu (${Math.round(inner.maxX - inner.minX)} mm).`);
           }
         } else if (el.typ === "front") {
+          // Prowadnica dłuższa niż szafka (najkrótsza z serii albo ręczne NL) - core/drawerSpec.js.
+          if ((el.subtype || "").includes("szuflada") && mod.type !== "slope_cabinet" && num(el.w) >= 1) {
+            const spec = drawerSpec(mod, el, project);
+            if (!spec.fitsDepth) {
+              add("error", mod, `Szuflada: prowadnica NL ${spec.nl} nie mieści się w szafce (dostępna głębokość ${Math.round(spec.maxDepth)} mm) - zmień system szuflad albo głębokość szafki.`);
+            }
+          }
           if (el.subtype === "szuflada-wewnetrzna") return;
           const fw = num(el.w), fh = num(el.h);
           if (el.w !== undefined && el.h !== undefined && (fw < MIN_FRONT_SIZE || fh < MIN_FRONT_SIZE)) {

@@ -73,7 +73,8 @@ projektu (`{ ...state.project.front, ...mod.front }`) — scalaj, nigdy nie wybi
 `distribution` + luzy/szczeliny + matematykę nakładania (nakładane vs wpuszczane) każdego
 frontu na konkretne `el.x / el.y / el.w / el.h`. To jedyne źródło prawdy o pozycjach frontów —
 silnik formatek czyta wyliczone `el.h/el.w`, nie liczy ich ponownie. Czysta funkcja na `state`,
-bez Three.js.
+bez Three.js. Fronty liczą się w kolejności powiązań (`elementsInBoundOrder`): front przypięty `bound*`
+do innego frontu po nim, niezależnie od kolejności w `mod.elements`.
 
 `update3D()` woła go dla każdego modułu przy renderowaniu. `calculateParts()`,
 `calculateAllProjectParts()` i `calculateProjectHardware()` najpierw wołają
@@ -294,7 +295,8 @@ a nie na płaszczyźnie wysokości chwytu.
 **Okleinowanie**: `engine/edgeBanding.js`. Domyślnie wszystkie cztery krawędzie (żadna dla
 „Plecy”/„Blat”); `project.edgeBanding` mapuje klucz formatki `category|name|length|width` (ta
 sama tożsamość co w zagregowanej liście formatek, więc dotyczy wszystkich identycznych formatek)
-na wartości logiczne `[long1,long2,short1,short2]`. Edytowane kliknięciem krawędzi ikonki w
+na wartości logiczne `[long1,long2,short1,short2]`. Formatka z `materialId` ma klucz z materiałem na końcu
+(osobne ustawienia dla tych samych wymiarów w różnych materiałach; stary klucz bez materiału działa zapasowo). Edytowane kliknięciem krawędzi ikonki w
 tabeli Formatki w hubie (`ui/edgeBandingUi.js`); zasila metry w Okuciach/kosztach i etykiety
 planu rozkroju.
 

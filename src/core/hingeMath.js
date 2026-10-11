@@ -2,6 +2,10 @@
 import { state } from './state.js';
 import { round1 } from '../utils/math.js';
 
+// Minimalny odstęp osi dwóch puszek 35 mm (z zapasem na prowadniki) i od krawędzi drzwi.
+const MIN_CUP_SPACING = 70;
+const MIN_CUP_EDGE = 30;
+
 export function calculateHinges(front, boardThick, obstacles, side) {
   const h = round1(front.h); 
   const y = round1(front.y); 
@@ -35,6 +39,13 @@ export function calculateHinges(front, boardThick, obstacles, side) {
   
   if (count === 2) {
     cupRelPositions = [bottomDist, h - topDist];
+    // Krótkie drzwi (np. klapka 200 mm przy odsunięciach 100/100): puszki lądowały w tym
+    // samym miejscu albo w odwrotnej kolejności. Rozsuwamy je symetrycznie na co najmniej
+    // MIN_CUP_SPACING, ale nie bliżej krawędzi niż MIN_CUP_EDGE.
+    if (h - topDist - bottomDist < MIN_CUP_SPACING) {
+      const edge = Math.max(MIN_CUP_EDGE, (h - MIN_CUP_SPACING) / 2);
+      cupRelPositions = [round1(edge), round1(h - edge)];
+    }
   } else {
     const step = round1((h - topDist - bottomDist) / (count - 1));
     for (let i = 0; i < count; i++) {

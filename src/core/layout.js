@@ -178,6 +178,32 @@ export function getTraverseConfig(cons) {
   return result;
 }
 
+// Elementy w kolejności, w której fronty powiązane z innymi frontami (baseZone.bound*)
+// przychodzą po tych, od których zależą. Reszta zachowuje kolejność z tablicy; cykl
+// (uszkodzone dane) nie zapętla - element w trakcie odwiedzania jest pomijany.
+export function elementsInBoundOrder(elements) {
+  const list = elements || [];
+  const byId = new Map(list.map((e) => [e.id, e]));
+  const out = [];
+  const seen = new Map(); // element -> 1 (w trakcie) | 2 (gotowe)
+  const visit = (el) => {
+    const st = seen.get(el);
+    if (st) return;
+    seen.set(el, 1);
+    const bz = el.typ === 'front' && el.baseZone;
+    if (bz) {
+      ['boundLeft', 'boundRight', 'boundBottom', 'boundTop'].forEach((k) => {
+        const dep = bz[k] && byId.get(bz[k]);
+        if (dep && dep !== el && dep.typ === 'front' && seen.get(dep) !== 1) visit(dep);
+      });
+    }
+    seen.set(el, 2);
+    out.push(el);
+  };
+  list.forEach(visit);
+  return out;
+}
+
 export function recalculateLayout(mod) {
   if (!mod || !mod.elements) return;
   const config = state.project;
@@ -213,7 +239,9 @@ export function recalculateLayout(mod) {
       });
   }
 
-  mod.elements.forEach(el => {
+  // Kolejność wg powiązań: front przypięty (bound*) do innego frontu liczy się po nim -
+  // inaczej czytał jego pozycję sprzed przeliczenia, gdy tamten leżał dalej w tablicy.
+  elementsInBoundOrder(mod.elements).forEach(el => {
       if (el.typ === 'front' && el.baseZone) {
           if (el.baseZone.boundBottom) {
               const getBound = (id, type, fallback) => {

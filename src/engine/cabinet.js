@@ -213,16 +213,17 @@ export function collectProjectParts() {
           const crossPos = alongZ ? x : z;
           const frontCoord = alongZ ? (x + worldW) : (z + worldD);
 
+          // Szukamy wśród WSZYSTKICH biegów (nie tylko ostatniego): szafka z innego rzędu o
+          // tym samym obrocie (np. wyspa) wpadała w sortowaniu między szafki pod ścianą i
+          // rozbijała ich wspólny cokół na kilka odcinków.
           let joined = false;
-          if (plinthRuns.length > 0) {
-              let last = plinthRuns[plinthRuns.length - 1];
-              if (last.rot === rot && Math.abs((last.along + last.runLen) - along) <= 1 &&
-                  last.crossPos === crossPos && last.h === h && last.offset === offset && last.frontCoord === frontCoord) {
-                  // styk = początek dołączanej szafki (względem początku biegu) - tu wolno ciąć
-                  last.joints.push(along - last.along);
-                  last.runLen += runLen + (along - (last.along + last.runLen));
-                  joined = true;
-              }
+          const last = plinthRuns.find(r => r.rot === rot && Math.abs((r.along + r.runLen) - along) <= 1 &&
+              r.crossPos === crossPos && r.h === h && r.offset === offset && r.frontCoord === frontCoord);
+          if (last) {
+              // styk = początek dołączanej szafki (względem początku biegu) - tu wolno ciąć
+              last.joints.push(along - last.along);
+              last.runLen += runLen + (along - (last.along + last.runLen));
+              joined = true;
           }
           if (!joined) {
               plinthRuns.push({ rot, along, runLen, crossPos, y, h, offset, frontCoord, joints: [] });

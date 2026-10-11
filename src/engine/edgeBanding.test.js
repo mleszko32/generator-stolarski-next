@@ -64,3 +64,21 @@ describe("describeEdges", () => {
     expect(describeEdges([false, false, true, true])).toBe("2 szer.");
   });
 });
+
+describe("okleina a materiał frontu", () => {
+  const front = (materialId) => ({ category: "Front", name: "Drzwi Lewe", length: 716, width: 597, qty: 1, materialId });
+
+  it("dwa fronty o tych samych wymiarach w różnych materiałach mają osobne ustawienia", () => {
+    const rules = withEdges({}, front("mat-a"), [true, true, false, false]);
+    expect(getPartEdges(front("mat-a"), rules)).toEqual([true, true, false, false]);
+    expect(getPartEdges(front("mat-b"), rules)).toEqual([true, true, true, true]);
+  });
+
+  it("stary klucz bez materiału nadal działa", () => {
+    const rules = { "Front|Drzwi Lewe|716|597": [false, false, false, false] };
+    expect(getPartEdges(front("mat-a"), rules)).toEqual([false, false, false, false]);
+    const next = withEdges(rules, front("mat-a"), [true, true, true, true]);
+    expect(getPartEdges(front("mat-a"), next)).toEqual([true, true, true, true]);
+    expect(getPartEdges(front("mat-b"), next)).toEqual([false, false, false, false]);
+  });
+});

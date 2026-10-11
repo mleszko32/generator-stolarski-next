@@ -244,3 +244,22 @@ describe("migrateLegacyRoom", () => {
     expect(project.room).toEqual({ width: 5300, height: 2600, depth: 3920 });
   });
 });
+
+describe("recalculateLayout — kolejność powiązanych frontów", () => {
+  beforeEach(() => setProject(freshProject()));
+
+  it("front przypięty do frontu leżącego dalej w tablicy liczy się z jego aktualnej pozycji", () => {
+    const top = { id: "f-top", typ: "front", subtype: "drzwi", frontIndex: 0, gap: 3, distribution: "1",
+      baseZone: { boundLeft: "cab-left", boundRight: "cab-right", boundBottom: "f-bot", boundTop: "cab-top", offsetBottom: 0, offsetTop: 0 } };
+    const bot = { id: "f-bot", typ: "front", subtype: "szuflada", frontIndex: 0, gap: 3, distribution: "1",
+      baseZone: { boundLeft: "cab-left", boundRight: "cab-right", boundBottom: "cab-bottom", minY: 18, maxY: 300, offsetBottom: 0, offsetTop: 0 } };
+    const mod = baseModule({ elements: [top, bot] });
+    setProject(freshProject({ modules: [mod] }));
+
+    recalculateLayout(mod);
+    const once = { y: top.y, h: top.h };
+    recalculateLayout(mod);
+    expect({ y: top.y, h: top.h }).toEqual(once);
+    expect(top.baseZone.minY).toBeCloseTo(bot.y + bot.h, 5);
+  });
+});

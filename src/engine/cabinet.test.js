@@ -428,3 +428,33 @@ describe("zawiasy „globalne” przy szafkach obróconych o 90°", () => {
     expect(mountingData.some((m) => m.type === "door" && m.frontId === "drzwi-a")).toBe(false);
   });
 });
+
+describe("cokół a wyspa między szafkami pod ścianą", () => {
+  it("szafka z innego rzędu (wyspa) nie rozbija wspólnego cokołu ściany", () => {
+    setProject(freshProject({
+      room: { width: 4000, height: 2600, depth: 4000 },
+      modules: [
+        baseModule({ id: "w1", position: { x: 0, y: 0, z: 0 } }),
+        baseModule({ id: "isl", position: { x: 300, y: 0, z: 2000 } }),
+        baseModule({ id: "w2", position: { x: 600, y: 0, z: 0 } }),
+      ],
+    }));
+    const plinths = calculateAllProjectParts().filter((p) => p.name.startsWith("Cokół dolny"));
+    expect(plinths.map((p) => p.length).sort((a, b) => a - b)).toEqual([600, 1200]);
+  });
+});
+
+describe("kontrola projektu: prowadnica dłuższa niż szafka", () => {
+  it("zgłasza szufladę w płytkiej szafce", async () => {
+    const { validateProject } = await import("../core/validate.js");
+    const mod = baseModule({ dimensions: { width: 600, height: 720, depth: 250 }, elements: [
+      { id: "f0", typ: "front", subtype: "szuflada", frontIndex: 0, gap: 3, distribution: "1",
+        baseZone: { minX: 18, maxX: 582, minY: 18, maxY: 702, offsetBottom: 0, offsetTop: 0 } },
+    ] });
+    setProject(freshProject({ modules: [mod] }));
+    const msgs = validateProject().issues.filter((i) => i.message.includes("prowadnica NL"));
+    expect(msgs).toHaveLength(1);
+    setProject(freshProject({ modules: [baseModule({ elements: mod.elements })] }));
+    expect(validateProject().issues.some((i) => i.message.includes("prowadnica NL"))).toBe(false);
+  });
+});

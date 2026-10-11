@@ -14,6 +14,9 @@ import { drawerSystems } from "./drawerSystems.js";
 import { corpusInnerDepth } from "./backPanel.js";
 import { num } from "../utils/math.js";
 
+// Zapas za prowadnicą (jak w calculateNominalLength, core/drawerMath.js).
+const NL_SAFETY = 5;
+
 // mod: szafka, el: front szufladowy, project: state.project.
 export function drawerSpec(mod, el, project) {
   const th = num(project.materials && project.materials.boardThickness, 18) || 18;
@@ -53,15 +56,20 @@ export function drawerSpec(mod, el, project) {
   let depth = corpusInnerDepth(mod, project);
   if (isInternal) depth -= innerThick + innerSetback;
   else if (isInset) depth -= th;
+  // Głębokość realnie dostępna (bez ręcznego NL) - do sprawdzenia, czy prowadnica się mieści.
+  const maxDepth = depth;
   const forceNL = parseFloat(el.forceNL);
   if (Number.isFinite(forceNL)) depth = forceNL + 10;
 
   const comps = getDrawerComponents(system, openingW, depth, availableSpace, el.forceVariant || "auto", el.drawerSideHeight);
   const nl = comps ? comps.nominalLength : calculateNominalLength(depth, system);
+  // calculateNominalLength zwraca najkrótszą prowadnicę z serii także wtedy, gdy nie mieści
+  // się ona w szafce (np. wisząca 300 mm) - tu wychodzi to na jaw (kontrola projektu).
+  const fitsDepth = nl <= maxDepth - NL_SAFETY;
 
   return {
     system, th, isInternal, isInset, innerThick, innerSetback,
-    availableSpace, simulatedSpace, depth, nl,
+    availableSpace, simulatedSpace, depth, maxDepth, nl, fitsDepth,
     openingX0, openingX1, openingW,
     comps,
   };

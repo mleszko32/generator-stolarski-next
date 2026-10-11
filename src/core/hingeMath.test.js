@@ -73,3 +73,21 @@ describe("stackedHingeObstacles", () => {
     expect(obs.filter((o) => o.isStructural)).toHaveLength(2); // tylko wieńce samej dolnej
   });
 });
+
+describe("calculateHinges — krótkie drzwi", () => {
+  beforeEach(() => setProject(freshProject()));
+
+  it("dwie puszki nie lądują w tym samym miejscu ani w odwrotnej kolejności", () => {
+    for (const h of [140, 200, 230]) {
+      const hinges = calculateHinges(door({ h }), 18, [], "left");
+      expect(hinges).toHaveLength(2);
+      expect(hinges[1].y - hinges[0].y).toBeGreaterThanOrEqual(70);
+      expect(hinges[0].y).toBeGreaterThanOrEqual(30);
+      expect(hinges[1].y).toBeLessThanOrEqual(h - 30);
+    }
+  });
+
+  it("zwykłe drzwi bez zmian (100 od dołu i od góry)", () => {
+    expect(calculateHinges(door(), 18, [], "left").map((x) => x.y)).toEqual([100, 600]);
+  });
+});

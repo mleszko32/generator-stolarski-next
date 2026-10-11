@@ -10,6 +10,10 @@
 // szer.2] (true = okleić). Klucz to ta sama tożsamość, po której lista formatek
 // zlicza sztuki (kategoria|nazwa|długość|szerokość), więc wybór dotyczy wszystkich
 // identycznych formatek w projekcie. Brak wpisu = reguła domyślna (dookoła albo nic).
+// Formatka z materialId (fronty, boki dokładane, blendy) ma klucz z materiałem - ta sama
+// tożsamość co wiersz listy formatek, więc dwa fronty o tych samych wymiarach w różnych
+// materiałach mają osobne ustawienia. Stary klucz bez materiału (projekty sprzed tej
+// zmiany) dalej działa jako zapasowy.
 export const EDGE_BANDING_EXCLUDED_CATEGORIES = ['Plecy', 'Blat'];
 // Zapas okleiny doliczany do zamówienia (odpad na końcach, docinanie).
 export const EDGE_BANDING_RESERVE = 0.10;
@@ -21,13 +25,16 @@ export function isEdgeBanded(part) {
   return !EDGE_BANDING_EXCLUDED_CATEGORIES.includes(part.category);
 }
 
+const baseEdgeKey = (part) => `${part.category}|${part.name}|${part.length}|${part.width}`;
+
 export function edgeKey(part) {
-  return `${part.category}|${part.name}|${part.length}|${part.width}`;
+  const base = baseEdgeKey(part);
+  return part.materialId ? `${base}|${part.materialId}` : base;
 }
 
 // rules: project.edgeBanding (albo null). Zwraca [dł.1, dł.2, szer.1, szer.2].
 export function getPartEdges(part, rules = null) {
-  const r = rules && rules[edgeKey(part)];
+  const r = rules && (rules[edgeKey(part)] || rules[baseEdgeKey(part)]);
   if (Array.isArray(r) && r.length === 4) return r.map(Boolean);
   const all = isEdgeBanded(part);
   return [all, all, all, all];
@@ -38,7 +45,9 @@ export function getPartEdges(part, rules = null) {
 export function withEdges(rules, part, edges) {
   const next = { ...(rules || {}) };
   const def = isEdgeBanded(part);
-  if (edges.every((e) => e === def)) delete next[edgeKey(part)];
+  // Wybór równy domyślnemu usuwa wpis - chyba że zostałby stary klucz bez materiału, który
+  // by go nadpisał; wtedy zapisujemy domyślny wybór jawnie.
+  if (edges.every((e) => e === def) && !(part.materialId && next[baseEdgeKey(part)])) delete next[edgeKey(part)];
   else next[edgeKey(part)] = edges.map(Boolean);
   return next;
 }
