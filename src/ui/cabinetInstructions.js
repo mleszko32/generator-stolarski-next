@@ -51,7 +51,9 @@ function rcCardHtml(panels) {
     if (row.st.alongFrom !== "przód") return `${pos}${pair}`;
     // Łączniki przy dole / górze: przednia wiertarka od zderzaka, tylna wg trybu, środkowe - pin w szynie.
     if (i === 0 && Math.abs(shot[0] - RC_FRONT_STOP) < 0.05) {
-      return `${pos}${pair} - przednia wiertarka${rc.frontPin ? ` (pin ${rc.frontPin})` : ""}, przód do zderzaka 37`;
+      // Pin przedniej wiertarki z doboru dla tej głębokości (zwykle ten, na którym się pracuje).
+      const fp = rc.rearMode === "pin" ? rcRearScrew(row.depth, rc).frontPin : rc.frontPin;
+      return `${pos}${pair} - przednia wiertarka${fp ? ` (pin ${fp})` : ""}, przód do zderzaka 37`;
     }
     if (i === all.length - 1 && all.length > 1) {
       const r = rcRearScrew(row.depth, rc);

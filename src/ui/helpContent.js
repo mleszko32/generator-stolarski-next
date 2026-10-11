@@ -203,7 +203,9 @@ export const HELP_SECTIONS = [
         tylnej krawędzi (37 mm od tyłu) albo na pinie w szynie - wtedy otwór wypada w najbliższym otworze szyny
         (29–45 mm od tyłu). Kalibracja stołu z warsztatu (przednia pin 3, formatka 510 mm, tylna pin 7 → 40 mm
         od tyłu) jest wpisana domyślnie; karta wiercenia podaje numer tylnego pinu dla każdej głębokości, a pod
-        ustawieniami widać przykłady (np. 521 mm → pin 6).</li>
+        ustawieniami widać przykłady (np. 521 mm → pin 6). Przestawienie przedniej wiertarki na inny pin nie
+        zmienia położenia otworów, tylko numer tylnego pinu - wpisz pin, na którym pracujesz, w „Pin przedniej
+        wiertarki przy pracy”.</li>
         <li><b>Rzuty ścian</b> - widok każdej ściany z szafkami i otworami.</li>
         <li><b>Blaty</b> - odcinki blatów i łączenia w narożnikach.</li>
         <li><b>Okucia i okleina</b> - lista zakupów (nóżki, łączniki, komplety szuflad, zawiasy, okleina w mb).</li>

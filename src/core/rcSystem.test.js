@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { baseAndPin, rcRearScrew, rcRearOverride, rcPanelSetups, getRcSettings } from "./rcSystem.js";
+import { baseAndPin, rcRearScrew, rcRearOverride, rcPanelSetups, getRcSettings, rcPinsFor } from "./rcSystem.js";
 import { jointSetPositions } from "../engine/carcaseParts.js";
 import { getCabinetPanels } from "../engine/cabinetDrillings.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
@@ -24,8 +24,8 @@ describe("stół RC System - tylny otwór łączników", () => {
   });
 
   it("pin z kalibracją z warsztatu (510, pin 7 -> 470 od przodu = 40 od tyłu): najbliższy otwór szyny", () => {
-    const s = { rearMode: "pin", calibDepth: 510, calibRear: 40, calibPin: 7 };
-    expect(rcRearScrew(510, s)).toEqual({ x: 470, exact: true, pin: 7 });   // pomiar
+    const s = { rearMode: "pin", calibDepth: 510, calibRear: 40, calibPin: 7, calibFrontPin: 3, frontPin: 3 };
+    expect(rcRearScrew(510, s)).toEqual({ x: 470, exact: true, pin: 7, frontPin: 3 }); // pomiar
     expect(rcRearScrew(521, s)).toMatchObject({ x: 486, pin: 6 });          // 35 od tyłu, pin 6 jak w warsztacie
     expect(rcRearScrew(320, s)).toMatchObject({ x: 278, pin: 19 });
     expect(rcRearScrew(560, s)).toMatchObject({ x: 518, pin: 4 });
@@ -34,21 +34,38 @@ describe("stół RC System - tylny otwór łączników", () => {
       expect(D - r.x).toBeGreaterThanOrEqual(29);
       expect(D - r.x).toBeLessThanOrEqual(45);
       expect(Math.abs((r.x - 470) % 16)).toBe(0);                          // zawsze na siatce szyny
-      if (r.pin !== null) expect(r.x).toBe(470 + (7 - r.pin) * 16);
+      if (r.pin !== null) expect(r.x).toBe(470 + ((3 - r.frontPin) + (7 - r.pin)) * 16);
     }
   });
 
   it("bez numeru pinu w kalibracji - samo położenie; pin spoza szyny -> null", () => {
     expect(rcRearScrew(510, { rearMode: "pin", calibDepth: 510, calibRear: 40 }).pin).toBeNull();
-    expect(rcRearScrew(1200, { rearMode: "pin", calibDepth: 510, calibRear: 40, calibPin: 7 }).pin).toBeNull();
+    expect(rcRearScrew(1200, { rearMode: "pin", calibDepth: 510, calibRear: 40, calibPin: 7, calibFrontPin: 3 }).pin).toBeNull();
   });
 
   it("domyślna kalibracja = pomiar z warsztatu; puste pola jej nie kasują; nadpisanie tylko gdy stół włączony", () => {
-    expect(getRcSettings({})).toMatchObject({ enabled: false, rearMode: "pin", calibDepth: 510, calibRear: 40, calibPin: 7, frontPin: 3 });
+    expect(getRcSettings({})).toMatchObject({ enabled: false, rearMode: "pin", calibDepth: 510, calibRear: 40, calibPin: 7, calibFrontPin: 3, frontPin: 3 });
     expect(getRcSettings({ rcSystem: { calibDepth: null, calibRear: "" } })).toMatchObject({ calibDepth: 510, calibRear: 40 });
     expect(rcRearOverride(510, { rcSystem: { enabled: false } })).toBeNull();
     expect(rcRearOverride(510, { rcSystem: { enabled: true } })).toBe(470);
     expect(rcRearOverride(510, { rcSystem: { enabled: true, rearMode: "stop" } })).toBe(473);
+  });
+
+  it("pin przedniej wiertarki nie zmienia położenia otworów, tylko numer tylnego pinu (suma stała)", () => {
+    const base = { rearMode: "pin", calibDepth: 510, calibRear: 40, calibPin: 7, calibFrontPin: 3 };
+    [2, 3, 5].forEach((fp) => {
+      const r = rcRearScrew(510, { ...base, frontPin: fp });
+      expect(r.x).toBe(470);
+      expect(r.frontPin + r.pin).toBe(10);
+      expect(r.frontPin).toBe(fp);
+    });
+  });
+
+  it("gdy tylny pin nie mieści się na szynie, dobiera najbliższy pin przedni; za głęboka formatka - bez pinów", () => {
+    const s = { rearMode: "pin", calibDepth: 510, calibRear: 40, calibPin: 7, calibFrontPin: 3, frontPin: 3 };
+    expect(rcRearScrew(250, s)).toMatchObject({ frontPin: 5, pin: 21 });
+    expect(rcRearScrew(650, s)).toMatchObject({ pin: null, frontPin: null });
+    expect(rcPinsFor(0, { calibPin: 7 })).toEqual({ pin: null, frontPin: null }); // bez pinu przedniego w kalibracji
   });
 
   it("zestawy łączników z tylnym otworem ze stołu; środkowe dalej w rastrze 32 od przodu", () => {

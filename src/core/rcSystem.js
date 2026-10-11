@@ -49,9 +49,14 @@ export const RC_FRONT_STOP = 37;         // zderzak przy przedniej wiertarce
 export const RC_SPINDLE = 32;            // rozstaw wrzecion wiertarki
 
 // Kalibracja domyślna = pomiar stołu z warsztatu (patrz wyżej); w projekcie można ją zmienić.
-// calibPin / frontPin - numery pinów przy pomiarze (tylny liczony od tylnego końca szyny,
-// przedni od przedniego); z nich karta wiercenia podaje numer pinu dla każdej głębokości.
-export const RC_DEFAULT_CALIB = { calibDepth: 510, calibRear: 40, calibPin: 7, frontPin: 3 };
+// calibPin / calibFrontPin - numery pinów przy pomiarze (tylny liczony od tylnego końca
+// szyny, przedni od przedniego); frontPin - pin przedniej wiertarki, na którym się pracuje.
+//
+// Pin przedniej wiertarki NIE zmienia położenia otworów w mm: formatka bazuje przodem o
+// zderzak przedniej wiertarki, więc przesuwa się razem z nią o pełne 16 mm i tylny otwór
+// wypada na tej samej siatce co 16 mm od przodu formatki. Zmienia się tylko numer tylnego
+// pinu - dla danej głębokości suma (pin przedni + pin tylny) jest stała.
+export const RC_DEFAULT_CALIB = { calibDepth: 510, calibRear: 40, calibPin: 7, calibFrontPin: 3, frontPin: 3 };
 export const RC_RAIL_PINS = 21; // otwory 1…20 od każdego końca + nienumerowany środkowy (21)
 const DEFAULTS = { enabled: false, rearMode: "pin", ...RC_DEFAULT_CALIB };
 // Zakres, w którym może wypaść tylny otwór na pinie (najbliższy otwór szyny co 16 mm).
@@ -80,7 +85,7 @@ export function baseAndPin(dist) {
 export const baseText = (bp) => (bp ? `otwór ${String(bp.base).replace(".", ",")}${bp.pin ? ` + pin +${String(bp.pin).replace(".", ",")}` : " + pin neutralny"}` : null);
 
 // Położenie tylnego wkrętu łączników (mm od przodu formatki o głębokości `depth`) przy pracy
-// na stole. { x, exact, range? }:
+// na stole. { x, exact, range?, pin?, frontPin? }:
 // - zderzak do krawędzi: depth - 37, dokładnie;
 // - pin z kalibracją: siatka co 16 mm wyznaczona pomiarem, pozycja najbliższa 37 mm od tyłu
 //   (przy remisie dalej od tyłu);
@@ -92,12 +97,27 @@ export function rcRearScrew(depth, settings) {
   if (isCalibrated(s)) {
     const x0 = num(s.calibDepth) - num(s.calibRear);
     const k = Math.ceil((D - RC_FRONT_STOP - x0) / RC_RAIL_STEP - 0.5);
-    // Wiertarka bliżej przodu = wyższy numer pinu liczony od tyłu (szyna co 16 mm).
-    const calibPin = Math.round(num(s.calibPin, 0));
-    const pin = calibPin > 0 ? calibPin - k : null;
-    return { x: round1(x0 + k * RC_RAIL_STEP), exact: true, pin: pin >= 1 && pin <= RC_RAIL_PINS ? pin : null };
+    return { x: round1(x0 + k * RC_RAIL_STEP), exact: true, ...rcPinsFor(k, s) };
   }
   return { x: round1(D - RC_FRONT_STOP), exact: false, range: RC_PIN_RANGE };
+}
+
+// Numery pinów dla otworu przesuniętego o k oczek szyny względem pomiaru. Tylna wiertarka
+// bliżej przodu = wyższy numer od tyłu; przednia wiertarka dalej od przodu (wyższy numer) =
+// formatka bliżej tyłu = niższy numer tylnego pinu. Gdy przy pinie przednim, na którym się
+// pracuje, tylny nie mieści się na szynie (bardzo płytka / głęboka formatka), bierzemy
+// najbliższy pin przedni, przy którym się mieści. { pin, frontPin } albo nulle bez numerów w kalibracji.
+export function rcPinsFor(k, s) {
+  const calibPin = Math.round(num(s.calibPin, 0));
+  const calibFront = Math.round(num(s.calibFrontPin, num(s.frontPin, 0)));
+  if (!(calibPin > 0) || !(calibFront > 0)) return { pin: null, frontPin: null };
+  const sum = calibPin + calibFront - k;            // pin przedni + pin tylny dla tej głębokości
+  const ok = (p) => p >= 1 && p <= RC_RAIL_PINS;
+  const preferred = Math.round(num(s.frontPin, calibFront)) || calibFront;
+  const fronts = Array.from({ length: RC_RAIL_PINS }, (_, i) => i + 1)
+    .sort((a, b) => Math.abs(a - preferred) - Math.abs(b - preferred) || a - b);
+  const f = fronts.find((fp) => ok(sum - fp));
+  return f ? { pin: sum - f, frontPin: f } : { pin: null, frontPin: null };
 }
 
 // Czy stół zmienia położenie tylnego otworu (tylko gdy włączony i wynik jest pewny).
