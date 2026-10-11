@@ -29,6 +29,10 @@ import { showAlert } from "../utils/modal.js";
 
 let alignMode = { active: false, sourceMod: null, sourceEl: null, banner: null };
 let isFrontsVisible = true;
+// Osobne przełączniki widoczności (pasek widoku): "Ukryj fronty" chowa tylko fronty szafek.
+let isSidePanelsVisible = true; // boki dokładane
+let isBlendsVisible = true;     // blendy
+let isWorktopsVisible = true;   // blaty
 // Etykiety z nazwami szafek unoszące się nad każdą z nich w 3D (zgłoszona
 // potrzeba: przy wielu modułach nie dało się z widoku poznać, która szafka to
 // która, bez klikania każdej po kolei) - stan zapamiętany, żeby nie trzeba było
@@ -714,6 +718,27 @@ export function init3DViewer() {
       renderInteriorEditorIfVisible();
   };
 
+  // Boki dokładane, blendy i blaty - każda grupa z własnym przyciskiem (wcześniej chował
+  // je "Ukryj fronty zewn.", choć to nie fronty).
+  const makeVisibilityToggle = (icon, name, title, get, set) => {
+      const btn = document.createElement('button');
+      btn.className = 'btn view-btn';
+      btn.title = title;
+      const paint = () => {
+          btn.innerHTML = `<i class="ti ti-${icon}" aria-hidden="true"></i> ${get() ? 'Ukryj' : 'Pokaż'} ${name}`;
+          btn.classList.toggle('active', !get());
+      };
+      btn.onclick = () => { set(!get()); paint(); update3D(); };
+      paint();
+      return btn;
+  };
+  const toggleSidePanelsBtn = makeVisibilityToggle('layout-board', 'boki', 'Boki dokładane',
+      () => isSidePanelsVisible, (v) => { isSidePanelsVisible = v; });
+  const toggleBlendsBtn = makeVisibilityToggle('layout-distribute-vertical', 'blendy', 'Blendy',
+      () => isBlendsVisible, (v) => { isBlendsVisible = v; });
+  const toggleWorktopsBtn = makeVisibilityToggle('square', 'blaty', 'Blaty',
+      () => isWorktopsVisible, (v) => { isWorktopsVisible = v; });
+
   const toggleInteriorBtn = document.createElement('button');
   toggleInteriorBtn.innerHTML = '<i class="ti ti-layout-list" aria-hidden="true"></i> Wnętrze 2D';
   toggleInteriorBtn.title = 'Klikalny edytor wnęk — dziel/obsadzaj fronty bez trafiania w 3D';
@@ -751,6 +776,9 @@ export function init3DViewer() {
 
   uiOverlay.appendChild(toggleBtn);
   uiOverlay.appendChild(toggleFrontsBtn);
+  uiOverlay.appendChild(toggleSidePanelsBtn);
+  uiOverlay.appendChild(toggleBlendsBtn);
+  uiOverlay.appendChild(toggleWorktopsBtn);
   uiOverlay.appendChild(toggleLabelsBtn);
   uiOverlay.appendChild(toggleInteriorBtn);
   uiOverlay.appendChild(toggleMeasureBtn);
@@ -1551,8 +1579,8 @@ export function update3D() {
   // Ta sama sztuczka co przy module: position.x/z to róg FAKTYCZNEGO odcisku
   // po uwzględnieniu obrotu (getWorldFootprint działa na tym obiekcie bez
   // zmian, bo ma ten sam kształt dimensions/rotation co moduł).
-  if (isFrontsVisible) {
-      worktopBoxes(state.project).forEach(b => {
+  {
+      if (isWorktopsVisible) worktopBoxes(state.project).forEach(b => {
           const w = b.x1 - b.x0, d = b.z1 - b.z0, h = b.y1 - b.y0;
           const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), isXrayMode ? mats.xray.shelf : worktopMat);
           mesh.position.set(b.x0 + w / 2, b.y0 + h / 2, b.z0 + d / 2);
@@ -1561,6 +1589,7 @@ export function update3D() {
           cabinetGroup.add(mesh);
       });
       (state.project.sidePanels || []).forEach(panel => {
+          if (panel.kind === 'blenda' ? !isBlendsVisible : !isSidePanelsVisible) return;
           const isActiveSide = panel.id === state.activeSidePanelId;
           const { worldW, worldD } = getWorldFootprint(panel);
           const x = parseFloat(panel.position?.x) || 0;

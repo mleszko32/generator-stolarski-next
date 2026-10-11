@@ -201,7 +201,9 @@ body {
 .btn-outline:hover { background: var(--surface-subtle); }
 .view-btn { padding: 8px 12px; font-size: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
 /* Pasek przycisków widoku 3D (prawy górny róg) i banery trybów (miarka, wyrównywanie). */
-.view-toolbar { position: absolute; top: 15px; right: 15px; z-index: 100; display: flex; gap: 10px; }
+/* Zawija się w wąskim widoku (wcześniej skrajne przyciski wychodziły poza panel). */
+.view-toolbar { position: absolute; top: 15px; right: 15px; left: 15px; z-index: 100; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; pointer-events: none; }
+.view-toolbar > * { pointer-events: auto; }
 .view-banner {
   position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 2000;
   display: flex; align-items: center; gap: 15px; padding: 12px 24px;

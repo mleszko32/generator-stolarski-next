@@ -138,7 +138,7 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
 
 - `src/render/viewer3d.js` (~1600 linii) — scena Three.js, OrbitControls, przeciąganie modułów
   z przyciąganiem co 40 mm, edycja kliknięciem / menu kontekstowym, przełączniki widoczności
-  frontów, „tryb wyrównywania”. Właściciel sceny i `update3D()`. Render na żądanie
+  (osobno: fronty, boki dokładane, blendy, blaty — „Ukryj fronty” chowa tylko fronty szafek), „tryb wyrównywania”. Właściciel sceny i `update3D()`. Render na żądanie
   (`requestRender`, zdarzenia tylko z płótna), rozmiar z `ResizeObserver` na kontenerze; przy
   schowanym widoku 3D (Wnętrze 2D) `update3D()` tylko ustawia `sceneDirty`, a scenę dobudowuje
   ponowne pokazanie. Po przebudowie `update3D()` przelicza `matrixWorld` (raycast tuż po
