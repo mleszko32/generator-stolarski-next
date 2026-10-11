@@ -20,6 +20,7 @@ import { drawerCardsHtml, bindDrawerCards } from "./drawerSettings.js";
 import { propHeaderHtml, sectionHtml, bindSections, setSectionDots, positionRotationHtml } from "./propertiesShell.js";
 import { blindCornerSectionHtml, bindBlindCornerSection } from "./blindCornerProperties.js";
 import { findRowAround } from "../core/wallFill.js";
+import { findKitchenRunAround } from "../core/kitchenRun.js";
 import { openWallFillModal } from "./wallFillModal.js";
 
 function getSelectedMods() {
@@ -181,6 +182,8 @@ export function initPropertiesPanel() {
   // Rząd szafek przy ścianie, do którego należy ta szafka (core/wallFill.js) -
   // przycisk "Zmień podział rzędu" otwiera okno rozmieszczania w trybie edycji.
   const wallRow = findRowAround(state.project, activeModule.id);
+  // Kuchnia L/U (ściany połączone narożnikami) - przycisk "Zmień podział kuchni L/U".
+  const kitchenRun = findKitchenRunAround(state.project, activeModule.id);
 
   rightSidebar.innerHTML = `
     ${propHeaderHtml({
@@ -205,10 +208,11 @@ export function initPropertiesPanel() {
         rotClass: 'btn-rotate', hint: 'Skrót: klawisz R obraca aktywną szafkę o +90°.',
       })}
 
-      ${wallRow ? `
+      ${wallRow || kitchenRun ? `
         <h3>Rząd przy ścianie</h3>
-        <div class="property-group">
-          <button type="button" id="btn-edit-wall-row" class="btn btn-sm btn-block" title="Podziel na nowo cały rząd, w którym stoi ta szafka (inny wariant, szerokości, blenda) - bez usuwania szafek"><i class="ti ti-layout-columns" aria-hidden="true"></i> Zmień podział rzędu (${wallRow.moduleIds.length} szt.)</button>
+        <div class="property-group" style="display: flex; flex-direction: column; gap: 6px;">
+          ${wallRow ? `<button type="button" id="btn-edit-wall-row" class="btn btn-sm btn-block" title="Podziel na nowo cały rząd, w którym stoi ta szafka (inny wariant, szerokości, blenda) - bez usuwania szafek"><i class="ti ti-layout-columns" aria-hidden="true"></i> Zmień podział rzędu (${wallRow.moduleIds.length} szt.)</button>` : ''}
+          ${kitchenRun ? `<button type="button" id="btn-edit-kitchen-run" class="btn btn-sm btn-block" title="Podziel na nowo całą kuchnię razem z narożnikami - bez usuwania szafek"><i class="ti ti-layout-board" aria-hidden="true"></i> Zmień podział kuchni ${kitchenRun.walls.length === 2 ? 'L' : 'U'} (${kitchenRun.moduleIds.length} szt.)</button>` : ''}
         </div>
       ` : ''}
 
@@ -781,6 +785,10 @@ function setupEventListeners() {
   document.getElementById('btn-edit-wall-row')?.addEventListener('click', () => {
     const mod = getActiveModule();
     if (mod) openWallFillModal(() => { initPropertiesPanel(); updateAll(); }, { editModuleId: mod.id });
+  });
+  document.getElementById('btn-edit-kitchen-run')?.addEventListener('click', () => {
+    const mod = getActiveModule();
+    if (mod) openWallFillModal(() => { initPropertiesPanel(); updateAll(); }, { editKitchenId: mod.id });
   });
 
   const btnGroupCombine = document.getElementById('btn-group-combine');

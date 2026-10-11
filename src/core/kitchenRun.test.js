@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { state } from "./state.js";
-import { planKitchenRun, applyKitchenRun, runPresets } from "./kitchenRun.js";
+import { planKitchenRun, applyKitchenRun, runPresets, findKitchenRunAround, customFromRun, replaceKitchenRun } from "./kitchenRun.js";
 import { computeWallLayouts } from "./walls.js";
 import { validateProject } from "./validate.js";
 import { freshProject, setProject } from "../test/fixtures.js";
@@ -186,5 +186,100 @@ describe("planKitchenRun", () => {
     const b = planKitchenRun(state.project, { walls: ["lewa", "tyl"], corners: [{ kind: "L" }], fill, choice: { [key]: 1 } });
     expect(b.walls[1].segments[0].chosen).toBe(1);
     expect(b.walls[1].segments[0].items).not.toEqual(a.walls[1].segments[0].items);
+  });
+});
+
+describe("zmiana podziału istniejącej kuchni L/U", () => {
+  beforeEach(() => setProject(freshProject({ room, modules: [], sidePanels: [], openings: [] })));
+
+  const build = (opts) => {
+    const plan = planKitchenRun(state.project, { fill, ...opts });
+    applyKitchenRun(plan);
+    return plan;
+  };
+  const replan = (info, extra = {}) => {
+    const base = {
+      walls: info.walls, type: info.type, corners: info.corners, armLength: info.armLength, fill,
+      wallGap: info.gap, ignoreIds: [...info.moduleIds, ...info.panelIds],
+      template: state.project.modules.find((m) => m.id === info.templateId) || null,
+    };
+    const first = planKitchenRun(state.project, base);
+    return planKitchenRun(state.project, { ...base, custom: customFromRun(info, first), ...extra });
+  };
+
+  it("rozpoznaje L z szafką narożną - od zwykłej szafki i od szafki L", () => {
+    build({ walls: ["lewa", "tyl"], corners: [{ kind: "L", size: 900 }], wallGap: 50 });
+    const cab = state.project.modules.find((m) => m.type === "base_cabinet" && m.rotation === 0);
+    const info = findKitchenRunAround(state.project, cab.id);
+    expect(info).toMatchObject({ walls: ["lewa", "tyl"], presetId: "lewa+tyl", type: "base_cabinet", gap: 50 });
+    expect(info.corners[0]).toMatchObject({ kind: "L", size: 900 });
+    expect(info.moduleIds.sort()).toEqual(state.project.modules.map((m) => m.id).sort());
+    expect(info.panelIds.sort()).toEqual(state.project.sidePanels.map((p) => p.id).sort());
+    const corner = state.project.modules.find((m) => m.type === "corner_cabinet");
+    expect(findKitchenRunAround(state.project, corner.id).walls).toEqual(["lewa", "tyl"]);
+  });
+
+  it("rozpoznaje U, szafkę ślepą i narożnik martwy z ich ustawieniami", () => {
+    build({
+      walls: ["lewa", "tyl", "prawa"],
+      corners: [{ kind: "blind", blindOn: "next", width: 1000, frontWidth: 500, filler: 50 }, { kind: "dead", blindOn: "prev", filler: 40 }],
+    });
+    const cab = state.project.modules.find((m) => m.rotation === 90);
+    const info = findKitchenRunAround(state.project, cab.id);
+    expect(info.walls).toEqual(["lewa", "tyl", "prawa"]);
+    expect(info.corners[0]).toMatchObject({ kind: "blind", blindOn: "next", width: 1000, frontWidth: 500, filler: 50 });
+    expect(info.corners[1]).toMatchObject({ kind: "dead", blindOn: "prev", filler: 40 });
+  });
+
+  it("pojedynczy rząd przy ścianie to nie kuchnia L/U", () => {
+    const plan = planKitchenRun(state.project, { walls: ["tyl"], fill });
+    applyKitchenRun(plan);
+    expect(findKitchenRunAround(state.project, state.project.modules[0].id)).toBeNull();
+  });
+
+  it("ten sam podział: szafki zostają na miejscu, z tymi samymi id", () => {
+    build({ walls: ["lewa", "tyl"], corners: [{ kind: "L", size: 900 }] });
+    const before = JSON.parse(JSON.stringify(state.project.modules));
+    const info = findKitchenRunAround(state.project, before.find((m) => m.rotation === 0 && m.type === "base_cabinet").id);
+    const r = replaceKitchenRun(info, replan(info));
+    expect(r.removed).toEqual([]);
+    const after = Object.fromEntries(state.project.modules.map((m) => [m.id, m]));
+    expect(Object.keys(after).sort()).toEqual(before.map((m) => m.id).sort());
+    before.forEach((m) => {
+      expect(after[m.id].position).toEqual(m.position);
+      expect(after[m.id].dimensions.width).toBe(m.dimensions.width);
+    });
+  });
+
+  it("nowy podział: wnętrza zostają, nadmiarowe szafki znikają, narożnik zmienia rozmiar", () => {
+    build({ walls: ["lewa", "tyl"], corners: [{ kind: "L", size: 900 }] });
+    const tyl = state.project.modules.filter((m) => m.rotation === 0 && m.type === "base_cabinet").sort((a, b) => a.position.x - b.position.x);
+    tyl[0].name = "Zlewowa";
+    const corner = state.project.modules.find((m) => m.type === "corner_cabinet");
+    const info = findKitchenRunAround(state.project, tyl[0].id);
+    const first = planKitchenRun(state.project, {
+      walls: info.walls, corners: [{ ...info.corners[0], size: 1000 }], fill, wallGap: info.gap,
+      ignoreIds: [...info.moduleIds, ...info.panelIds],
+    });
+    const key = first.walls[1].segments[0].key;
+    const plan = planKitchenRun(state.project, {
+      walls: info.walls, corners: [{ ...info.corners[0], size: 1000 }], fill, wallGap: info.gap,
+      ignoreIds: [...info.moduleIds, ...info.panelIds], custom: { [key]: "1000, *" },
+    });
+    const r = replaceKitchenRun(info, plan);
+    expect(r.removed.length).toBe(tyl.length - 2);
+    const z = state.project.modules.find((m) => m.id === tyl[0].id);
+    expect(z).toMatchObject({ name: "Zlewowa", dimensions: { width: 1000 }, position: { x: 1000 } });
+    expect(state.project.modules.find((m) => m.id === corner.id).dimensions).toMatchObject({ width: 1000, legB: 1000 });
+    const { issues } = validateProject();
+    expect(issues.filter((i) => /narożnik|Nachodzi/i.test(i.message))).toEqual([]);
+  });
+
+  it("ignoreIds: plan liczony tak, jakby kuchni nie było", () => {
+    const empty = planKitchenRun(state.project, { walls: ["lewa", "tyl"], corners: [{ kind: "L" }], fill });
+    build({ walls: ["lewa", "tyl"], corners: [{ kind: "L" }] });
+    const info = findKitchenRunAround(state.project, state.project.modules[0].id);
+    const again = planKitchenRun(state.project, { walls: ["lewa", "tyl"], corners: [{ kind: "L" }], fill, ignoreIds: [...info.moduleIds, ...info.panelIds] });
+    expect(again.walls.map((w) => w.segments.map((s) => [s.u0, s.u1]))).toEqual(empty.walls.map((w) => w.segments.map((s) => [s.u0, s.u1])));
   });
 });

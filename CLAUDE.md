@@ -313,6 +313,12 @@ kopii projektu (podmienia `state.project` jak `validate.js`): najpierw narożnik
 zaślepka + blenda), potem `findFreeSegments` + `divideSegment` na każdej ścianie z resztą z dala od narożnika;
 `applyKitchenRun` dokłada gotowe obiekty. Ściany w kolejności zgodnej z zegarem (koniec ściany = początek
 następnej), ostrzeżenie o przejściu w U < 1200 mm.
+Zmiana istniejącej kuchni L/U (przycisk „Zmień podział kuchni L/U” w prawym panelu zwykłej szafki i szafki narożnej):
+`findKitchenRunAround` rozpoznaje geometrycznie ściany połączone narożnikami (szafka L, ślepa, zaślepka martwego
+narożnika + blenda narożna), ich ustawienia, zasięg skrajnych ramion i obecne szerokości (`customFromRun` wpisuje je
+jako własne szerokości odcinków); `planKitchenRun(..., { ignoreIds })` liczy, jakby kuchni nie było, a
+`replaceKitchenRun` zmienia ją na miejscu (szafki na ścianie po kolei od lewej, szafka L / ślepa w tym samym
+narożniku zachowują wnętrza; blendy i zaślepki od nowa).
 
 **Szafka ślepa i okucia narożne**: szafka ślepa to zwykła szafka z `mod.blindCorner = { active, side, frontWidth,
 fitting }` — `core/blindCorner.js` (czyste, z testami): `applyBlindCorner` na końcu `recalculateLayout` przycina

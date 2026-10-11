@@ -13,6 +13,8 @@ import { generateCornerBlankSVG, generateCornerPartsDrawings } from "../render/c
 import { initPropertiesPanel } from "./properties.js";
 import { propHeaderHtml, sectionHtml, bindSections, positionRotationHtml, bindModulePosition } from "./propertiesShell.js";
 import { cornerFittingSectionHtml, bindCornerFittingSection } from "./blindCornerProperties.js";
+import { findKitchenRunAround } from "../core/kitchenRun.js";
+import { openWallFillModal } from "./wallFillModal.js";
 
 // Prosty, samodzielny widok do druku wykroju L-kształtnej formatki narożnej
 // (Wieniec narożny / Półka narożna, engine/cornerParts.js: getCornerCorpusParts) -
@@ -83,12 +85,15 @@ export function renderCornerModuleProperties(rightSidebar, mod) {
   const legB = parseFloat(mod.dimensions.legB) || 0;
   const { depthA, depthB } = getCornerDepths(mod);
   const height = parseFloat(mod.dimensions.height) || 0;
+  // Szafka L w kuchni L/U - zmiana podziału całej kuchni (core/kitchenRun.js).
+  const kitchenRun = findKitchenRunAround(state.project, mod.id);
 
   rightSidebar.innerHTML = `
     ${propHeaderHtml({ name: mod.name, dims: `${legA}×${legB}×${height}`, extra: 'narożna', nameId: 'input-corner-name' })}
 
     <button type="button" id="btn-corner-configure" class="btn btn-block btn-primary mb-8"><i class="ti ti-settings" aria-hidden="true"></i> Konfiguruj szafkę narożną</button>
     <button type="button" id="btn-corner-blank-print" class="btn btn-block btn-sm mb-8"><i class="ti ti-file-text" aria-hidden="true"></i> Wykrój narożny (jak wyciąć wieniec/półkę)</button>
+    ${kitchenRun ? `<button type="button" id="btn-edit-kitchen-run" class="btn btn-block btn-sm mb-8" title="Podziel na nowo całą kuchnię razem z narożnikami - bez usuwania szafek"><i class="ti ti-layout-board" aria-hidden="true"></i> Zmień podział kuchni ${kitchenRun.walls.length === 2 ? 'L' : 'U'} (${kitchenRun.moduleIds.length} szt.)</button>` : ''}
 
     ${sectionHtml('wymiary', `
       <h3>Wymiary Modułu</h3>
@@ -119,4 +124,6 @@ export function renderCornerModuleProperties(rightSidebar, mod) {
 
   document.getElementById('btn-corner-configure')?.addEventListener('click', () => openCornerConfigModal(mod));
   document.getElementById('btn-corner-blank-print')?.addEventListener('click', () => openCornerBlankPrintView(mod));
+  document.getElementById('btn-edit-kitchen-run')?.addEventListener('click', () =>
+    openWallFillModal(() => { initPropertiesPanel(); refresh(); }, { editKitchenId: mod.id }));
 }

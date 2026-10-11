@@ -11,7 +11,10 @@ import {
   getClearance, setClearance,
   findRowAround, replaceFillRow, describeWidths,
 } from "../core/wallFill.js";
-import { runPresets, planKitchenRun, applyKitchenRun, CORNER_KINDS, defaultCorner } from "../core/kitchenRun.js";
+import {
+  runPresets, planKitchenRun, applyKitchenRun, CORNER_KINDS, defaultCorner,
+  findKitchenRunAround, customFromRun, replaceKitchenRun,
+} from "../core/kitchenRun.js";
 import { fittingsOfKind } from "../core/cornerFittings.js";
 import { getWorldFootprint } from "../core/layout.js";
 import { getSidePanelBox } from "../core/moduleDrag.js";
@@ -44,11 +47,19 @@ const fmt = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
 // editModuleId: tryb "Zmień podział rzędu" - rząd, do którego należy ta szafka
 // (core/wallFill.js: findRowAround), jest dzielony na nowo i zmieniany na miejscu
 // (replaceFillRow) zamiast usuwania i wstawiania od nowa.
-export function openWallFillModal(onChange, { editModuleId = null } = {}) {
+// editKitchenId: tryb "Zmień podział kuchni L/U" - cała kuchnia wokół tej szafki
+// (core/kitchenRun.js: findKitchenRunAround) z narożnikami, zmieniana na miejscu
+// (replaceKitchenRun).
+export function openWallFillModal(onChange, { editModuleId = null, editKitchenId = null } = {}) {
   let calc = null;
   const edit = editModuleId ? findRowAround(state.project, editModuleId) : null;
   if (editModuleId && !edit) {
     showAlert("Ta szafka nie stoi w rzędzie przy ścianie (albo to szafka narożna / ślepa), więc nie ma czego dzielić na nowo.");
+    return;
+  }
+  const kedit = editKitchenId ? findKitchenRunAround(state.project, editKitchenId) : null;
+  if (editKitchenId && !kedit) {
+    showAlert("Ta szafka nie należy do kuchni L/U (ciągu na dwóch albo trzech ścianach połączonych narożnikiem).");
     return;
   }
   // W trybie edycji ustawienia startują od obecnego układu rzędu: "Stałe + reszta"
@@ -61,18 +72,28 @@ export function openWallFillModal(onChange, { editModuleId = null } = {}) {
     restMode: "blenda",
     fillerSide: edit.fillers.length === 2 ? "both" : edit.fillers.length ? edit.fillers[0].side : saved.fillerSide,
     editGap: edit.gap,
+  } : kedit ? {
+    // Kuchnia L/U startuje od obecnego układu: narożniki, zasięg ramion i szerokości
+    // szafek w odcinkach (custom, uzupełniane przy pierwszym przeliczeniu).
+    ...saved, scope: "kitchen", presetId: kedit.presetId, type: kedit.type,
+    corners: JSON.parse(JSON.stringify(kedit.corners)), armLength: { ...kedit.armLength },
+    choice: {}, custom: null, editGap: kedit.gap,
   } : saved;
   // Odstęp od otworów i strefa przed drzwiami są zapisane w projekcie (project.wallFill).
   cfg.openingMargin = getClearance(state.project, "openingMargin");
   cfg.doorPassage = getClearance(state.project, "doorPassage");
-  const editTemplate = edit ? state.project.modules.find((m) => m.id === editModuleId) : null;
-  const ignoreIds = edit ? [...edit.moduleIds, ...edit.panelIds] : null;
+  const editTemplate = edit ? state.project.modules.find((m) => m.id === editModuleId)
+    : kedit ? state.project.modules.find((m) => m.id === kedit.templateId) || null : null;
+  const ignoreIds = edit ? [...edit.moduleIds, ...edit.panelIds] : kedit ? [...kedit.moduleIds, ...kedit.panelIds] : null;
+  const anyEdit = !!(edit || kedit);
 
   const dlg = openModal({
-    title: edit ? "Zmień podział rzędu" : "Rozmieść szafki",
+    title: edit ? "Zmień podział rzędu" : kedit ? "Zmień podział kuchni L/U" : "Rozmieść szafki",
     subtitle: edit
       ? `Rząd przy ścianie: ${edit.moduleIds.length} szt. (${describeWidths(edit.widths)}${edit.fillers.length ? ` + blenda ${edit.fillers.map((f) => fmt(f.width)).join(" + ")}` : ""}). Szafki zostaną zmienione na miejscu - wnętrza i ustawienia zostają, dodatkowe szafki są kopią zaznaczonej, nadmiarowe znikają.`
-      : "Jedna ściana albo cała kuchnia L/U od narożników. Program znajdzie wolne miejsce (bez kolizji z szafkami, oknami i drzwiami) i zaproponuje podział.",
+      : kedit
+        ? `Kuchnia ${kedit.walls.length === 2 ? "L" : "U"}: ${kedit.walls.map((w) => (WALLS.find((x) => x.id === w) || {}).label || w).join(" + ")}, ${kedit.moduleIds.length} szt. Szafki zostaną zmienione na miejscu - wnętrza i ustawienia zostają (na każdej ścianie po kolei od lewej), dodatkowe są kopią zaznaczonej, nadmiarowe znikają, blendy i zaślepki są wstawiane od nowa.`
+        : "Jedna ściana albo cała kuchnia L/U od narożników. Program znajdzie wolne miejsce (bez kolizji z szafkami, oknami i drzwiami) i zaproponuje podział.",
     width: 860,
     body: `
       <div class="field"><div class="seg" id="wf-scope">
@@ -127,12 +148,12 @@ export function openWallFillModal(onChange, { editModuleId = null } = {}) {
       <div class="wf-kitchen-only" id="wf-kitchen-result"></div>`,
     footer: [
       { label: "Anuluj" },
-      { label: edit ? "Zmień rząd" : "Wstaw szafki", kind: "primary", icon: "layout-columns", onClick: (close) => apply(close) },
+      { label: edit ? "Zmień rząd" : kedit ? "Zmień kuchnię" : "Wstaw szafki", kind: "primary", icon: "layout-columns", onClick: (close) => apply(close) },
     ],
   });
 
   const $ = (sel) => dlg.bodyEl.querySelector(sel);
-  const wallGap = () => (edit ? cfg.editGap : getWallGap(state.project, cfg.type));
+  const wallGap = () => (anyEdit ? cfg.editGap : getWallGap(state.project, cfg.type));
   const applyBtn = dlg.footEl.querySelector(".btn-primary");
 
   // --- powiązania pól ---
@@ -151,12 +172,16 @@ export function openWallFillModal(onChange, { editModuleId = null } = {}) {
   bindSeg("#wf-scope", "scope", (v) => { cfg.scope = v; });
   $("#wf-preset").value = cfg.presetId;
   $("#wf-preset").addEventListener("change", (e) => { cfg.presetId = e.target.value; resetKitchen(); cfg.armLength = {}; refresh(); });
-  bindSeg("#wf-mode", "mode", (v) => { cfg.mode = v; cfg.variant = 0; });
+  bindSeg("#wf-mode", "mode", (v) => {
+    cfg.mode = v; cfg.variant = 0;
+    // Zmiana kuchni: wybór podziału ogólnego zastępuje obecne szerokości wpisane w odcinkach.
+    if (kedit) { cfg.custom = {}; cfg.choice = {}; }
+  });
   bindSeg("#wf-rest", "rest", (v) => { cfg.restMode = v; cfg.variant = 0; });
   bindNum("#wf-u0", (v) => { cfg.u0 = v; cfg.variant = 0; });
   bindNum("#wf-u1", (v) => { cfg.u1 = v; cfg.variant = 0; });
   bindNum("#wf-wallgap", (v) => {
-    if (edit) cfg.editGap = Math.max(0, v);
+    if (anyEdit) cfg.editGap = Math.max(0, v);
     else setWallGap(state.project, cfg.type, v);
     resetSegment(); cfg.choice = {};
   });
@@ -228,16 +253,22 @@ export function openWallFillModal(onChange, { editModuleId = null } = {}) {
 
   function refreshKitchen() {
     const preset = presetOf();
-    const template = state.project.modules.find((m) => m.id === cfg.templateId) || null;
+    const template = kedit ? editTemplate : state.project.modules.find((m) => m.id === cfg.templateId) || null;
     const row = rowProfile(cfg.type, template, { wallGap: wallGap() });
     if (!cfg.corners || cfg.corners.length !== preset.walls.length - 1) {
       cfg.corners = preset.walls.slice(1).map(() => defaultCorner(row));
     }
-    const plan = planKitchenRun(state.project, {
+    const opts = () => ({
       walls: preset.walls, type: cfg.type, template, corners: cfg.corners, armLength: cfg.armLength,
-      fill: fillOpts(), choice: cfg.choice, custom: cfg.custom, openingMargin: cfg.openingMargin, doorPassage: cfg.doorPassage,
-      wallGap: wallGap(),
+      fill: fillOpts(), choice: cfg.choice, custom: cfg.custom || {}, openingMargin: cfg.openingMargin, doorPassage: cfg.doorPassage,
+      wallGap: wallGap(), ignoreIds,
     });
+    let plan = planKitchenRun(state.project, opts());
+    if (kedit && !cfg.custom) {
+      // Pierwsze przeliczenie: odcinki dostają szerokości szafek, które w nich stoją.
+      cfg.custom = customFromRun(kedit, plan);
+      plan = planKitchenRun(state.project, opts());
+    }
     kcalc = { preset, row, plan };
     renderKitchenSetup();
     renderKitchenResult();
@@ -311,8 +342,8 @@ export function openWallFillModal(onChange, { editModuleId = null } = {}) {
     const cabinets = plan.modules.length, panels = plan.panels.length;
     const warn = plan.warnings.length ? `<div class="notice notice-warn mb-8">${plan.warnings.map(escapeHtml).join("<br>")}</div>` : "";
     el.innerHTML = `${walls}${warn}
-      <div class="wf-preview">${planSvg(plan)}</div>
-      <div class="modal-sub" style="margin:6px 0 0">Do wstawienia: ${cabinets} szafek, ${panels} blend / zaślepek.</div>`;
+      <div class="wf-preview">${planSvg(plan, ignoreIds)}</div>
+      <div class="modal-sub" style="margin:6px 0 0">${kedit ? "Po zmianie" : "Do wstawienia"}: ${cabinets} szafek, ${panels} blend / zaślepek.</div>`;
     el.querySelectorAll("[data-custom]").forEach((inp) => inp.addEventListener("change", () => {
       cfg.custom[inp.dataset.custom] = inp.value.trim();
       cfg.choice[inp.dataset.custom] = 0;
@@ -350,9 +381,9 @@ export function openWallFillModal(onChange, { editModuleId = null } = {}) {
     dlg.bodyEl.querySelectorAll(".wf-single").forEach((el) => { el.style.display = kitchen ? "none" : ""; });
     dlg.bodyEl.querySelectorAll(".wf-kitchen-only").forEach((el) => { el.style.display = kitchen ? "" : "none"; });
     $("#wf-wall-field").style.display = kitchen || edit ? "none" : "";
-    $("#wf-preset-field").style.display = kitchen ? "" : "none";
-    if (edit) {
-      // Ściana, rząd i wzór wynikają z edytowanego rzędu.
+    $("#wf-preset-field").style.display = kitchen && !kedit ? "" : "none";
+    if (anyEdit) {
+      // Ściana / układ, rząd i wzór wynikają z edytowanego rzędu albo kuchni.
       $("#wf-scope").closest(".field").style.display = "none";
       $("#wf-type").closest(".field").style.display = "none";
       $("#wf-template").closest(".field").style.display = "none";
@@ -435,7 +466,8 @@ export function openWallFillModal(onChange, { editModuleId = null } = {}) {
   function apply(close) {
     if (cfg.scope === "kitchen") {
       if (!kcalc || !kcalc.plan.modules.length) return;
-      applyKitchenRun(kcalc.plan);
+      if (kedit) replaceKitchenRun(kedit, kcalc.plan);
+      else applyKitchenRun(kcalc.plan);
       close();
       if (onChange) onChange();
       return;
@@ -522,7 +554,9 @@ function previewSvg(calc, wallId, ignoreIds = null) {
 }
 
 // Rzut z góry (ściana tylna u góry): istniejące szafki, nowe szafki i blendy z planu kuchni L/U.
-function planSvg(plan) {
+// ignoreIds - szafki/blendy zmienianej kuchni: nie rysujemy ich jako istniejących.
+function planSvg(plan, ignoreIds = null) {
+  const ignore = new Set(ignoreIds || []);
   const room = plan.room;
   const W = room.width, D = room.depth;
   const fs = Math.max(W, D) / 45;
@@ -537,8 +571,8 @@ function planSvg(plan) {
     const x0 = num(m.position.x), z0 = num(m.position.z);
     return { x0, x1: x0 + worldW, z0, z1: z0 + worldD };
   };
-  (state.project.modules || []).forEach((m) => rect(modBox(m), "wf-existing"));
-  (state.project.sidePanels || []).forEach((p) => rect(getSidePanelBox(p), "wf-existing"));
+  (state.project.modules || []).filter((m) => !ignore.has(m.id)).forEach((m) => rect(modBox(m), "wf-existing"));
+  (state.project.sidePanels || []).filter((p) => !ignore.has(p.id)).forEach((p) => rect(getSidePanelBox(p), "wf-existing"));
   plan.modules.forEach((m) => rect(modBox(m), m.blindCorner ? "wf-cab wf-cab-blind" : "wf-cab",
     m.type === "corner_cabinet" ? "L" : fmt(num(m.dimensions.width))));
   plan.panels.forEach((p) => rect(getSidePanelBox(p), "wf-blenda"));
