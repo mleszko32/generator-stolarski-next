@@ -20,6 +20,7 @@ import { openVersionHistory } from "./ui/versionHistory.js";
 import { openModal, showAlert } from "./utils/modal.js";
 import { readLocalBackup, clearLocalBackup, startLocalBackup } from "./core/localBackup.js";
 import { applyProjectData } from "./core/storage.js";
+import { openHelp } from "./ui/helpModal.js";
 
 const navIcon = (name, text) => `<i class="ti ti-${name}" aria-hidden="true"></i> ${text}`;
 
@@ -129,6 +130,14 @@ function stopAutosave() {
   if (autosaveStatusEl) autosaveStatusEl.innerText = '';
 }
 
+
+// --- POMOC (instrukcja obsługi, ui/helpModal.js) ---
+document.getElementById('btn-help')?.addEventListener('click', () => openHelp());
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'F1') return;
+  e.preventDefault(); // F1 w przeglądarce otwiera jej własną pomoc
+  openHelp();
+});
 
 // --- POMIESZCZENIE ---
 const btnRoom = document.getElementById('btn-room-settings');

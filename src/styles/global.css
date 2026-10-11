@@ -702,3 +702,35 @@ button, input, select, textarea { font-family: inherit; }
 .wf-corner-head { font-size: var(--fs-md); font-weight: 600; margin-bottom: 8px; color: var(--text-primary); }
 .wf-corner .field-row > .field { min-width: 140px; }
 .wf-own { width: 230px; }
+
+/* =========================================
+   INSTRUKCJA OBSŁUGI (ui/helpModal.js)
+   ========================================= */
+.help { display: grid; grid-template-columns: 230px 1fr; gap: 20px; min-height: 60vh; }
+.help-nav { position: sticky; top: 0; align-self: start; display: flex; flex-direction: column; gap: 8px; }
+.help-toc { display: flex; flex-direction: column; gap: 2px; }
+.help-toc-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 7px 10px; border: none; border-radius: var(--radius); background: transparent;
+  color: var(--text-primary); font-family: var(--font); font-size: var(--fs-md); cursor: pointer;
+}
+.help-toc-item:hover { background: var(--surface-subtle); }
+.help-toc-item.is-active { background: var(--tint-blue); color: var(--accent); font-weight: 600; }
+.help-content { font-size: var(--fs-md); line-height: 1.6; color: var(--text-primary); max-width: 680px; }
+.help-content h3 { margin: 0 0 12px; font-size: var(--fs-xl); display: flex; align-items: center; gap: 8px; }
+.help-content h4 { margin: 16px 0 6px; font-size: var(--fs-lg); }
+.help-content ul, .help-content ol { padding-left: 20px; margin: 6px 0 10px; }
+.help-content li { margin-bottom: 4px; }
+.help-content code { background: var(--surface-subtle); border-radius: 4px; padding: 1px 5px; font-size: var(--fs-sm); }
+.help-note { background: var(--info-bg); color: var(--info-fg); border-radius: var(--radius); padding: 8px 12px; }
+.help-keys { border-collapse: collapse; }
+.help-keys td { padding: 6px 12px 6px 0; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+.help-keys kbd {
+  display: inline-block; min-width: 20px; padding: 1px 6px; text-align: center;
+  border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px;
+  background: var(--surface-panel); font-family: var(--font); font-size: var(--fs-sm);
+}
+@media (max-width: 720px) {
+  .help { grid-template-columns: 1fr; }
+  .help-nav { position: static; }
+}

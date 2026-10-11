@@ -12,6 +12,7 @@ export function initLayout() {
       <div class="nav-actions">
           <button id="btn-undo" class="btn btn-sm" title="Cofnij (Ctrl+Z)"><i class="ti ti-arrow-back-up" aria-hidden="true"></i></button>
           <button id="btn-redo" class="btn btn-sm" title="Wprzód (Ctrl+Y)"><i class="ti ti-arrow-forward-up" aria-hidden="true"></i></button>
+          <button id="btn-help" class="btn btn-sm" title="Instrukcja obsługi (F1)"><i class="ti ti-help" aria-hidden="true"></i> Pomoc</button>
           <button id="btn-room-settings" class="btn btn-sm" title="Wymiary pomieszczenia"><i class="ti ti-home" aria-hidden="true"></i> Pomieszczenie</button>
           <div class="nav-sep"></div>
           <span id="autosave-status"></span>

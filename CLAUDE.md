@@ -183,6 +183,10 @@ Wszystkie panele renderują się przez przypisanie szablonów tekstowych do `inn
   dane liczy czyste `core/moduleInfo.js` (`getModuleSummary`: wymiary korpusu/wnętrza, drzwi
   z zawiasami, szuflady z frontem i skrzynką, półki).
 
+**Instrukcja obsługi**: przycisk „Pomoc” na górnym pasku i klawisz F1 (`ui/helpModal.js`); treść rozdziałów
+w `ui/helpContent.js`. Przy zmianie nazwy przycisku/sekcji albo nowej funkcji zaktualizuj właściwy rozdział —
+`helpContent.test.js` pilnuje, żeby nazwy sekcji huba i prawego panelu zgadzały się z instrukcją.
+
 ### Konwencje UI (spójny interfejs)
 
 - Jeden zestaw fontów i skala typografii (`--font`, `--fs-*`) oraz jeden zestaw tokenów w
