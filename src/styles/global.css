@@ -136,6 +136,27 @@ body {
   --color-teal: #0f766e;
   --color-gold: #b45309;
   --shadow-btn: none;
+
+  /* Paleta edytora wnętrza 2D, ikonek okleiny i podpowiedzi w panelach (style inline
+     w ui/interiorEditor.js, ui/properties.js, ui/edgeBandingUi.js czytają te zmienne). */
+  --surface-faint: #f8fafc;
+  --border-soft: #e2e8f0;
+  --text-strong: #334155;
+  --text-muted-strong: #475569;
+  --text-accent-deep: #1e3a8a;
+  --tint-blue: #eff6ff;
+  --tint-orange: #fff7ed;
+  --hatch-dark: #dbe2ea;
+  --hatch-light: #eef2f6;
+  --tone-orange-strong: #c2410c;
+  --tone-sky: #0284c7;
+  --tone-violet-strong: #6d28d9;
+  --tone-amber: #f59e0b;
+  --tone-green: #16a34a;
+  --warn-bg-strong: #fde68a;
+  --danger-border: #fca5a5;
+  --tone-emerald: #34d399;
+  --tint-emerald: #d1fae5;
 }
 
 /* Cztery rodzaje przycisków zamiast tęczy: główny (.btn-primary, jeden na

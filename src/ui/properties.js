@@ -80,9 +80,9 @@ export function initPropertiesPanel() {
 
   if (!activeModule) {
     rightSidebar.innerHTML = `
-      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #94a3b8; text-align: center; padding: 20px;">
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--border-strong); text-align: center; padding: 20px;">
         <span style="font-size: 40px; margin-bottom: 10px;"><i class="ti ti-settings" aria-hidden="true"></i></span>
-        <h3 style="margin: 0; color: #64748b; text-transform: none; letter-spacing: normal; border-bottom: none; font-size: 15px;">Brak aktywnej szafki</h3>
+        <h3 style="margin: 0; color: var(--text-secondary); text-transform: none; letter-spacing: normal; border-bottom: none; font-size: 15px;">Brak aktywnej szafki</h3>
       </div>
     `;
     return;
@@ -320,7 +320,7 @@ export function initPropertiesPanel() {
                 </div>
               `;
             }).join('')}
-            <div style="font-size: 10px; color: #94a3b8;">Odznaczenie obu naraz nie jest możliwe — korpus musi mieć choć jeden trawers.</div>
+            <div style="font-size: 10px; color: var(--border-strong);">Odznaczenie obu naraz nie jest możliwe — korpus musi mieć choć jeden trawers.</div>
           </div>
         `;
       })() : ''}
@@ -377,7 +377,7 @@ export function initPropertiesPanel() {
         <div class="property-group" style="margin-bottom: ${actualTopText ? '12px' : '8px'};"><label class="fs-xs">Od góry do środka puszki (mm):</label><input type="number" id="input-hinge-top" value="${fh.topOffset}" step="0.5" />${actualTopText}</div>
         <div class="property-group" style="margin-bottom: ${actualBottomText ? '12px' : '8px'};"><label class="fs-xs">Od dołu do środka puszki (mm):</label><input type="number" id="input-hinge-bottom" value="${fh.bottomOffset}" step="0.5" />${actualBottomText}</div>
         <div class="property-group"><label class="fs-xs">Bezpieczny margines od półki (mm):</label><input type="number" id="input-hinge-margin" value="${fh.margin}" step="0.5" /></div>
-        <div class="property-group" style="margin-top: 8px; margin-bottom: 0;"><label style="font-size: 11px; font-weight: 600;">Wymuś ilość zawiasów (0 = Auto):</label><input type="number" id="input-hinge-count" value="${fh.forceCount || 0}" step="0.5" style="border-color: #34d399; background-color: #d1fae5;" /></div>
+        <div class="property-group" style="margin-top: 8px; margin-bottom: 0;"><label style="font-size: 11px; font-weight: 600;">Wymuś ilość zawiasów (0 = Auto):</label><input type="number" id="input-hinge-count" value="${fh.forceCount || 0}" step="0.5" style="border-color: var(--tone-emerald); background-color: var(--tint-emerald);" /></div>
       </div>
 
       <h3>Zawiasy — pozycje ręczne</h3>
@@ -387,7 +387,7 @@ export function initPropertiesPanel() {
         <div class="prop-box">
           <div class="prop-box-title">
             <i class="ti ti-door" aria-hidden="true"></i> ${escapeHtml(group.label)}
-            <span style="font-weight: normal; color: #94a3b8;">(wys. ${fmtMm(group.front.h)}mm, start ${fmtMm(group.front.y)}mm od dołu szafki)</span>
+            <span style="font-weight: normal; color: var(--border-strong);">(wys. ${fmtMm(group.front.h)}mm, start ${fmtMm(group.front.y)}mm od dołu szafki)</span>
           </div>
           ${group.hinges.map((h, i) => {
               const overridden = group.front.hingeOverrides && group.front.hingeOverrides[i] !== undefined && group.front.hingeOverrides[i] !== null;

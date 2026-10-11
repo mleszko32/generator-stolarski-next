@@ -76,10 +76,10 @@ function frontLabelText(front) {
 }
 
 const FRONT_COLORS = {
-  drzwi: { fill: "#eff6ff", border: "#2563eb" },
-  "drzwi-lp": { fill: "#eff6ff", border: "#2563eb" },
-  szuflada: { fill: "#fff7ed", border: "#d97706" },
-  "szuflada-wewnetrzna": { fill: "#fff7ed", border: "#c2410c" },
+  drzwi: { fill: "var(--tint-blue)", border: "var(--accent)" },
+  "drzwi-lp": { fill: "var(--tint-blue)", border: "var(--accent)" },
+  szuflada: { fill: "var(--tint-orange)", border: "var(--color-warning)" },
+  "szuflada-wewnetrzna": { fill: "var(--tint-orange)", border: "var(--tone-orange-strong)" },
 };
 
 // Przycisk pływającego paska (klasy .zone-toolbar-* w styles/global.css).
@@ -411,13 +411,13 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
         top: px.toPxY(it.outer.maxY) + "px",
         width: toPxLen(it.outer.maxX - it.outer.minX) + "px",
         height: toPxLen(it.outer.maxY - it.outer.minY) + "px",
-        border: "2px solid #334155",
+        border: "2px solid var(--text-strong)",
         // "Przekrój płyty" na grubości boków/wieńców, jak na rysunku
         // technicznym - biała strefa wnęk (inner, niżej) rysuje się NA
         // WIERZCHU tego szrafowania, więc widać je tylko jako obwódkę.
         // Ramię narożnika nie ma osobno policzonej "pełnej bryły" (outer ===
         // tree.rect), więc tam nie ma czego szrafować - zostaje białe.
-        background: cornerArm ? "#ffffff" : "repeating-linear-gradient(45deg, #dbe2ea, #dbe2ea 4px, #eef2f6 4px, #eef2f6 8px)",
+        background: cornerArm ? "var(--surface-panel)" : "repeating-linear-gradient(45deg, var(--hatch-dark), var(--hatch-dark) 4px, var(--hatch-light) 4px, var(--hatch-light) 8px)",
         boxSizing: "border-box",
       });
       world.appendChild(shellEl);
@@ -430,7 +430,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
           top: px.toPxY(it.tree.rect.maxY) + "px",
           width: toPxLen(it.tree.rect.maxX - it.tree.rect.minX) + "px",
           height: toPxLen(it.tree.rect.maxY - it.tree.rect.minY) + "px",
-          background: "#ffffff",
+          background: "var(--surface-panel)",
           boxSizing: "border-box",
           pointerEvents: "none",
         });
@@ -464,8 +464,8 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
         const svgNS = "http://www.w3.org/2000/svg";
         const svg = document.createElementNS(svgNS, "svg");
         Object.assign(svg.style, { position: "absolute", left: "0", top: "0", width: "1px", height: "1px", overflow: "visible", pointerEvents: "none" });
-        svg.innerHTML = `<polygon points="${pts(ov.above)}" fill="#f8fafc" fill-opacity="0.92" />`
-          + `<polygon points="${pts(ov.slab)}" fill="#dbe2ea" stroke="#334155" stroke-width="2" />`;
+        svg.innerHTML = `<polygon points="${pts(ov.above)}" style="fill:var(--surface-faint); fill-opacity:0.92" />`
+          + `<polygon points="${pts(ov.slab)}" style="fill:var(--hatch-dark); stroke:var(--text-strong); stroke-width:2" />`;
         world.appendChild(svg);
       }
     });
@@ -477,8 +477,8 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     const title = document.createElement("div");
     const titleSuffix = cornerArm ? ` — ramię ${cornerArm}` : "";
     const titleName = items.length > 1 ? `grupa (${items.length} szafki: ${items.map((it) => escapeHtml(it.mod.name)).join(", ")})` : escapeHtml(mod.name);
-    title.innerHTML = `🗂️ Wnętrze: <b>${titleName}${titleSuffix}</b> <span style="color:#94a3b8; font-weight:normal;">— klik w wnękę: podziel / obsadź · Shift+klik: zaznacz kilka wnęk do scalenia jednym frontem · klik w dzielnik: przesuń / usuń · przeciągnij tło: przesuń · scroll: przybliż</span>`;
-    Object.assign(title.style, { position: "absolute", top: "10px", left: "16px", fontSize: "13px", color: "#1e3a8a", pointerEvents: "none" });
+    title.innerHTML = `🗂️ Wnętrze: <b>${titleName}${titleSuffix}</b> <span style="color:var(--border-strong); font-weight:normal;">— klik w wnękę: podziel / obsadź · Shift+klik: zaznacz kilka wnęk do scalenia jednym frontem · klik w dzielnik: przesuń / usuń · przeciągnij tło: przesuń · scroll: przybliż</span>`;
+    Object.assign(title.style, { position: "absolute", top: "10px", left: "16px", fontSize: "13px", color: "var(--text-accent-deep)", pointerEvents: "none" });
 
     // Ostrzeżenie o kolizjach wnętrza (np. półka w strefie szuflad) - od razu po edycji.
     const collisions = items.flatMap((it) => findInteriorCollisions(it.mod).map((msg) => (items.length > 1 ? it.mod.name + ": " : "") + msg));
@@ -487,7 +487,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       warn.innerHTML = `<b>⚠ Kolizja w środku szafki</b><br>${collisions.slice(0, 3).map(escapeHtml).join("<br>")}${collisions.length > 3 ? `<br>… i ${collisions.length - 3} więcej (zakładka Kontrola projektu)` : ""}`;
       Object.assign(warn.style, {
         position: "absolute", top: "44px", left: "16px", maxWidth: "min(560px, 60%)", padding: "8px 12px",
-        background: "#fee2e2", border: "1px solid #fca5a5", color: "#991b1b", borderRadius: "6px",
+        background: "var(--danger-bg)", border: "1px solid var(--danger-border)", color: "var(--danger-fg)", borderRadius: "6px",
         fontSize: "12px", lineHeight: "1.4", pointerEvents: "none", zIndex: "5",
       });
       viewport.appendChild(warn);
@@ -584,8 +584,8 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       b.innerText = label;
       b.title = title;
       Object.assign(b.style, {
-        width: "28px", height: "28px", border: "1px solid #cbd5e1", borderRadius: "6px",
-        background: "#fff", color: "#334155", fontWeight: "bold", fontSize: "14px", cursor: "pointer",
+        width: "28px", height: "28px", border: "1px solid var(--border)", borderRadius: "6px",
+        background: "var(--surface-panel)", color: "var(--text-strong)", fontWeight: "bold", fontSize: "14px", cursor: "pointer",
       });
       b.addEventListener("click", (e) => { e.stopPropagation(); onClick(); });
       wrap.appendChild(b);
@@ -598,8 +598,8 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     zoomLabelEl = document.createElement("div");
     zoomLabelEl.innerText = Math.round(view.scale * 100) + "%";
     Object.assign(zoomLabelEl.style, {
-      textAlign: "center", fontSize: "10.5px", fontWeight: "bold", color: "#64748b",
-      background: "#fff", border: "1px solid #e2e8f0", borderRadius: "5px", padding: "2px 0",
+      textAlign: "center", fontSize: "10.5px", fontWeight: "bold", color: "var(--text-secondary)",
+      background: "var(--surface-panel)", border: "1px solid var(--border-soft)", borderRadius: "5px", padding: "2px 0",
     });
     wrap.appendChild(zoomLabelEl);
 
@@ -704,7 +704,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       ? (isH ? editFront.w : editFront.h)
       : (isH ? node.rect.maxX - node.rect.minX : node.rect.maxY - node.rect.minY);
     const locked = !!parentSplit && (side === "a" ? !!parentSplit.divider.lockA : !!parentSplit.divider.lockB);
-    const color = !parentSplit ? "#94a3b8" : locked ? "#b45309" : "#0284c7";
+    const color = !parentSplit ? "var(--border-strong)" : locked ? "var(--color-gold)" : "var(--tone-sky)";
 
     const line = document.createElement("div");
     Object.assign(line.style, { position: "absolute", pointerEvents: "none" });
@@ -802,8 +802,8 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       forcedSpan.title = "Kliknij, żeby wpisać dokładny wymiar";
       Object.assign(forcedSpan.style, {
         cursor: "pointer",
-        borderBottom: "1px dotted #7c3aed",
-        color: isForced ? "#6d28d9" : "#94a3b8",
+        borderBottom: "1px dotted var(--color-purple)",
+        color: isForced ? "var(--tone-violet-strong)" : "var(--border-strong)",
         fontWeight: isForced ? "bold" : "normal",
       });
       forcedSpan.addEventListener("click", (e) => {
@@ -832,7 +832,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
         const resetBtn = document.createElement("span");
         resetBtn.innerText = "↺";
         resetBtn.title = "Wróć do automatycznego wymiaru";
-        Object.assign(resetBtn.style, { cursor: "pointer", fontSize: "9px", color: "#6d28d9" });
+        Object.assign(resetBtn.style, { cursor: "pointer", fontSize: "9px", color: "var(--tone-violet-strong)" });
         resetBtn.addEventListener("click", (e) => {
           e.stopPropagation();
           delete editInfo.front[editInfo.axis];
@@ -850,8 +850,8 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     numSpan.title = "Kliknij, żeby wpisać dokładny wymiar";
     Object.assign(numSpan.style, {
       cursor: "pointer",
-      borderBottom: "1px dotted #0284c7",
-      color: locked ? "#b45309" : "#0284c7",
+      borderBottom: "1px dotted var(--tone-sky)",
+      color: locked ? "var(--color-gold)" : "var(--tone-sky)",
       fontWeight: locked ? "bold" : "normal",
     });
     numSpan.addEventListener("click", (e) => {
@@ -903,8 +903,8 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     const { minX, maxX, minY, maxY } = node.rect;
     const el = document.createElement("div");
     const selected = isNodeInMergeSelection(node, mod);
-    const idleBg = selected ? "#fef3c7" : (insideFront ? "transparent" : "#f8fafc");
-    const hoverBg = selected ? "#fde68a" : (insideFront ? "rgba(224,242,254,0.55)" : "#e0f2fe");
+    const idleBg = selected ? "var(--warn-bg)" : (insideFront ? "transparent" : "var(--surface-faint)");
+    const hoverBg = selected ? "var(--warn-bg-strong)" : (insideFront ? "rgba(224,242,254,0.55)" : "var(--info-bg)");
 
     Object.assign(el.style, {
       position: "absolute",
@@ -913,14 +913,14 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       width: px.toPxLen(maxX - minX) + "px",
       height: px.toPxLen(maxY - minY) + "px",
       boxSizing: "border-box",
-      border: selected ? "2px solid #f59e0b" : (insideFront ? "1px dashed rgba(100,116,139,0.6)" : "1px dashed #cbd5e1"),
+      border: selected ? "2px solid var(--tone-amber)" : (insideFront ? "1px dashed rgba(100,116,139,0.6)" : "1px dashed var(--border)"),
       background: idleBg,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       cursor: "pointer",
       fontSize: "11px",
-      color: selected ? "#92400e" : (insideFront ? "#475569" : "#94a3b8"),
+      color: selected ? "var(--warn-fg)" : (insideFront ? "var(--text-muted-strong)" : "var(--border-strong)"),
       fontWeight: selected ? "bold" : "normal",
       transition: "background .12s",
     });
@@ -975,12 +975,12 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
         height: d + "px",
         boxSizing: "border-box",
         borderRadius: "50%",
-        border: "1.5px solid #334155",
-        background: "#ffffff",
+        border: "1.5px solid var(--text-strong)",
+        background: "var(--surface-panel)",
         pointerEvents: "none",
       });
       const dot = document.createElement("div");
-      Object.assign(dot.style, { position: "absolute", left: "50%", top: "50%", width: "3px", height: "3px", margin: "-1.5px 0 0 -1.5px", borderRadius: "50%", background: "#334155" });
+      Object.assign(dot.style, { position: "absolute", left: "50%", top: "50%", width: "3px", height: "3px", margin: "-1.5px 0 0 -1.5px", borderRadius: "50%", background: "var(--text-strong)" });
       cup.appendChild(dot);
       return cup;
     });
@@ -1000,7 +1000,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
   function renderFrontOverlay(node, stage, px, mod, parentH = null, parentV = null, hidden = false) {
     const { minX, maxX, minY, maxY } = node.rect;
     const isMultiFront = node.fronts.length > 1;
-    const colors = FRONT_COLORS[node.fronts[0].subtype] || { fill: "#f1f5f9", border: "#94a3b8" };
+    const colors = FRONT_COLORS[node.fronts[0].subtype] || { fill: "var(--surface-subtle)", border: "var(--border-strong)" };
     const badgeStyle = hidden;
 
     // Widoczny front zasłania wnętrze i rysuje się w PRAWDZIWYM rozmiarze (el.x/y/w/h po
@@ -1099,7 +1099,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
           width: px.toPxLen(g.x1 - g.x0) + "px",
           height: px.toPxLen(g.y1 - g.y0) + "px",
           boxSizing: "border-box",
-          border: "1.5px solid #d97706",
+          border: "1.5px solid var(--color-warning)",
           background: "rgba(245,158,11,0.14)",
           pointerEvents: "none",
         });
@@ -1111,7 +1111,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
         const inner = document.createElement("div");
         Object.assign(inner.style, {
           position: "absolute", left: Math.max(px.toPxLen(16), 3) + "px", right: Math.max(px.toPxLen(16), 3) + "px",
-          top: "0", bottom: Math.max(px.toPxLen(16), 3) + "px", borderLeft: "1px solid #d97706", borderRight: "1px solid #d97706",
+          top: "0", bottom: Math.max(px.toPxLen(16), 3) + "px", borderLeft: "1px solid var(--color-warning)", borderRight: "1px solid var(--color-warning)",
         });
         box.appendChild(bottom);
         box.appendChild(inner);
@@ -1180,8 +1180,8 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     // Ta sama tekstura płyty co korpus (patrz shellEl w render()) - kolor
     // ramki dalej rozróżnia konstrukcyjną (zielona, kołek+wkręt) od ruchomej
     // (szara, na podpórkach), tylko sam materiał teraz wygląda tak samo.
-    handle.style.background = "repeating-linear-gradient(45deg, #dbe2ea, #dbe2ea 3px, #eef2f6 3px, #eef2f6 6px)";
-    handle.style.border = node.divider.isStructural ? "1.5px solid #16a34a" : "1px solid #475569";
+    handle.style.background = "repeating-linear-gradient(45deg, var(--hatch-dark), var(--hatch-dark) 3px, var(--hatch-light) 3px, var(--hatch-light) 6px)";
+    handle.style.border = node.divider.isStructural ? "1.5px solid var(--tone-green)" : "1px solid var(--text-muted-strong)";
     handle.style.boxSizing = "border-box";
     handle.style.zIndex = "2";
 
