@@ -80,9 +80,10 @@ pomiar z warsztatu: przednia pin 3, formatka 510 mm, tylna pin 7 → 470 mm od p
 z numeru pinu przy pomiarze karta wiercenia podaje numer tylnego pinu dla każdej głębokości; pin przedniej wiertarki
 nie zmienia położenia otworów w mm - formatka przesuwa się razem z nią - tylko numer tylnego pinu: oba przesuwają się razem
 (różnica tylny − przedni stała dla danej głębokości, warsztat: 3/7 i 2/6), `rcPinsFor` dobiera inny pin przedni, gdy tylny nie mieści się na szynie 1…21); środkowe zestawy
-łączników wierci tylna wiertarka przesunięta do przodu na pinie, więc przy skalibrowanym stole leżą na tej samej siatce
-(`rcMidGrid` → `jointSetPositions(..., midGrid)`: wkręt od tyłu, kołek 32 mm bliżej przodu, np. bok 510: 262/230 = pin 20;
-numer pinu na karcie z `rcPinsForX`) i
+łączników wierci tylna wiertarka przesunięta do przodu, przednią stroną do pinu; od pinu do najbliższego wiertła jest
+z obu stron 37 mm, więc siatka środka jest przesunięta względem tylnej o 37 + 32 + 37 = 106 mm (`rcMidGrid` →
+`jointSetPositions(..., midGrid)`: wkręt na tylnym wrzecionie, kołek 32 mm bliżej przodu; bok 510: 240/272, pin 16 od
+przodu; numer pinu na karcie z `rcMidPinForX`) i
 `rcRearScrew` — położenie tylnego wkrętu (na pinie: najbliższy otwór szyny, czyli 37 ± 8 mm od tyłu, 29…45); gdy pewne (zderzak / pin po kalibracji), `jointSetsFor` w `carcaseParts.js`
 przesuwa tylny zestaw łączników wszędzie (rysunek 2D, instrukcje, okucia). `rcPanelSetups` grupuje otwory boku wg
 ustawienia (krawędź do pinów + otwór bazowy, pozycje wzdłuż, pary co 32 mm = jedno wiercenie) — karta „Wiercenie na

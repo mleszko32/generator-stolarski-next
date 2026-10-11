@@ -125,19 +125,38 @@ export function rcPinsFor(k, s) {
 // null (stół wyłączony / bez kalibracji). Ta sama dla każdej głębokości - zależy tylko od
 // pomiaru (formatka bazuje przodem o zderzak przedniej wiertarki). Z niej środkowe zestawy
 // łączników, wiercone tylną wiertarką przesuniętą do przodu.
+//
+// Geometria (warsztat): wiertarka dotyka pinu jedną albo drugą stroną, a od pinu do
+// najbliższego wiertła jest zawsze 37 mm. Tylny zestaw - pin ZA wiertarką: tylne wiertło =
+// pin − 37. Środkowy zestaw - wiertarka przesunięta do przodu, pin PRZED nią: przednie
+// wiertło = pin + 37, tylne = pin + 37 + 32. Środkowa siatka jest więc przesunięta względem
+// tylnej o 37 + 32 + 37 = 106 mm (wkręt na tylnym wrzecionie, jak w tylnym zestawie).
+export const RC_PIN_TO_BIT = 37;
+export const RC_RAIL_HOLES = 41; // 20 od tyłu + środkowy (21) + 20 od przodu
+const MID_SHIFT = 2 * RC_PIN_TO_BIT + RC_SPINDLE;
+
 export function rcMidGrid(project) {
   const s = getRcSettings(project);
   if (!s.enabled || !isCalibrated(s)) return null;
-  return { origin: num(s.calibDepth) - num(s.calibRear), step: RC_RAIL_STEP };
+  return { origin: num(s.calibDepth) - num(s.calibRear) + MID_SHIFT, step: RC_RAIL_STEP };
 }
 
-// Piny dla tylnej wiertarki ustawionej tak, by tylne wrzeciono (wkręt) było x mm od przodu
-// formatki (np. środkowy zestaw). { pin, frontPin } albo nulle, gdy x nie leży na siatce.
-export function rcPinsForX(x, settings) {
+// Pin dla środkowego zestawu, którego tylne wiertło (wkręt) jest x mm od przodu formatki.
+// { pin, from: 'tył' | 'przód' } - numer liczony od tylnego końca szyny, a za środkową dziurą
+// (21) od przedniego końca; null, gdy x nie leży na siatce albo poza szyną.
+export function rcMidPinForX(x, settings) {
   const s = settings || DEFAULTS;
-  if (!isCalibrated(s)) return { pin: null, frontPin: null };
-  const k = (num(x) - (num(s.calibDepth) - num(s.calibRear))) / RC_RAIL_STEP;
-  return Math.abs(k - Math.round(k)) < 0.01 ? rcPinsFor(Math.round(k), s) : { pin: null, frontPin: null };
+  const calibPin = Math.round(num(s.calibPin, 0));
+  const calibFront = Math.round(num(s.calibFrontPin, num(s.frontPin, 0)));
+  if (!isCalibrated(s) || !(calibPin > 0) || !(calibFront > 0)) return null;
+  const k = (num(x) - (num(s.calibDepth) - num(s.calibRear) + MID_SHIFT)) / RC_RAIL_STEP;
+  if (Math.abs(k - Math.round(k)) > 0.01) return null;
+  const front = Math.round(num(s.frontPin, calibFront)) || calibFront;
+  // Ta sama zasada co tylny pin (rcPinsFor): pin tylny − pin przedni stały dla położenia.
+  const n = calibPin + (front - calibFront) - Math.round(k);
+  if (n >= 1 && n <= RC_RAIL_PINS) return { pin: n, from: "tył" };
+  if (n > RC_RAIL_PINS && n <= RC_RAIL_HOLES) return { pin: RC_RAIL_HOLES + 1 - n, from: "przód" };
+  return null;
 }
 
 // Czy stół zmienia położenie tylnego otworu (tylko gdy włączony i wynik jest pewny).

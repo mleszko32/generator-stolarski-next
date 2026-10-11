@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { baseAndPin, rcRearScrew, rcRearOverride, rcPanelSetups, getRcSettings, rcPinsFor, rcMidGrid, rcPinsForX } from "./rcSystem.js";
+import { baseAndPin, rcRearScrew, rcRearOverride, rcPanelSetups, getRcSettings, rcPinsFor, rcMidGrid, rcMidPinForX } from "./rcSystem.js";
 import { jointSetPositions } from "../engine/carcaseParts.js";
 import { getCabinetPanels } from "../engine/cabinetDrillings.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
@@ -94,9 +94,9 @@ describe("stół RC System - karta wiercenia boku", () => {
 });
 
 describe("stół RC System - środkowe zestawy łączników", () => {
-  // Warsztat: środkowe łączniki wierci tylna wiertarka przesunięta do przodu i zablokowana pinem,
-  // więc wypadają na tej samej siatce co 16 mm co tylny otwór (wkręt = tylne wrzeciono).
-  const grid = { origin: 470, step: 16 };
+  // Warsztat: środkowe łączniki wierci tylna wiertarka przesunięta do przodu, przednią stroną do
+  // pinu; od pinu do wiertła zawsze 37 mm -> siatka środka przesunięta o 37 + 32 + 37 = 106 mm.
+  const grid = { origin: 576, step: 16 };
   const settings = getRcSettings({ rcSystem: { enabled: true } });
 
   it("siatka tylko przy włączonym i skalibrowanym stole", () => {
@@ -104,11 +104,11 @@ describe("stół RC System - środkowe zestawy łączników", () => {
     expect(rcMidGrid({ rcSystem: { enabled: true } })).toEqual(grid);
   });
 
-  it("bok 510: środkowy zestaw na siatce (262/230 zamiast 261/293), pin 20", () => {
+  it("bok 510: środkowy zestaw 240/272 (pin 470 + 37 = 507, środek = pin + 37 / + 69), pin 16 od przodu", () => {
     const sets = jointSetPositions(510, 250, 470, grid);
-    expect(sets).toEqual([{ screw: 37, dowel: 69 }, { screw: 262, dowel: 230 }, { screw: 470, dowel: 438 }]);
-    expect(rcPinsForX(262, settings)).toMatchObject({ pin: 20, frontPin: 3 });
-    expect(rcPinsForX(261, settings)).toMatchObject({ pin: null });
+    expect(sets).toEqual([{ screw: 37, dowel: 69 }, { screw: 272, dowel: 240 }, { screw: 470, dowel: 438 }]);
+    expect(rcMidPinForX(272, settings)).toEqual({ pin: 16, from: "przód" });
+    expect(rcMidPinForX(262, settings)).toBeNull();
   });
 
   it("tylny wkręt na pinie może wypaść bliżej tyłu niż 37 mm (521 -> 486, 35 od tyłu)", () => {
