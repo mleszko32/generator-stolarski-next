@@ -11,12 +11,14 @@
 // - położenie wzdłuż krawędzi: przednia wiertarka - formatka przodem do zderzaka przy
 //   wiertarce (pierwsze wiertło 37 mm od przodu); wiertarka dwuwrzecionowa wierci dwa
 //   otwory co 32 mm jednym ruchem (wiertło pod wkręt zawsze od strony krawędzi);
-// - obie wiertarki (przednia i tylna) mają własny zderzak, który jedzie razem z wiertarką;
-//   formatka opiera się krawędzią o zderzak, więc pierwszy otwór wypada zawsze 37 mm od tej
-//   krawędzi - przód od przedniego zderzaka, tył od tylnego. Pin w szynie (otwory co 16 mm,
-//   numerowane od obu końców, sprawdzone pomiarem w warsztacie) tylko blokuje wiertarkę w
-//   miejscu i nie zmienia odległości otworu od krawędzi. Wcześniejszy model zakładał, że
-//   tylny otwór zależy od siatki szyny (37…52 mm od tyłu) i wymaga kalibracji - nieprawda.
+// - tylna wiertarka: albo zderzakiem do tylnej krawędzi (otwór 37 mm od tyłu, jak na
+//   filmach producenta), albo zablokowana pinem w numerowanym otworze szyny - otwory szyny
+//   są co 16 mm, więc tylny otwór wypada 37…52 mm od tyłu (najbliższy pin w stronę
+//   formatki). Producent nie podaje, gdzie jest zero szyny, dlatego dokładne położenie
+//   wymaga jednego pomiaru (kalibracja: głębokość formatki + odległość tylnego otworu od tyłu).
+// Potwierdzone w warsztacie: formatka zawsze bazuje przodem o zderzak przedniej wiertarki
+// (37 mm od przodu); tylną można dosunąć zderzakiem (37 od tyłu) albo zablokować pinem -
+// wtedy przesuwa się o kilka mm i otwór wypada dalej od tyłu, zależnie od głębokości.
 import { num, round1 } from "../utils/math.js";
 
 // Otwory bazowe w blacie (mm od osi wiertła do krawędzi formatki) i ich zastosowanie wg producenta.
@@ -38,17 +40,18 @@ export const RC_BASES = [
   { base: 37, use: "System 32 - pierwszy otwór od krawędzi" },
 ];
 export const RC_PINS = [0, 0.5, 1, 1.5, 2];
-export const RC_RAIL_STEP = 16;          // rozstaw numerowanych otworów w szynie (pomiar w warsztacie)
-export const RC_FRONT_STOP = 37;         // zderzak wiertarki: pierwszy otwór od krawędzi opartej o zderzak
+export const RC_RAIL_STEP = 16;          // rozstaw otworów w szynie - potwierdzony w warsztacie (numeracja od obu końców)
+export const RC_FRONT_STOP = 37;         // zderzak przy przedniej wiertarce
 export const RC_SPINDLE = 32;            // rozstaw wrzecion wiertarki
 
-// Stare projekty mogą mieć jeszcze rearMode / calibDepth / calibRear z poprzedniego modelu -
-// są ignorowane.
-const DEFAULTS = { enabled: false };
+const DEFAULTS = { enabled: false, rearMode: "pin", calibDepth: null, calibRear: null };
 
 export function getRcSettings(project) {
-  return { ...DEFAULTS, ...((project && project.rcSystem) || {}) };
+  const s = { ...DEFAULTS, ...((project && project.rcSystem) || {}) };
+  if (s.rearMode !== "stop") s.rearMode = "pin";
+  return s;
 }
+const isCalibrated = (s) => num(s.calibDepth, 0) > 0 && num(s.calibRear, 0) >= RC_FRONT_STOP;
 
 // Ustawienie odległości od krawędzi: otwór bazowy + pin. Najpierw pin neutralny, potem
 // najmniejszy dodatni. null, gdy żadna kombinacja nie daje tej odległości (np. 69 mm).
@@ -62,17 +65,30 @@ export function baseAndPin(dist) {
 }
 export const baseText = (bp) => (bp ? `otwór ${String(bp.base).replace(".", ",")}${bp.pin ? ` + pin +${String(bp.pin).replace(".", ",")}` : " + pin neutralny"}` : null);
 
-// Położenie tylnego wkrętu łączników (mm od przodu formatki o głębokości `depth`): tylna
-// wiertarka ze zderzakiem do tylnej krawędzi -> zawsze 37 mm od tyłu.
-export function rcRearScrew(depth) {
-  return { x: round1(num(depth) - RC_FRONT_STOP), exact: true };
+// Położenie tylnego wkrętu łączników (mm od przodu formatki o głębokości `depth`) przy pracy
+// na stole. { x, exact, range? }:
+// - zderzak do krawędzi: depth - 37, dokładnie;
+// - pin z kalibracją: siatka co 16 mm wyznaczona pomiarem, najbliższa pozycja w stronę
+//   formatki (otwór co najmniej 37 mm od tyłu);
+// - pin bez kalibracji: depth - 37 jako położenie robocze + zakres 37…52 mm od tyłu.
+export function rcRearScrew(depth, settings) {
+  const D = num(depth);
+  const s = settings || DEFAULTS;
+  if (s.rearMode === "stop") return { x: round1(D - RC_FRONT_STOP), exact: true };
+  if (isCalibrated(s)) {
+    const x0 = num(s.calibDepth) - num(s.calibRear);
+    const k = Math.floor((D - RC_FRONT_STOP - x0) / RC_RAIL_STEP);
+    return { x: round1(x0 + k * RC_RAIL_STEP), exact: true };
+  }
+  return { x: round1(D - RC_FRONT_STOP), exact: false, range: [RC_FRONT_STOP, RC_FRONT_STOP + RC_RAIL_STEP - 1] };
 }
 
-// Tylny otwór łączników przy pracy na stole (mm od przodu) albo null, gdy stół wyłączony.
-// To samo położenie co domyślny rozstaw (jointSetPositions: 37 od tyłu) - zostaje jako
-// jedno miejsce, gdyby stół kiedyś wymagał innego.
+// Czy stół zmienia położenie tylnego otworu (tylko gdy włączony i wynik jest pewny).
 export function rcRearOverride(depth, project) {
-  return getRcSettings(project).enabled ? rcRearScrew(depth).x : null;
+  const s = getRcSettings(project);
+  if (!s.enabled) return null;
+  const r = rcRearScrew(depth, s);
+  return r.exact ? r.x : null;
 }
 
 // ---------------------------------------------------------------------------

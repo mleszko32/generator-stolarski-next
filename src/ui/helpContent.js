@@ -198,8 +198,10 @@ export const HELP_SECTIONS = [
         <li><b>Rysunki 2D</b> - rysunki formatek z wierceniami (wydruk pojedynczej formatki na A4).</li>
         <li><b>Skrzynki szuflad</b> - rysunki skrzynek drewnianych (MOVENTO) z otworami łączników.</li>
         <li><b>Instrukcje montażu</b> - kolejność składania i rysunki każdej szafki. Po zaznaczeniu
-        „Wiercę na stole RC System” dochodzi karta wiercenia: która krawędź do pinów, otwór bazowy z pinem
-        i pozycje otworów (łączniki 37 mm od przodu i od tyłu - obie wiertarki ze zderzakiem).</li>
+        „Wiercę na stole RC System” dochodzi karta wiercenia (krawędź do pinów, otwór bazowy z pinem, pozycje
+        otworów). Przód formatki zawsze do zderzaka przedniej wiertarki (37 mm). Tylna wiertarka: zderzakiem do
+        tylnej krawędzi (37 mm od tyłu) albo na pinie w szynie - wtedy wpisz raz kalibrację (głębokość boku +
+        zmierzona odległość tylnego otworu od tyłu), a program policzy położenie dla każdej głębokości.</li>
         <li><b>Rzuty ścian</b> - widok każdej ściany z szafkami i otworami.</li>
         <li><b>Blaty</b> - odcinki blatów i łączenia w narożnikach.</li>
         <li><b>Okucia i okleina</b> - lista zakupów (nóżki, łączniki, komplety szuflad, zawiasy, okleina w mb).</li>
