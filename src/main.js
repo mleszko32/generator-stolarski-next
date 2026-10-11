@@ -58,9 +58,7 @@ if (btnRedo) btnRedo.addEventListener('click', () => { if (redo()) refreshAfterH
 onHistoryChange(({ canUndo, canRedo }) => {
   [[btnUndo, canUndo], [btnRedo, canRedo]].forEach(([btn, enabled]) => {
     if (!btn) return;
-    btn.disabled = !enabled;
-    btn.style.opacity = enabled ? '1' : '0.5';
-    btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+    btn.disabled = !enabled; // wygląd wyłączonego przycisku: .btn:disabled w global.css
   });
 });
 
@@ -163,11 +161,7 @@ function reflectAuth(user) {
   const signedIn = !!user;
   if (authStatus) authStatus.innerText = signedIn ? `✓ ${user.email}` : 'niezalogowany';
   if (btnAuth) btnAuth.innerHTML = signedIn ? navIcon('logout', 'Wyloguj') : navIcon('login', 'Zaloguj (Google)');
-  cloudButtons.forEach(b => {
-    b.disabled = !signedIn;
-    b.style.opacity = signedIn ? '1' : '0.5';
-    b.style.cursor = signedIn ? 'pointer' : 'not-allowed';
-  });
+  cloudButtons.forEach(b => { b.disabled = !signedIn; }); // wygląd: .btn:disabled w global.css
   if (signedIn) startAutosave(); else stopAutosave();
 }
 
@@ -289,7 +283,3 @@ if (btnLoad) {
   }
   startLocalBackup();
 })();
-
-window.addEventListener('cabinetMoved', () => {
-  initPropertiesPanel(); // Odświeża suwaki i inputy z prawej strony
-});

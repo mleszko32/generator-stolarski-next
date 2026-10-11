@@ -12,9 +12,8 @@ export const formatVal = (val) => Number(Number(val).toFixed(1));
 
 // Środek otworu pod podpórkę półki ruchomej leży 2.5 mm NIŻEJ niż wysokość półki
 // (promień podpórki fi 5) - dzięki temu górna krawędź podpórki jest równo z
-// wysokością półki i wymiar przestrzeni między półkami zostaje dokładny. Tak
-// liczyło to core/shelfMath.js: calculateShelfHoles; refaktor rysunku z 3.09
-// przestał z niego korzystać i otwory wypadły na samej wysokości półki.
+// wysokością półki i wymiar przestrzeni między półkami zostaje dokładny (refaktor
+// rysunku z 3.09 to zgubił i otwory wypadły na samej wysokości półki).
 const SHELF_PIN_DROP = 2.5;
 
 // Opis wysokości otworu w stylu rysunku boku zwykłej szafki: bliższa krawędź

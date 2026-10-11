@@ -6,7 +6,7 @@
 // kodem QR. Ustawienia (format arkusza, szerokość cięcia, obrzeże) zapisują się
 // w state.project.cutPlan razem z projektem.
 import qrcode from "qrcode-generator";
-import { escapeHtml } from "../utils/dom.js";
+import { escapeHtml, openHtmlWindow } from "../utils/dom.js";
 import { state } from "../core/state.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { collectProjectParts } from "../engine/cabinet.js";
@@ -144,8 +144,7 @@ function openPrintWindow(title, bodyHtml, extraCss = '') {
     </style></head><body>
     <div class="bar"><button onclick="window.print()">🖨️ Drukuj / Zapisz jako PDF</button></div>
     ${bodyHtml}</body></html>`;
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  window.open(URL.createObjectURL(blob), '_blank');
+  openHtmlWindow(html);
 }
 
 function printCutPlan(plan) {

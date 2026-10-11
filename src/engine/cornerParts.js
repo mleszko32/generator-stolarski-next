@@ -179,8 +179,8 @@ export function getCornerPartsGeometry(mod, config = state.project) {
   };
 }
 
-// Nawierty pod podpórki półek narożnych (System 32, jak półka ruchoma w
-// core/shelfMath.js: calculateShelfHoles) - półka L opiera się na OBU bokach
+// Nawierty pod podpórki półek narożnych (System 32, jak półka ruchoma zwykłej
+// szafki) - półka L opiera się na OBU bokach
 // (bok ramienia A i bok ramienia B), więc każdy z nich dostaje dwa rzędy
 // (37 mm od przodu i od tyłu) po 3 otwory na każdą półkę. Zwraca opis obu
 // boków w układzie rysunku: x = odległość od PRZEDNIEJ krawędzi boku, y = od dołu.

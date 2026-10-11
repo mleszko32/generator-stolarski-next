@@ -23,3 +23,25 @@ export function escapeHtml(value) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+
+// Otwiera stronę HTML (wydruk, rysunek, raport) w nowej karcie z adresu blob. Adres jest
+// zwalniany po minucie - karta ma już wtedy wczytany dokument, a blob nie wisi w pamięci
+// do zamknięcia aplikacji (wcześniej każdy wydruk zostawiał swoją kopię).
+export function openHtmlWindow(html) {
+  const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+  const win = window.open(url, "_blank");
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  return win;
+}
+
+// Pobranie pliku wygenerowanego w przeglądarce (CSV, DXF, JSON).
+export function downloadFile(filename, content, type) {
+  const url = URL.createObjectURL(content instanceof Blob ? content : new Blob([content], { type }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

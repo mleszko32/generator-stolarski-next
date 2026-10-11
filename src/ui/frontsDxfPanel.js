@@ -5,7 +5,7 @@
 // Obliczenia i zapis DXF: engine/frontsDxf.js. Rozmiar arkusza wspólny z
 // planem rozkroju (project.cutPlan), odstęp/obrzeże/obracanie - project.frontsDxf.
 
-import { escapeHtml } from "../utils/dom.js";
+import { escapeHtml, downloadFile } from "../utils/dom.js";
 import { state } from "../core/state.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { collectProjectParts } from "../engine/cabinet.js";
@@ -38,16 +38,7 @@ function sheetPreview(sheet, s) {
   return svg + '</svg>';
 }
 
-function download(filename, content) {
-  const url = URL.createObjectURL(new Blob([content], { type: 'application/dxf' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+const download = (filename, content) => downloadFile(filename, content, 'application/dxf');
 
 const safeName = (t) => String(t || 'projekt').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l').replace(/Ł/g, 'L').replace(/[^A-Za-z0-9_-]+/g, '_');
 

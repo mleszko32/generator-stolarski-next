@@ -689,12 +689,7 @@ export function init3DViewer() {
   });
 
   const uiOverlay = document.createElement('div');
-  uiOverlay.style.position = 'absolute';
-  uiOverlay.style.top = '15px';
-  uiOverlay.style.right = '15px';
-  uiOverlay.style.zIndex = '100';
-  uiOverlay.style.display = 'flex';
-  uiOverlay.style.gap = '10px';
+  uiOverlay.className = 'view-toolbar'; // styl: global.css
   
   const toggleBtn = document.createElement('button');
   toggleBtn.innerHTML = '<i class="ti ti-refresh" aria-hidden="true"></i> Przezroczysty (Szkic)';
@@ -913,16 +908,10 @@ export function enterAlignMode(mod, el) {
   alignMode.sourceEl = el;
 
   const banner = document.createElement('div');
-  Object.assign(banner.style, {
-      position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)',
-      background: '#0ea5e9', color: 'white', padding: '12px 24px', borderRadius: '8px',
-      fontWeight: 'bold', zIndex: '2000', boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-      display: 'flex', alignItems: 'center', gap: '15px'
-  });
-  
+  banner.className = 'view-banner view-banner-info'; // styl: global.css
   banner.innerHTML = `
       <span><i class="ti ti-magnet" aria-hidden="true"></i> Kliknij na scenie wieniec lub półkę innej szafki, do której chcesz wyrównać...</span>
-      <button style="background:white; color:#0ea5e9; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold;">Anuluj</button>
+      <button type="button" class="btn btn-sm">Anuluj</button>
   `;
 
   banner.querySelector('button').onclick = (e) => {

@@ -3,7 +3,7 @@
 import { calculateProjectCost } from "../engine/cost.js";
 import { state } from "../core/state.js";
 import { scheduleCheckpoint } from "../core/history.js";
-import { escapeHtml } from "../utils/dom.js";
+import { escapeHtml, downloadFile } from "../utils/dom.js";
 import { initPropertiesPanel } from "./properties.js";
 import { update3D } from "../render/viewer3d.js";
 import { updateSidebar } from "./sidebar.js";
@@ -335,14 +335,7 @@ export function mountKosztorys(root) {
             showAlert('Baza cen jest pusta - najpierw zapisz ceny jako domyślne.');
             return;
         }
-        const blob = new Blob([exportPriceDefaultsJson()], { type: 'application/json' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'baza-cen.json';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        downloadFile('baza-cen.json', exportPriceDefaultsJson(), 'application/json');
     });
     const priceFileInput = modal.querySelector('#kosztorys-price-file');
     modal.querySelector('#kosztorys-price-import').addEventListener('click', () => priceFileInput.click());

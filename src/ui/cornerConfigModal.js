@@ -11,7 +11,6 @@
 // zmiana wymiaru tu NIE wymaga ręcznego przeliczenia zon frontów, tylko
 // update3D() (który i tak woła recalculateAllLayouts) + odświeżenie obu
 // edytorów wnętrza poniżej, żeby zobaczyć nowy układ.
-import { escapeHtml } from "../utils/dom.js";
 import { evalDimensionExpr, fmtMm } from "../utils/math.js";
 import { update3D } from "../render/viewer3d.js";
 import { updateSidebar } from "./sidebar.js";
@@ -21,6 +20,7 @@ import { generateCornerBlankSVG, generateCornerPartsDrawings } from "../render/c
 import { autoDistributeShelves } from "../core/shelfMath.js";
 import { getCornerDepths } from "../core/layout.js";
 import { state } from "../core/state.js";
+import { openModal } from "../utils/modal.js";
 
 export function openCornerConfigModal(mod) {
   // Efektywny luz frontu od krawędzi korpusu - ta sama reguła co w
@@ -29,20 +29,8 @@ export function openCornerConfigModal(mod) {
   const fcNow = { ...(state.project.front?.clearance || {}), ...(mod.front?.clearance || {}) };
   const cornerClearanceNow = parseFloat(fcNow.right ?? fcNow.sides ?? 1.5) || 0;
   const cornerFrontGap = parseFloat(mod.front?.gap ?? state.project.front?.gap) || 3;
-  // Ta sama obudowa co reszta okien (klasy .modal-* z styles/global.css); treść ma
-  // własny, bardzo długi układ, więc całość przewija się w oknie.
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-
-  const modal = document.createElement('div');
-  modal.className = 'modal';
-  modal.style.setProperty('--modal-w', '900px');
-  modal.style.display = 'block';
-  modal.style.overflowY = 'auto';
-  modal.style.padding = '20px';
-
-  modal.innerHTML = `
-    <h2 class="modal-title" style="margin-bottom:4px"><i class="ti ti-ruler-2" aria-hidden="true"></i> Konfigurator szafki narożnej: <span style="color:#2563eb;">${escapeHtml(mod.name)}</span></h2>
+  // Wspólne okno (utils/modal.js): Esc i klik w tło zamykają, treść przewija się w .modal-body.
+  const bodyHtml = `
     <div class="hint" style="margin-top:0; margin-bottom:14px;">Kąt prosty 90°, dwa ramiona. Kliknij wnękę w ramieniu, żeby ją podzielić albo obsadzić frontem - tak samo jak w edytorze wnętrza zwykłej szafki.</div>
 
     <div class="prop-box" style="padding:12px; margin-bottom:14px;">
@@ -100,13 +88,21 @@ export function openCornerConfigModal(mod) {
       </div>
     </div>
 
-    <div style="display:flex; justify-content:flex-end; margin-top:16px;">
-      <button type="button" id="btn-corner-modal-close" class="btn btn-primary btn-sm">Zamknij</button>
-    </div>
   `;
 
-  overlay.appendChild(modal);
-  document.body.appendChild(overlay);
+  const dlg = openModal({
+    title: `Konfigurator szafki narożnej: ${mod.name || ''}`,
+    width: 900,
+    body: bodyHtml,
+    footer: [{ label: 'Zamknij', kind: 'primary' }],
+    // Każde zamknięcie (przycisk, Esc, klik w tło) odświeża resztę aplikacji.
+    onClose: () => {
+      update3D();
+      updateSidebar();
+      initPropertiesPanel();
+    },
+  });
+  const modal = dlg.modal;
 
   const armAContainer = modal.querySelector('#corner-arm-a-container');
   const armBContainer = modal.querySelector('#corner-arm-b-container');
@@ -202,7 +198,7 @@ export function openCornerConfigModal(mod) {
 
   const holesEl = modal.querySelector('#corner-shelf-holes');
   function renderShelfHoles() {
-    holesEl.innerHTML = `<div style="font-size:12px; color:#475569; margin-bottom:2px;">Rysunki formatek szafki (widok z góry / z boku) - wymiary i nawierty jak w rysunkach zwykłych szafek.</div>${generateCornerPartsDrawings(mod)}`;
+    holesEl.innerHTML = `<div class="hint" style="margin:0 0 2px 0;">Rysunki formatekszafki (widok z góry / z boku) - wymiary i nawierty jak w rysunkach zwykłych szafek.</div>${generateCornerPartsDrawings(mod)}`;
   }
   renderShelvesList();
 
@@ -376,12 +372,4 @@ export function openCornerConfigModal(mod) {
     updateSidebar();
   });
 
-  const close = () => {
-    document.body.removeChild(overlay);
-    update3D();
-    updateSidebar();
-    initPropertiesPanel();
-  };
-  modal.querySelector('#btn-corner-modal-close').addEventListener('click', close);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 }

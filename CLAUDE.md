@@ -203,8 +203,7 @@ Wszystkie panele renderują się przez przypisanie szablonów tekstowych do `inn
 
 Zmodyfikuj `state` → wywołaj `update3D()` i `updateSidebar()` → wywołaj też
 `initPropertiesPanel()`, jeśli zmieniła się struktura formularza (a nie tylko wartości).
-`main.js` nasłuchuje zdarzenia `cabinetMoved` na `window` (wysyłanego przy przeciąganiu w 3D),
-żeby przerysować panel właściwości.
+Przeciąganie w 3D samo woła te odświeżenia po puszczeniu myszy (`render/viewer3d.js`).
 
 **Cofnij/ponów** (`core/history.js`) korzysta z tego przepływu: `update3D()` / `updateSidebar()` /
 `initPropertiesPanel()` wołają `scheduleCheckpoint()`, który z debounce'em robi migawkę JSON

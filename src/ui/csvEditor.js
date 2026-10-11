@@ -2,7 +2,7 @@
 // Edytor i eksport CSV listy formatek (przycisk "Eksport CSV" w oknie Produkcja).
 import { calculateAllProjectParts } from "../engine/cabinet.js";
 import { state } from "../core/state.js";
-import { escapeHtml } from "../utils/dom.js";
+import { escapeHtml, downloadFile } from "../utils/dom.js";
 import { openModal, showAlert } from "../utils/modal.js";
 import { getPartEdges, describeEdges } from "../engine/edgeBanding.js";
 
@@ -142,17 +142,9 @@ function openCsvEditorModal(partsList) {
             csvContent += `"${cat}";"${name}";${len};${wid};${qty};"${src}";"${edge}"\n`;
         });
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-
         const projName = state.project.name.replace(/\s+/g, '_');
         const fileNameSuffix = filterMode === 'all' ? 'Cale_Zlecenie' : filterMode;
-        link.download = `Formatki_${fileNameSuffix}_${projName}.csv`;
-
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        downloadFile(`Formatki_${fileNameSuffix}_${projName}.csv`, csvContent, 'text/csv;charset=utf-8;');
         close();
     }
 

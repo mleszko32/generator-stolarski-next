@@ -4,7 +4,7 @@
 import { getActiveModule, addModuleFromTemplate } from "../core/state.js";
 import { listTemplates, saveTemplate, deleteTemplate, exportLibraryJson, importLibraryJson } from "../core/moduleLibrary.js";
 import { showCustomDialog } from "../core/storage.js";
-import { escapeHtml } from "../utils/dom.js";
+import { escapeHtml, downloadFile } from "../utils/dom.js";
 import { openModal, showAlert } from "../utils/modal.js";
 
 const TYPE_LABELS = {
@@ -96,14 +96,7 @@ export function openModuleLibrary(onChange) {
 
   box.querySelector("#lib-export").onclick = () => {
     if (listTemplates().length === 0) { showAlert("Biblioteka jest pusta - nie ma czego eksportować."); return; }
-    const blob = new Blob([exportLibraryJson()], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "biblioteka-szafek.json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    downloadFile("biblioteka-szafek.json", exportLibraryJson(), "application/json");
   };
 
   const fileInput = box.querySelector("#lib-file");

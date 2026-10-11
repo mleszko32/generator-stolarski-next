@@ -7,7 +7,7 @@
 // Ten sam wzorzec okna co wykrój narożnika (ui/cornerProperties.js:
 // openCornerBlankPrintView) - samodzielny HTML w nowej karcie.
 import { state } from "../core/state.js";
-import { escapeHtml } from "../utils/dom.js";
+import { escapeHtml, openHtmlWindow } from "../utils/dom.js";
 import { round1 } from "../utils/math.js";
 import { getSlopeBoards, getSlopeShapes, getSlopeGeometry, getSlopeDrillings } from "../core/slopeCabinet.js";
 import { jointSetsFor } from "../engine/carcaseParts.js";
@@ -186,6 +186,5 @@ export function openSlopeCutDrawings(mod) {
 </body>
 </html>`;
 
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  window.open(URL.createObjectURL(blob), '_blank');
+  openHtmlWindow(html);
 }

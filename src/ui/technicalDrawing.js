@@ -9,7 +9,7 @@ import { initPropertiesPanel } from "./properties.js";
 import { openCornerBlankPrintView } from "./cornerProperties.js";
 import { openSlopeCutDrawings } from "./slopeCutDrawings.js";
 import { updateSidebar } from "./sidebar.js";
-import { escapeHtml } from "../utils/dom.js";
+import { escapeHtml, openHtmlWindow } from "../utils/dom.js";
 import { showAlert } from "../utils/modal.js";
 
 export function openTechnicalDrawing() {
@@ -475,8 +475,7 @@ export function openTechnicalDrawing() {
           </body>
           </html>`;
 
-        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-        window.open(URL.createObjectURL(blob), '_blank');
+        openHtmlWindow(htmlContent);
     } catch (err) {
         console.error("Błąd generowania rysunku:", err);
         showAlert("Wystąpił błąd podczas generowania SVG: " + err.message);

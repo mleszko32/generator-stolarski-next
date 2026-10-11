@@ -4,7 +4,7 @@
 // drewnianej (MOVENTO) - nagłówek ze wzorami Blum, tabela formatek, rysunki boku, dna,
 // tyłu i czoła wewnętrznego z ponumerowanymi otworami i tabela otworów. Jedna skrzynka
 // na stronę wydruku. Dane: core/drawerBoxBuild.js, rysunki: render/drawerBoxDrawing2d.js.
-import { escapeHtml } from "../utils/dom.js";
+import { escapeHtml, openHtmlWindow } from "../utils/dom.js";
 import { JOIN_METHODS, cabinetFrontView } from "../core/drawerBoxBuild.js";
 import { state } from "../core/state.js";
 import { cabinetLocatorSVG, drawingScale, sideSVG, bottomSVG, plateSVG, legendHtml, assemblySVG, assemblyStepsHtml } from "../render/drawerBoxDrawing2d.js";
@@ -120,6 +120,5 @@ ${WORKSHOP_CSS}  </style>
   ${boxes.map((b, i) => boxCard(b, settings, i)).join("")}
 </body>
 </html>`;
-  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-  window.open(URL.createObjectURL(blob), "_blank");
+  openHtmlWindow(html);
 }

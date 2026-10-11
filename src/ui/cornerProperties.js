@@ -6,7 +6,7 @@ import { state } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
 import { getCornerDepths } from "../core/layout.js";
-import { escapeHtml } from "../utils/dom.js";
+import { escapeHtml, openHtmlWindow } from "../utils/dom.js";
 import { fmtMm } from "../utils/math.js";
 import { openCornerConfigModal } from "./cornerConfigModal.js";
 import { generateCornerBlankSVG, generateCornerPartsDrawings } from "../render/cornerDrawing2d.js";
@@ -70,8 +70,7 @@ export function openCornerBlankPrintView(mod) {
     </html>
   `;
 
-  const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-  window.open(URL.createObjectURL(blob), '_blank');
+  openHtmlWindow(htmlContent);
 }
 
 // Szafka narożna z frontem łamanym (mod.type === 'corner_cabinet', core/

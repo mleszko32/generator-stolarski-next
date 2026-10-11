@@ -7,7 +7,7 @@
 // Dane: engine/cabinetDrillings.js, rysunki: render/cabinetDrawing2d.js; szafka narożna:
 // engine/cornerDrillings.js + render/cornerInstructions2d.js (formatki L, montaż, kroki); szafka pod
 // skos: engine/slopeDrillings.js + render/slopeInstructions2d.js.
-import { escapeHtml } from "../utils/dom.js";
+import { escapeHtml, openHtmlWindow } from "../utils/dom.js";
 import { state } from "../core/state.js";
 import { computeWallLayouts } from "../core/walls.js";
 import { getCabinetPanels, getCabinetConstruction } from "../engine/cabinetDrillings.js";
@@ -183,6 +183,5 @@ ${WORKSHOP_CSS}  </style>
   ${list.map((m, i) => cabinetCard(m, i, layouts)).join("")}
 </body>
 </html>`;
-  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-  window.open(URL.createObjectURL(blob), "_blank");
+  openHtmlWindow(html);
 }

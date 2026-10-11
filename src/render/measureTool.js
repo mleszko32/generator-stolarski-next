@@ -193,16 +193,12 @@ export function updateMeasureHover() {
 function ensureMeasureBanner() {
   if (measureMode.banner) return measureMode.banner;
   const banner = document.createElement('div');
-  Object.assign(banner.style, {
-      position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)',
-      background: '#f59e0b', color: 'white', padding: '12px 24px', borderRadius: '8px',
-      fontWeight: 'bold', zIndex: '2000', boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-      display: 'flex', alignItems: 'center', gap: '15px', fontFamily: 'var(--font)', fontSize: '14px'
-  });
+  banner.className = 'view-banner view-banner-warning'; // styl: global.css
   const textSpan = document.createElement('span');
   const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'btn btn-sm';
   closeBtn.innerText = 'Zamknij miarkę';
-  Object.assign(closeBtn.style, { background: 'white', color: '#b45309', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' });
   closeBtn.onclick = (e) => { e.stopPropagation(); exitMeasureMode(); };
   banner.appendChild(textSpan);
   banner.appendChild(closeBtn);

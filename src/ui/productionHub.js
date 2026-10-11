@@ -4,7 +4,7 @@
 // nawigacja po lewej (Formatki, Rozkrój i etykiety, Rysunki 2D, Okucia i
 // okleina, Kosztorys), zawartość po prawej. Akcje (wydruki, CSV, kosztorys)
 // to te same funkcje co dotąd (ui/sidebar.js), tylko w jednym miejscu.
-import { escapeHtml } from "../utils/dom.js";
+import { escapeHtml, openHtmlWindow } from "../utils/dom.js";
 import { fmtMm, num, round1 } from "../utils/math.js";
 import { state, getActiveModule } from "../core/state.js";
 import { collectProjectParts, calculateAllProjectParts } from "../engine/cabinet.js";
@@ -487,7 +487,7 @@ function renderSciany(el) {
       </style></head><body>
       <div class="bar"><button onclick="window.print()">Drukuj / Zapisz jako PDF</button></div>
       ${pages}</body></html>`;
-    window.open(URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' })), '_blank');
+    openHtmlWindow(html);
   });
 }
 
@@ -545,7 +545,7 @@ function renderOfferCard(el) {
   card.querySelector('#offer-print').addEventListener('click', () => {
     const snapshot = card.querySelector('#offer-snap').checked ? captureViewerSnapshot() : null;
     const html = buildOfferHtml({ project: state.project, cost: calculateProjectCost(), snapshot });
-    window.open(URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' })), '_blank');
+    openHtmlWindow(html);
   });
 }
 

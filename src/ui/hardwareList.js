@@ -2,7 +2,7 @@
 // Wydruk listy zakupów (okucia) całego projektu.
 import { calculateProjectHardware } from "../engine/hardware.js";
 import { state } from "../core/state.js";
-import { escapeHtml } from "../utils/dom.js";
+import { escapeHtml, openHtmlWindow } from "../utils/dom.js";
 import { showAlert } from "../utils/modal.js";
 
 export function printHardwareList() {
@@ -88,6 +88,5 @@ export function printHardwareList() {
       </html>
     `;
     
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-    window.open(URL.createObjectURL(blob), '_blank');
+    openHtmlWindow(htmlContent);
 }
