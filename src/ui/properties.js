@@ -197,9 +197,9 @@ export function initPropertiesPanel() {
 
     ${tabContent("wymiary", `
       <h3>Wymiary Modułu</h3>
-      <div class="property-group"><label>Szerokość (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-width" value="${activeModule.dimensions.width}" /></div>
-      <div class="property-group"><label>Wysokość korpusu (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-height" value="${activeModule.dimensions.height}" /></div>
-      <div class="property-group"><label>Głębokość (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-depth" value="${activeModule.dimensions.depth}" /></div>
+      <div class="property-group"><label>Szerokość (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-width" value="${escapeHtml(activeModule.dimensions.width)}" /></div>
+      <div class="property-group"><label>Wysokość korpusu (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-height" value="${escapeHtml(activeModule.dimensions.height)}" /></div>
+      <div class="property-group"><label>Głębokość (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-depth" value="${escapeHtml(activeModule.dimensions.depth)}" /></div>
 
       <hr class="divider">
 
@@ -244,7 +244,7 @@ export function initPropertiesPanel() {
         ${allFrontsList.map(({ front, label }) => `
           <div class="property-group mb-8">
             <label class="fs-xs">${escapeHtml(label)} — materiał:</label>
-            <select class="input-front-material" data-front-id="${front.id}">
+            <select class="input-front-material" data-front-id="${escapeHtml(front.id)}">
               ${(state.project.pricing?.frontMaterials || []).map((mat, i) => `<option value="${escapeHtml(mat.id)}" ${(front.materialId ? front.materialId === mat.id : i === 0) ? 'selected' : ''}>${escapeHtml(mat.name)}</option>`).join('')}
               <option value="__new__">+ Nowy materiał…</option>
             </select>
@@ -257,11 +257,11 @@ export function initPropertiesPanel() {
           <div class="row mb-8">
             <div class="property-group grow">
               <label class="fs-xs">${escapeHtml(label)} — od osi góra [mm]:</label>
-              <input type="number" class="input-front-axisgap-top" data-front-id="${front.id}" placeholder="Auto (gap/2)" value="${front.gapFromAxisTop ?? ''}" step="0.5" />
+              <input type="number" class="input-front-axisgap-top" data-front-id="${escapeHtml(front.id)}" placeholder="Auto (gap/2)" value="${front.gapFromAxisTop ?? ''}" step="0.5" />
             </div>
             <div class="property-group grow">
               <label class="fs-xs">— od osi dół [mm]:</label>
-              <input type="number" class="input-front-axisgap-bottom" data-front-id="${front.id}" placeholder="Auto (gap/2)" value="${front.gapFromAxisBottom ?? ''}" step="0.5" />
+              <input type="number" class="input-front-axisgap-bottom" data-front-id="${escapeHtml(front.id)}" placeholder="Auto (gap/2)" value="${front.gapFromAxisBottom ?? ''}" step="0.5" />
             </div>
           </div>
         `).join('')}
@@ -394,10 +394,10 @@ export function initPropertiesPanel() {
               return `
               <div class="row-center tight">
                 <span style="width: 52px; flex-shrink: 0; font-size: 11px; font-weight: 600;">Zawias ${i + 1}:</span>
-                <input type="number" class="input-hinge-override flex-1 minw-0${overridden ? ' is-overridden' : ''}" data-front-id="${group.front.id}" data-hinge-index="${i}" value="${h.y}" step="0.5" />
+                <input type="number" class="input-hinge-override flex-1 minw-0${overridden ? ' is-overridden' : ''}" data-front-id="${escapeHtml(group.front.id)}" data-hinge-index="${i}" value="${h.y}" step="0.5" />
                 <span class="hint no-shrink">mm</span>
                 ${overridden
-                    ? `<button type="button" class="btn-hinge-reset btn-reset" data-front-id="${group.front.id}" data-hinge-index="${i}" title="Wróć do automatycznej pozycji">↺</button>`
+                    ? `<button type="button" class="btn-hinge-reset btn-reset" data-front-id="${escapeHtml(group.front.id)}" data-hinge-index="${i}" title="Wróć do automatycznej pozycji">↺</button>`
                     : (h.isAdjusted ? `<span title="Automatycznie odsunięty, żeby ominąć półkę/przeszkodę" style="flex-shrink: 0;"><i class="ti ti-alert-triangle" aria-hidden="true"></i></span>` : '<span style="width: 24px; flex-shrink: 0;"></span>')
                 }
               </div>

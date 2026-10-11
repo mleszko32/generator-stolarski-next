@@ -64,10 +64,16 @@ onHistoryChange(({ canUndo, canRedo }) => {
   });
 });
 
+// Przy otwartym oknie (modal, hub) skróty nie działają: cofanie podmienia cały
+// state.project, a okno dalej edytowałoby stary obiekt (zmiany znikałyby bez śladu),
+// a "R" obracałoby szafkę schowaną pod oknem.
+const isOverlayOpen = () => !!document.querySelector('.modal-overlay, .hub-overlay');
+
 // Skróty klawiszowe Ctrl+Z / Ctrl+Y (Ctrl+Shift+Z jako alternatywa dla redo).
 // Pomijamy pola tekstowe, żeby nie podbierać natywnego cofania w inputach.
 window.addEventListener('keydown', (e) => {
   if (!e.ctrlKey && !e.metaKey) return;
+  if (isOverlayOpen()) return;
   const tag = document.activeElement?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement?.isContentEditable) return;
 
@@ -85,6 +91,7 @@ window.addEventListener('keydown', (e) => {
 // ui/properties.js i w menu kontekstowym 3D, patrz render/viewer3d.js).
 window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (isOverlayOpen()) return;
   const tag = document.activeElement?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement?.isContentEditable) return;
   if (e.key.toLowerCase() !== 'r') return;
@@ -189,10 +196,13 @@ if (btnHistory) {
 
 if (btnLoad) {
   btnLoad.addEventListener('click', async () => {
+    if (btnLoad.disabled) return;
+    btnLoad.disabled = true;
     btnLoad.innerHTML = navIcon('loader-2', 'Szukam...');
-    
+
     const projects = await getSavedProjectsList();
     btnLoad.innerHTML = navIcon('folder-open', 'Wczytaj projekt');
+    btnLoad.disabled = false;
 
     if (projects.length === 0) {
       showAlert("Brak zapisanych projektów w chmurze.");
@@ -220,10 +230,16 @@ if (btnLoad) {
       // AKCJA: Wczytywanie projektu
       row.querySelector('.load-open').onclick = async () => {
         dlg.close();
+        // Dwa nakładające się wczytania mogłyby skończyć w odwrotnej kolejności.
+        btnLoad.disabled = true;
         btnLoad.innerHTML = navIcon('loader-2', 'Wczytywanie...');
-        const success = await loadProjectFromCloud(projName);
-        if (success) refreshAfterProjectLoad();
-        btnLoad.innerHTML = navIcon('folder-open', 'Wczytaj projekt');
+        try {
+          const success = await loadProjectFromCloud(projName);
+          if (success) refreshAfterProjectLoad();
+        } finally {
+          btnLoad.innerHTML = navIcon('folder-open', 'Wczytaj projekt');
+          btnLoad.disabled = false;
+        }
       };
 
       // AKCJA: Usuwanie z bazy po potwierdzeniu
@@ -261,6 +277,9 @@ if (btnLoad) {
       );
       if (restore) {
         if (applyProjectData(backup.project, null)) refreshAfterProjectLoad();
+        // Uszkodzona kopia (applyProjectData pokazał już błąd) - usuwamy ją, inaczej to samo
+        // pytanie i ten sam błąd wracałyby przy każdym starcie.
+        else clearLocalBackup();
       } else {
         clearLocalBackup();
       }

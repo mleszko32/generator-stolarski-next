@@ -6,7 +6,7 @@ const h = vi.hoisted(() => {
   const store = new Map();
   const clone = (v) => JSON.parse(JSON.stringify(v));
   const auth = { currentUser: { email: "mleszko32@gmail.com" } };
-  return { store, clone, auth };
+  return { store, clone, auth, failProjectWrite: false };
 });
 
 // showAlert buduje okno w DOM, którego tu nie ma - komunikaty nie są tematem tych testów.
@@ -28,7 +28,11 @@ vi.mock("firebase/firestore", () => {
     getFirestore: () => ({}),
     doc: ref,
     collection: ref,
-    setDoc: async (r, data) => { store.set(r.path, clone(data)); },
+    setDoc: async (r, data) => {
+      // failProjectWrite: zapis samego dokumentu projektu się nie udaje (np. brak internetu).
+      if (h.failProjectWrite && r.path.split("/").length === 2) throw new Error("offline");
+      store.set(r.path, clone(data));
+    },
     getDoc: async (r) => ({ exists: () => store.has(r.path), data: () => clone(store.get(r.path)) }),
     getDocs: async (c) => {
       const docs = childrenOf(c.path).map((p) => ({ id: p.split("/").pop(), data: () => clone(store.get(p)) }));
@@ -63,6 +67,7 @@ beforeEach(() => {
   state.project.modules = [];
   state.project.marker = 0;
   state.loadedProjectId = null;
+  h.failProjectWrite = false;
 });
 
 describe("historia wersji projektu", () => {
@@ -147,5 +152,46 @@ describe("historia wersji projektu", () => {
     expect(markers.length).toBeLessThanOrEqual(61); // przycinanie działa w tle, po zapisie
     expect(markers).toContain(65);
     expect(markers).not.toContain(1);
+  });
+});
+
+describe("przywrócenie wersji przy błędzie zapisu", () => {
+  it("nie podmienia projektu w aplikacji, gdy zapis w chmurze się nie uda", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    h.store.set("projects/P", { name: "P", modules: [], marker: 1 });
+    state.loadedProjectId = "P";
+    state.project.marker = 2;
+    await storage.saveProjectToCloud("P");
+    const list = await storage.listProjectVersions("P");
+    const v1 = list.find((v) => JSON.parse(h.store.get(`projects/P/versionData/${v.id}`).json).marker === 1);
+
+    state.project.marker = 9;
+    h.failProjectWrite = true;
+    expect(await storage.restoreProjectVersion("P", v1.id)).toBe(false);
+    expect(state.project.marker).toBe(9);
+  });
+});
+
+describe("autozapis a zmiana projektu w trakcie", () => {
+  it("nie nadpisuje znacznika zapisu, gdy w trakcie wczytano inny projekt", async () => {
+    h.store.set("projects/P", { name: "P", modules: [], marker: 1 });
+    await storage.loadProjectFromCloud("P");
+    state.project.marker = 2;
+
+    const pending = storage.saveProjectSilently();
+    storage.applyProjectData({ modules: [], marker: 7 }, "Q");
+    expect(await pending).toBe("stale");
+    expect(h.store.get("projects/P").marker).toBe(1);
+  });
+
+  it("nie odtwarza projektu usuniętego w trakcie autozapisu", async () => {
+    h.store.set("projects/P", { name: "P", modules: [], marker: 1 });
+    await storage.loadProjectFromCloud("P");
+    state.project.marker = 2;
+
+    const pending = storage.saveProjectSilently();
+    await storage.deleteProjectFromCloud("P");
+    expect(await pending).toBe("stale");
+    expect(h.store.has("projects/P")).toBe(false);
   });
 });

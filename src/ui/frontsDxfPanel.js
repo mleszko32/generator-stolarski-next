@@ -7,6 +7,7 @@
 
 import { escapeHtml } from "../utils/dom.js";
 import { state } from "../core/state.js";
+import { scheduleCheckpoint } from "../core/history.js";
 import { collectProjectParts } from "../engine/cabinet.js";
 import { DXF_DEFAULTS, collectFrontPieces, nestFronts, placedOutlines, centroid, sheetToDxf, allSheetsToDxf } from "../engine/frontsDxf.js";
 
@@ -106,6 +107,7 @@ export function mountFrontsDxf(container) {
       const v = parse(e.target);
       if (v === null) return;
       state.project.frontsDxf = { ...(state.project.frontsDxf || {}), [key]: v };
+      scheduleCheckpoint();
       render();
     });
   };

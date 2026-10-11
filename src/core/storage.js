@@ -13,6 +13,8 @@ import { migrateLegacyRoom, clampModuleToRoom } from "./layout.js";
 import { resetHistory } from "./history.js";
 import { openModal, showAlert } from "../utils/modal.js";
 import { validateProjectData } from "./projectSchema.js";
+import { sanitizeProjectData } from "./projectSanitize.js";
+import { isAllowedEmail, FIREBASE_PROJECT_ID } from "./access.js";
 
 // Konfiguracja klienta Firebase jest z założenia publiczna (leci do przeglądarki)
 // i sama z siebie niczego nie chroni. Realną barierą są reguły Firestore w
@@ -20,7 +22,7 @@ import { validateProjectData } from "./projectSchema.js";
 const firebaseConfig = {
   apiKey: "AIzaSyDnv-wvIpfM7Idlsiqaj8LTDLw9Zmtm3cg",
   authDomain: "generator-stolarski-next.firebaseapp.com",
-  projectId: "generator-stolarski-next",
+  projectId: FIREBASE_PROJECT_ID,
   storageBucket: "generator-stolarski-next.firebasestorage.app",
   messagingSenderId: "230164946690",
   appId: "1:230164946690:web:23c3c7a37c33e7e921ac1b"
@@ -31,15 +33,19 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
-// Konta z dostępem do chmury. TE SAME adresy muszą być w firestore.rules —
-// tutaj to tylko wygodny check po stronie klienta (czytelny komunikat zamiast
-// surowego błędu "permission denied"), tam jest właściwe zabezpieczenie.
-export const ALLOWED_EMAILS = ["mleszko32@gmail.com", "mebleleszko@gmail.com"];
-const isAllowedEmail = (email) => !!email && ALLOWED_EMAILS.includes(String(email).toLowerCase());
+// Konta z dostępem do chmury: core/access.js (wspólne z api/gemini.js). Tutaj to tylko
+// wygodny check po stronie klienta (czytelny komunikat zamiast surowego błędu
+// "permission denied"); właściwe zabezpieczenie to firestore.rules.
 
 // --- AUTORYZACJA ---
 export function onAuthChange(callback) {
   return onAuthStateChanged(auth, callback);
+}
+
+// Token ID zalogowanego konta dla funkcji serwerowych (api/gemini.js) albo null.
+export async function getIdToken() {
+  const u = auth.currentUser;
+  return u ? u.getIdToken() : null;
 }
 
 export function getCurrentUser() {
@@ -143,6 +149,13 @@ let lastSavedSnapshot = null;
 function markSaved() {
   lastSavedSnapshot = JSON.stringify(state.project);
 }
+
+// "Generacja" projektu: rośnie przy każdym wczytaniu/przywróceniu, ręcznym zapisie i
+// usunięciu z chmury. Autozapis sprawdza ją po każdym await - jeśli w międzyczasie
+// wczytano inny projekt albo usunięto bieżący, rezygnuje, zamiast nadpisać znacznik
+// zapisu cudzą treścią albo odtworzyć usunięty dokument.
+let projectGeneration = 0;
+let autosaveInFlight = false;
 
 // Czy bieżący projekt różni się od ostatnio zapisanego/wczytanego z chmury
 // (dla kopii lokalnej, patrz core/localBackup.js).
@@ -260,11 +273,19 @@ export async function restoreProjectVersion(projectId, versionId) {
       return false;
     }
     const data = JSON.parse(snap.data().json);
+    const validated = validateProjectData(data);
+    if (!validated.success) {
+      showAlert("❌ Ta wersja ma uszkodzone dane:\n" + validated.issues.join("\n"));
+      return false;
+    }
     await archiveVersion(projectId, state.project, "Przed przywróceniem wersji", { force: true });
-    if (!applyProjectData(data, projectId)) return false; // state.project nietknięty, nie ma czego zapisywać
-    const toSave = JSON.parse(JSON.stringify(state.project));
+    // Najpierw zapis w chmurze, dopiero potem podmiana stanu: przy błędzie zapisu (np. brak
+    // internetu) aplikacja zostaje z dotychczasowym projektem, zamiast z przywróconym
+    // stanem, którego nie widać na ekranie i którego nie ma w chmurze.
+    const toSave = JSON.parse(JSON.stringify(validated.data));
     toSave.name = projectId;
     await setDoc(doc(db, "projects", projectId), toSave);
+    if (!applyProjectData(data, projectId)) return false;
     state.project.name = projectId;
     markSaved();
     return true;
@@ -313,9 +334,19 @@ export async function saveProjectToCloud(projectId = null) {
     const dataToSave = JSON.parse(JSON.stringify(state.project));
     dataToSave.name = targetId;
 
+    const prevSnap = await getDoc(projectRef).catch(() => null);
+    // "Zapisz jako NOWY" / pierwszy zapis pod nazwą, która już istnieje: bez pytania
+    // nadpisywało to inny projekt (do odzyskania tylko z historii wersji).
+    if (targetId !== state.loadedProjectId && prevSnap && prevSnap.exists()) {
+      const ok = await showCustomDialog("confirm", "Projekt już istnieje",
+        `W chmurze jest już projekt „${targetId}”. Nadpisać go bieżącym projektem?\n(Jego obecna treść trafi do historii wersji.)`,
+        "", "Nadpisz", "Anuluj");
+      if (!ok) return;
+    }
+    projectGeneration++;
+
     // Historia wersji: poprzednia treść (jeśli projekt już istnieje) i nowy punkt zapisu.
     if (targetId !== state.loadedProjectId) resetVersionSession();
-    const prevSnap = await getDoc(projectRef).catch(() => null);
     if (prevSnap && prevSnap.exists()) {
       await archiveVersion(targetId, prevSnap.data(), "Przed zapisem ręcznym", { force: true });
     }
@@ -348,7 +379,8 @@ export function applyProjectData(data, projectId) {
     showAlert("❌ Nie udało się wczytać projektu - uszkodzone dane:\n" + validated.issues.join("\n"));
     return false;
   }
-  state.project = validated.data;
+  // Pola techniczne bez znaków HTML/JS, wymiary jako liczby (core/projectSanitize.js).
+  state.project = sanitizeProjectData(validated.data);
   ensureRoomDefaults(state.project); // projekty zapisane przed dodaniem pomieszczeń mogą nie mieć tego pola
   ensurePricingDefaults(state.project); // ...ani projekty sprzed dodania kosztorysu
   ensureSidePanelsDefaults(state.project); // ...ani projekty sprzed dodania boków dokładanych
@@ -362,6 +394,7 @@ export function applyProjectData(data, projectId) {
   state.activeModuleId = state.project.modules.length > 0 ? state.project.modules[0].id : null;
   state.activeSidePanelId = null;
   state.loadedProjectId = projectId;
+  projectGeneration++;
   resetHistory(); // cofanie między dwoma różnymi wczytanymi projektami nie ma sensu
   return true;
 }
@@ -396,6 +429,7 @@ export async function deleteProjectFromCloud(projectId) {
   if (!requireOwner()) return false;
   try {
     const projectRef = doc(db, "projects", projectId);
+    if (state.loadedProjectId === projectId) projectGeneration++; // trwający autozapis nie odtworzy dokumentu
     await deleteDoc(projectRef);
     // Podkolekcje nie znikają razem z dokumentem - sprzątamy historię wersji.
     try {
@@ -440,16 +474,21 @@ export async function getSavedProjectsList() {
 // Celowo NIE zakłada nazwy projektu: dopóki użytkownik choć raz nie zapisze
 // ręcznie (i tym samym nie ustali state.loadedProjectId), nie ma dokąd cicho
 // zapisywać — inaczej autozapis co chwilę tworzyłby nowe, bezimienne projekty.
-// Zwraca 'saved' | 'no-changes' | 'no-project' | 'not-signed-in' | 'error'.
+// Zwraca 'saved' | 'no-changes' | 'no-project' | 'not-signed-in' | 'busy' (poprzedni jeszcze
+// trwa) | 'stale' (w trakcie wczytano/usunięto projekt - nic nie oznaczono) | 'error'.
 export async function saveProjectSilently() {
   if (!auth.currentUser || !isOwner()) return "not-signed-in";
   if (!state.loadedProjectId) return "no-project";
 
   const current = JSON.stringify(state.project);
   if (current === lastSavedSnapshot) return "no-changes";
+  if (autosaveInFlight) return "busy";
 
+  const gen = projectGeneration;
+  const targetId = state.loadedProjectId;
+  const stale = () => gen !== projectGeneration || state.loadedProjectId !== targetId;
+  autosaveInFlight = true;
   try {
-    const targetId = state.loadedProjectId;
     const projectRef = doc(db, "projects", targetId);
     const dataToSave = JSON.parse(current);
     dataToSave.name = targetId;
@@ -464,11 +503,15 @@ export async function saveProjectSilently() {
       }
     }
 
+    if (stale()) return "stale";
     await setDoc(projectRef, dataToSave);
+    if (stale()) return "stale";
     lastSavedSnapshot = current;
     return "saved";
   } catch (error) {
     console.error("Błąd autozapisu:", error);
     return "error";
+  } finally {
+    autosaveInFlight = false;
   }
 }

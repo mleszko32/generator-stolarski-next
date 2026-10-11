@@ -46,7 +46,7 @@ export function drawerCardsHtml(mod, { sideInfo, extraHtml = () => '', list = dr
       sizeHtml = `
             <div class="property-group mb-8">
               <label class="fs-xs">Wysokość boku szuflady [mm]:</label>
-              <input type="number" class="input-drawer-side-height" data-front-id="${front.id}" placeholder="Auto (maks. ${maxH})" value="${front.drawerSideHeight || ''}" />
+              <input type="number" class="input-drawer-side-height" data-front-id="${escapeHtml(front.id)}" placeholder="Auto (maks. ${maxH})" value="${front.drawerSideHeight || ''}" />
               ${warn}
             </div>`;
     } else {
@@ -56,7 +56,7 @@ export function drawerCardsHtml(mod, { sideInfo, extraHtml = () => '', list = dr
       sizeHtml = `
             <div class="property-group mb-8">
               <label class="fs-xs">Wymuszony wariant boku:</label>
-              <select class="input-drawer-force-variant" data-front-id="${front.id}">
+              <select class="input-drawer-force-variant" data-front-id="${escapeHtml(front.id)}">
                 <option value="auto" ${(!front.forceVariant || front.forceVariant === 'auto') ? 'selected' : ''}>Auto (maksymalny)</option>
                 ${variantOptionsHtml}
               </select>
@@ -69,27 +69,27 @@ export function drawerCardsHtml(mod, { sideInfo, extraHtml = () => '', list = dr
             ${sizeHtml}
             <div class="property-group mb-8">
               <label class="fs-xs">Wymuszona głębokość (NL, mm):</label>
-              <input type="number" class="input-drawer-force-nl" data-front-id="${front.id}" placeholder="Auto" value="${front.forceNL || ''}" />
+              <input type="number" class="input-drawer-force-nl" data-front-id="${escapeHtml(front.id)}" placeholder="Auto" value="${front.forceNL || ''}" />
             </div>
 
             <div class="row mb-8">
               <div class="property-group grow">
                 <label class="fs-xs">Wymuś wys. [mm]:</label>
-                <input type="number" class="input-front-force-h" data-front-id="${front.id}" placeholder="Auto" value="${front.forceH || ''}" />
+                <input type="number" class="input-front-force-h" data-front-id="${escapeHtml(front.id)}" placeholder="Auto" value="${front.forceH || ''}" />
               </div>
               <div class="property-group grow">
                 <label class="fs-xs">Wymuś szer. [mm]:</label>
-                <input type="number" class="input-front-force-w" data-front-id="${front.id}" placeholder="Auto" value="${front.forceW || ''}" />
+                <input type="number" class="input-front-force-w" data-front-id="${escapeHtml(front.id)}" placeholder="Auto" value="${front.forceW || ''}" />
               </div>
             </div>
             <div style="display: flex; gap: 6px; margin-bottom: ${isInner ? '8px' : '0'};">
               <div class="property-group grow">
                 <label class="fs-xs">Przesuń Y ↕ [mm]:</label>
-                <input type="number" class="input-front-force-offset-y" data-front-id="${front.id}" value="${front.forceOffsetY || 0}" />
+                <input type="number" class="input-front-force-offset-y" data-front-id="${escapeHtml(front.id)}" value="${front.forceOffsetY || 0}" />
               </div>
               <div class="property-group grow">
                 <label class="fs-xs">Przesuń X ↔ [mm]:</label>
-                <input type="number" class="input-front-force-offset-x" data-front-id="${front.id}" value="${front.forceOffsetX || 0}" />
+                <input type="number" class="input-front-force-offset-x" data-front-id="${escapeHtml(front.id)}" value="${front.forceOffsetX || 0}" />
               </div>
             </div>
 
@@ -98,27 +98,27 @@ export function drawerCardsHtml(mod, { sideInfo, extraHtml = () => '', list = dr
               <div class="row mb-8">
                 <div class="property-group grow">
                   <label class="fs-xs">Grubość frontu wewn. [mm]:</label>
-                  <input type="number" class="input-inner-front-thickness" data-front-id="${front.id}" value="${front.innerFrontThickness ?? 18}" />
+                  <input type="number" class="input-inner-front-thickness" data-front-id="${escapeHtml(front.id)}" value="${front.innerFrontThickness ?? 18}" />
                 </div>
                 <div class="property-group grow">
                   <label class="fs-xs">Luz do krawędzi [mm]:</label>
-                  <input type="number" class="input-inner-front-setback" data-front-id="${front.id}" value="${front.innerSetback ?? 2}" />
+                  <input type="number" class="input-inner-front-setback" data-front-id="${escapeHtml(front.id)}" value="${front.innerSetback ?? 2}" />
                 </div>
               </div>
               <div class="row mb-8">
                 <div class="property-group grow">
                   <label class="fs-xs">Wolne miejsce od dołu:</label>
-                  <input type="number" class="input-inner-basezone-bottom" data-front-id="${front.id}" value="${bz.offsetBottom || 0}" />
+                  <input type="number" class="input-inner-basezone-bottom" data-front-id="${escapeHtml(front.id)}" value="${bz.offsetBottom || 0}" />
                 </div>
                 <div class="property-group grow">
                   <label class="fs-xs">Wolne miejsce od góry:</label>
-                  <input type="number" class="input-inner-basezone-top" data-front-id="${front.id}" value="${bz.offsetTop || 0}" />
+                  <input type="number" class="input-inner-basezone-top" data-front-id="${escapeHtml(front.id)}" value="${bz.offsetTop || 0}" />
                 </div>
               </div>
             ` : `
-              <button type="button" class="btn btn-sm btn-block btn-add-inner-drawer" data-front-id="${front.id}"><i class="ti ti-plus" aria-hidden="true"></i> Dodaj szufladę wewnętrzną nad tą</button>
+              <button type="button" class="btn btn-sm btn-block btn-add-inner-drawer" data-front-id="${escapeHtml(front.id)}"><i class="ti ti-plus" aria-hidden="true"></i> Dodaj szufladę wewnętrzną nad tą</button>
             `}
-            <button type="button" class="btn btn-sm btn-block btn-danger btn-delete-front" data-front-id="${front.id}"><i class="ti ti-trash" aria-hidden="true"></i> Usuń tę szufladę</button>
+            <button type="button" class="btn btn-sm btn-block btn-danger btn-delete-front" data-front-id="${escapeHtml(front.id)}"><i class="ti ti-trash" aria-hidden="true"></i> Usuń tę szufladę</button>
           </div>
         `;
   }).join('');

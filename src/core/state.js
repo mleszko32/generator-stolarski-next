@@ -1,5 +1,6 @@
 // src/core/state.js
-import { ensureCornerDefaults } from "./layout.js";
+import { ensureCornerDefaults, getWorldFootprint } from "./layout.js";
+import { sanitizeProjectData } from "./projectSanitize.js";
 import { buildSlopeElements, migrateSlopeModule } from "./slopeCabinet.js";
 // depth:600 z poprzedniego (martwego, nigdy nie renderowanego) pola room nie ma
 // sensu jako realny pokój - to szerokość korytarza, nie mieściłby się w nim nawet
@@ -239,6 +240,10 @@ export function getActiveModule() {
   return state.project.modules.find(m => m.id === state.activeModuleId) || null;
 }
 
+// Prawa krawędź szafki w pokoju (z obrotem; position.x bywa napisem z formularza - bez
+// parseFloat "1200" + 600 dawało "1200600") - stąd stawiamy kolejną szafkę.
+const rightEdgeX = (m) => (parseFloat(m.position && m.position.x) || 0) + getWorldFootprint(m).worldW;
+
 // Nowy obiekt szafki (dolna / wisząca / słupek) z domyślnymi wymiarami, BEZ dodania
 // do projektu. Wspólne dla addModule i rozmieszczania szafek na ścianie
 // (core/wallFill.js), żeby obie drogi dawały takie same szafki. Id ma losowy
@@ -293,7 +298,7 @@ export function addModule(type = "base_cabinet") {
 
   let nextX = 0;
   if (state.project.modules.length > 0) {
-    nextX = Math.max(...state.project.modules.map(m => m.position.x + parseFloat(m.dimensions.width)));
+    nextX = Math.max(...state.project.modules.map(rightEdgeX));
   }
   newModule.position.x = nextX;
 
@@ -325,7 +330,7 @@ export function addCornerModule() {
 
   let nextX = 0;
   if (state.project.modules.length > 0) {
-    nextX = Math.max(...state.project.modules.map(m => (parseFloat(m.position.x) || 0) + (parseFloat(m.dimensions.width) || 0)));
+    nextX = Math.max(...state.project.modules.map(rightEdgeX));
   }
 
   const newModule = {
@@ -357,7 +362,7 @@ export function addSlopeModule() {
 
   let nextX = 0;
   if (state.project.modules.length > 0) {
-    nextX = Math.max(...state.project.modules.map(m => (parseFloat(m.position.x) || 0) + (parseFloat(m.dimensions.width) || 0)));
+    nextX = Math.max(...state.project.modules.map(rightEdgeX));
   }
 
   const newModule = {
@@ -462,7 +467,9 @@ export function deleteModule(moduleId) {
 // Nowe id zachowuje początek starego (layout rozpoznaje fronty po prefiksie
 // "front" i "-L-"/"-P-" w id) i dostaje losowy przyrostek na końcu.
 export function cloneModuleWithNewIds(source) {
-  const copy = JSON.parse(JSON.stringify(source));
+  // Szablon może pochodzić z pliku JSON (biblioteka szafek) - przez to samo sito co
+  // wczytany projekt (core/projectSanitize.js).
+  const copy = sanitizeProjectData(JSON.parse(JSON.stringify(source)));
   const rand = () => 'c' + Math.random().toString(36).substring(2, 7);
   copy.id = 'mod-' + Date.now() + Math.random().toString(36).substring(2, 6);
   copy.rotation = copy.rotation || 0; // zabezpieczenie dla modułów sprzed tego pola
@@ -490,7 +497,7 @@ export function addModuleFromTemplate(templateModule, { suffix = '' } = {}) {
   if (suffix) newMod.name = newMod.name + suffix;
   let nextX = 0;
   if (state.project.modules.length > 0) {
-    nextX = Math.max(...state.project.modules.map(m => m.position.x + parseFloat(m.dimensions.width)));
+    nextX = Math.max(...state.project.modules.map(rightEdgeX));
   }
   newMod.position = { ...(newMod.position || { y: 0, z: 0 }), x: nextX };
   state.project.modules.push(newMod);
@@ -510,7 +517,7 @@ export function duplicateModule(moduleId) {
 
   let nextX = 0;
   if (state.project.modules.length > 0) {
-    nextX = Math.max(...state.project.modules.map(m => m.position.x + parseFloat(m.dimensions.width))) + 50;
+    nextX = Math.max(...state.project.modules.map(rightEdgeX)) + 50;
   }
   newMod.position.x = nextX;
 

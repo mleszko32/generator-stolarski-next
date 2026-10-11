@@ -2,6 +2,7 @@
 // Okno kosztorysu projektu (ceny materiałów i okuć, robocizna, montaż, marża, rabat, VAT).
 import { calculateProjectCost } from "../engine/cost.js";
 import { state } from "../core/state.js";
+import { scheduleCheckpoint } from "../core/history.js";
 import { escapeHtml } from "../utils/dom.js";
 import { initPropertiesPanel } from "./properties.js";
 import { update3D } from "../render/viewer3d.js";
@@ -125,7 +126,15 @@ export function mountKosztorys(root) {
     const materialsTbody = modal.querySelector('#kosztorys-materials-tbody');
     const hardwareTbody = modal.querySelector('#kosztorys-hardware-tbody');
 
-    function recalc() {
+    // recalc(INIT) przy otwarciu tylko liczy i pokazuje - nie przepisuje pól do pricing (samo
+    // otwarcie kosztorysu nie może oznaczać projektu jako zmienionego). Każde inne wywołanie
+    // (zmiana pola, przycisk) zapisuje ceny i robi punkt cofania.
+    const INIT = Symbol('init');
+    function recalc(arg) {
+        if (arg !== INIT) readInputs();
+        renderTotals();
+    }
+    function readInputs() {
         modal.querySelectorAll('.kosztorys-mat-price').forEach(input => {
             const cat = input.getAttribute('data-cat');
             pricing.materials[cat] = parseFloat(input.value) || 0;
@@ -153,7 +162,9 @@ export function mountKosztorys(root) {
         pricing.transport = num('#kosztorys-transport');
         pricing.discountPercent = Math.min(100, num('#kosztorys-discount'));
         pricing.vatPercent = num('#kosztorys-vat');
-
+        scheduleCheckpoint();
+    }
+    function renderTotals() {
         const cost = calculateProjectCost();
 
         modal.querySelectorAll('.kosztorys-mat-area').forEach(cell => {
@@ -345,7 +356,7 @@ export function mountKosztorys(root) {
 
     renderMaterialRows();
     renderHardwareRows();
-    recalc();
+    recalc(INIT);
     modal.querySelector('#kosztorys-margin').addEventListener('input', recalc);
     modal.querySelector('#kosztorys-labor-margin').addEventListener('input', recalc);
     ['labor-hours','labor-rate','lacquer-hours','lacquer-rate','cutting','assembly-hours','assembly-rate','transport','discount','vat'].forEach(k => modal.querySelector('#kosztorys-' + k).addEventListener('input', recalc));

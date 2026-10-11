@@ -8,6 +8,7 @@
 import qrcode from "qrcode-generator";
 import { escapeHtml } from "../utils/dom.js";
 import { state } from "../core/state.js";
+import { scheduleCheckpoint } from "../core/history.js";
 import { collectProjectParts } from "../engine/cabinet.js";
 import { nestParts } from "../engine/nesting.js";
 import { isEdgeBanded, getPartEdges, describeEdges, totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "../engine/edgeBanding.js";
@@ -258,6 +259,7 @@ export function mountCutPlan(modal, onClose = null) {
       const v = parse(e.target);
       if (v === null) return;
       state.project.cutPlan = { ...getSettings(), [key]: v };
+      scheduleCheckpoint();
       render();
     });
   };

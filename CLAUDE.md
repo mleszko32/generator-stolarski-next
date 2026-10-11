@@ -395,7 +395,19 @@ generowane niezależnie w każdym projekcie), aktualizując cenę albo dodając 
 *niezapisanej* pracy (co 20 s i przy ukryciu karty; czyszczona, gdy projekt zgadza się z kopią
 w chmurze). Przy starcie `main.js` proponuje jej przywrócenie; przywrócony projekt celowo NIE
 jest powiązany z projektem w chmurze (`loadedProjectId = null`), żeby autozapis nigdy niczego
-po cichu nie nadpisał.
+po cichu nie nadpisał. Uszkodzona kopia (odrzucona przez `applyProjectData`) jest usuwana.
+
+**Dane z zewnątrz**: `applyProjectData` i `cloneModuleWithNewIds` (szablony z biblioteki / pliku)
+przepuszczają dane przez `core/projectSanitize.js`: wymiary i pozycja jako liczby, z napisów
+technicznych (id, powiązania, ustawienia) znikają znaki HTML/JS (`< > " ' & \` i grawis); tekst użytkownika (`name`, `decor`,
+oferta…) zostaje i musi iść przez `escapeHtml`. Nowe pole z wolnym tekstem dopisz do `FREE_TEXT_KEYS`.
+
+**Zapis a autozapis**: `storage.js` liczy „generację” projektu (wczytanie, ręczny zapis, usunięcie);
+autozapis sprawdza ją po każdym `await` i rezygnuje (`stale`), zamiast nadpisać cudzy znacznik
+zapisu albo odtworzyć usunięty dokument. „Zapisz jako NOWY” pod istniejącą nazwą pyta o nadpisanie.
+Przywrócenie wersji najpierw zapisuje ją w chmurze, dopiero potem podmienia stan aplikacji.
+Skróty Ctrl+Z/Y i R nie działają przy otwartym oknie (`.modal-overlay`/`.hub-overlay`), a zmiany
+ustawień w hubie (oferta, ceny, rozkrój, DXF) wołają `scheduleCheckpoint()`.
 
 **Historia wersji**: przed nadpisaniem projektu w chmurze (ręczny zapis, autozapis najwyżej raz
 na 10 min, przywrócenie) `storage.js` archiwizuje poprzednią zawartość w podkolekcjach
@@ -407,19 +419,26 @@ pamięci (`core/storage.test.js`).
 **Logowanie**: lista dozwolonych kont Google (wszystkie współdzielą kolekcję `projects`).
 Logowanie Google (`signInWithGoogle` / `signOutUser` / `onAuthChange` / `getCurrentUser`,
 podpięte w `main.js`, przycisk w `layout.js`). Każda funkcja chmurowa przerywa przez
-`requireOwner()`, jeśli zalogowanego e-maila nie ma w `ALLOWED_EMAILS` (`storage.js`).
+`requireOwner()`, jeśli zalogowanego e-maila nie ma w `ALLOWED_EMAILS` (`core/access.js`, wspólne z
+`api/gemini.js`).
 Prawdziwą bramką jest `firestore.rules` (te same e-maile) — jednorazowa konfiguracja konsoli
 (włączenie dostawcy Google, publikacja reguł) jest opisana w `FIREBASE.md`. Sprawdzenie po
 stronie klienta służy tylko do czytelnego komunikatu błędu.
-Dodanie/usunięcie użytkownika = edycja `ALLOWED_EMAILS` w `storage.js` **i** listy w
+Dodanie/usunięcie użytkownika = edycja `ALLOWED_EMAILS` w `core/access.js` **i** listy w
 `isOwner()` w `firestore.rules`, potem ponowna publikacja reguł.
 
 ### Import szkicu AI
 
-`api/gemini.js` to funkcja Vercela: POST `{ base64Image, mimeType }`, woła Gemini
-(`gemini-flash-latest`) ze stałym polskim promptem i zwraca tablicę JSON modułów szafek.
-`sidebar.js` mapuje ten JSON na `state.project.modules`, dosyntetyzowując `elements` i ich
-`baseZone`. Wymaga zmiennej środowiskowej `GEMINI_API_KEY` na Vercelu.
+`api/gemini.js` to funkcja Vercela: POST `{ base64Image, mimeType }` z nagłówkiem
+`Authorization: Bearer <token ID Firebase>` (`getIdToken()` ze `storage.js`). Token sprawdza
+`api/_lib/firebaseToken.js` (podpis RS256 kluczami Google przez WebCrypto, bez firebase-admin), e-mail musi
+być w `core/access.js` — bez tego 401/403 i nic nie idzie do płatnego Gemini. Walidacja zapytania i
+wyciąganie tablicy z odpowiedzi: `api/_lib/sketch.js`; klucz w nagłówku `x-goog-api-key`, limit czasu 55 s.
+Odpowiedź: `{ modules: [...] }`. Klient zmniejsza zdjęcie do 1600 px (limit 4,5 MB Vercela), a dane od
+modelu traktuje jako niezaufane: `core/aiSketchImport.js` (`sanitizeAiModules` — biała lista typów,
+zakresy wymiarów; `buildModulesFromAi` — szafki z `createModuleObject`). Pomocnicze pliki i testy
+funkcji leżą w `api/_lib/` (Vercel nie robi z `_` endpointów — nie kładź testów bezpośrednio w `api/`).
+Wymaga zmiennej środowiskowej `GEMINI_API_KEY` na Vercelu.
 
 ## Konwencje i pułapki
 

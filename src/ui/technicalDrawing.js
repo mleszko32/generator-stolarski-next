@@ -79,7 +79,7 @@ export function openTechnicalDrawing() {
 
         const tabsHtml = groupModules.length > 1 ? `
               <div class="module-tabs">
-                  ${groupModules.map(m => `<button class="module-tab${m.id === activeMod.id ? ' active' : ''}" data-module-id="${m.id}" onclick="switchModule('${m.id}', this)">${escapeHtml(m.name)}</button>`).join('')}
+                  ${groupModules.map(m => `<button class="module-tab${m.id === activeMod.id ? ' active' : ''}" data-module-id="${escapeHtml(m.id)}" onclick="switchModule(this.dataset.moduleId, this)">${escapeHtml(m.name)}</button>`).join('')}
               </div>
         ` : '';
 

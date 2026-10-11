@@ -1,4 +1,4 @@
-import { state, addModule, deleteModule, duplicateModule, addSidePanel, deleteSidePanel, addCornerModule, addSlopeModule } from "../core/state.js";
+import { state, addModule, deleteModule, duplicateModule, addSidePanel, deleteSidePanel, addCornerModule, addSlopeModule, ensureSidePanelsDefaults } from "../core/state.js";
 import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel } from "./properties.js";
 import { openProductionHub } from "./productionHub.js";
@@ -8,28 +8,49 @@ import { openWallFillModal } from "./wallFillModal.js";
 import { snapSidePanel } from "../core/sidePanelSnap.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
-import { showAlert } from "../utils/modal.js";
+import { showAlert, openModal } from "../utils/modal.js";
+import { sanitizeAiModules, buildModulesFromAi } from "../core/aiSketchImport.js";
+import { getIdToken } from "../core/storage.js";
+import { clampModuleToRoom } from "../core/layout.js";
 
+// Okno oczekiwania na wynik AI (wspólne openModal, bez zamykania w trakcie).
+let aiLoader = null;
 function showLoading(msg) {
-    let l = document.getElementById('ai-loader');
-    if(!l) {
-        l = document.createElement('div');
-        l.id = 'ai-loader';
-        Object.assign(l.style, {
-            position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
-            backgroundColor: 'rgba(15, 23, 42, 0.9)', color: '#10b981', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', zIndex: '9999',
-            fontSize: '24px', fontWeight: 'bold', flexDirection: 'column'
-        });
-        document.body.appendChild(l);
-    }
-    l.innerHTML = `<div><i class="ti ti-wand" aria-hidden="true"></i> ${msg}</div><div style="font-size:14px; margin-top:15px; color:#94a3b8;">Sztuczna Inteligencja rozrysowuje wnęki i półki. Cierpliwości...</div>`;
-    l.style.display = 'flex';
+    hideLoading();
+    aiLoader = openModal({
+        title: 'Import szkicu (AI)', closeButton: false, dismissable: false, width: 420,
+        body: `<p><i class="ti ti-wand" aria-hidden="true"></i> ${escapeHtml(msg)}</p><p class="empty-note">Sztuczna inteligencja rozrysowuje wnęki i półki. Cierpliwości...</p>`,
+    });
 }
 
 function hideLoading() {
-    const l = document.getElementById('ai-loader');
-    if(l) l.style.display = 'none';
+    if (aiLoader) aiLoader.close();
+    aiLoader = null;
+}
+
+// Zdjęcie z telefonu potrafi mieć kilka MB (limit zapytania Vercela to 4,5 MB) - zmniejszamy
+// do 1600 px na dłuższym boku i zapisujemy jako JPEG. Format, którego przeglądarka nie
+// umie narysować (np. HEIC), idzie bez zmian.
+async function prepareImage(file) {
+    const MAX = 1600;
+    try {
+        const bmp = await createImageBitmap(file);
+        const k = Math.min(1, MAX / Math.max(bmp.width, bmp.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(bmp.width * k);
+        canvas.height = Math.round(bmp.height * k);
+        canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+        if (bmp.close) bmp.close();
+        return { base64Image: canvas.toDataURL('image/jpeg', 0.85).split(',')[1], mimeType: 'image/jpeg' };
+    } catch (e) {
+        const dataUrl = await new Promise((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve(r.result);
+            r.onerror = () => reject(new Error('Nie udało się odczytać pliku.'));
+            r.readAsDataURL(file);
+        });
+        return { base64Image: String(dataUrl).split(',')[1], mimeType: file.type };
+    }
 }
 
 
@@ -69,12 +90,12 @@ export function updateSidebar() {
       const cls = isActive ? ' is-active' : (isSelected ? ' is-selected' : '');
       const group = m.groupId ? `<i class="ti ti-link li-group" title="Zgrupowana z innymi szafkami" aria-hidden="true"></i>` : '';
       html += `
-        <div class="list-item module-item${cls}" data-id="${m.id}">
+        <div class="list-item module-item${cls}" data-id="${escapeHtml(m.id)}">
           <i class="ti ${MODULE_ICONS[m.type] || MODULE_ICONS.base_cabinet} li-icon" aria-hidden="true"></i>
-          <div class="li-main"><span class="li-name">${escapeHtml(m.name)}</span>${group}<span class="li-meta">${m.dimensions.width} × ${m.dimensions.height}</span></div>
+          <div class="li-main"><span class="li-name">${escapeHtml(m.name)}</span>${group}<span class="li-meta">${escapeHtml(m.dimensions.width)} × ${escapeHtml(m.dimensions.height)}</span></div>
           <div class="li-actions">
-            <button class="icon-btn btn-mod-dup" data-id="${m.id}" title="Kopiuj szafkę"><i class="ti ti-copy" aria-hidden="true"></i></button>
-            <button class="icon-btn btn-mod-del" data-id="${m.id}" title="Usuń szafkę"><i class="ti ti-trash" aria-hidden="true"></i></button>
+            <button class="icon-btn btn-mod-dup" data-id="${escapeHtml(m.id)}" title="Kopiuj szafkę"><i class="ti ti-copy" aria-hidden="true"></i></button>
+            <button class="icon-btn btn-mod-del" data-id="${escapeHtml(m.id)}" title="Usuń szafkę"><i class="ti ti-trash" aria-hidden="true"></i></button>
           </div>
         </div>`;
     });
@@ -101,10 +122,10 @@ export function updateSidebar() {
   const sideItem = (p, icon, fallbackName, delTitle, meta) => {
     const isActive = p.id === state.activeSidePanelId;
     return `
-        <div class="list-item side-panel-item${isActive ? ' is-active' : ''}" data-id="${p.id}">
+        <div class="list-item side-panel-item${isActive ? ' is-active' : ''}" data-id="${escapeHtml(p.id)}">
           <i class="ti ${icon} li-icon" aria-hidden="true"></i>
-          <div class="li-main"><span class="li-name">${escapeHtml(p.name || fallbackName)}</span><span class="li-meta">${meta}</span></div>
-          <div class="li-actions"><button class="icon-btn btn-side-panel-del" data-id="${p.id}" title="${delTitle}"><i class="ti ti-trash" aria-hidden="true"></i></button></div>
+          <div class="li-main"><span class="li-name">${escapeHtml(p.name || fallbackName)}</span><span class="li-meta">${escapeHtml(meta)}</span></div>
+          <div class="li-actions"><button class="icon-btn btn-side-panel-del" data-id="${escapeHtml(p.id)}" title="${delTitle}"><i class="ti ti-trash" aria-hidden="true"></i></button></div>
         </div>`;
   };
   const boks = state.project.sidePanels.filter(p => p.kind !== 'blenda');
@@ -287,119 +308,42 @@ export function updateSidebar() {
       inputAi.addEventListener('change', async (e) => {
           const file = e.target.files[0];
           if (!file) return;
+          inputAi.value = "";
 
-          const mimeType = file.type;
+          const token = await getIdToken();
+          if (!token) {
+              showAlert("Import szkicu wymaga zalogowania (przycisk „Zaloguj (Google)”).");
+              return;
+          }
+
           showLoading("Rozszyfrowuję strukturę wnęk i półek...");
+          try {
+              const { base64Image, mimeType } = await prepareImage(file);
+              const response = await fetch('/api/gemini', {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                  body: JSON.stringify({ base64Image, mimeType })
+              });
+              // Błąd platformy (np. 413) przychodzi jako tekst, nie JSON.
+              const data = await response.json().catch(() => null);
+              if (!response.ok || !data) throw new Error((data && data.error) || `serwer odpowiedział kodem ${response.status}`);
 
-          const reader = new FileReader();
-          reader.onload = async (ev) => {
-              const base64Image = ev.target.result.split(',')[1];
+              // Dane od modelu są niezaufane - walidacja i budowa szafek w core/aiSketchImport.js.
+              const aiModules = sanitizeAiModules(data.modules);
+              if (aiModules.length === 0) throw new Error("nie rozpoznano żadnej szafki na zdjęciu.");
 
-              try {
-                  const response = await fetch('/api/gemini', { 
-                      method: "POST", 
-                      headers: { "Content-Type": "application/json" }, 
-                      body: JSON.stringify({ base64Image, mimeType }) 
-                  });
-                  
-                  const data = await response.json();
-                  
-                  if (data.error) throw new Error(data.error.message || data.error);
-                  
-                  const rawJson = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
-                  const aiModules = JSON.parse(rawJson);
-                  
-                  let currentX = 0;
-                  if (state.project.modules.length > 0) {
-                      const lastMod = state.project.modules[state.project.modules.length - 1];
-                      currentX = lastMod.position.x + parseFloat(lastMod.dimensions.width);
-                  }
-
-                  const generatedModules = aiModules.map(aiMod => {
-                      const w = parseFloat(aiMod.width) || 600;
-                      const h = parseFloat(aiMod.height) || (aiMod.type === 'tall_cabinet' ? 2000 : 720);
-                      const d = aiMod.type === 'upper_cabinet' ? 300 : 510;
-                      const posY = aiMod.type === 'upper_cabinet' ? 1400 : 0;
-                      
-                      const mod = {
-                          id: 'mod-' + Date.now() + Math.random().toString(36).substr(2,5),
-                          name: aiMod.name || 'Moduł AI',
-                          type: aiMod.type || 'base_cabinet',
-                          dimensions: { width: w, height: h, depth: d },
-                          position: { x: currentX, y: posY, z: 0 },
-                          legs: { active: aiMod.type !== 'upper_cabinet', height: 100, plinth: true, plinthOffset: 40 },
-                          backPanel: { type: 'nakladane', offset: 16 },
-                          elements: []
-                      };
-                      
-                      currentX += w; 
-
-                      const th = parseFloat(state.project.materials?.boardThickness) || 18;
-                      const internalH = h - (th * 2);
-                      const gapFront = parseFloat(state.project.front?.gap) || 3;
-
-                      if (aiMod.sections && aiMod.sections.length > 0) {
-                          let currentY = th;
-                          const totalSectionsHeight = aiMod.sections.reduce((sum, sec) => sum + (parseFloat(sec.height) || 0), 0);
-                          const scale = totalSectionsHeight > 0 ? internalH / totalSectionsHeight : 1;
-
-                          aiMod.sections.forEach((sec, idx) => {
-                              const secH = (parseFloat(sec.height) || (internalH / aiMod.sections.length)) * scale;
-                              let zoneMinY = currentY;
-                              let zoneMaxY = currentY + secH;
-                              
-                              if (idx === aiMod.sections.length - 1) zoneMaxY = h - th; 
-
-                              const bZone = { minX: th, maxX: w - th, minY: zoneMinY, maxY: zoneMaxY, offsetBottom: 0, offsetTop: 0 };
-                              
-                              const sType = sec.type || 'drzwi';
-                              const count = parseInt(sec.count) || 1;
-
-                              if (sType === 'szuflady') {
-                                  for(let i = 0; i < count; i++) {
-                                      mod.elements.push({
-                                          id: 'front-' + Date.now() + Math.random().toString(36).substr(2,5),
-                                          typ: 'front', subtype: 'szuflada',
-                                          baseZone: { ...bZone },
-                                          frontCount: count, distribution: count.toString(), frontIndex: i, gap: gapFront, forceVariant: 'auto', forceNL: null
-                                      });
-                                  }
-                              } else if (sType === 'drzwi_lp') {
-                                  mod.elements.push({ id: 'front-L-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi-lp', baseZone: { ...bZone }, frontCount: 2, frontIndex: 0, gap: gapFront });
-                                  mod.elements.push({ id: 'front-P-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi-lp', baseZone: { ...bZone }, frontCount: 2, frontIndex: 1, gap: gapFront });
-                              } else if (sType === 'drzwi') {
-                                  mod.elements.push({ id: 'front-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi', baseZone: { ...bZone }, frontCount: 1, frontIndex: 0, gap: gapFront, openingSide: 'left' });
-                              }
-                              
-                              if (idx < aiMod.sections.length - 1) {
-                                  mod.elements.push({
-                                      id: 'poziom-' + Date.now() + Math.random().toString(36).substring(2, 6),
-                                      typ: 'poziom', x: th, y: zoneMaxY, w: w - (th * 2), h: th, isStructural: true 
-                                  });
-                                  currentY = zoneMaxY + th;
-                              }
-                          });
-                      } else {
-                          const bZone = { minX: th, maxX: w - th, minY: th, maxY: h - th, offsetBottom: 0, offsetTop: 0 };
-                          mod.elements.push({ id: 'front-' + Date.now() + Math.random(), typ: 'front', subtype: 'drzwi', baseZone: { ...bZone }, frontCount: 1, frontIndex: 0, gap: gapFront, openingSide: 'left' });
-                      }
-
-                      return mod;
-                  });
-
-                  state.project.modules.push(...generatedModules);
-                  hideLoading();
-                  initPropertiesPanel();
-                  updateSidebar();
-                  update3D();
-                  
-              } catch(err) {
-                  hideLoading();
-                  showAlert("⚠️ Sztuczna Inteligencja napotkała problem: " + err.message);
-              }
-              inputAi.value = "";
-          };
-          reader.readAsDataURL(file);
+              const generated = buildModulesFromAi(aiModules, state.project);
+              state.project.modules.push(...generated);
+              ensureSidePanelsDefaults(state.project);
+              generated.forEach((m) => clampModuleToRoom(m));
+              hideLoading();
+              initPropertiesPanel();
+              updateSidebar();
+              update3D();
+          } catch(err) {
+              hideLoading();
+              showAlert("⚠️ Sztuczna Inteligencja napotkała problem: " + err.message);
+          }
       });
   }
 

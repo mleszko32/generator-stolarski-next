@@ -540,6 +540,7 @@ function renderOfferCard(el) {
 
   card.querySelectorAll('.offer-f').forEach(inp => inp.addEventListener('input', () => {
     state.project.offer = { ...getOfferSettings(state.project), [inp.dataset.k]: inp.type === 'number' ? (parseFloat(inp.value) || 0) : inp.value };
+    scheduleCheckpoint(); // inaczej cofnięcie późniejszej zmiany kasowałoby wpisane dane oferty
   }));
   card.querySelector('#offer-print').addEventListener('click', () => {
     const snapshot = card.querySelector('#offer-snap').checked ? captureViewerSnapshot() : null;

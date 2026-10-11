@@ -3,7 +3,8 @@
 Aplikacja korzysta z Firestore do zapisu projektów w chmurze. Dostęp jest
 ograniczony do listy kont Google (wszystkie widzą te same projekty).
 
-- Kod klienta: `src/core/storage.js` (lista `ALLOWED_EMAILS`).
+- Lista kont: `src/core/access.js` (`ALLOWED_EMAILS`) — używa jej klient (`storage.js`)
+  i funkcja importu szkicu AI (`api/gemini.js`).
 - Reguły bazy: `firestore.rules` (te same adresy e-mail — muszą się zgadzać).
 
 ## Jednorazowa konfiguracja w konsoli Firebase
@@ -37,7 +38,7 @@ Dodaj domenę produkcyjną (np. `*.vercel.app` albo własną).
 
 Zmień adresy w **dwóch** miejscach i opublikuj reguły ponownie:
 
-1. `src/core/storage.js` → `ALLOWED_EMAILS`
+1. `src/core/access.js` → `ALLOWED_EMAILS`
 2. `firestore.rules` → lista w `isOwner()`
 
 Alternatywnie w regułach można użyć UID zamiast e-maila (patrz komentarz w
