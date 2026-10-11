@@ -47,6 +47,7 @@ export const RC_PINS = [0, 0.5, 1, 1.5, 2];
 export const RC_RAIL_STEP = 16;          // rozstaw otworów w szynie - potwierdzony w warsztacie (numeracja od obu końców)
 export const RC_FRONT_STOP = 37;         // zderzak przy przedniej wiertarce
 export const RC_SPINDLE = 32;            // rozstaw wrzecion wiertarki
+export const RC_MAX_DEPTH = 650;         // najgłębsza formatka, jaką przyjmuje stół (warsztat)
 
 // Kalibracja domyślna = pomiar stołu z warsztatu (patrz wyżej); w projekcie można ją zmienić.
 // calibPin / calibFrontPin - numery pinów przy pomiarze (tylny liczony od tylnego końca
@@ -72,6 +73,7 @@ export function rcPinSideText(pin, from, settings) {
   return `pin ${pin} po ${side === "lewa" ? "lewej" : "prawej"} (strona ${from === "przód" ? "przedniej" : "tylnej"} wiertarki)`;
 }
 export const RC_RAIL_PINS = 21; // otwory 1…20 od każdego końca + nienumerowany środkowy (21)
+export const RC_RAIL_HOLES = 41; // 20 od tyłu + środkowy (21) + 20 od przodu
 const DEFAULTS = { enabled: false, rearMode: "pin", frontSide: RC_DEFAULT_FRONT_SIDE, ...RC_DEFAULT_CALIB };
 // Zakres, w którym może wypaść tylny otwór na pinie (najbliższy otwór szyny co 16 mm).
 export const RC_PIN_RANGE = [RC_FRONT_STOP - RC_RAIL_STEP / 2, RC_FRONT_STOP + RC_RAIL_STEP / 2];
@@ -111,27 +113,30 @@ export function rcRearScrew(depth, settings) {
   if (isCalibrated(s)) {
     const x0 = num(s.calibDepth) - num(s.calibRear);
     const k = Math.ceil((D - RC_FRONT_STOP - x0) / RC_RAIL_STEP - 0.5);
-    return { x: round1(x0 + k * RC_RAIL_STEP), exact: true, ...rcPinsFor(k, s) };
+    const pins = rcPinsFor(k, s);
+    // Tylny pin poza szyną (bardzo głęboka formatka) - tylna wiertarka zderzakiem: 37 od tyłu.
+    if (pins.pin === null && pins.frontPin !== null) return { x: round1(D - RC_FRONT_STOP), exact: true, ...pins, stopFallback: true };
+    return { x: round1(x0 + k * RC_RAIL_STEP), exact: true, ...pins };
   }
   return { x: round1(D - RC_FRONT_STOP), exact: false, range: RC_PIN_RANGE };
 }
 
-// Numery pinów dla otworu przesuniętego o k oczek szyny względem pomiaru (tylny otwór o
-// 16 mm bliżej tyłu formatki = tylny pin o 1 niżej). Przestawienie przedniej wiertarki o
-// jeden pin przestawia tylną o jeden w tę samą stronę numeracji. Gdy przy pinie przednim, na którym się
-// pracuje, tylny nie mieści się na szynie (bardzo płytka / głęboka formatka), bierzemy
-// najbliższy pin przedni, przy którym się mieści. { pin, frontPin } albo nulle bez numerów w kalibracji.
+// Numery pinów dla tylnego otworu przesuniętego o k oczek szyny względem pomiaru (tylny
+// otwór o 16 mm bliżej tyłu formatki = tylny pin o 1 niżej). Przestawienie przedniej wiertarki
+// o jeden pin przestawia tylną o jeden w tę samą stronę numeracji. Przednia zostaje na pinie,
+// na którym się pracuje (frontPin) - program jej nie przestawia. Tylny pin liczony od końca
+// tylnej wiertarki; za środkową dziurą (płytka formatka) - od końca przedniej (from 'przód').
+// Poza szyną od tyłu (bardzo głęboka formatka) - pin null (rcRearScrew: zderzak).
+// { pin, from, frontPin } albo nulle bez numerów w kalibracji.
 export function rcPinsFor(k, s) {
   const calibPin = Math.round(num(s.calibPin, 0));
   const calibFront = Math.round(num(s.calibFrontPin, num(s.frontPin, 0)));
-  if (!(calibPin > 0) || !(calibFront > 0)) return { pin: null, frontPin: null };
-  const diff = calibPin - calibFront - k;           // pin tylny − pin przedni dla tej głębokości
-  const ok = (p) => p >= 1 && p <= RC_RAIL_PINS;
-  const preferred = Math.round(num(s.frontPin, calibFront)) || calibFront;
-  const fronts = Array.from({ length: RC_RAIL_PINS }, (_, i) => i + 1)
-    .sort((a, b) => Math.abs(a - preferred) - Math.abs(b - preferred) || a - b);
-  const f = fronts.find((fp) => ok(fp + diff));
-  return f ? { pin: f + diff, frontPin: f } : { pin: null, frontPin: null };
+  if (!(calibPin > 0) || !(calibFront > 0)) return { pin: null, from: null, frontPin: null };
+  const front = Math.round(num(s.frontPin, calibFront)) || calibFront;
+  const n = calibPin + (front - calibFront) - k;    // numer od końca tylnej wiertarki (1…41)
+  if (n >= 1 && n <= RC_RAIL_PINS) return { pin: n, from: "tył", frontPin: front };
+  if (n > RC_RAIL_PINS && n <= RC_RAIL_HOLES) return { pin: RC_RAIL_HOLES + 1 - n, from: "przód", frontPin: front };
+  return { pin: null, from: null, frontPin: front };
 }
 
 // Siatka położeń tylnej wiertarki na pinach (mm od przodu formatki): { origin, step } albo
@@ -146,7 +151,6 @@ export function rcPinsFor(k, s) {
 // ale pomiar dał 5 mm więcej (średnica pinu / punkt styku), dlatego środek ma własną
 // kalibrację (calibMidX / calibMidPin); 106 mm zostaje tylko jako zapas bez pomiaru.
 export const RC_PIN_TO_BIT = 37;
-export const RC_RAIL_HOLES = 41; // 20 od tyłu + środkowy (21) + 20 od przodu
 const MID_SHIFT = 2 * RC_PIN_TO_BIT + RC_SPINDLE;
 
 const midCalibrated = (s) => num(s.calibMidX, 0) > 0 && num(s.calibMidPin, 0) > 0;

@@ -458,3 +458,16 @@ describe("kontrola projektu: prowadnica dłuższa niż szafka", () => {
     expect(validateProject().issues.some((i) => i.message.includes("prowadnica NL"))).toBe(false);
   });
 });
+
+describe("kontrola projektu: bok głębszy niż przyjmuje stół RC System", () => {
+  it("ostrzega tylko przy włączonym stole i boku > 650 mm", async () => {
+    const { validateProject } = await import("../core/validate.js");
+    const deep = baseModule({ dimensions: { width: 600, height: 720, depth: 700 } });
+    setProject(freshProject({ modules: [deep], rcSystem: { enabled: true } }));
+    expect(validateProject().issues.some((i) => i.message.includes("stół RC System"))).toBe(true);
+    setProject(freshProject({ modules: [deep] }));
+    expect(validateProject().issues.some((i) => i.message.includes("stół RC System"))).toBe(false);
+    setProject(freshProject({ modules: [baseModule()], rcSystem: { enabled: true } }));
+    expect(validateProject().issues.some((i) => i.message.includes("stół RC System"))).toBe(false);
+  });
+});

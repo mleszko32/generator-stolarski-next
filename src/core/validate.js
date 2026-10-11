@@ -14,6 +14,8 @@ import { computeWallLayouts } from "./walls.js";
 import { openingInstrumental, WALL_LOCATIVE } from "./openings.js";
 import { num } from "../utils/math.js";
 import { drawerSpec } from "./drawerSpec.js";
+import { getRcSettings, RC_MAX_DEPTH } from "./rcSystem.js";
+import { resolveBackPanel } from "./backPanel.js";
 import { checkBlindCorner, innerDims } from "./blindCorner.js";
 import { checkCornerFitting, getCornerFitting } from "./cornerFittings.js";
 import { cornerFrontIssues, footprintBoxes, passageIssues } from "./cornerChecks.js";
@@ -110,6 +112,11 @@ export function validateProject(project = state.project) {
     if (w <= 0 || h <= 0 || dep <= 0) {
       add("error", mod, "Ma zerowy lub niepoprawny wymiar (szerokość, wysokość lub głębokość).");
       return;
+    }
+    // Stół RC System przyjmuje formatki do RC_MAX_DEPTH - głębszego boku nie nawierci się na nim.
+    if (getRcSettings(project).enabled && mod.type !== "corner_cabinet") {
+      const sideDepth = resolveBackPanel(mod, project).type === "nut" ? dep : dep - num(project.materials && project.materials.backThickness, 3);
+      if (sideDepth > RC_MAX_DEPTH) add("warn", mod, `Bok ma ${Math.round(sideDepth)} mm głębokości - więcej niż ${RC_MAX_DEPTH} mm, które przyjmuje stół RC System; wierć poza stołem.`);
     }
     if (mod.type !== "corner_cabinet" && w < 100) {
       add("warn", mod, `Bardzo wąska (${Math.round(w)} mm) - sprawdź, czy to nie pomyłka w wymiarze.`);

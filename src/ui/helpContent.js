@@ -208,7 +208,9 @@ export const HELP_SECTIONS = [
         wpisz pin, na którym pracujesz, w „Pin przedniej
         wiertarki przy pracy”. Środkowe łączniki (głębokie boki) wierci tylna wiertarka przesunięta do przodu,
         przednią stroną do pinu (od pinu do wiertła 37 mm) - karta podaje numer pinu (np. bok 510 mm: 245/277 mm, pin 16 po stronie przedniej wiertarki). Szyna jest numerowana z obu końców,
-        więc karta zawsze mówi, po której stronie liczyć pin (ustawienie „Przednia wiertarka stoi”, domyślnie po lewej).</li>
+        więc karta zawsze mówi, po której stronie liczyć pin (ustawienie „Przednia wiertarka stoi”, domyślnie po lewej). Stół przyjmuje
+        formatki do 650 mm; przy bokach głębszych niż ok. 600 mm tylny pin wychodzi poza szynę - karta każe wtedy
+        dosunąć tylną wiertarkę zderzakiem (37 mm od tyłu).</li>
         <li><b>Rzuty ścian</b> - widok każdej ściany z szafkami i otworami.</li>
         <li><b>Blaty</b> - odcinki blatów i łączenia w narożnikach.</li>
         <li><b>Okucia i okleina</b> - lista zakupów (nóżki, łączniki, komplety szuflad, zawiasy, okleina w mb).</li>

@@ -79,7 +79,9 @@ wiertarka „pin” w szynie co 16 mm albo „zderzak” 37 mm, kalibracja: gł�
 pomiar z warsztatu: przednia pin 3, formatka 510 mm, tylna pin 7 → 470 mm od przodu = 40 mm od tyłu, `RC_DEFAULT_CALIB`;
 z numeru pinu przy pomiarze karta wiercenia podaje numer tylnego pinu dla każdej głębokości; pin przedniej wiertarki
 nie zmienia położenia otworów w mm - formatka przesuwa się razem z nią - tylko numer tylnego pinu: oba przesuwają się razem
-(różnica tylny − przedni stała dla danej głębokości, warsztat: 3/7 i 2/6), `rcPinsFor` dobiera inny pin przedni, gdy tylny nie mieści się na szynie 1…21); środkowe zestawy
+(różnica tylny − przedni stała dla danej głębokości, warsztat: 3/7 i 2/6), `rcPinsFor` nie przestawia przedniej; tylny pin za środkową dziurą liczony od strony przedniej wiertarki, a poza szyną
+od tyłu (formatki ok. > 600 mm) — tylna wiertarka zderzakiem, 37 mm od tyłu; stół przyjmuje formatki do `RC_MAX_DEPTH` = 650 mm,
+głębsze boki: ostrzeżenie na karcie wiercenia i w kontroli projektu); środkowe zestawy
 łączników wierci tylna wiertarka przesunięta do przodu, przednią stroną do pinu; od pinu do najbliższego wiertła jest
 z obu stron ok. 37 mm; środek ma własną kalibrację z pomiaru (formatka 510, przednia pin 3, środek pin 16 od przodu →
 245/277; z samej geometrii wychodziło 5 mm mniej) — `rcMidGrid` → `jointSetPositions(..., midGrid)`: wkręt na tylnym

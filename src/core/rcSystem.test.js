@@ -25,7 +25,7 @@ describe("stół RC System - tylny otwór łączników", () => {
 
   it("pin z kalibracją z warsztatu (510, pin 7 -> 470 od przodu = 40 od tyłu): najbliższy otwór szyny", () => {
     const s = { rearMode: "pin", calibDepth: 510, calibRear: 40, calibPin: 7, calibFrontPin: 3, frontPin: 3 };
-    expect(rcRearScrew(510, s)).toEqual({ x: 470, exact: true, pin: 7, frontPin: 3 }); // pomiar
+    expect(rcRearScrew(510, s)).toEqual({ x: 470, exact: true, pin: 7, from: "tył", frontPin: 3 }); // pomiar
     expect(rcRearScrew(521, s)).toMatchObject({ x: 486, pin: 6 });          // 35 od tyłu, pin 6 jak w warsztacie
     expect(rcRearScrew(320, s)).toMatchObject({ x: 278, pin: 19 });
     expect(rcRearScrew(560, s)).toMatchObject({ x: 518, pin: 4 });
@@ -33,14 +33,15 @@ describe("stół RC System - tylny otwór łączników", () => {
       const r = rcRearScrew(D, s);
       expect(D - r.x).toBeGreaterThanOrEqual(29);
       expect(D - r.x).toBeLessThanOrEqual(45);
+      if (r.stopFallback) { expect(D - r.x).toBe(37); continue; }        // poza szyną - zderzak
       expect(Math.abs((r.x - 470) % 16)).toBe(0);                          // zawsze na siatce szyny
-      if (r.pin !== null) expect(r.x).toBe(470 + ((7 - r.pin) - (3 - r.frontPin)) * 16);
+      if (r.from === "tył") expect(r.x).toBe(470 + ((7 - r.pin) - (3 - r.frontPin)) * 16);
     }
   });
 
   it("bez numeru pinu w kalibracji - samo położenie; pin spoza szyny -> null", () => {
     expect(rcRearScrew(510, { rearMode: "pin", calibDepth: 510, calibRear: 40 }).pin).toBeNull();
-    expect(rcRearScrew(1200, { rearMode: "pin", calibDepth: 510, calibRear: 40, calibPin: 7, calibFrontPin: 3 }).pin).toBeNull();
+    expect(rcRearScrew(1200, { rearMode: "pin", calibDepth: 510, calibRear: 40, calibPin: 7, calibFrontPin: 3 })).toMatchObject({ pin: null, stopFallback: true, x: 1163 });
   });
 
   it("domyślna kalibracja = pomiar z warsztatu; puste pola jej nie kasują; nadpisanie tylko gdy stół włączony", () => {
@@ -61,12 +62,12 @@ describe("stół RC System - tylny otwór łączników", () => {
     });
   });
 
-  it("gdy tylny pin nie mieści się na szynie, dobiera najbliższy pin przedni; za głęboka formatka - bez pinów", () => {
+  it("przednia zostaje na swoim pinie; płytka formatka - tylny pin po stronie przedniej; głęboka (do 650) - zderzak", () => {
     const s = { rearMode: "pin", calibDepth: 510, calibRear: 40, calibPin: 7, calibFrontPin: 3, frontPin: 3 };
-    expect(rcRearScrew(250, s)).toMatchObject({ frontPin: 1, pin: 21 });
-    expect(rcRearScrew(650, s)).toMatchObject({ frontPin: 6, pin: 1 });
-    expect(rcRearScrew(200, s)).toMatchObject({ pin: null, frontPin: null });
-    expect(rcPinsFor(0, { calibPin: 7 })).toEqual({ pin: null, frontPin: null }); // bez pinu przedniego w kalibracji
+    expect(rcRearScrew(250, s)).toMatchObject({ x: 214, frontPin: 3, pin: 19, from: "przód" });
+    expect(rcRearScrew(600, s)).toMatchObject({ x: 566, frontPin: 3, pin: 1, from: "tył" });
+    expect(rcRearScrew(650, s)).toMatchObject({ x: 613, frontPin: 3, pin: null, stopFallback: true });
+    expect(rcPinsFor(0, { calibPin: 7 })).toEqual({ pin: null, from: null, frontPin: null }); // bez pinu przedniego w kalibracji
   });
 
   it("zestawy łączników z tylnym otworem ze stołu; środkowe dalej w rastrze 32 od przodu", () => {

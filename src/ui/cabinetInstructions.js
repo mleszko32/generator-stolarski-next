@@ -20,7 +20,7 @@ import { cornerAssemblySVG, cornerStepsHtml } from "../render/cornerInstructions
 import { getSlopePanels, getSlopeConstruction } from "../engine/slopeDrillings.js";
 import { slopeAssemblySVG, slopeStepsHtml } from "../render/slopeInstructions2d.js";
 import { WORKSHOP_CSS } from "./drawerBoxDrawings.js";
-import { getRcSettings, rcPanelSetups, rcRearScrew, rcMidPinForX, rcPinSideText, RC_FRONT_STOP, RC_PIN_RANGE } from "../core/rcSystem.js";
+import { getRcSettings, rcPanelSetups, rcRearScrew, rcMidPinForX, rcPinSideText, RC_FRONT_STOP, RC_PIN_RANGE, RC_MAX_DEPTH } from "../core/rcSystem.js";
 
 const fmt = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
 const TYPE = { base_cabinet: "Szafka dolna", upper_cabinet: "Szafka wisząca", tall_cabinet: "Słupek", corner_cabinet: "Szafka narożna", slope_cabinet: "Szafka pod skos" };
@@ -44,6 +44,11 @@ function rcCardHtml(panels) {
     });
   });
   if (!rows.length) return "";
+  // Stół przyjmuje formatki do RC_MAX_DEPTH (650 mm) - głębszych boków nie da się na nim wiercić.
+  const tooDeep = vertical.filter((p) => (parseFloat(p.length) || 0) > RC_MAX_DEPTH);
+  const deepNote = tooDeep.length
+    ? `<p class="lead"><b>Uwaga:</b> ${tooDeep.map((p) => `${escapeHtml(p.name)} (${fmt(p.length)} mm)`).join(", ")} - głębiej niż ${RC_MAX_DEPTH} mm, nie zmieści się na stole RC System; wierć poza stołem.</p>`
+    : "";
   rows.sort((a, b) => a.st.dist - b.st.dist || a.st.ref.localeCompare(b.st.ref));
   const shotText = (row, shot, i, all) => {
     const pos = shot.map((v) => fmt(v)).join(" + ");
@@ -58,8 +63,9 @@ function rcCardHtml(panels) {
     if (i === all.length - 1 && all.length > 1) {
       const r = rcRearScrew(row.depth, rc);
       if (rc.rearMode === "stop") return `${pos}${pair} - tylna wiertarka zderzakiem do tylnej krawędzi`;
+      if (r.stopFallback) return `${pos}${pair} - tylna wiertarka <b>zderzakiem do tylnej krawędzi</b> (pin poza szyną) - 37 mm od tyłu`;
       return r.exact
-        ? `${pos}${pair} - tylna wiertarka, ${r.pin ? `<b>${rcPinSideText(r.pin, "tył", rc)}</b>` : "na pinie w szynie"} - ${fmt(row.depth - r.x)} mm od tyłu`
+        ? `${pos}${pair} - tylna wiertarka, ${r.pin ? `<b>${rcPinSideText(r.pin, r.from, rc)}</b>` : "na pinie w szynie"} - ${fmt(row.depth - r.x)} mm od tyłu`
         : `${pos}${pair} - tylna wiertarka na najbliższym pinie: otwór ${RC_PIN_RANGE[0]}–${RC_PIN_RANGE[1]} mm od tyłu - <b>sprawdź pierwszą sztukę</b> (dokładnie po kalibracji w hubie)`;
     }
     // Środkowe zestawy: tylna wiertarka przesunięta do przodu, przednią stroną do pinu
@@ -81,7 +87,8 @@ function rcCardHtml(panels) {
     return `<li><b>${escapeHtml(p.name)}</b> × ${p.qty}: ${L ? "czoła na końcach obu ramion" : "czoła lewe i prawe"}, w osi grubości, od przodu ${zs.map(fmt).join(" / ")} mm</li>`;
   }).join("");
   return `<h3>Wiercenie na stole RC System</h3>
-    <p class="muted">Ustawienia posortowane wg otworu bazowego - wierć wszystkie formatki z jednym ustawieniem, zanim przestawisz piny. Wkręt (Ø3) zawsze od strony krawędzi.</p>
+    ${deepNote}
+    <p class="muted">Ustawienia posortowane wg otworu bazowego- wierć wszystkie formatki z jednym ustawieniem, zanim przestawisz piny. Wkręt (Ø3) zawsze od strony krawędzi.</p>
     <table class="parts"><thead><tr><th>Ustawienie</th><th>Formatka</th><th>Pozycje wzdłuż krawędzi [mm]</th></tr></thead><tbody>${body}</tbody></table>
     ${edgeList ? `<p class="lead"><b>W czole</b> (nakładka do wiercenia w sztorcu + blaszki):</p><ul class="steps">${edgeList}</ul>` : ""}`;
 }
