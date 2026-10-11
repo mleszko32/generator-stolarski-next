@@ -185,6 +185,27 @@ export function rcMidPinForX(x, settings, depth = null) {
   return hit ? { pin: hit.pin, from: hit.from } : null;
 }
 
+// Krótki opis pinu na rysunki formatek: "pin 3 L", "pin 7 P", "zero P" (L / P = lewa / prawa strona
+// szyny, wg ustawienia frontSide). Dla otworu pod wkręt x mm od przodu formatki o głębokości
+// panelDepth: przedni zestaw (37) - pin przedniej wiertarki, tylny / środkowy - tylnej (pin za nią
+// albo przed nią), tylna zderzakiem - "zderzak". null: stół wyłączony, bez kalibracji albo x poza siatką.
+export function rcPinLabel(x, panelDepth, project) {
+  const s = getRcSettings(project);
+  if (!s.enabled || !isCalibrated(s)) return null;
+  const f = rcFrontPinFor(panelDepth, s);
+  if (f === null) return null;
+  const frontSide = s.frontSide === "prawa" ? "P" : "L";
+  const backSide = frontSide === "L" ? "P" : "L";
+  const short = (pin, from) => (Number(pin) === 0 ? "zero " : "pin " + pin + " ") + (from === "przód" ? frontSide : backSide);
+  const X = num(x);
+  if (Math.abs(X - RC_FRONT_STOP) < 0.05) return short(f, "przód");
+  const rear = rcRearScrew(panelDepth, s);
+  if (Math.abs(X - rear.x) < 0.05) return rear.pin !== null && rear.pin !== undefined ? short(rear.pin, rear.from) : "zderzak";
+  const hit = pinSetups(panelDepth, f, s, "back").find((c) => Math.abs(c.xb - X) < 0.05)
+    || pinSetups(panelDepth, f, s, "front").find((c) => Math.abs(c.xb - X) < 0.05);
+  return hit ? short(hit.pin, hit.from) : null;
+}
+
 // Czy stół zmienia położenie tylnego otworu (tylko gdy włączony i wynik jest pewny).
 export function rcRearOverride(depth, project) {
   const s = getRcSettings(project);

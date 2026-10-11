@@ -206,7 +206,9 @@ export const HELP_SECTIONS = [
         wierci tylna wiertarka przesunięta do przodu, przednią stroną do pinu (bok 510 mm: 245/277 mm, pin 16 po
         lewej). Dla głębokich formatek program sam schodzi z przednią wiertarką na niższy pin; stół przyjmuje
         formatki do 650 mm. Wpisz pin, na którym zwykle pracujesz, w „Pin przedniej wiertarki przy pracy”
-        (0 = do zera listwy bez pinu), a stronę stołu w „Przednia wiertarka stoi”.</li>
+        (0 = do zera listwy bez pinu), a stronę stołu w „Przednia wiertarka stoi”. Numery pinów są też na
+        rysunkach boków (rysunek 2D i instrukcja): nad każdym zestawem łączników np. „pin 3 L”, „pin 16 L”, „pin 7 P”
+        (L / P - lewa / prawa strona szyny).</li>
         <li><b>Rzuty ścian</b> - widok każdej ściany z szafkami i otworami.</li>
         <li><b>Blaty</b> - odcinki blatów i łączenia w narożnikach.</li>
         <li><b>Okucia i okleina</b> - lista zakupów (nóżki, łączniki, komplety szuflad, zawiasy, okleina w mb).</li>

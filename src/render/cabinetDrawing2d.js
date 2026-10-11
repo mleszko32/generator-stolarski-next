@@ -7,6 +7,8 @@
 // projekcie" (rzut pokoju z góry i widok ściany z podświetloną szafką).
 import { C, FONT } from "./drawingPalette.js";
 import { resolveBackPanel } from "../core/backPanel.js";
+import { rcPinLabel } from "../core/rcSystem.js";
+import { state } from "../core/state.js";
 import { escapeHtml } from "../utils/dom.js";
 import { cabinetHoleSpecs } from "../engine/cabinetDrillings.js";
 import { lPanelSVG, lPanelFrame } from "./cornerInstructions2d.js";
@@ -105,6 +107,14 @@ export function verticalPanelSVG(panel, startNo = 1, scale = null, side = null) 
   uniq(face.filter((h) => h.kind === "zawias").map((h) => h.hingeY)).forEach((hy) => {
     b += `<text x="${r1(X(37) + (rev ? -8 : 8) * u)}" y="${r1(Y(hy) + 4 * u)}" font-family="${FONT}" text-anchor="${rev ? "end" : "start"}">${dimText(hy, H, KIND.zawias.color)}</text>`;
   });
+
+  // Stół RC System: pin dla każdego zestawu łączników (core/rcSystem.js: rcPinLabel) nad formatką.
+  if (panel.kind === "bok" || panel.kind === "przegroda") {
+    uniq(face.filter((h) => h.kind === "wkret").map((h) => h.x)).forEach((x) => {
+      const lbl = rcPinLabel(x, L, state.project);
+      if (lbl) b += text(X(x), -30 * u, lbl, { size: 9, color: C.emerald600, weight: "bold" });
+    });
+  }
 
   // Odległości od przodu nad formatką.
   uniq(visible.filter((h) => h.edge !== "lewe" && h.edge !== "prawe").map((h) => h.x)).forEach((x, i) => {

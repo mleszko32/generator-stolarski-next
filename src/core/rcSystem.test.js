@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { baseAndPin, rcRearScrew, rcRearOverride, rcPanelSetups, getRcSettings, rcMidGrid, rcMidPinForX, rcPinSideText, rcRailLength, rcFrontPinFor } from "./rcSystem.js";
+import { baseAndPin, rcRearScrew, rcRearOverride, rcPanelSetups, getRcSettings, rcMidGrid, rcMidPinForX, rcPinSideText, rcRailLength, rcFrontPinFor, rcPinLabel } from "./rcSystem.js";
 import { jointSetPositions } from "../engine/carcaseParts.js";
 import { getCabinetPanels } from "../engine/cabinetDrillings.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
@@ -135,5 +135,16 @@ describe("stół RC System - strona szyny przy numerze pinu", () => {
     expect(rcPinSideText(7, "tył", s)).toBe("pin 7 po prawej (strona tylnej wiertarki)");
     expect(rcPinSideText(7, "tył", { frontSide: "prawa" })).toBe("pin 7 po lewej (strona tylnej wiertarki)");
     expect(rcPinSideText(0, "tył", s)).toBe("od zera prawej listwy, bez pinu (strona tylnej wiertarki)");
+  });
+});
+
+describe("stół RC System - opis pinu na rysunkach", () => {
+  it("krótkie opisy dla zestawów boku 510 i 650; wyłączony stół - brak", () => {
+    const p = { rcSystem: { enabled: true } };
+    expect([37, 277, 470].map((x) => rcPinLabel(x, 510, p))).toEqual(["pin 3 L", "pin 16 L", "pin 7 P"]);
+    expect([37, 614].map((x) => rcPinLabel(x, 650, p))).toEqual(["pin 1 L", "zero P"]);
+    expect(rcPinLabel(470, 510, { rcSystem: { enabled: true, frontSide: "prawa" } })).toBe("pin 7 L");
+    expect(rcPinLabel(470, 510, { rcSystem: { enabled: false } })).toBeNull();
+    expect(rcPinLabel(300, 510, p)).toBeNull();
   });
 });

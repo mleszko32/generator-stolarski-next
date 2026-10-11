@@ -7,6 +7,7 @@ import { state } from '../core/state.js';
 import { escapeHtml } from '../utils/dom.js';
 import { C, FONT, FONT_UI } from './drawingPalette.js';
 import { jointSetsFor, jointDepthOf } from '../engine/carcaseParts.js';
+import { rcPinLabel } from '../core/rcSystem.js';
 
 export const formatVal = (val) => Number(Number(val).toFixed(1));
 
@@ -374,6 +375,13 @@ function drawSideDetails(ctx) {
                        svg += `<circle cx="${panel.svgX + holeX}" cy="${sideH - calcY}" r="${r}" fill="${C.purple600}" />`;
                    });
                }
+               // Stół RC System: pin dla każdego zestawu łączników nad górną krawędzią boku
+               // (core/rcSystem.js: rcPinLabel - "pin 3 L", "pin 16 L", "pin 7 P").
+               const jd = jointDepthOf(mod, state.project);
+               jointSetsFor(mod, state.project, jd).forEach((set) => {
+                   const lbl = rcPinLabel(set.screw, jd, state.project);
+                   if (lbl) svg += `<text x="${getSvgX(set.screw)}" y="${panelDrawY - 8}" font-size="10" font-weight="bold" fill="${C.emerald600}" text-anchor="middle" font-family="${FONT}">${lbl}</text>`;
+               });
           }
 
           const sortedDrawerYs = Array.from(drawerYs).sort((a,b) => a - b);
