@@ -44,7 +44,7 @@ describe("stół RC System - tylny otwór łączników", () => {
   });
 
   it("domyślna kalibracja = pomiar z warsztatu; puste pola jej nie kasują; nadpisanie tylko gdy stół włączony", () => {
-    expect(getRcSettings({})).toMatchObject({ enabled: false, rearMode: "pin", calibDepth: 510, calibRear: 40, calibPin: 7, calibFrontPin: 3, frontPin: 3 });
+    expect(getRcSettings({})).toMatchObject({ enabled: false, rearMode: "pin", calibDepth: 510, calibRear: 40, calibPin: 7, calibFrontPin: 3, frontPin: 3, calibMidX: 277, calibMidPin: 16 });
     expect(getRcSettings({ rcSystem: { calibDepth: null, calibRear: "" } })).toMatchObject({ calibDepth: 510, calibRear: 40 });
     expect(rcRearOverride(510, { rcSystem: { enabled: false } })).toBeNull();
     expect(rcRearOverride(510, { rcSystem: { enabled: true } })).toBe(470);
@@ -95,20 +95,25 @@ describe("stół RC System - karta wiercenia boku", () => {
 
 describe("stół RC System - środkowe zestawy łączników", () => {
   // Warsztat: środkowe łączniki wierci tylna wiertarka przesunięta do przodu, przednią stroną do
-  // pinu; od pinu do wiertła zawsze 37 mm -> siatka środka przesunięta o 37 + 32 + 37 = 106 mm.
-  const grid = { origin: 576, step: 16 };
+  // pinu. Pomiar: formatka 510, przednia pin 3, środek pin 16 (od przodu) -> 245/277.
+  const grid = { origin: 277, step: 16 };
   const settings = getRcSettings({ rcSystem: { enabled: true } });
 
   it("siatka tylko przy włączonym i skalibrowanym stole", () => {
     expect(rcMidGrid({ rcSystem: { enabled: false } })).toBeNull();
     expect(rcMidGrid({ rcSystem: { enabled: true } })).toEqual(grid);
+    // bez pomiaru środka - zapas z geometrii (tylny 470 + 37 + 32 + 37)
+    expect(rcMidGrid({ rcSystem: { enabled: true, calibMidX: 0 } })).toEqual({ origin: 576, step: 16 });
   });
 
-  it("bok 510: środkowy zestaw 240/272 (pin 470 + 37 = 507, środek = pin + 37 / + 69), pin 16 od przodu", () => {
+  it("bok 510: środkowy zestaw 245/277 na pinie 16 od przodu - jak pomiar", () => {
     const sets = jointSetPositions(510, 250, 470, grid);
-    expect(sets).toEqual([{ screw: 37, dowel: 69 }, { screw: 272, dowel: 240 }, { screw: 470, dowel: 438 }]);
-    expect(rcMidPinForX(272, settings)).toEqual({ pin: 16, from: "przód" });
-    expect(rcMidPinForX(262, settings)).toBeNull();
+    expect(sets).toEqual([{ screw: 37, dowel: 69 }, { screw: 277, dowel: 245 }, { screw: 470, dowel: 438 }]);
+    expect(rcMidPinForX(277, settings)).toEqual({ pin: 16, from: "przód" });
+    expect(rcMidPinForX(293, settings)).toEqual({ pin: 17, from: "przód" });
+    expect(rcMidPinForX(272, settings)).toBeNull();
+    expect(rcMidPinForX(277, { ...settings, frontPin: 2 })).toEqual({ pin: 15, from: "przód" });
+    expect(rcMidPinForX(277, { ...settings, calibMidX: null, calibMidPin: null })).toBeNull();
   });
 
   it("tylny wkręt na pinie może wypaść bliżej tyłu niż 37 mm (521 -> 486, 35 od tyłu)", () => {

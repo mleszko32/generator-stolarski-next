@@ -207,7 +207,7 @@ export const HELP_SECTIONS = [
         zmienia położenia otworów - tylny pin przesuwa się razem z nim (przednia 2 zamiast 3 = tylna 6 zamiast 7);
         wpisz pin, na którym pracujesz, w „Pin przedniej
         wiertarki przy pracy”. Środkowe łączniki (głębokie boki) wierci tylna wiertarka przesunięta do przodu,
-        przednią stroną do pinu (od pinu do wiertła 37 mm) - karta podaje numer pinu (np. bok 510 mm: 240/272 mm, pin 16 od przodu).</li>
+        przednią stroną do pinu (od pinu do wiertła 37 mm) - karta podaje numer pinu (np. bok 510 mm: 245/277 mm, pin 16 od przodu).</li>
         <li><b>Rzuty ścian</b> - widok każdej ściany z szafkami i otworami.</li>
         <li><b>Blaty</b> - odcinki blatów i łączenia w narożnikach.</li>
         <li><b>Okucia i okleina</b> - lista zakupów (nóżki, łączniki, komplety szuflad, zawiasy, okleina w mb).</li>

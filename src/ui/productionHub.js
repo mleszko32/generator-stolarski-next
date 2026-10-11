@@ -424,7 +424,9 @@ function renderInstrukcje(el) {
       <div class="field"><label>Kalibracja: głębokość zmierzonego boku [mm]</label><input type="number" class="rc-f" data-k="calibDepth" value="${rc.calibDepth ?? ''}" placeholder="np. 510"></div>
       <div class="field"><label>Kalibracja: tylny wkręt od tylnej krawędzi [mm]</label><input type="number" class="rc-f" data-k="calibRear" value="${rc.calibRear ?? ''}" placeholder="np. 40" step="0.5"></div>
       <div class="field"><label>Kalibracja: pin tylnej wiertarki (od tyłu)</label><input type="number" class="rc-f" data-k="calibPin" value="${rc.calibPin ?? ''}" placeholder="np. 7" min="1" max="21"></div>
-      <div class="field"><label>Kalibracja: pin przedniej wiertarki</label><input type="number" class="rc-f" data-k="calibFrontPin" value="${rc.calibFrontPin ?? ''}" placeholder="np. 3" min="1" max="21"></div>` : ''}
+      <div class="field"><label>Kalibracja: pin przedniej wiertarki</label><input type="number" class="rc-f" data-k="calibFrontPin" value="${rc.calibFrontPin ?? ''}" placeholder="np. 3" min="1" max="21"></div>
+      <div class="field"><label>Kalibracja środka: pin (od przodu)</label><input type="number" class="rc-f" data-k="calibMidPin" value="${rc.calibMidPin ?? ''}" placeholder="np. 16" min="1" max="21"></div>
+      <div class="field"><label>Kalibracja środka: tylny otwór od przodu [mm]</label><input type="number" class="rc-f" data-k="calibMidX" value="${rc.calibMidX ?? ''}" placeholder="np. 277" step="0.5"></div>` : ''}
       <div class="field"><label>Pin przedniej wiertarki przy pracy</label><input type="number" class="rc-f" data-k="frontPin" value="${rc.frontPin ?? ''}" placeholder="np. 3" min="1" max="21"></div>` : ''}
     </div>
     ${rc.enabled && rc.rearMode === 'pin' && !(rc.calibDepth > 0 && rc.calibRear > 0) ? '<p class="notice-warn fs-xs">Bez kalibracji tylny otwór łączników wypada 29–45 mm od tyłu (najbliższy pin szyny) - rysunki pokazują 37 mm, a karta wiercenia każe sprawdzić pierwszą sztukę. Zmierz raz jeden bok i wpisz dwie liczby wyżej.</p>' : ''}

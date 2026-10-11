@@ -57,7 +57,10 @@ export const RC_SPINDLE = 32;            // rozstaw wrzecion wiertarki
 // wypada na tej samej siatce co 16 mm od przodu formatki. Zmienia się tylko numer tylnego
 // pinu - oba przesuwają się razem: dla danej głębokości różnica (pin tylny − pin przedni)
 // jest stała (warsztat: 510 mm -> przednia 3 / tylna 7, przednia 2 / tylna 6).
-export const RC_DEFAULT_CALIB = { calibDepth: 510, calibRear: 40, calibPin: 7, calibFrontPin: 3, frontPin: 3 };
+// calibMidX / calibMidPin - pomiar środkowego zestawu: tylne wiertło (wkręt) calibMidX mm od
+// przodu formatki przy tylnej wiertarce opartej przednią stroną o pin calibMidPin, liczony od
+// PRZEDNIEGO końca szyny (warsztat: formatka 510, przednia pin 3, środek pin 16 -> 245/277).
+export const RC_DEFAULT_CALIB = { calibDepth: 510, calibRear: 40, calibPin: 7, calibFrontPin: 3, frontPin: 3, calibMidX: 277, calibMidPin: 16 };
 export const RC_RAIL_PINS = 21; // otwory 1…20 od każdego końca + nienumerowany środkowy (21)
 const DEFAULTS = { enabled: false, rearMode: "pin", ...RC_DEFAULT_CALIB };
 // Zakres, w którym może wypaść tylny otwór na pinie (najbliższy otwór szyny co 16 mm).
@@ -127,35 +130,39 @@ export function rcPinsFor(k, s) {
 // łączników, wiercone tylną wiertarką przesuniętą do przodu.
 //
 // Geometria (warsztat): wiertarka dotyka pinu jedną albo drugą stroną, a od pinu do
-// najbliższego wiertła jest zawsze 37 mm. Tylny zestaw - pin ZA wiertarką: tylne wiertło =
-// pin − 37. Środkowy zestaw - wiertarka przesunięta do przodu, pin PRZED nią: przednie
-// wiertło = pin + 37, tylne = pin + 37 + 32. Środkowa siatka jest więc przesunięta względem
-// tylnej o 37 + 32 + 37 = 106 mm (wkręt na tylnym wrzecionie, jak w tylnym zestawie).
+// najbliższego wiertła jest 37 mm. Tylny zestaw - pin ZA wiertarką; środkowy - wiertarka
+// przesunięta do przodu, pin PRZED nią (wkręt na tylnym wrzecionie, jak w tylnym zestawie).
+// Z samej geometrii środkowa siatka byłaby przesunięta o 37 + 32 + 37 = 106 mm względem tylnej,
+// ale pomiar dał 5 mm więcej (średnica pinu / punkt styku), dlatego środek ma własną
+// kalibrację (calibMidX / calibMidPin); 106 mm zostaje tylko jako zapas bez pomiaru.
 export const RC_PIN_TO_BIT = 37;
 export const RC_RAIL_HOLES = 41; // 20 od tyłu + środkowy (21) + 20 od przodu
 const MID_SHIFT = 2 * RC_PIN_TO_BIT + RC_SPINDLE;
 
+const midCalibrated = (s) => num(s.calibMidX, 0) > 0 && num(s.calibMidPin, 0) > 0;
+
 export function rcMidGrid(project) {
   const s = getRcSettings(project);
   if (!s.enabled || !isCalibrated(s)) return null;
-  return { origin: num(s.calibDepth) - num(s.calibRear) + MID_SHIFT, step: RC_RAIL_STEP };
+  const origin = midCalibrated(s) ? num(s.calibMidX) : num(s.calibDepth) - num(s.calibRear) + MID_SHIFT;
+  return { origin, step: RC_RAIL_STEP };
 }
 
 // Pin dla środkowego zestawu, którego tylne wiertło (wkręt) jest x mm od przodu formatki.
-// { pin, from: 'tył' | 'przód' } - numer liczony od tylnego końca szyny, a za środkową dziurą
-// (21) od przedniego końca; null, gdy x nie leży na siatce albo poza szyną.
+// { pin, from: 'przód' | 'tył' } - numer liczony od PRZEDNIEGO końca szyny (jak w pomiarze),
+// a za środkową dziurą (21) od tylnego; null, gdy x nie leży na siatce, poza szyną albo bez
+// kalibracji środka. Wyższy numer od przodu = wiertarka dalej od przodu = +16 mm; przestawienie
+// przedniej wiertarki o pin przestawia środkowy o pin w tę samą stronę (jak tylny).
 export function rcMidPinForX(x, settings) {
   const s = settings || DEFAULTS;
-  const calibPin = Math.round(num(s.calibPin, 0));
   const calibFront = Math.round(num(s.calibFrontPin, num(s.frontPin, 0)));
-  if (!isCalibrated(s) || !(calibPin > 0) || !(calibFront > 0)) return null;
-  const k = (num(x) - (num(s.calibDepth) - num(s.calibRear) + MID_SHIFT)) / RC_RAIL_STEP;
+  if (!midCalibrated(s) || !(calibFront > 0)) return null;
+  const k = (num(x) - num(s.calibMidX)) / RC_RAIL_STEP;
   if (Math.abs(k - Math.round(k)) > 0.01) return null;
   const front = Math.round(num(s.frontPin, calibFront)) || calibFront;
-  // Ta sama zasada co tylny pin (rcPinsFor): pin tylny − pin przedni stały dla położenia.
-  const n = calibPin + (front - calibFront) - Math.round(k);
-  if (n >= 1 && n <= RC_RAIL_PINS) return { pin: n, from: "tył" };
-  if (n > RC_RAIL_PINS && n <= RC_RAIL_HOLES) return { pin: RC_RAIL_HOLES + 1 - n, from: "przód" };
+  const m = Math.round(num(s.calibMidPin)) + (front - calibFront) + Math.round(k);
+  if (m >= 1 && m <= RC_RAIL_PINS) return { pin: m, from: "przód" };
+  if (m > RC_RAIL_PINS && m <= RC_RAIL_HOLES) return { pin: RC_RAIL_HOLES + 1 - m, from: "tył" };
   return null;
 }
 
