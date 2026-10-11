@@ -204,7 +204,8 @@ export const HELP_SECTIONS = [
         (29–45 mm od tyłu). Kalibracja stołu z warsztatu (przednia pin 3, formatka 510 mm, tylna pin 7 → 40 mm
         od tyłu) jest wpisana domyślnie; karta wiercenia podaje numer tylnego pinu dla każdej głębokości, a pod
         ustawieniami widać przykłady (np. 521 mm → pin 6). Przestawienie przedniej wiertarki na inny pin nie
-        zmienia położenia otworów, tylko numer tylnego pinu - wpisz pin, na którym pracujesz, w „Pin przedniej
+        zmienia położenia otworów - tylny pin przesuwa się razem z nim (przednia 2 zamiast 3 = tylna 6 zamiast 7);
+        wpisz pin, na którym pracujesz, w „Pin przedniej
         wiertarki przy pracy”.</li>
         <li><b>Rzuty ścian</b> - widok każdej ściany z szafkami i otworami.</li>
         <li><b>Blaty</b> - odcinki blatów i łączenia w narożnikach.</li>

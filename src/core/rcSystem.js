@@ -55,7 +55,8 @@ export const RC_SPINDLE = 32;            // rozstaw wrzecion wiertarki
 // Pin przedniej wiertarki NIE zmienia położenia otworów w mm: formatka bazuje przodem o
 // zderzak przedniej wiertarki, więc przesuwa się razem z nią o pełne 16 mm i tylny otwór
 // wypada na tej samej siatce co 16 mm od przodu formatki. Zmienia się tylko numer tylnego
-// pinu - dla danej głębokości suma (pin przedni + pin tylny) jest stała.
+// pinu - oba przesuwają się razem: dla danej głębokości różnica (pin tylny − pin przedni)
+// jest stała (warsztat: 510 mm -> przednia 3 / tylna 7, przednia 2 / tylna 6).
 export const RC_DEFAULT_CALIB = { calibDepth: 510, calibRear: 40, calibPin: 7, calibFrontPin: 3, frontPin: 3 };
 export const RC_RAIL_PINS = 21; // otwory 1…20 od każdego końca + nienumerowany środkowy (21)
 const DEFAULTS = { enabled: false, rearMode: "pin", ...RC_DEFAULT_CALIB };
@@ -102,22 +103,22 @@ export function rcRearScrew(depth, settings) {
   return { x: round1(D - RC_FRONT_STOP), exact: false, range: RC_PIN_RANGE };
 }
 
-// Numery pinów dla otworu przesuniętego o k oczek szyny względem pomiaru. Tylna wiertarka
-// bliżej przodu = wyższy numer od tyłu; przednia wiertarka dalej od przodu (wyższy numer) =
-// formatka bliżej tyłu = niższy numer tylnego pinu. Gdy przy pinie przednim, na którym się
+// Numery pinów dla otworu przesuniętego o k oczek szyny względem pomiaru (tylny otwór o
+// 16 mm bliżej tyłu formatki = tylny pin o 1 niżej). Przestawienie przedniej wiertarki o
+// jeden pin przestawia tylną o jeden w tę samą stronę numeracji. Gdy przy pinie przednim, na którym się
 // pracuje, tylny nie mieści się na szynie (bardzo płytka / głęboka formatka), bierzemy
 // najbliższy pin przedni, przy którym się mieści. { pin, frontPin } albo nulle bez numerów w kalibracji.
 export function rcPinsFor(k, s) {
   const calibPin = Math.round(num(s.calibPin, 0));
   const calibFront = Math.round(num(s.calibFrontPin, num(s.frontPin, 0)));
   if (!(calibPin > 0) || !(calibFront > 0)) return { pin: null, frontPin: null };
-  const sum = calibPin + calibFront - k;            // pin przedni + pin tylny dla tej głębokości
+  const diff = calibPin - calibFront - k;           // pin tylny − pin przedni dla tej głębokości
   const ok = (p) => p >= 1 && p <= RC_RAIL_PINS;
   const preferred = Math.round(num(s.frontPin, calibFront)) || calibFront;
   const fronts = Array.from({ length: RC_RAIL_PINS }, (_, i) => i + 1)
     .sort((a, b) => Math.abs(a - preferred) - Math.abs(b - preferred) || a - b);
-  const f = fronts.find((fp) => ok(sum - fp));
-  return f ? { pin: sum - f, frontPin: f } : { pin: null, frontPin: null };
+  const f = fronts.find((fp) => ok(fp + diff));
+  return f ? { pin: f + diff, frontPin: f } : { pin: null, frontPin: null };
 }
 
 // Czy stół zmienia położenie tylnego otworu (tylko gdy włączony i wynik jest pewny).

@@ -34,7 +34,7 @@ describe("stół RC System - tylny otwór łączników", () => {
       expect(D - r.x).toBeGreaterThanOrEqual(29);
       expect(D - r.x).toBeLessThanOrEqual(45);
       expect(Math.abs((r.x - 470) % 16)).toBe(0);                          // zawsze na siatce szyny
-      if (r.pin !== null) expect(r.x).toBe(470 + ((3 - r.frontPin) + (7 - r.pin)) * 16);
+      if (r.pin !== null) expect(r.x).toBe(470 + ((7 - r.pin) - (3 - r.frontPin)) * 16);
     }
   });
 
@@ -51,20 +51,21 @@ describe("stół RC System - tylny otwór łączników", () => {
     expect(rcRearOverride(510, { rcSystem: { enabled: true, rearMode: "stop" } })).toBe(473);
   });
 
-  it("pin przedniej wiertarki nie zmienia położenia otworów, tylko numer tylnego pinu (suma stała)", () => {
+  it("pin przedniej wiertarki nie zmienia położenia otworów; tylny przesuwa się razem z nim (warsztat: 3/7, 2/6)", () => {
     const base = { rearMode: "pin", calibDepth: 510, calibRear: 40, calibPin: 7, calibFrontPin: 3 };
     [2, 3, 5].forEach((fp) => {
       const r = rcRearScrew(510, { ...base, frontPin: fp });
       expect(r.x).toBe(470);
-      expect(r.frontPin + r.pin).toBe(10);
+      expect(r.pin - r.frontPin).toBe(4);
       expect(r.frontPin).toBe(fp);
     });
   });
 
   it("gdy tylny pin nie mieści się na szynie, dobiera najbliższy pin przedni; za głęboka formatka - bez pinów", () => {
     const s = { rearMode: "pin", calibDepth: 510, calibRear: 40, calibPin: 7, calibFrontPin: 3, frontPin: 3 };
-    expect(rcRearScrew(250, s)).toMatchObject({ frontPin: 5, pin: 21 });
-    expect(rcRearScrew(650, s)).toMatchObject({ pin: null, frontPin: null });
+    expect(rcRearScrew(250, s)).toMatchObject({ frontPin: 1, pin: 21 });
+    expect(rcRearScrew(650, s)).toMatchObject({ frontPin: 6, pin: 1 });
+    expect(rcRearScrew(200, s)).toMatchObject({ pin: null, frontPin: null });
     expect(rcPinsFor(0, { calibPin: 7 })).toEqual({ pin: null, frontPin: null }); // bez pinu przedniego w kalibracji
   });
 
