@@ -13,12 +13,14 @@
 //   otwory co 32 mm jednym ruchem (wiertło pod wkręt zawsze od strony krawędzi);
 // - tylna wiertarka: albo zderzakiem do tylnej krawędzi (otwór 37 mm od tyłu, jak na
 //   filmach producenta), albo zablokowana pinem w numerowanym otworze szyny - otwory szyny
-//   są co 16 mm, więc tylny otwór wypada 37…52 mm od tyłu (najbliższy pin w stronę
-//   formatki). Producent nie podaje, gdzie jest zero szyny, dlatego dokładne położenie
-//   wymaga jednego pomiaru (kalibracja: głębokość formatki + odległość tylnego otworu od tyłu).
+//   są co 16 mm, więc wiertarka staje w NAJBLIŻSZYM otworze szyny i tylny otwór wypada
+//   37 ± 8 mm od tyłu (29…45), zależnie od głębokości formatki. Producent nie podaje, gdzie
+//   jest zero szyny, dlatego dokładne położenie wymaga jednego pomiaru (kalibracja:
+//   głębokość formatki + odległość tylnego otworu od tyłu).
 // Potwierdzone w warsztacie: formatka zawsze bazuje przodem o zderzak przedniej wiertarki
-// (37 mm od przodu); tylną można dosunąć zderzakiem (37 od tyłu) albo zablokować pinem -
-// wtedy przesuwa się o kilka mm i otwór wypada dalej od tyłu, zależnie od głębokości.
+// (37 mm od przodu); tylną można dosunąć zderzakiem (37 od tyłu) albo zablokować pinem.
+// Pomiar stołu z warsztatu (domyślna kalibracja): formatka 521 mm, tylna wiertarka na
+// pinie 6 -> tylny otwór 34 mm od tyłu (najbliższy pin wypadł bliżej tyłu niż zderzak).
 import { num, round1 } from "../utils/math.js";
 
 // Otwory bazowe w blacie (mm od osi wiertła do krawędzi formatki) i ich zastosowanie wg producenta.
@@ -44,14 +46,21 @@ export const RC_RAIL_STEP = 16;          // rozstaw otworów w szynie - potwierd
 export const RC_FRONT_STOP = 37;         // zderzak przy przedniej wiertarce
 export const RC_SPINDLE = 32;            // rozstaw wrzecion wiertarki
 
-const DEFAULTS = { enabled: false, rearMode: "pin", calibDepth: null, calibRear: null };
+// Kalibracja domyślna = pomiar stołu z warsztatu (patrz wyżej); w projekcie można ją zmienić.
+export const RC_DEFAULT_CALIB = { calibDepth: 521, calibRear: 34 };
+const DEFAULTS = { enabled: false, rearMode: "pin", ...RC_DEFAULT_CALIB };
+// Zakres, w którym może wypaść tylny otwór na pinie (najbliższy otwór szyny co 16 mm).
+export const RC_PIN_RANGE = [RC_FRONT_STOP - RC_RAIL_STEP / 2, RC_FRONT_STOP + RC_RAIL_STEP / 2];
 
 export function getRcSettings(project) {
-  const s = { ...DEFAULTS, ...((project && project.rcSystem) || {}) };
+  const own = (project && project.rcSystem) || {};
+  const s = { ...DEFAULTS };
+  // Puste pola (null / "") nie kasują domyślnej kalibracji.
+  Object.keys(own).forEach((k) => { if (own[k] !== null && own[k] !== undefined && own[k] !== "") s[k] = own[k]; });
   if (s.rearMode !== "stop") s.rearMode = "pin";
   return s;
 }
-const isCalibrated = (s) => num(s.calibDepth, 0) > 0 && num(s.calibRear, 0) >= RC_FRONT_STOP;
+const isCalibrated = (s) => num(s.calibDepth, 0) > 0 && num(s.calibRear, 0) > 0;
 
 // Ustawienie odległości od krawędzi: otwór bazowy + pin. Najpierw pin neutralny, potem
 // najmniejszy dodatni. null, gdy żadna kombinacja nie daje tej odległości (np. 69 mm).
@@ -68,19 +77,19 @@ export const baseText = (bp) => (bp ? `otwór ${String(bp.base).replace(".", ","
 // Położenie tylnego wkrętu łączników (mm od przodu formatki o głębokości `depth`) przy pracy
 // na stole. { x, exact, range? }:
 // - zderzak do krawędzi: depth - 37, dokładnie;
-// - pin z kalibracją: siatka co 16 mm wyznaczona pomiarem, najbliższa pozycja w stronę
-//   formatki (otwór co najmniej 37 mm od tyłu);
-// - pin bez kalibracji: depth - 37 jako położenie robocze + zakres 37…52 mm od tyłu.
+// - pin z kalibracją: siatka co 16 mm wyznaczona pomiarem, pozycja najbliższa 37 mm od tyłu
+//   (przy remisie dalej od tyłu);
+// - pin bez kalibracji: depth - 37 jako położenie robocze + zakres 29…45 mm od tyłu.
 export function rcRearScrew(depth, settings) {
   const D = num(depth);
   const s = settings || DEFAULTS;
   if (s.rearMode === "stop") return { x: round1(D - RC_FRONT_STOP), exact: true };
   if (isCalibrated(s)) {
     const x0 = num(s.calibDepth) - num(s.calibRear);
-    const k = Math.floor((D - RC_FRONT_STOP - x0) / RC_RAIL_STEP);
+    const k = Math.ceil((D - RC_FRONT_STOP - x0) / RC_RAIL_STEP - 0.5);
     return { x: round1(x0 + k * RC_RAIL_STEP), exact: true };
   }
-  return { x: round1(D - RC_FRONT_STOP), exact: false, range: [RC_FRONT_STOP, RC_FRONT_STOP + RC_RAIL_STEP - 1] };
+  return { x: round1(D - RC_FRONT_STOP), exact: false, range: RC_PIN_RANGE };
 }
 
 // Czy stół zmienia położenie tylnego otworu (tylko gdy włączony i wynik jest pewny).

@@ -200,8 +200,9 @@ export const HELP_SECTIONS = [
         <li><b>Instrukcje montażu</b> - kolejność składania i rysunki każdej szafki. Po zaznaczeniu
         „Wiercę na stole RC System” dochodzi karta wiercenia (krawędź do pinów, otwór bazowy z pinem, pozycje
         otworów). Przód formatki zawsze do zderzaka przedniej wiertarki (37 mm). Tylna wiertarka: zderzakiem do
-        tylnej krawędzi (37 mm od tyłu) albo na pinie w szynie - wtedy wpisz raz kalibrację (głębokość boku +
-        zmierzona odległość tylnego otworu od tyłu), a program policzy położenie dla każdej głębokości.</li>
+        tylnej krawędzi (37 mm od tyłu) albo na pinie w szynie - wtedy otwór wypada w najbliższym otworze szyny
+        (29–45 mm od tyłu). Kalibracja stołu z warsztatu (formatka 521 mm → 34 mm od tyłu) jest wpisana domyślnie;
+        pod ustawieniami widać, gdzie wypada tylny otwór dla typowych głębokości.</li>
         <li><b>Rzuty ścian</b> - widok każdej ściany z szafkami i otworami.</li>
         <li><b>Blaty</b> - odcinki blatów i łączenia w narożnikach.</li>
         <li><b>Okucia i okleina</b> - lista zakupów (nóżki, łączniki, komplety szuflad, zawiasy, okleina w mb).</li>

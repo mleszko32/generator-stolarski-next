@@ -19,29 +19,31 @@ describe("stół RC System - tylny otwór łączników", () => {
     expect(rcRearScrew(510, { rearMode: "stop" })).toEqual({ x: 473, exact: true });
   });
 
-  it("pin bez kalibracji: położenie robocze 37 od tyłu + zakres 37…52", () => {
-    expect(rcRearScrew(510, { rearMode: "pin" })).toEqual({ x: 473, exact: false, range: [37, 52] });
+  it("pin bez kalibracji: położenie robocze 37 od tyłu + zakres najbliższego pinu 29…45", () => {
+    expect(rcRearScrew(510, { rearMode: "pin" })).toEqual({ x: 473, exact: false, range: [29, 45] });
   });
 
-  it("pin z kalibracją (bok 510 -> 45 od tyłu): siatka co 16 mm, zawsze co najmniej 37 od tyłu", () => {
-    const s = { rearMode: "pin", calibDepth: 510, calibRear: 45 };
-    expect(rcRearScrew(510, s).x).toBe(465);                    // 45 od tyłu
-    expect(526 - rcRearScrew(526, s).x).toBe(45);               // +16 mm głębokości -> ta sama odległość od tyłu
-    const r560 = 560 - rcRearScrew(560, s).x;
-    expect(r560).toBeGreaterThanOrEqual(37);
-    expect(r560).toBeLessThan(53);
-    [320, 400, 513, 600].forEach((D) => {
+  it("pin z kalibracją z warsztatu (521 -> 34 od tyłu): najbliższy otwór szyny co 16 mm", () => {
+    const s = { rearMode: "pin", calibDepth: 521, calibRear: 34 };
+    expect(rcRearScrew(521, s).x).toBe(487);                    // 34 od tyłu - pomiar
+    expect(510 - rcRearScrew(510, s).x).toBe(39);
+    expect(560 - rcRearScrew(560, s).x).toBe(41);
+    expect(320 - rcRearScrew(320, s).x).toBe(41);
+    expect(537 - rcRearScrew(537, s).x).toBe(34);               // +16 mm głębokości -> ta sama odległość od tyłu
+    for (let D = 300; D <= 650; D++) {
       const r = D - rcRearScrew(D, s).x;
-      expect(r).toBeGreaterThanOrEqual(37);
-      expect(r).toBeLessThan(53);
-    });
+      expect(r).toBeGreaterThanOrEqual(29);
+      expect(r).toBeLessThanOrEqual(45);
+      expect(Math.abs((rcRearScrew(D, s).x - 487) % 16)).toBe(0); // zawsze na siatce szyny
+    }
   });
 
-  it("nadpisanie tylko gdy stół włączony i wynik pewny", () => {
-    expect(rcRearOverride(510, { rcSystem: { enabled: false, rearMode: "stop" } })).toBeNull();
-    expect(rcRearOverride(510, { rcSystem: { enabled: true, rearMode: "pin" } })).toBeNull();
-    expect(rcRearOverride(510, { rcSystem: { enabled: true, rearMode: "pin", calibDepth: 510, calibRear: 45 } })).toBe(465);
-    expect(getRcSettings({}).rearMode).toBe("pin");
+  it("domyślna kalibracja = pomiar z warsztatu; puste pola jej nie kasują; nadpisanie tylko gdy stół włączony", () => {
+    expect(getRcSettings({})).toMatchObject({ enabled: false, rearMode: "pin", calibDepth: 521, calibRear: 34 });
+    expect(getRcSettings({ rcSystem: { calibDepth: null, calibRear: "" } })).toMatchObject({ calibDepth: 521, calibRear: 34 });
+    expect(rcRearOverride(510, { rcSystem: { enabled: false } })).toBeNull();
+    expect(rcRearOverride(510, { rcSystem: { enabled: true } })).toBe(471);
+    expect(rcRearOverride(510, { rcSystem: { enabled: true, rearMode: "stop" } })).toBe(473);
   });
 
   it("zestawy łączników z tylnym otworem ze stołu; środkowe dalej w rastrze 32 od przodu", () => {

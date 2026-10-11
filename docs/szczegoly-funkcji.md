@@ -75,8 +75,9 @@ karty. Lista okuć liczy złącza skosu z otworów (dno, skos, półki stałe) z
 
 **Stół RC System** (rcsystem.pl, ręczny stół do nawiercania): `core/rcSystem.js` (czyste, z testami) — otwory bazowe
 w blacie (`RC_BASES`, mm od osi wiertła) + piny +0,5…+2 (`baseAndPin`), ustawienia `project.rcSystem` (włączony, tylna
-wiertarka „pin” w szynie co 16 mm albo „zderzak” 37 mm, kalibracja: głębokość boku + tylny otwór od tyłu) i
-`rcRearScrew` — położenie tylnego wkrętu; gdy pewne (zderzak / pin po kalibracji), `jointSetsFor` w `carcaseParts.js`
+wiertarka „pin” w szynie co 16 mm albo „zderzak” 37 mm, kalibracja: głębokość boku + tylny otwór od tyłu; domyślnie
+pomiar z warsztatu 521 mm → 34 mm, `RC_DEFAULT_CALIB`) i
+`rcRearScrew` — położenie tylnego wkrętu (na pinie: najbliższy otwór szyny, czyli 37 ± 8 mm od tyłu, 29…45); gdy pewne (zderzak / pin po kalibracji), `jointSetsFor` w `carcaseParts.js`
 przesuwa tylny zestaw łączników wszędzie (rysunek 2D, instrukcje, okucia). `rcPanelSetups` grupuje otwory boku wg
 ustawienia (krawędź do pinów + otwór bazowy, pozycje wzdłuż, pary co 32 mm = jedno wiercenie) — karta „Wiercenie na
 stole RC System” w instrukcji szafki, ustawienia w hubie „Instrukcje montażu”. Łączniki wieńców / półek stałych liczą

@@ -31,7 +31,7 @@ import { mountKosztorys } from "./kosztorysModal.js";
 import { collectDrawerBoxes, getDrawerBoxSettings, JOIN_METHODS, LAMELLO } from "../core/drawerBoxBuild.js";
 import { openDrawerBoxDrawings } from "./drawerBoxDrawings.js";
 import { openCabinetInstructions, supportsInstructions } from "./cabinetInstructions.js";
-import { getRcSettings } from "../core/rcSystem.js";
+import { getRcSettings, rcRearScrew } from "../core/rcSystem.js";
 
 const SECTIONS = [
   { id: 'formatki', label: 'Formatki', icon: 'ti-list-details' },
@@ -424,7 +424,8 @@ function renderInstrukcje(el) {
       <div class="field"><label>Kalibracja: głębokość zmierzonego boku [mm]</label><input type="number" class="rc-f" data-k="calibDepth" value="${rc.calibDepth ?? ''}" placeholder="np. 510"></div>
       <div class="field"><label>Kalibracja: tylny wkręt od tylnej krawędzi [mm]</label><input type="number" class="rc-f" data-k="calibRear" value="${rc.calibRear ?? ''}" placeholder="np. 45" step="0.5"></div>` : ''}` : ''}
     </div>
-    ${rc.enabled && rc.rearMode === 'pin' && !(rc.calibDepth > 0 && rc.calibRear >= 37) ? '<p class="notice-warn fs-xs">Bez kalibracji tylny otwór łączników wypada 37–52 mm od tyłu (najbliższy pin szyny w stronę formatki) - rysunki pokazują 37 mm, a karta wiercenia każe sprawdzić pierwszą sztukę. Zmierz raz jeden bok i wpisz dwie liczby wyżej.</p>' : ''}
+    ${rc.enabled && rc.rearMode === 'pin' && !(rc.calibDepth > 0 && rc.calibRear > 0) ? '<p class="notice-warn fs-xs">Bez kalibracji tylny otwór łączników wypada 29–45 mm od tyłu (najbliższy pin szyny) - rysunki pokazują 37 mm, a karta wiercenia każe sprawdzić pierwszą sztukę. Zmierz raz jeden bok i wpisz dwie liczby wyżej.</p>' : ''}
+    ${rc.enabled && rc.rearMode === 'pin' && rc.calibDepth > 0 && rc.calibRear > 0 ? `<p class="hub-sub">Tylny otwór na pinie (kalibracja ${rc.calibDepth} mm → ${rc.calibRear} mm od tyłu): ${[320, 510, 521, 560].map((D) => `${D} mm → ${Math.round((D - rcRearScrew(D, rc).x) * 10) / 10} mm od tyłu`).join(', ')}.</p>` : ''}
     ${mods.length === 0 ? '<p class="hub-empty">Projekt nie ma jeszcze szafek.</p>' : `
     <table class="hub-table">
       <thead><tr><th>Szafka</th><th>Wymiary</th><th></th></tr></thead>
