@@ -20,7 +20,7 @@ import { cornerAssemblySVG, cornerStepsHtml } from "../render/cornerInstructions
 import { getSlopePanels, getSlopeConstruction } from "../engine/slopeDrillings.js";
 import { slopeAssemblySVG, slopeStepsHtml } from "../render/slopeInstructions2d.js";
 import { WORKSHOP_CSS } from "./drawerBoxDrawings.js";
-import { getRcSettings, rcPanelSetups, rcRearScrew, RC_FRONT_STOP, RC_PIN_RANGE } from "../core/rcSystem.js";
+import { getRcSettings, rcPanelSetups, rcRearScrew, rcPinsForX, RC_FRONT_STOP, RC_PIN_RANGE } from "../core/rcSystem.js";
 
 const fmt = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
 const TYPE = { base_cabinet: "Szafka dolna", upper_cabinet: "Szafka wisząca", tall_cabinet: "Słupek", corner_cabinet: "Szafka narożna", slope_cabinet: "Szafka pod skos" };
@@ -62,7 +62,11 @@ function rcCardHtml(panels) {
         ? `${pos}${pair} - tylna wiertarka na ${r.pin ? `<b>pinie ${r.pin}</b> (od tyłu)` : "pinie w szynie"} - ${fmt(row.depth - r.x)} mm od tyłu`
         : `${pos}${pair} - tylna wiertarka na najbliższym pinie: otwór ${RC_PIN_RANGE[0]}–${RC_PIN_RANGE[1]} mm od tyłu - <b>sprawdź pierwszą sztukę</b> (dokładnie po kalibracji w hubie)`;
     }
-    return `${pos}${pair} - wiertarka zablokowana pinem w szynie (${fmt(shot[0])} mm od przodu)`;
+    // Środkowe zestawy: tylna wiertarka przesunięta do przodu i zablokowana pinem (wkręt = tylne wrzeciono).
+    const mp = rc.rearMode === "pin" || rc.calibDepth ? rcPinsForX(Math.max(...shot), rc) : { pin: null };
+    return mp.pin
+      ? `${pos}${pair} - tylna wiertarka przesunięta do przodu na <b>pinie ${mp.pin}</b> (od tyłu)`
+      : `${pos}${pair} - wiertarka zablokowana pinem w szynie (${fmt(shot[0])} mm od przodu)`;
   };
   const body = rows.map((row) => `<tr>
       <td><b>${escapeHtml(row.st.refLabel)}</b> do pinów<div class="muted">${row.st.baseText ? escapeHtml(row.st.baseText) : `${fmt(row.st.dist)} mm - ustaw na listwie`} = ${fmt(row.st.dist)} mm</div></td>

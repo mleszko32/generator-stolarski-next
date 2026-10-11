@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { baseAndPin, rcRearScrew, rcRearOverride, rcPanelSetups, getRcSettings, rcPinsFor } from "./rcSystem.js";
+import { baseAndPin, rcRearScrew, rcRearOverride, rcPanelSetups, getRcSettings, rcPinsFor, rcMidGrid, rcPinsForX } from "./rcSystem.js";
 import { jointSetPositions } from "../engine/carcaseParts.js";
 import { getCabinetPanels } from "../engine/cabinetDrillings.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
@@ -90,5 +90,38 @@ describe("stół RC System - karta wiercenia boku", () => {
     // podpórki półki ruchomej: przód do pinów, otwór 37, pozycje od dołu
     const front = setups.find((s) => s.ref === "przod" && s.kinds.includes("podporka"));
     expect(front).toMatchObject({ dist: 37, base: { base: 37, pin: 0 }, alongFrom: "dół" });
+  });
+});
+
+describe("stół RC System - środkowe zestawy łączników", () => {
+  // Warsztat: środkowe łączniki wierci tylna wiertarka przesunięta do przodu i zablokowana pinem,
+  // więc wypadają na tej samej siatce co 16 mm co tylny otwór (wkręt = tylne wrzeciono).
+  const grid = { origin: 470, step: 16 };
+  const settings = getRcSettings({ rcSystem: { enabled: true } });
+
+  it("siatka tylko przy włączonym i skalibrowanym stole", () => {
+    expect(rcMidGrid({ rcSystem: { enabled: false } })).toBeNull();
+    expect(rcMidGrid({ rcSystem: { enabled: true } })).toEqual(grid);
+  });
+
+  it("bok 510: środkowy zestaw na siatce (262/230 zamiast 261/293), pin 20", () => {
+    const sets = jointSetPositions(510, 250, 470, grid);
+    expect(sets).toEqual([{ screw: 37, dowel: 69 }, { screw: 262, dowel: 230 }, { screw: 470, dowel: 438 }]);
+    expect(rcPinsForX(262, settings)).toMatchObject({ pin: 20, frontPin: 3 });
+    expect(rcPinsForX(261, settings)).toMatchObject({ pin: null });
+  });
+
+  it("tylny wkręt na pinie może wypaść bliżej tyłu niż 37 mm (521 -> 486, 35 od tyłu)", () => {
+    expect(jointSetPositions(521, 250, 486, grid).at(-1)).toEqual({ screw: 486, dowel: 454 });
+  });
+
+  it("zestawy na siatce nie nachodzą na przedni ani tylny zestaw", () => {
+    for (let D = 300; D <= 900; D += 7) {
+      const sets = jointSetPositions(D, 250, null, grid);
+      for (let i = 1; i < sets.length; i++) {
+        const lo = Math.min(sets[i].screw, sets[i].dowel), hiPrev = Math.max(sets[i - 1].screw, sets[i - 1].dowel);
+        expect(lo).toBeGreaterThan(hiPrev);
+      }
+    }
   });
 });

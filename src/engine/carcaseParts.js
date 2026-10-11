@@ -4,7 +4,7 @@
 // wydzielone z engine/cabinet.js. Używane też przez engine/cornerParts.js.
 import { getTraverseConfig } from "../core/layout.js";
 import { resolveBackPanel, corpusInnerDepth } from "../core/backPanel.js";
-import { rcRearOverride } from "../core/rcSystem.js";
+import { rcRearOverride, rcMidGrid } from "../core/rcSystem.js";
 
 // Zestawy łączników korpusu (wkręt + kołek) na połączeniu o długości `depth` (wieniec / półka
 // stała / przegroda z bokiem): skrajne - wkręt 37 mm od przodu i od tyłu, kołek 32 mm dalej w
@@ -15,26 +15,41 @@ import { rcRearOverride } from "../core/rcSystem.js";
 export const DEFAULT_JOINT_SPACING = 250;
 // rearScrew - położenie tylnego wkrętu narzucone przez stół RC System (core/rcSystem.js:
 // tylna wiertarka na pinie szyny co 16 mm); bez niego tylny wkręt 37 mm od tyłu.
-export function jointSetPositions(depth, maxSpacing = DEFAULT_JOINT_SPACING, rearScrew = null) {
+// midGrid - { origin, step }: środkowe zestawy wiercone tylną wiertarką przesuniętą do przodu i
+// zablokowaną pinem (warsztat) - wkręt na siatce origin + k·step, kołek 32 mm bliżej przodu
+// (to samo ułożenie wrzecion co w tylnym zestawie). Bez niego raster 32 mm od przedniego wkrętu.
+export function jointSetPositions(depth, maxSpacing = DEFAULT_JOINT_SPACING, rearScrew = null, midGrid = null) {
   const D = parseFloat(depth) || 0;
   const max = Math.max(64, parseFloat(maxSpacing) || DEFAULT_JOINT_SPACING);
   const front = 37;
   const rr = parseFloat(rearScrew);
-  const rear = Number.isFinite(rr) && rr > front + 32 && rr <= D - 37 ? rr : D - 37;
+  // Na pinie szyny tylny otwór może wypaść bliżej tyłu niż 37 mm (29…45, core/rcSystem.js).
+  const rear = Number.isFinite(rr) && rr > front + 32 && rr <= D - 20 ? rr : D - 37;
   if (rear - front < 64) return [{ screw: front, dowel: front + 32 }];
   const sets = [{ screw: front, dowel: front + 32 }];
   const mid = Math.max(0, Math.ceil((rear - front) / max) - 1);
+  const step = midGrid && parseFloat(midGrid.step);
+  const origin = midGrid && parseFloat(midGrid.origin);
   for (let i = 1; i <= mid; i++) {
     const ideal = front + ((rear - front) * i) / (mid + 1);
-    const screw = front + Math.round((ideal - front) / 32) * 32;
-    sets.push({ screw, dowel: screw + 32 });
+    if (step > 0 && Number.isFinite(origin)) {
+      // Środek pary w miejscu idealnym: wkręt (tylne wrzeciono) ok. ideal + 16.
+      let screw = origin + Math.round((ideal + 16 - origin) / step) * step;
+      // Nie nachodzić na przedni (kołek 69) ani tylny zestaw (kołek rear - 32).
+      while (screw - 32 < front + 32 + step && screw + step <= rear - 32) screw += step;
+      while (screw > rear - 32 - step && screw - step - 32 >= front + 32) screw -= step;
+      sets.push({ screw, dowel: screw - 32 });
+    } else {
+      const screw = front + Math.round((ideal - front) / 32) * 32;
+      sets.push({ screw, dowel: screw + 32 });
+    }
   }
   sets.push({ screw: rear, dowel: rear - 32 });
   return sets;
 }
 // Zestawy dla formatki o głębokości depth w danej szafce (rozstaw z konstrukcji, tylny
 // otwór wg stołu RC System, jeśli włączony i skalibrowany / na zderzaku).
-export const jointSetsFor = (mod, config, depth) => jointSetPositions(depth, jointSpacingOf(mod, config), rcRearOverride(depth, config));
+export const jointSetsFor = (mod, config, depth) => jointSetPositions(depth, jointSpacingOf(mod, config), rcRearOverride(depth, config), rcMidGrid(config));
 // Głębokość połączenia wieniec / półka stała z bokiem = głębokość wieńca (bez pleców, przy
 // plecach w nucie także bez odsunięcia nutu). Od niej liczą się zestawy łączników - tylny
 // zestaw 37 mm od tyłu WIEŃCA, a nie od tyłu szafki (wcześniej od głębokości szafki: przy

@@ -121,6 +121,25 @@ export function rcPinsFor(k, s) {
   return f ? { pin: f + diff, frontPin: f } : { pin: null, frontPin: null };
 }
 
+// Siatka położeń tylnej wiertarki na pinach (mm od przodu formatki): { origin, step } albo
+// null (stół wyłączony / bez kalibracji). Ta sama dla każdej głębokości - zależy tylko od
+// pomiaru (formatka bazuje przodem o zderzak przedniej wiertarki). Z niej środkowe zestawy
+// łączników, wiercone tylną wiertarką przesuniętą do przodu.
+export function rcMidGrid(project) {
+  const s = getRcSettings(project);
+  if (!s.enabled || !isCalibrated(s)) return null;
+  return { origin: num(s.calibDepth) - num(s.calibRear), step: RC_RAIL_STEP };
+}
+
+// Piny dla tylnej wiertarki ustawionej tak, by tylne wrzeciono (wkręt) było x mm od przodu
+// formatki (np. środkowy zestaw). { pin, frontPin } albo nulle, gdy x nie leży na siatce.
+export function rcPinsForX(x, settings) {
+  const s = settings || DEFAULTS;
+  if (!isCalibrated(s)) return { pin: null, frontPin: null };
+  const k = (num(x) - (num(s.calibDepth) - num(s.calibRear))) / RC_RAIL_STEP;
+  return Math.abs(k - Math.round(k)) < 0.01 ? rcPinsFor(Math.round(k), s) : { pin: null, frontPin: null };
+}
+
 // Czy stół zmienia położenie tylnego otworu (tylko gdy włączony i wynik jest pewny).
 export function rcRearOverride(depth, project) {
   const s = getRcSettings(project);
