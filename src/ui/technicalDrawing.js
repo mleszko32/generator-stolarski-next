@@ -207,21 +207,26 @@ export function openTechnicalDrawing() {
                       }
                   }
 
+                  // Nasłuchiwacze okna podpinane raz (pan.svg wskazuje bieżący rysunek) - wcześniej
+                  // każde przełączenie szafki dokładało kolejne trzy, trzymające stare SVG.
+                  const pan = { svg: null, active: false, start: { x: 0, y: 0 }, startViewBox: { x: 0, y: 0 } };
+                  const stopPan = () => { pan.active = false; if (pan.svg) pan.svg.style.cursor = 'grab'; };
+                  window.addEventListener('mousemove', (e) => {
+                      if (!pan.active || !pan.svg) return; const svg = pan.svg; const CTM = svg.getScreenCTM();
+                      const dx = (e.clientX - pan.start.x) / CTM.a; const dy = (e.clientY - pan.start.y) / CTM.d;
+                      svg.viewBox.baseVal.x = pan.startViewBox.x - dx; svg.viewBox.baseVal.y = pan.startViewBox.y - dy;
+                  });
+                  window.addEventListener('mouseup', stopPan);
+                  window.addEventListener('mouseleave', stopPan);
+
                   function bindSvgPanZoom() {
                       const svg = document.getElementById('side-panel-svg');
                       if (!svg) return;
-                      let isPanning = false; let startPoint = { x: 0, y: 0 }; let startViewBox = { x: 0, y: 0 };
+                      pan.svg = svg; pan.active = false;
                       svg.addEventListener('mousedown', (e) => {
-                          isPanning = true; startPoint = { x: e.clientX, y: e.clientY };
-                          startViewBox = { x: svg.viewBox.baseVal.x, y: svg.viewBox.baseVal.y }; svg.style.cursor = 'grabbing';
+                          pan.active = true; pan.start = { x: e.clientX, y: e.clientY };
+                          pan.startViewBox = { x: svg.viewBox.baseVal.x, y: svg.viewBox.baseVal.y }; svg.style.cursor = 'grabbing';
                       });
-                      window.addEventListener('mousemove', (e) => {
-                          if (!isPanning) return; const CTM = svg.getScreenCTM();
-                          const dx = (e.clientX - startPoint.x) / CTM.a; const dy = (e.clientY - startPoint.y) / CTM.d;
-                          svg.viewBox.baseVal.x = startViewBox.x - dx; svg.viewBox.baseVal.y = startViewBox.y - dy;
-                      });
-                      window.addEventListener('mouseup', () => { isPanning = false; svg.style.cursor = 'grab'; });
-                      window.addEventListener('mouseleave', () => { isPanning = false; svg.style.cursor = 'grab'; });
                       svg.addEventListener('wheel', (e) => {
                           e.preventDefault(); const zoom = e.deltaY > 0 ? 1.1 : 0.9; const pt = svg.createSVGPoint();
                           pt.x = e.clientX; pt.y = e.clientY; const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());

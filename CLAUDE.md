@@ -137,9 +137,15 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
 
 - `src/render/viewer3d.js` (~1600 linii) — scena Three.js, OrbitControls, przeciąganie modułów
   z przyciąganiem co 40 mm, edycja kliknięciem / menu kontekstowym, przełączniki widoczności
-  frontów, „tryb wyrównywania”. Właściciel sceny i `update3D()`. Wydzielone z niego:
+  frontów, „tryb wyrównywania”. Właściciel sceny i `update3D()`. Render na żądanie
+  (`requestRender`, zdarzenia tylko z płótna), rozmiar z `ResizeObserver` na kontenerze; przy
+  schowanym widoku 3D (Wnętrze 2D) `update3D()` tylko ustawia `sceneDirty`, a scenę dobudowuje
+  ponowne pokazanie. Po przebudowie `update3D()` przelicza `matrixWorld` (raycast tuż po
+  przebudowie). Kliknięcie bez ruchu nie przebudowuje sceny drugi raz (`dragMoved`). Wydzielone z niego:
   - `meshBuilders.js` — materiały i budowanie brył (`addBox`, `addHole`, `addHardware`,
     `createLabelSprite`, `disposeObject`); trzyma flagę x-ray (`isXrayMode` / `setXrayMode`).
+    Geometrie płyt/otworów, okucia i etykiety są współdzielone z cache (`userData.shared` —
+    `disposeObject` ich nie zwalnia); nie modyfikuj geometrii siatki po `addBox`.
   - `cornerCabinet3d.js` — `renderCornerCabinet(mod, isActive, th, parentGroup)`.
   - `measureTool.js` — miarka; scenę/kamerę/raycaster dostaje raz przez `initMeasureTool()`.
   - Przyciąganie i kolizje przy przeciąganiu szafek są w `core/moduleDrag.js` (czyste, z

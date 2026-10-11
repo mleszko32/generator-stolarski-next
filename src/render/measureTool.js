@@ -75,7 +75,13 @@ function exitMeasureMode() {
 
 function clearMeasureVisuals() {
   if (!measureGroup) return;
-  while (measureGroup.children.length > 0) measureGroup.remove(measureGroup.children[0]);
+  // Kule i linie pomiaru mają własne geometrie/materiały - zwalniamy je (pamięć GPU).
+  while (measureGroup.children.length > 0) {
+    const old = measureGroup.children[0];
+    measureGroup.remove(old);
+    old.geometry?.dispose();
+    old.material?.dispose();
+  }
 }
 
 function addMeasurePoint(point) {
@@ -134,7 +140,11 @@ export function updateMeasureHover() {
   const marker = ensureHoverMarker();
   ctx.raycaster.setFromCamera(measureHoverMouse, ctx.camera);
   const targets = ctx.getTargets().filter(Boolean);
-  const hits = targets.length ? ctx.raycaster.intersectObjects(targets, true).filter(h => !h.object.userData?.isMeasureTool) : [];
+  // Tylko bryły (bez krawędzi LineSegments - trafiona krawędź przy rogu wyłączała przyciąganie)
+  // i bez przygaszonych ścian bliżej kamery (niewidoczne, a łapały punkt zamiast szafki za nimi).
+  const hits = targets.length ? ctx.raycaster.intersectObjects(targets, true).filter(h =>
+    h.object.isMesh && !h.object.userData?.isMeasureTool &&
+    !(h.object.userData?.isWall && h.object.material && h.object.material.opacity < 0.5)) : [];
 
   if (hits.length === 0) {
       measureHoverPoint = null;

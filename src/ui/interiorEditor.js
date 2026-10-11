@@ -267,9 +267,16 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
   function refreshAfterEdit() {
     selectedNode = null;
     clearMergeSelection();
-    update3D();
-    updateSidebar();
-    initPropertiesPanel();
+    // update3D/updateSidebar/initPropertiesPanel każde z osobna przerysowują widoczny edytor
+    // (renderInteriorEditorIfVisible) - wstrzymujemy to i rysujemy raz, na końcu.
+    suppressAutoRender++;
+    try {
+      update3D();
+      updateSidebar();
+      initPropertiesPanel();
+    } finally {
+      suppressAutoRender--;
+    }
     render();
   }
 
@@ -1179,6 +1186,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     handle.style.zIndex = "2";
 
     let dragging = false;
+    let renderQueued = false;
     let dragStartClient = 0;
     let dragStartPos = 0;
 
@@ -1195,7 +1203,11 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
         // px -> mm: oś Y jest odwrócona względem ekranu
         const deltaMm = isH ? -deltaClient / (handle._scale || 1) : deltaClient / (handle._scale || 1);
         moveSplit(mod, node, dragStartPos + deltaMm);
-        render();
+        // Pełne przerysowanie edytora najwyżej raz na klatkę, nie na każdy mousemove.
+        if (!renderQueued) {
+          renderQueued = true;
+          requestAnimationFrame(() => { renderQueued = false; render(); });
+        }
       };
       const onUp = () => {
         window.removeEventListener("mousemove", onMove);
@@ -1437,6 +1449,9 @@ const mainEditor = createZoneEditor({
   cornerArm: undefined,
 });
 
+// > 0 w trakcie refreshAfterEdit - patrz tam.
+let suppressAutoRender = 0;
+
 export function toggleInteriorEditor() {
   const interior = document.getElementById("editor-interior-container");
   const viewer3d = document.getElementById("editor-3d-container");
@@ -1445,11 +1460,15 @@ export function toggleInteriorEditor() {
   interior.style.display = showing ? "block" : "none";
   if (viewer3d) viewer3d.style.display = showing ? "none" : "block";
   if (showing) mainEditor.render();
+  // Przycisk "Wnętrze 2D / Podgląd 3D" w nakładce widoku (render/viewer3d.js) aktualizuje
+  // napis z tego zdarzenia - przełączenie bywa wołane też z trybu wyrównywania i ze skosu.
+  window.dispatchEvent(new CustomEvent("interiorEditorToggle", { detail: { visible: showing } }));
 }
 
 // Wołane z update3D()/updateSidebar()/initPropertiesPanel() — czyli tam,
 // gdzie cała reszta aplikacji już dziś odświeża swoje panele po zmianie
 // stanu (patrz CLAUDE.md: „Przepływ aktualizacji”). Tanie, gdy panel jest ukryty.
 export function renderInteriorEditorIfVisible() {
+  if (suppressAutoRender) return;
   mainEditor.renderIfVisible();
 }

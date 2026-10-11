@@ -45,6 +45,8 @@ export function areFrontsVisible() {
 }
 
 let isDragging = false;
+let dragMoved = false;   // czy w trakcie przeciągania szafka/bok faktycznie się ruszyły
+let sceneDirty = false;  // update3D pominięte przy ukrytym widoku - dobudować po pokazaniu
 let dragTarget = null;
 let dragModule = null;
 const dragOffset = new THREE.Vector3();
@@ -145,6 +147,7 @@ function rebuildRoomGeometry() {
     mesh.position.set(pos[0], pos[1], pos[2]);
     mesh.receiveShadow = true;
     roomGroup.add(mesh);
+    mesh.userData.isWall = true; // miarka pomija przygaszone ściany (render/measureTool.js)
     wallMeshes.push({ mesh, normal });
   });
 
@@ -160,6 +163,7 @@ function rebuildRoomGeometry() {
     );
     mesh.position.set(b.cx, b.cy, b.cz);
     roomGroup.add(mesh);
+    mesh.userData.isWall = true;
     wallMeshes.push({ mesh, normal: new THREE.Vector3(b.normal[0], b.normal[1], b.normal[2]) });
   });
 }
@@ -443,6 +447,8 @@ export function init3DViewer() {
 
           const intersect = new THREE.Vector3();
           if (!raycaster.ray.intersectPlane(dragPlane, intersect)) return;
+          dragMoved = true;
+          requestRender();
 
           const newGroupPos = intersect.clone().add(dragOffset);
           const { worldW, worldD } = getWorldFootprint(dragSidePanel);
@@ -469,10 +475,14 @@ export function init3DViewer() {
       mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
       
+      // Kursor nad horyzontem (promień nie trafia w płaszczyznę podłogi): bez tego
+      // intersect zostawał (0,0,0) i szafka skakała do rogu pokoju.
       const intersect = new THREE.Vector3();
-      raycaster.ray.intersectPlane(dragPlane, intersect);
-      
-      if (intersect) {
+      if (!raycaster.ray.intersectPlane(dragPlane, intersect)) return;
+      dragMoved = true;
+      requestRender();
+
+      {
           let newGroupPos = intersect.add(dragOffset);
 
           const H = parseFloat(dragModule.dimensions.height) || 720;
@@ -611,7 +621,24 @@ export function init3DViewer() {
       }
   });
 
-  window.addEventListener('pointerup', (e) => {
+  // Zwykłe kliknięcie (bez ruchu) nie przebudowuje sceny drugi raz - zaznaczenie
+  // odświeżył już pointerdown. pointercancel (pióro, dotyk, utrata wskaźnika) kończy
+  // przeciąganie tak samo, inaczej kamera zostawała zablokowana (controls.enabled = false).
+  const endPointerDrag = () => {
+      const moved = dragMoved;
+      dragMoved = false;
+      if (isDragging && !moved) {
+          isDragging = false;
+          dragTarget = null;
+          dragModule = null;
+          controls.enabled = true;
+      }
+      if (isDraggingSidePanel && !moved) {
+          isDraggingSidePanel = false;
+          dragSidePanelTarget = null;
+          dragSidePanel = null;
+          controls.enabled = true;
+      }
       if (isDragging) {
           isDragging = false;
           // Ostateczne, świadome obrotu zabezpieczenie (patrz clampModuleToRoom w
@@ -640,7 +667,9 @@ export function init3DViewer() {
           updateSidebar();
           initPropertiesPanel(); // odśwież wartości X/Z w formularzu po snapowaniu
       }
-  });
+  };
+  window.addEventListener('pointerup', endPointerDrag);
+  window.addEventListener('pointercancel', endPointerDrag);
 
   renderer.domElement.addEventListener('pointerup', (e) => {
       if (Math.abs(e.clientX - pointerDownPos.x) < 5 && Math.abs(e.clientY - pointerDownPos.y) < 5) {
@@ -656,6 +685,7 @@ export function init3DViewer() {
       const r = renderer.domElement.getBoundingClientRect();
       measureHoverMouse.x = ((e.clientX - r.left) / r.width) * 2 - 1;
       measureHoverMouse.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+      measureDirty = true;
   });
 
   const uiOverlay = document.createElement('div');
@@ -693,20 +723,15 @@ export function init3DViewer() {
   toggleInteriorBtn.innerHTML = '<i class="ti ti-layout-list" aria-hidden="true"></i> Wnętrze 2D';
   toggleInteriorBtn.title = 'Klikalny edytor wnęk — dziel/obsadzaj fronty bez trafiania w 3D';
   toggleInteriorBtn.className = 'btn view-btn';
-  toggleInteriorBtn.onclick = () => {
-      toggleInteriorEditor();
-      const showingInterior = document.getElementById('editor-interior-container')?.style.display !== 'none';
+  toggleInteriorBtn.onclick = () => toggleInteriorEditor();
+  // Napis przycisku zgodny z widokiem także przy przełączeniu z innego miejsca (tryb
+  // wyrównywania, przycisk wnętrza skosu) - toggleInteriorEditor wysyła zdarzenie.
+  // Rozmiar renderera po powrocie do 3D pilnuje ResizeObserver niżej.
+  window.addEventListener('interiorEditorToggle', (e) => {
+      const showingInterior = !!(e.detail && e.detail.visible);
       toggleInteriorBtn.innerHTML = showingInterior ? '<i class="ti ti-cube" aria-hidden="true"></i> Podgląd 3D' : '<i class="ti ti-layout-list" aria-hidden="true"></i> Wnętrze 2D';
       toggleInteriorBtn.classList.toggle('active', showingInterior);
-      if (!showingInterior && container) {
-          // #editor-3d-container był ukryty (display:none) — jego clientWidth/Height mogły
-          // w tym czasie wynosić 0 i "zatrzasnąć się" w renderze/kamerze (patrz resize listener
-          // niżej). Wymuś przeliczenie teraz, gdy kontener już ma prawdziwy rozmiar.
-          camera.aspect = container.clientWidth / container.clientHeight;
-          camera.updateProjectionMatrix();
-          renderer.setSize(container.clientWidth, container.clientHeight);
-      }
-  };
+  });
 
   const toggleMeasureBtn = document.createElement('button');
   toggleMeasureBtn.innerHTML = '<i class="ti ti-ruler-measure" aria-hidden="true"></i> Miarka';
@@ -739,16 +764,26 @@ export function init3DViewer() {
   // gdyby overlay był jego dzieckiem, przycisk powrotu do 3D zniknąłby razem z nim.
   (container.parentElement || container).appendChild(uiOverlay);
 
-  ['pointerdown', 'pointermove', 'wheel', 'keydown', 'keyup'].forEach(ev =>
-    window.addEventListener(ev, () => requestRender(1200), { passive: true }));
+  // Ruch myszy nad panelami bocznymi czy hubem nie ma powodu odświeżać sceny - tylko
+  // zdarzenia na płótnie (przeciąganie szafek woła requestRender samo, w pointermove).
+  ['pointerdown', 'pointermove', 'wheel'].forEach(ev =>
+    renderer.domElement.addEventListener(ev, () => requestRender(1200), { passive: true }));
+  ['keydown', 'keyup'].forEach(ev => window.addEventListener(ev, () => requestRender(600), { passive: true }));
 
-  window.addEventListener('resize', () => {
-      requestRender();
-      if (!container) return;
-      camera.aspect = container.clientWidth / container.clientHeight;
+  // Rozmiar renderera z rozmiaru kontenera (także po powrocie z widoku Wnętrze 2D,
+  // gdy kontener miał display:none). Rozmiar 0 pomijamy - aspect 0/0 dawał NaN w kamerze.
+  // Po ponownym pokazaniu kontenera dobudowujemy scenę, jeśli update3D() ją pominęło.
+  const syncSize = () => {
+      const w = container.clientWidth, h = container.clientHeight;
+      if (!w || !h) return;
+      camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      renderer.setSize(container.clientWidth, container.clientHeight);
-  });
+      renderer.setSize(w, h);
+      if (sceneDirty) update3D();
+      requestRender();
+  };
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(syncSize).observe(container);
+  else window.addEventListener('resize', syncSize);
 
   update3D();
   animate();
@@ -848,20 +883,27 @@ export function captureModuleSnapshot(moduleId, size = 160) {
 // każdej interakcji (mysz, kółko, klawisz) i po każdej przebudowie sceny; w
 // bezczynności zostaje rzadki "oddech" (co ~0,5 s) na wypadek zmian bez zgłoszenia.
 let renderActiveUntil = 0;
+let measureDirty = false;
 let lastIdleRender = 0;
 function requestRender(ms = 1500) {
   renderActiveUntil = Math.max(renderActiveUntil, performance.now() + ms);
 }
 const IDLE_RENDER_MS = 500;
 
+// Karty w tle i tak nie dostają requestAnimationFrame - sprawdzamy tylko schowany kontener.
+const isViewerHidden = () => !container || container.clientWidth === 0;
+
 function animate() {
   requestAnimationFrame(animate);
+  if (isViewerHidden()) return; // widok Wnętrze 2D - nie ma czego rysować
   const now = performance.now();
-  if (controls.update()) requestRender(600); // kamera jeszcze dojeżdża (damping)
-  if (now > renderActiveUntil && now - lastIdleRender < IDLE_RENDER_MS && !isMeasureActive()) return;
+  if (controls.update()) { requestRender(600); measureDirty = true; } // kamera jeszcze dojeżdża (damping)
+  // Miarka: raycast i klatka tylko po ruchu myszy albo kamery, nie 60 razy na sekundę.
+  if (isMeasureActive() && measureDirty) requestRender(100);
+  if (now > renderActiveUntil && now - lastIdleRender < IDLE_RENDER_MS) return;
   lastIdleRender = now;
   updateWallVisibility();
-  if (isMeasureActive()) updateMeasureHover();
+  if (isMeasureActive() && measureDirty) { updateMeasureHover(); measureDirty = false; }
   renderer.render(scene, camera);
 }
 
@@ -1050,6 +1092,10 @@ export function update3D() {
   renderInteriorEditorIfVisible(); // patrz ui/interiorEditor.js — odświeża się tylko, gdy jest widoczny
   refreshModuleInfoCard(); // karta "Informacje o szafce" w prawym panelu - na żywo po każdej zmianie
   if (!cabinetGroup) return;
+  // Widok 3D schowany (Wnętrze 2D): nie przebudowujemy sceny przy każdej zmianie -
+  // zrobi to ResizeObserver, gdy kontener znowu będzie widoczny (syncSize w init3DViewer).
+  if (container && container.clientWidth === 0) { sceneDirty = true; return; }
+  sceneDirty = false;
 
   while (cabinetGroup.children.length > 0) {
       const old = cabinetGroup.children[0];
@@ -1560,4 +1606,10 @@ export function update3D() {
           cabinetGroup.add(panelGroup);
       });
   }
+
+  // Macierze świata nowych brył od razu, nie dopiero przy najbliższej klatce: raycast
+  // (kliknięcie tuż po przebudowie w pointerdown, miarka) czyta matrixWorld, a klatka
+  // nie zawsze zdąży się narysować między pointerdown i pointerup.
+  cabinetGroup.updateMatrixWorld(true);
+  if (labelsGroup) labelsGroup.updateMatrixWorld(true);
 }

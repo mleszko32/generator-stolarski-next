@@ -49,15 +49,30 @@ function getLineMat(color) {
   return m;
 }
 
+// Geometrie współdzielone przez wiele siatek (te same wymiary płyty, otworu, okucia) -
+// przebudowa sceny nie tworzy ich od nowa i nie wolno ich zwalniać razem z siatką.
+// Limit wpisów, żeby długa sesja z wieloma różnymi wymiarami nie rosła bez końca
+// (powyżej limitu geometria jest zwykła, zwalniana z siatką).
+const GEO_CACHE_MAX = 3000;
+const geoCache = new Map();
+function cachedGeometry(key, make) {
+  let g = geoCache.get(key);
+  if (g) return g;
+  g = make();
+  if (geoCache.size < GEO_CACHE_MAX) { g.userData.shared = true; geoCache.set(key, g); }
+  return g;
+}
+
 // Zwalnia geometrie i materiały (pamięć GPU) usuniętej ze sceny gałęzi. Bez tego
 // każde update3D() zostawiało po sobie setki geometrii, aż widok zaczynał zwalniać.
+// Pomija wszystko oznaczone userData.shared (materiały, geometrie i tekstury z cache).
 export function disposeObject(root) {
   root.traverse(o => {
-    if (o.geometry) o.geometry.dispose();
+    if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose();
     const m = o.material;
     if (m) (Array.isArray(m) ? m : [m]).forEach(x => {
       if (!x.userData.shared) {
-        if (x.map) x.map.dispose(); // etykiety (createLabelSprite) mają własną, jednorazową teksturę canvas
+        if (x.map && !x.map.userData.shared) x.map.dispose();
         x.dispose();
       }
     });
@@ -81,7 +96,32 @@ function roundRectPath(ctx, x, y, w, h, r) {
 // renderowania/synchronizacji). depthTest:false -> zawsze czytelna na wierzchu,
 // nawet zza innej szafki albo ściany - to ma pomagać ZNALEŹĆ szafkę, więc
 // nie powinna dać się niechcący zasłonić.
+// Materiał etykiety (tekstura z canvasa) z cache po tekście - przebudowa sceny przy każdej
+// zmianie (np. wpisywaniu w pole) nie rysuje i nie wgrywa na GPU tych samych napisów od nowa.
+const labelCache = new Map();
+const LABEL_CACHE_MAX = 300;
+
 export function createLabelSprite(text) {
+  const cached = labelCache.get(text);
+  if (cached) return makeLabelSprite(cached);
+  const entry = buildLabelMaterial(text);
+  if (labelCache.size < LABEL_CACHE_MAX) {
+    entry.material.userData.shared = true;
+    entry.material.map.userData.shared = true;
+    labelCache.set(text, entry);
+  }
+  return makeLabelSprite(entry);
+}
+
+function makeLabelSprite({ material, aspect }) {
+  const sprite = new THREE.Sprite(material);
+  sprite.renderOrder = 999;
+  const worldH = 130; // mm - wysokość etykiety w scenie (skalowana z zoomem jak reszta bryły)
+  sprite.scale.set(worldH * aspect, worldH, 1);
+  return sprite;
+}
+
+function buildLabelMaterial(text) {
   const fontPx = 44;
   const padX = 22, padY = 14;
   const measCanvas = document.createElement('canvas');
@@ -105,16 +145,13 @@ export function createLabelSprite(text) {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false });
-  const sprite = new THREE.Sprite(material);
-  sprite.renderOrder = 999;
-  const worldH = 130; // mm - wysokość etykiety w scenie (skalowana z zoomem jak reszta bryły)
-  sprite.scale.set(worldH * (canvas.width / canvas.height), worldH, 1);
-  return sprite;
+  return { material, aspect: canvas.width / canvas.height };
 }
 
 
 export function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, parentGroup, rotationY = 0) {
-  const geo = new THREE.BoxGeometry(w, h, d);
+  const dimKey = `${w}|${h}|${d}`;
+  const geo = cachedGeometry('box|' + dimKey, () => new THREE.BoxGeometry(w, h, d));
   let matObj = isXrayMode ? mats.xray : mats.solid;
   let mat = matObj.corpus;
   if (type === 'front') mat = matObj.front;
@@ -134,7 +171,7 @@ export function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, 
   if (userData) mesh.userData = userData;
   mesh.castShadow = !isXrayMode; mesh.receiveShadow = !isXrayMode;
 
-  const edges = new THREE.EdgesGeometry(geo);
+  const edges = cachedGeometry('edges|' + dimKey, () => new THREE.EdgesGeometry(geo));
   const isSelected = isActiveModule || (userData && state.selectedModules && state.selectedModules.has(userData.moduleId));
   let edgeColor = isXrayMode ? (type === 'drawerBox' ? 0xd97706 : 0x64748b) : 0x334155; 
   if (isSelected && type !== 'drawerBox') edgeColor = 0x2563eb; // skrzynki szuflad zostają w swoim kolorze także w zaznaczonej szafce
@@ -148,7 +185,7 @@ export function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, 
 
 export function addHole(radius, depth, x, y, z, rotationAxis, parentGroup) {
   if (!isXrayMode) return; 
-  const geo = new THREE.CylinderGeometry(radius, radius, depth, 16);
+  const geo = cachedGeometry(`hole|${radius}|${depth}`, () => new THREE.CylinderGeometry(radius, radius, depth, 16));
   const mesh = new THREE.Mesh(geo, holeMat);
   if (rotationAxis === 'x') mesh.rotation.z = Math.PI / 2; 
   if (rotationAxis === 'y') mesh.rotation.x = 0;           
@@ -157,19 +194,21 @@ export function addHole(radius, depth, x, y, z, rotationAxis, parentGroup) {
   parentGroup.add(mesh);
 }
 
+// Okucia (podpórki, kołki, wkręty) - jedna geometria i jeden materiał na typ (wcześniej
+// nowy materiał dla każdej sztuki, przy kilkunastu szafkach tysiące obiektów na GPU).
+const HARDWARE = {
+  support: { geo: new THREE.CylinderGeometry(2.5, 2.5, 12, 16), mat: new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.2 }) },
+  dowel: { geo: new THREE.CylinderGeometry(4.0, 4.0, 30, 16), mat: new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.9 }) },
+  screw: { geo: new THREE.CylinderGeometry(1.5, 1.5, 45, 16), mat: new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.6, roughness: 0.4 }) },
+};
+Object.values(HARDWARE).forEach(({ geo, mat }) => { geo.userData.shared = true; mat.userData.shared = true; });
+
 export function addHardware(type, x, y, z, axis, parentGroup) {
   if (!isXrayMode) return; 
-  let geo, mat;
-  if (type === 'support') {
-      geo = new THREE.CylinderGeometry(2.5, 2.5, 12, 16);
-      mat = new THREE.MeshStandardMaterial({color: 0x94a3b8, metalness: 0.9, roughness: 0.2}); 
-  } else if (type === 'dowel') {
-      geo = new THREE.CylinderGeometry(4.0, 4.0, 30, 16);
-      mat = new THREE.MeshStandardMaterial({color: 0xb45309, roughness: 0.9}); 
-  } else if (type === 'screw') {
-      geo = new THREE.CylinderGeometry(1.5, 1.5, 45, 16);
-      mat = new THREE.MeshStandardMaterial({color: 0x334155, metalness: 0.6, roughness: 0.4}); 
-  }
+  const hw = HARDWARE[type];
+  if (!hw) return;
+  const geo = hw.geo;
+  const mat = hw.mat;
   const mesh = new THREE.Mesh(geo, mat);
   if (axis === 'x') mesh.rotation.z = Math.PI / 2;
   else if (axis === 'z') mesh.rotation.x = Math.PI / 2;

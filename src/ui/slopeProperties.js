@@ -160,9 +160,15 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', (e) => { apply(e.target.value); refresh(); });
   };
+  // Debounce jak w ui/properties.js - bez niego każdy znak przebudowywał całą scenę 3D.
+  let inputTimer = null;
   const onInput = (id, apply) => {
     const el = document.getElementById(id);
-    if (el) el.addEventListener('input', (e) => { apply(e.target.value); update3D(); updateSidebar(); });
+    if (el) el.addEventListener('input', (e) => {
+      apply(e.target.value);
+      clearTimeout(inputTimer);
+      inputTimer = setTimeout(() => { update3D(); updateSidebar(); }, 50);
+    });
   };
   const findFront = (id) => (mod.elements || []).find((el) => el.id === id);
 
