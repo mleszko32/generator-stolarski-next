@@ -8,6 +8,7 @@ import { WALLS, computeWallLayouts } from "../core/walls.js";
 import {
   ROW_TYPES, STANDARD_WIDTHS, rowProfile, findFreeSegments, divideSegment,
   buildFillItems, findPlanConflicts, applyFillPlan, getWallGap, setWallGap,
+  getClearance, setClearance,
   findRowAround, replaceFillRow, describeWidths,
 } from "../core/wallFill.js";
 import { runPresets, planKitchenRun, applyKitchenRun, CORNER_KINDS, defaultCorner } from "../core/kitchenRun.js";
@@ -31,7 +32,6 @@ const saved = {
   scope: "wall", presetId: "lewa+tyl", corners: null, armLength: {}, choice: {}, custom: {},
   wallId: "tyl", type: "base_cabinet", templateId: "",
   u0: null, u1: null,
-  openingMargin: 50, doorPassage: 600,
   mode: "standard", catalog: STANDARD_WIDTHS.join(", "), count: "",
   fixedSplit: "600, 800, *, *", ratioSplit: "1:2:1",
   restMode: "blenda", fillerSide: "right", maxFiller: 150, roundTo: 1,
@@ -62,6 +62,9 @@ export function openWallFillModal(onChange, { editModuleId = null } = {}) {
     fillerSide: edit.fillers.length === 2 ? "both" : edit.fillers.length ? edit.fillers[0].side : saved.fillerSide,
     editGap: edit.gap,
   } : saved;
+  // Odstęp od otworów i strefa przed drzwiami są zapisane w projekcie (project.wallFill).
+  cfg.openingMargin = getClearance(state.project, "openingMargin");
+  cfg.doorPassage = getClearance(state.project, "doorPassage");
   const editTemplate = edit ? state.project.modules.find((m) => m.id === editModuleId) : null;
   const ignoreIds = edit ? [...edit.moduleIds, ...edit.panelIds] : null;
 
@@ -157,8 +160,16 @@ export function openWallFillModal(onChange, { editModuleId = null } = {}) {
     else setWallGap(state.project, cfg.type, v);
     resetSegment(); cfg.choice = {};
   });
-  bindNum("#wf-margin", (v) => { cfg.openingMargin = Math.max(0, v); resetSegment(); });
-  bindNum("#wf-passage", (v) => { cfg.doorPassage = Math.max(0, v); resetSegment(); });
+  bindNum("#wf-margin", (v) => {
+    setClearance(state.project, "openingMargin", v);
+    cfg.openingMargin = getClearance(state.project, "openingMargin");
+    resetSegment();
+  });
+  bindNum("#wf-passage", (v) => {
+    setClearance(state.project, "doorPassage", v);
+    cfg.doorPassage = getClearance(state.project, "doorPassage");
+    resetSegment();
+  });
   bindNum("#wf-maxfiller", (v) => { cfg.maxFiller = Math.max(0, v); cfg.variant = 0; });
   $("#wf-round").addEventListener("change", (e) => { cfg.roundTo = num(e.target.value, 1); refresh(); });
   $("#wf-side").addEventListener("change", (e) => { cfg.fillerSide = e.target.value; refresh(); });

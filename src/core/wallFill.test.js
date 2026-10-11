@@ -3,7 +3,7 @@ import { state } from "./state.js";
 import {
   wallToWorld, worldToWall, rowProfile, findBlocked, findFreeSegments, parseSplit,
   divideSegment, buildFillItems, findPlanConflicts, applyFillPlan, describeWidths,
-  getWallGap, setWallGap, frontAllowance, findRowAround, replaceFillRow,
+  getWallGap, setWallGap, getClearance, setClearance, frontAllowance, findRowAround, replaceFillRow,
 } from "./wallFill.js";
 import { computeWallLayouts } from "./walls.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
@@ -86,6 +86,16 @@ describe("odsunięcie od ściany (project.wallFill.wallGap)", () => {
     expect(getWallGap(state.project, "tall_cabinet")).toBe(50);
     setWallGap(state.project, "upper_cabinet", -5);
     expect(getWallGap(state.project, "upper_cabinet")).toBe(0);
+  });
+
+  it("odstęp od otworów i strefa przed drzwiami: domyślne 50/600, zapis w projekcie także 0", () => {
+    expect(getClearance(state.project, "openingMargin")).toBe(50);
+    expect(getClearance(state.project, "doorPassage")).toBe(600);
+    setClearance(state.project, "openingMargin", 0);
+    expect(getClearance(state.project, "openingMargin")).toBe(0);
+    expect(state.project.wallFill.openingMargin).toBe(0);
+    setClearance(state.project, "doorPassage", -10);
+    expect(getClearance(state.project, "doorPassage")).toBe(0);
   });
 
   it("applyFillPlan stawia szafki i blendę odsunięte od ściany na każdej ścianie", () => {

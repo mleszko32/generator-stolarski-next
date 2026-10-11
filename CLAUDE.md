@@ -297,7 +297,9 @@ szerokościami, a `findFreeSegments(..., { ignoreIds })` nie traktuje szafek rz�
 rząd na miejscu: szafki używane ponownie po kolei od lewej (wnętrza zostają), brakujące = kopie zaznaczonej, nadmiarowe usuwane,
 blendy rzędu zastępowane nowymi.
 Odsunięcie tyłu szafek od ściany (szczelina na instalacje): `project.wallFill.wallGap` per rząd
-(`getWallGap`/`setWallGap`; bez ustawienia dolne i słupki 50, wiszące 0), pole w oknie. Funkcje `core` dostają je
+(`getWallGap`/`setWallGap`; bez ustawienia dolne i słupki 50, wiszące 0), pole w oknie. Tak samo w projekcie zapisane są
+odstęp od otworów i strefa przed drzwiami (`project.wallFill.openingMargin`/`doorPassage`, `getClearance`/`setClearance`,
+domyślnie 50/600) — też w trybie „Zmień podział rzędu”. Funkcje `core` dostają je
 jawnie (`opts.wallGap`, domyślnie 0). `rowProfile(..., { wallGap })` daje `gap` i `frontPlane` = odsunięcie +
 korpus z plecami + front (`frontAllowance(project, mod)` = grubość płyty + odsunięcie frontu od korpusu
 `front.bodyGap`, domyślnie 2 mm — `frontBodyGap` w `core/state.js`, pole w zakładce Front; to samo odsunięcie

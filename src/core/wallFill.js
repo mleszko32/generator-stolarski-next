@@ -58,6 +58,22 @@ export function setWallGap(project, type, value) {
   if (!project.wallFill) project.wallFill = {};
   project.wallFill.wallGap = { ...DEFAULT_WALL_GAP, ...(project.wallFill.wallGap || {}), [type]: Math.max(0, num(value)) };
 }
+
+// Odstęp szafek od krawędzi otworów i głębokość strefy przed drzwiami - zapisywane
+// w projekcie (project.wallFill), żeby okno rozmieszczania i "Zmień podział rzędu"
+// startowały od ostatnio wpisanych wartości (także 0).
+export const DEFAULT_CLEARANCES = { openingMargin: 50, doorPassage: 600 };
+
+export function getClearance(project, key) {
+  const v = project && project.wallFill && project.wallFill[key];
+  if (v !== undefined && v !== null && v !== "") return Math.max(0, num(v));
+  return DEFAULT_CLEARANCES[key];
+}
+
+export function setClearance(project, key, value) {
+  if (!project.wallFill) project.wallFill = {};
+  project.wallFill[key] = Math.max(0, num(value));
+}
 // Reszta mniejsza od tego to zwykły luz montażowy, a nie blenda.
 export const MIN_FILLER = 3;
 export const MIN_CABINET_WIDTH = 150;
