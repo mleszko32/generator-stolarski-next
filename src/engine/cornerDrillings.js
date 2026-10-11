@@ -16,6 +16,7 @@
 //   ramienia A, y wzdłuż ramienia B; otwory w czołach na końcach ramion mają edge
 //   'koniec-A' / 'koniec-B' i z = odległość od przodu (jak czoła wieńca zwykłej szafki).
 import { recalculateLayout, getCornerDepths } from "../core/layout.js";
+import { resolveBackPanel, corpusInnerDepth } from "../core/backPanel.js";
 import { getCornerShelfHoles, getCornerWieniecHoles, getCornerPartsGeometry, getCornerCorpusParts, getCornerDoorHinges } from "./cornerParts.js";
 import { cabinetHoleSpecs } from "./cabinetDrillings.js";
 import { num, round1 } from "../utils/math.js";
@@ -106,9 +107,8 @@ export function getCornerPanels(mod, project) {
   // Półki i przegrody wewnątrz ramion (poziom/pion z cornerArm) - wymiary jak na liście formatek
   // (engine/cabinet.js: getInteriorParts); otworów pod nie instrukcja jeszcze nie liczy.
   const { depthA, depthB } = getCornerDepths(mod);
-  const backP = mod.backPanel || { type: "nakladane", offset: 16 };
   const frontCfg = { ...(project.front || {}), ...(mod.front || {}) };
-  const depthFor = (d) => (backP.type === "nut" ? d - num(backP.offset, 16) - backThick : d - backThick) - (frontCfg.type === "wpuszczane" ? th : 0);
+  const depthFor = (d) => corpusInnerDepth(mod, project, d) - (frontCfg.type === "wpuszczane" ? th : 0);
   ["A", "B"].forEach((arm) => {
     const armEls = (mod.elements || []).filter((e) => e.cornerArm === arm && (e.typ === "poziom" || e.typ === "pion"));
     const d = depthFor(arm === "A" ? depthA : depthB);
@@ -126,7 +126,7 @@ export function getCornerPanels(mod, project) {
   getCornerCorpusParts(mod, project).filter((p) => p.category === "Plecy").forEach((p) => {
     const arm = p.name.includes("Ramię B") ? "B" : "A";
     panels.push({ id: `plecy-${arm.toLowerCase()}`, kind: "plecy", name: `Plecy ramienia ${arm} (HDF)`, qty: 1, length: p.length, width: p.width, thickness: backThick, holes: [],
-      note: backP.type === "nut"
+      note: resolveBackPanel(mod, project).type === "nut"
         ? "w nucie boku; krawędź przy narożu nakładana na listwę - wsunąć przed skręceniem korpusu"
         : "nakładane - przybić / przykręcić do boku, wieńców i listwy narożnej po złożeniu korpusu" });
   });
@@ -140,7 +140,7 @@ const fmtNum = (v) => String(round1(v)).replace(".", ",");
 export function getCornerConstruction(mod, project) {
   const els = mod.elements || [];
   const { depthA, depthB } = getCornerDepths(mod);
-  const backP = { type: "nakladane", ...(mod.backPanel || {}) };
+  const backP = resolveBackPanel(mod, project);
   const doors = els.filter((e) => e.typ === "front" && (e.subtype || "").includes("drzwi"));
   return {
     legA: num(mod.dimensions.width, 860),

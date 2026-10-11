@@ -179,3 +179,14 @@ describe("jointSetPositions - zestawy kołek + wkręt", () => {
     expect(jointSetPositions(510, 150).length).toBe(4);
   });
 });
+
+describe("getCorpusParts — półka stała w kolumnie", () => {
+  it("ma długość swojej wnęki (el.w), nie całego korpusu", () => {
+    const mod = baseModule({ elements: [
+      { id: "p", typ: "pion", isStructural: true, x: 300, w: 18 },
+      { id: "s", typ: "poziom", isStructural: true, x: 318, w: 264, y: 350, h: 18 },
+    ] });
+    const shelves = getCorpusParts(mod, config()).filter((p) => p.name === "W600" && p.length !== 564);
+    expect(shelves).toEqual([{ name: "W600", length: 264, width: 510, qty: 1, category: "Korpus" }]);
+  });
+});

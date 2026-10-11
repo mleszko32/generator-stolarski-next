@@ -158,3 +158,13 @@ describe("calculateDrawerHoles - MOVENTO na półce", () => {
     expect(h.slideSideHoles[0].y).toBe(556);
   });
 });
+
+describe("calculateDrawerHoles — luzy szafki", () => {
+  beforeEach(() => setProject(freshProject()));
+
+  it("bierze luz dolny z przekazanych (scalonych) luzów szafki, nie tylko z projektu", () => {
+    const proj = calculateDrawerHoles("merivobox", 0, 300, 18, 0, true);
+    const local = calculateDrawerHoles("merivobox", 0, 300, 18, 0, true, null, null, { sides: 1.5, top: 5, bottom: 4 });
+    expect(local.frontHoles[0].y).toBe(proj.frontHoles[0].y - 4);
+  });
+});

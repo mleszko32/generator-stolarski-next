@@ -115,11 +115,22 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
   prowadnic MOVENTO wg karty Blum: wkręty 38 mm nad wieńcem/półką pod szufladą
   (`calculateDrawerHoles(..., nl, zoneBottom)`), w poziomie `moventoRunnerHoles(system, nl)`.
 - `drawerMath.js` — dobór długości nominalnej, dobór wariantu wysokości do dostępnego miejsca,
-  wymiary elementów szuflady, pozycje wierceń `calculateDrawerHoles()`.
+  wymiary elementów szuflady, pozycje wierceń `calculateDrawerHoles()` (luzy frontu podawaj
+  scalone z szafką — ostatni parametr).
+- `drawerSpec.js` — `drawerSpec(mod, el, project)`: **jedyne** miejsce parametrów szuflady
+  zwykłej szafki (system, wnęka w świetle z `baseZone` — kolumna za przegrodą jest węższa,
+  wysokość wnęki, głębokość i NL z frontem wpuszczanym / czołem szuflady wewn. / `forceNL`,
+  składniki skrzynki). Korzystają z niego lista formatek, lista okuć, obrys skrzynki
+  (`drawerBoxes.js`) i 3D — nie licz tego ponownie gdzie indziej.
+- `backPanel.js` — `resolveBackPanel(mod, project)` (domyślne ustawienia pleców = te z
+  formularza) i `corpusInnerDepth(...)` (głębokość wieńców); nie pisz własnych fallbacków
+  `mod.backPanel || {...}`.
 - `hingeMath.js` — `calculateHinges()`: liczba zawiasów + pozycje Y puszek z omijaniem kolizji
   z półkami/przeszkodami (pętla przesuwania naprzemiennie o 1 mm). `cabinet.js` dodatkowo
-  wylicza „globalne” zawiasy między modułami, żeby drzwi przechodzące przez kilka
-  postawionych na sobie korpusów dostały zawiasy z sąsiednich modułów.
+  wylicza „globalne” zawiasy między modułami (nachodzenie odcisków z obrotem + ten sam obrót),
+  żeby drzwi przechodzące przez kilka postawionych na sobie korpusów dostały zawiasy z
+  sąsiednich modułów; przeszkody z szafek postawionych na sobie daje `stackedHingeObstacles`
+  (wspólne dla rysunku wierceń i 3D).
 - `shelfMath.js` — wiercenia półek w Systemie 32 i `autoDistributeShelves()`.
 
 ### Renderowanie

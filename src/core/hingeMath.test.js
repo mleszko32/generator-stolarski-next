@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { calculateHinges } from "./hingeMath.js";
-import { freshProject, setProject } from "../test/fixtures.js";
+import { calculateHinges, stackedHingeObstacles } from "./hingeMath.js";
+import { freshProject, setProject, baseModule } from "../test/fixtures.js";
 
 const door = (over = {}) => ({ id: "front-door", h: 700, y: 0, ...over });
 
@@ -54,5 +54,22 @@ describe("calculateHinges", () => {
       const clashes = h.y + 16 > 600 && h.y - 16 < 618;
       expect(clashes).toBe(false);
     }
+  });
+});
+
+describe("stackedHingeObstacles", () => {
+  const stacked = (over) => baseModule({ id: "gora", position: { x: 0, y: 820, z: 0 }, legs: { active: false }, elements: [], ...over });
+
+  it("dolicza wieńce szafki postawionej w tym samym miejscu, w układzie Y dolnej", () => {
+    const dol = baseModule();
+    const obs = stackedHingeObstacles(dol, [dol, stacked()], 18);
+    // dolna: na nóżkach 100 -> spód górnej (y 820) to 720 w układzie dolnej
+    expect(obs.some((o) => o.y === 720)).toBe(true);
+  });
+
+  it("pomija szafki o innym Z albo obrocie (to nie jest ta sama szafa)", () => {
+    const dol = baseModule();
+    const obs = stackedHingeObstacles(dol, [dol, stacked({ position: { x: 0, y: 820, z: 2000 } }), stacked({ rotation: 90 })], 18);
+    expect(obs.filter((o) => o.isStructural)).toHaveLength(2); // tylko wieńce samej dolnej
   });
 });

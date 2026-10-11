@@ -3,6 +3,7 @@
 // Formatki i wiercenia korpusu prostokątnej szafki (boki, wieńce, trawersy, plecy) -
 // wydzielone z engine/cabinet.js. Używane też przez engine/cornerParts.js.
 import { getTraverseConfig } from "../core/layout.js";
+import { resolveBackPanel, corpusInnerDepth } from "../core/backPanel.js";
 import { rcRearOverride } from "../core/rcSystem.js";
 
 // Zestawy łączników korpusu (wkręt + kołek) na połączeniu o długości `depth` (wieniec / półka
@@ -39,10 +40,7 @@ export const jointSetsFor = (mod, config, depth) => jointSetPositions(depth, joi
 // zestaw 37 mm od tyłu WIEŃCA, a nie od tyłu szafki (wcześniej od głębokości szafki: przy
 // plecach nakładanych wypadał 34 mm od tyłu boku, przy nucie 14 mm od końca wieńca).
 export function jointDepthOf(mod, config) {
-  const D = parseFloat(mod.dimensions.depth) || 0;
-  const backThick = parseFloat(config.materials && config.materials.backThickness) || 3;
-  const backP = { type: 'nakladane', offset: 16, ...((config && config.backPanel) || {}), ...(mod.backPanel || {}) };
-  return backP.type === 'nut' ? D - (parseFloat(backP.offset) || 16) - backThick : D - backThick;
+  return corpusInnerDepth(mod, config, parseFloat(mod.dimensions.depth) || 0);
 }
 
 export const jointSpacingOf = (mod, config) => {
@@ -114,9 +112,7 @@ export function getCorpusHoles(mod, config) {
 export function getPionMountHoles(mod, config) {
   const { width, height, depth } = mod.dimensions;
   const th = config.materials.boardThickness || 18;
-  const backThick = config.materials.backThickness || 3;
-  const backP = mod.backPanel || { type: 'nakladane', offset: 16 };
-  const topBottomDepth = backP.type === 'nut' ? depth - backP.offset - backThick : depth - backThick;
+  const topBottomDepth = corpusInnerDepth(mod, config, parseFloat(depth) || 0);
 
   const piony = (mod.elements || []).filter(el => el.typ === 'pion' && el.isStructural);
   if (piony.length === 0) return [];
@@ -178,7 +174,7 @@ export function getCorpusParts(mod, config) {
   const { width, height, depth } = mod.dimensions;
   const board = config.materials.boardThickness;
   const backThick = config.materials.backThickness;
-  const backP = mod.backPanel || { type: 'nakladane', offset: 16 };
+  const backP = resolveBackPanel(mod, config);
 
   const construction = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(config.construction || {}), ...(mod.construction || {}) };
   const isTopBottomFullWidth = construction.joinType === 'wience_przelotowe';
@@ -187,7 +183,7 @@ export function getCorpusParts(mod, config) {
   const sideHeight = isTopBottomFullWidth ? height - (board * 2) : height;
   parts.push({ name: "Bok (L/P)", length: parseFloat(sideHeight.toFixed(1)), width: sideDepth, qty: 2, category: "Korpus" });
 
-  const tbDepth = backP.type === 'nut' ? depth - backP.offset - backThick : depth - backThick;
+  const tbDepth = corpusInnerDepth(mod, config, parseFloat(depth) || 0);
   const tbWidth = isTopBottomFullWidth ? width : width - (board * 2);
 
   parts.push({ name: `W${width}`, length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1, category: "Korpus" });
@@ -205,11 +201,14 @@ export function getCorpusParts(mod, config) {
     if (trav.rear.active) parts.push({ name: trName, length: parseFloat(tbWidth.toFixed(1)), width: trav.rear.width, qty: 1, category: "Korpus" });
   }
 
-  const structuralShelvesCount = mod.elements ? mod.elements.filter(el => el.typ === 'poziom' && el.isStructural).length : 0;
-  if (structuralShelvesCount > 0) {
-    const shelfWidth = width - (board * 2);
-    parts.push({ name: `W${width}`, length: parseFloat(shelfWidth.toFixed(1)), width: tbDepth, qty: structuralShelvesCount, category: "Korpus" });
-  }
+  // Półka stała ma długość swojej wnęki (el.w) - w kolumnie za przegrodą jest węższa niż
+  // korpus (tak samo instrukcje montażu, engine/cabinetDrillings.js). Jednakowe półki - jedna pozycja.
+  const shelfQty = new Map();
+  (mod.elements || []).filter(el => el.typ === 'poziom' && el.isStructural).forEach(el => {
+    const len = parseFloat((parseFloat(el.w) || (width - (board * 2))).toFixed(1));
+    shelfQty.set(len, (shelfQty.get(len) || 0) + 1);
+  });
+  shelfQty.forEach((qty, len) => parts.push({ name: `W${width}`, length: len, width: tbDepth, qty, category: "Korpus" }));
 
   return parts;
 }
@@ -217,11 +216,11 @@ export function getCorpusParts(mod, config) {
 export function getBackPanelParts(mod, config) {
   const { width, height } = mod.dimensions;
   const board = config.materials.boardThickness;
-  const backP = mod.backPanel || { type: 'nakladane', grooveDepth: 6, clearance: 2, nutBuild: 'all' };
+  const backP = resolveBackPanel(mod, config);
 
   let hdfWidth, hdfHeight;
-  const totalClearance = backP.clearance !== undefined ? backP.clearance * 2 : 4;
-  const currentNutBuild = backP.nutBuild || 'all';
+  const totalClearance = backP.clearance * 2;
+  const currentNutBuild = backP.nutBuild;
 
   if (backP.type === 'nut') {
     hdfWidth = (currentNutBuild === 'all' || currentNutBuild === 'sides')

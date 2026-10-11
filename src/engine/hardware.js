@@ -3,7 +3,8 @@
 // Lista okuć projektu (nóżki, złącza, komplety szuflad, zawiasy, okleina) - wydzielona
 // z engine/cabinet.js. Czyta zagregowaną listę formatek z calculateAllProjectParts().
 import { state } from "../core/state.js";
-import { getDrawerComponents, drawerHardwareKey } from "../core/drawerMath.js";
+import { drawerHardwareKey } from "../core/drawerMath.js";
+import { drawerSpec } from "../core/drawerSpec.js";
 import { calculateHinges } from "../core/hingeMath.js";
 import { getSlopeDrawerHardware, getSlopeFronts } from "../core/slopeCabinet.js";
 import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "./edgeBanding.js";
@@ -22,15 +23,7 @@ export function calculateProjectHardware() {
   const hardwareList = {};
 
   config.modules.forEach(mod => {
-    const W = parseFloat(mod.dimensions.width) || 600;
-    const D = parseFloat(mod.dimensions.depth) || 513;
     const board = config.materials.boardThickness || 18;
-    const backThick = config.materials.backThickness || 3;
-    const backP = mod.backPanel || { type: 'nakladane', offset: 16 };
-    const topBottomDepth = backP.type === 'nut' ? D - backP.offset - backThick : D - backThick;
-
-    const f = { ...(config.front || {}), ...(mod.front || {}) };
-    const fc = { ...(config.front?.clearance || {}), ...(mod.front?.clearance || {}) };
 
     if (mod.legs && mod.legs.active) {
       const legH = parseFloat(mod.legs.height) || 100;
@@ -119,25 +112,17 @@ export function calculateProjectHardware() {
       const obstacles = allObstacles.filter(o => (o.cornerArm || '_') === armKey).concat(cornerShelfObstacles);
       fronts.sort((a, b) => a.y - b.y);
 
-      fronts.forEach((front, index) => {
+      fronts.forEach((front) => {
         const isInternalDrawer = front.subtype === 'szuflada-wewnetrzna';
 
         if (front.subtype === 'szuflada' || isInternalDrawer) {
-          const isBottomInZone = front.frontIndex === 0;
-          const isTopInZone = index === fronts.length - 1;
-
-          let availableSpace = front.h;
-          if (isBottomInZone) availableSpace -= (board - (parseFloat(fc.bottom) || 0));
-          if (isTopInZone) availableSpace -= (board - (parseFloat(fc.top) || 0));
-
-          const innerWidth = front.baseZone ? (front.baseZone.maxX - front.baseZone.minX) : W - (board * 2);
-          const userForcedVariant = front.forceVariant || 'auto';
-
-          const sysName = f.drawerSystem || 'merivobox';
-          const drawerComps = getDrawerComponents(sysName, innerWidth, topBottomDepth, availableSpace, userForcedVariant, front.drawerSideHeight);
-
-          if (drawerComps) {
-            const hwKey = drawerHardwareKey(sysName, drawerComps);
+          // Szuflada szafki ślepej przycięta do zera nie istnieje (jak w liście formatek).
+          if (blind && !(front.w >= 1)) return;
+          // Ten sam dobór co lista formatek i 3D (core/drawerSpec.js): wnęka w świetle,
+          // front wpuszczany / czoło szuflady wewnętrznej, ręczne NL i wariant.
+          const spec = drawerSpec(mod, front, config);
+          if (spec.comps) {
+            const hwKey = drawerHardwareKey(spec.system, spec.comps);
             if (!hardwareList[hwKey]) hardwareList[hwKey] = { name: hwKey, qty: 0, unit: 'kpl.' };
             hardwareList[hwKey].qty += 1;
           }

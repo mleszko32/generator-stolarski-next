@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { calculateParts, calculateAllProjectParts } from "./cabinet.js";
 import { calculateProjectHardware } from "./hardware.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
+import { state } from "../core/state.js";
 import { drawerSystems } from "../core/drawerSystems.js";
 import { buildSlopeElements } from "../core/slopeCabinet.js";
 
@@ -395,5 +396,35 @@ describe("formatki szuflad z szafek o różnej szerokości się sumują", () => 
     expect(sides).toHaveLength(1);
     expect(sides[0].qty).toBe(4);
     expect(sides[0].name).not.toMatch(/W\d/);
+  });
+});
+
+describe("szuflada w kolumnie za przegrodą", () => {
+  it("dno i tył z szerokości wnęki, a otwory frontu od krawędzi przegrody", () => {
+    const zone = { minX: 18, maxX: 300, minY: 18, maxY: 702, offsetBottom: 0, offsetTop: 0 };
+    const mod = baseModule({ elements: [
+      { id: "p", typ: "pion", isStructural: true, x: 300, y: 18, w: 18, h: 684 },
+      { id: "f0", typ: "front", subtype: "szuflada", frontIndex: 0, gap: 3, distribution: "1", baseZone: zone },
+    ] });
+    setProject(freshProject({ modules: [mod] }));
+    const { parts, mountingData } = calculateParts();
+    expect(parts.find((p) => p.name.startsWith("Dno szuflady")).width).toBe(282 - 51);
+    const holes = mountingData.find((m) => m.type === "drawer" && m.frontId === "f0");
+    const f0 = mod.elements[1];
+    // zakład frontu na prawą krawędź wnęki (przegroda w x=300) + 20,5
+    expect(holes.frontHoles[0].xOffsetRight).toBeCloseTo(f0.x + f0.w - 300 + 20.5, 5);
+  });
+});
+
+describe("zawiasy „globalne” przy szafkach obróconych o 90°", () => {
+  it("sąsiednia szafka w rzędzie na bocznej ścianie nie dokłada swoich zawiasów", () => {
+    const door = { id: "drzwi-a", typ: "front", subtype: "drzwi", frontIndex: 0, gap: 3, openingSide: "left",
+      baseZone: { minX: 18, maxX: 282, minY: 18, maxY: 702, offsetBottom: 0, offsetTop: 0 } };
+    const a = baseModule({ id: "a", rotation: 90, dimensions: { width: 300, height: 720, depth: 560 }, position: { x: 0, y: 0, z: 0 }, elements: [door] });
+    const b = baseModule({ id: "b", rotation: 90, dimensions: { width: 400, height: 720, depth: 560 }, position: { x: 0, y: 0, z: 300 }, elements: [] });
+    setProject(freshProject({ modules: [a, b] }));
+    state.activeModuleId = "b";
+    const { mountingData } = calculateParts();
+    expect(mountingData.some((m) => m.type === "door" && m.frontId === "drzwi-a")).toBe(false);
   });
 });

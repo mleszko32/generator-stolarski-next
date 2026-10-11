@@ -3,6 +3,7 @@
 // Szafka narożna (mod.type === "corner_cabinet"): formatki korpusu, zawiasy drzwi,
 // wiercenia i geometria do rysunków 2D - wydzielone z engine/cabinet.js.
 import { state } from "../core/state.js";
+import { resolveBackPanel } from "../core/backPanel.js";
 import { calculateHinges } from "../core/hingeMath.js";
 import { fmtMm } from "../utils/math.js";
 import { recalculateLayout, getCornerDepths } from "../core/layout.js";
@@ -67,11 +68,9 @@ export function getCornerCorpusParts(mod, config) {
   // płaska (nakładana) niezależnie od backPanel.type. Rowek (grooveDepth) i
   // pojedynczy luz (clearance, nie clearance*2 jak przy dwóch bokach w
   // zwykłym module) dotyczą więc tylko strony boku, nie strony listwy.
-  const backP = mod.backPanel || { type: 'nakladane', grooveDepth: 6, clearance: 2, nutBuild: 'all' };
+  const backP = resolveBackPanel(mod, config);
   const isNutBack = backP.type === 'nut';
-  const nutBuild = backP.nutBuild || 'all';
-  const grooveDepth = parseFloat(backP.grooveDepth) || 6;
-  const clearance = backP.clearance !== undefined ? parseFloat(backP.clearance) : 2;
+  const { nutBuild, grooveDepth, clearance } = backP;
   const nutSides = isNutBack && (nutBuild === 'all' || nutBuild === 'sides');
   const nutTopBottom = isNutBack && (nutBuild === 'all' || nutBuild === 'top_bottom');
 

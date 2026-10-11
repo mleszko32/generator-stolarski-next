@@ -3,10 +3,10 @@
 // Położenie i wymiary korpusu ("skrzynki") szuflady w widoku od przodu, w układzie
 // modułu (mm, x od lewej krawędzi korpusu, y od dołu korpusu). Te same wzory, co
 // rysowanie szuflad w 3D (render/viewer3d.js, tryb przezroczysty) i lista formatek
-// (engine/cabinet.js): dno i tył z getDrawerComponents, boki po 16 mm. Używane
+// (engine/cabinet.js): dno i tył z core/drawerSpec.js, boki po 16 mm. Używane
 // przez edytor wnętrza 2D, gdy fronty są ukryte. Wymaga aktualnego layoutu
 // (el.y/el.h po recalculateLayout).
-import { getDrawerComponents } from "./drawerMath.js";
+import { drawerSpec } from "./drawerSpec.js";
 import { num } from "../utils/math.js";
 import { getSlopeFronts, getSlopeGeometry } from "./slopeCabinet.js";
 
@@ -16,36 +16,13 @@ const SIDE_T = 16;   // grubość boku i dna szuflady
 // Zwraca { rect: {x0,x1,y0,y1}, comps, system } (rect = obrys całej skrzynki razem z bokami;
 // comps = składniki z getDrawerComponents: długość nominalna, dno, tył) albo null.
 export function getDrawerBoxInfo(mod, el, project) {
-  const th = num(project.materials && project.materials.boardThickness, 18) || 18;
-  const W = num(mod.dimensions && mod.dimensions.width);
-  const D = num(mod.dimensions && mod.dimensions.depth);
-  const H = num(mod.dimensions && mod.dimensions.height);
-  const front = { ...(project.front || {}), ...(mod.front || {}) };
-  const isInternal = el.subtype === "szuflada-wewnetrzna";
-  const isInset = front.type === "wpuszczane";
-  const y = num(el.y), h = num(el.h);
-
-  let availableSpace = h;
-  if (y < th) availableSpace -= th;
-  if (y + h > H - th) availableSpace -= th;
-
-  const innerW = W - th * 2;
-  // Głębokość dla doboru długości nominalnej (NL) - TAK SAMO jak lista formatek
-  // (engine/cabinet.js: getFrontsAndDrawers): głębokość wieńców korpusu (bez płyty pleców;
-  // przy plecach w nucie jeszcze bez cofnięcia), a od niej front wewnętrzny albo grubość
-  // frontu wpuszczanego. Wcześniej 3D i ta funkcja odejmowały stałe 19 mm i dobierały o
-  // stopień krótszą prowadnicę (450 zamiast 500) niż formatka dna.
-  const backThick = num(project.materials && project.materials.backThickness, 3) || 3;
-  const backP = mod.backPanel || { type: "nakladane", offset: 16 };
-  let depth = backP.type === "nut" ? D - num(backP.offset, 16) - backThick : D - backThick;
-  if (isInternal) depth -= num(el.innerFrontThickness, 18) + num(el.innerSetback, 2);
-  else if (isInset) depth -= th;
-  const forceNL = parseFloat(el.forceNL);
-  if (Number.isFinite(forceNL)) depth = forceNL + 10;
-
-  const sys = String(front.drawerSystem || "merivobox").toLowerCase();
-  const comps = getDrawerComponents(sys, innerW, depth, availableSpace, el.forceVariant || "auto", el.drawerSideHeight);
+  // Wnęka, głębokość (NL) i skrzynka - TAK SAMO jak lista formatek i okuć
+  // (core/drawerSpec.js). Skrzynka wyśrodkowana we wnęce w świetle (kolumna za przegrodą).
+  const spec = drawerSpec(mod, el, project);
+  const comps = spec.comps;
   if (!comps) return null;
+  const { th, isInset, availableSpace, openingX0, openingW, system: sys } = spec;
+  const y = num(el.y);
 
   const dw = comps.bottom.width;
   const dh = comps.back.height;
@@ -55,12 +32,12 @@ export function getDrawerBoxInfo(mod, el, project) {
   if (comps.woodenBox) {
     // MOVENTO: boki z płyty, skrzynka zaczyna się luz nad dołem wnęki.
     const t = comps.sideThickness;
-    const x0 = th + (innerW - dw) / 2 - t;
+    const x0 = openingX0 + (openingW - dw) / 2 - t;
     const yb = y0 + comps.bottomClearance;
-    return { rect: { x0, x1: x0 + dw + 2 * t, y0: yb, y1: yb + comps.sideHeight }, comps, system: sys, openingW: innerW, openingH: availableSpace };
+    return { rect: { x0, x1: x0 + dw + 2 * t, y0: yb, y1: yb + comps.sideHeight }, comps, system: sys, openingW, openingH: availableSpace };
   }
-  const x0 = th + (innerW - dw) / 2 - SIDE_T;
-  return { rect: { x0, x1: x0 + dw + 2 * SIDE_T, y0, y1: y0 + SIDE_T + dh }, comps, system: sys, openingW: innerW, openingH: availableSpace };
+  const x0 = openingX0 + (openingW - dw) / 2 - SIDE_T;
+  return { rect: { x0, x1: x0 + dw + 2 * SIDE_T, y0, y1: y0 + SIDE_T + dh }, comps, system: sys, openingW, openingH: availableSpace };
 }
 
 // Sam obrys skrzynki (patrz getDrawerBoxInfo) albo null.

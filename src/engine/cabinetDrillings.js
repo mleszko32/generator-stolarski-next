@@ -16,6 +16,7 @@
 // - formatka pozioma (wieniec, półka, trawers poziomy): rzut z góry, x od lewej krawędzi
 //   formatki, z od przodu; otwory w czołach mają edge 'lewe' / 'prawe' / 'przednie' / 'tylne'.
 import { calculateModuleParts } from "./cabinet.js";
+import { resolveBackPanel, corpusInnerDepth } from "../core/backPanel.js";
 import { recalculateLayout, getTraverseConfig } from "../core/layout.js";
 import { jointSetsFor } from "./carcaseParts.js";
 import { num, round1 } from "../utils/math.js";
@@ -50,10 +51,10 @@ export function getCabinetPanels(mod, project) {
   const W = num(mod.dimensions.width), H = num(mod.dimensions.height), D = num(mod.dimensions.depth);
   const cons = { joinType: "boki_przelotowe", topType: "pelny", traverseWidth: 100, ...(project.construction || {}), ...(mod.construction || {}) };
   const isFull = cons.joinType === "wience_przelotowe";       // wieńce na całą szerokość, boki między nimi
-  const backP = { type: "nakladane", offset: 16, ...(project.backPanel || {}), ...(mod.backPanel || {}) };
+  const backP = resolveBackPanel(mod, project);
   const sideH = isFull ? H - 2 * th : H;
   const sideD = backP.type === "nut" ? D : D - backThick;
-  const tbDepth = backP.type === "nut" ? D - num(backP.offset, 16) - backThick : D - backThick;
+  const tbDepth = corpusInnerDepth(mod, project, D);
   const tbW = isFull ? W : W - 2 * th;
   const spec = cabinetHoleSpecs(th);
   const setsToKinds = (depth) => jointSetsFor(mod, project, depth).flatMap((s) => [[s.screw, "wkret"], [s.dowel, "kolek"]]).sort((a, b) => a[0] - b[0]);
@@ -233,7 +234,7 @@ export function getCabinetPanels(mod, project) {
 // Opis konstrukcji do nagłówka instrukcji i kolejności montażu.
 export function getCabinetConstruction(mod, project) {
   const cons = { joinType: "boki_przelotowe", topType: "pelny", ...(project.construction || {}), ...(mod.construction || {}) };
-  const backP = { type: "nakladane", ...(project.backPanel || {}), ...(mod.backPanel || {}) };
+  const backP = resolveBackPanel(mod, project);
   return {
     isFull: cons.joinType === "wience_przelotowe",
     topType: cons.topType,

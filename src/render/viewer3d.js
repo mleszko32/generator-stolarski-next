@@ -1,12 +1,13 @@
 // src/render/viewer3d.js
 import * as THREE from 'three';
+import { resolveBackPanel } from '../core/backPanel.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { state, DEFAULT_ROOM, frontBodyGap } from '../core/state.js';
 
-import { getDrawerComponents, calculateDrawerHoles } from '../core/drawerMath.js';
-import { drawerSystems } from '../core/drawerSystems.js';
-import { calculateHinges } from '../core/hingeMath.js';
+import { calculateDrawerHoles } from '../core/drawerMath.js';
+import { drawerSpec } from '../core/drawerSpec.js';
+import { calculateHinges, stackedHingeObstacles } from '../core/hingeMath.js';
 import { recalculateLayout, getTraverseConfig, getWorldFootprint, clampModuleToRoom, getModuleBox } from '../core/layout.js';
 import { buildZoneTree, moveSplit } from '../core/zoneTree.js';
 import { scheduleCheckpoint } from '../core/history.js';
@@ -1124,7 +1125,7 @@ export function update3D() {
       const udCorp = { moduleId: mod.id, type: 'corpus' };
       const udBack = { moduleId: mod.id, type: 'corpus', part: 'back' }; 
 
-      const backP = mod.backPanel || { type: 'nakladane', offset: 16 };
+      const backP = resolveBackPanel(mod, state.project);
       const backThick = 3; 
       
       let sideD, tbD, backZ;
@@ -1284,8 +1285,6 @@ export function update3D() {
                       return; 
                   }
 
-                  const f = modFront;
-
                   let innerFrontThick = 18;
                   let innerSetback = 0;
                   let zForFront;
@@ -1310,58 +1309,20 @@ export function update3D() {
                       if (isXrayMode || !isFrontsVisible) {
                           const isBottomInZone = el.frontIndex === 0;
                           
-                          let availableSpace = el.h;
-                          if (el.y < th) availableSpace -= th; 
-                          if (el.y + el.h > H - th) availableSpace -= th; 
-
-                          const sysName = (f.drawerSystem || 'merivobox').toLowerCase();
-
-                          // NAPRAWA: forceVariant to klucz katalogu (np. "srednia"), nie litera
-                          // typu ("K") — różne systemy różnie nazywają literą ten sam klucz
-                          // (patrz core/drawerSystems.js). Porównanie po literze nigdy się nie
-                          // zgadzało, więc wymuszony wariant był tu po cichu ignorowany.
-                          let simulatedSpace = availableSpace;
-                          if (el.forceVariant && el.forceVariant !== 'auto') {
-                              const variantData = (drawerSystems[sysName] || drawerSystems.merivobox).variants[el.forceVariant];
-                              if (variantData) simulatedSpace = Math.min(variantData.height, availableSpace);
-                          }
-                          // NAPRAWA: jak przy dY niżej - korekta "dolnego frontu" w
-                          // calculateDrawerHoles ma sens tylko dla frontu nakładanego,
-                          // zjeżdżającego na wieniec dolny. Front wpuszczany ma już
-                          // poprawne el.y liczone od wnętrza (core/layout.js). Sprawdzamy
-                          // geometrię (baseZone.minY ~ th), nie tag "boundBottom" - starsze
-                          // projekty (import AI) budują baseZone bez tego taga wcale.
+                          // Wnęka, głębokość (NL) i skrzynka - wspólne z listą formatek i okuć
+                          // (core/drawerSpec.js); skrzynka wyśrodkowana we wnęce w świetle.
+                          const spec = drawerSpec(mod, el, state.project);
+                          const { system: sysName, simulatedSpace, openingX0, openingX1, openingW: innerWidth } = spec;
+                          const drawerComps = spec.comps;
+                          // NAPRAWA: korekta "dolnego frontu" w calculateDrawerHoles ma sens tylko dla
+                          // frontu nakładanego, zjeżdżającego na wieniec dolny. Front wpuszczany ma już
+                          // poprawne el.y liczone od wnętrza (core/layout.js). Sprawdzamy geometrię
+                          // (baseZone.minY ~ th), nie tag "boundBottom" - starsze projekty (import AI)
+                          // budują baseZone bez tego taga wcale.
                           const isBottomOuter = el.baseZone && parseFloat(el.baseZone.minY) <= th + 0.5;
-                          
-                          // NAPRAWA: el.w to szerokość FRONTU (kurczy się dla wpuszczanego,
-                          // patrz core/layout.js - front wpuszczany nie "zjeżdża" na boki o
-                          // grubość płyty jak nakładany). Realne dno/tył szuflady liczone są
-                          // od szerokości KORPUSU (engine/cabinet.js: width - board*2), stałej
-                          // niezależnie od stylu frontu - użycie tu el.w rysowało węższe pudło
-                          // szuflady w 3D niż w rzeczywistej liście formatek dla frontu
-                          // wpuszczanego, mimo że cutlist się nie zmieniał.
-                          const innerWidth = W - (th * 2);
-                          
-                          // Jak w liście formatek (engine/cabinet.js: getFrontsAndDrawers): głębokość wieńców
-                          // korpusu, od niej front wewnętrzny albo grubość frontu wpuszczanego. Wcześniej stałe
-                          // D - 19 dawało o stopień krótszą prowadnicę (450 zamiast 500 NL) niż formatka dna.
-                          const backThickForNL = parseFloat(state.project.materials?.backThickness) || 3;
-                          let availableDepth = backP.type === 'nut' ? D - backP.offset - backThickForNL : D - backThickForNL;
-                          if (isInternal) {
-                              availableDepth -= (innerFrontThick + innerSetback);
-                          } else if (isInsetFront) {
-                              availableDepth -= th;
-                          }
-                          
-                          if (el.forceNL && !isNaN(parseFloat(el.forceNL))) {
-                              availableDepth = parseFloat(el.forceNL) + 10;
-                          }
-
-                          // Pełne availableSpace, nie simulatedSpace — patrz analogiczny komentarz
-                          // w engine/cabinet.js (getFrontsAndDrawers).
-                          const drawerComps = getDrawerComponents(sysName, innerWidth, availableDepth, availableSpace, el.forceVariant || 'auto', el.drawerSideHeight);
+                          const fcMerged = { ...(state.project.front?.clearance || {}), ...(mod.front?.clearance || {}) };
                           // NL z doboru szuflady - MOVENTO ma tylne otwory prowadnicy zależne od długości.
-                          const dHoles = calculateDrawerHoles(sysName, el.y, simulatedSpace, th, el.frontIndex, isBottomInZone && isBottomOuter && !isInsetFront, drawerComps ? drawerComps.nominalLength : null, el.baseZone ? (parseFloat(el.baseZone.minY) || 0) + (parseFloat(el.baseZone.offsetBottom) || 0) : null);
+                          const dHoles = calculateDrawerHoles(sysName, el.y, simulatedSpace, th, el.frontIndex, isBottomInZone && isBottomOuter && !isInsetFront, spec.nl, el.baseZone ? (parseFloat(el.baseZone.minY) || 0) + (parseFloat(el.baseZone.offsetBottom) || 0) : null, fcMerged);
 
                           if (drawerComps && drawerComps.woodenBox) {
                               // MOVENTO: skrzynka z płyty (core/drawerMath.js) - boki na całą
@@ -1372,7 +1333,7 @@ export function update3D() {
                               const L = drawerComps.sides.length;
                               const sH = drawerComps.sideHeight;
                               const bH = drawerComps.back.height;
-                              const dX = posX + th + (innerWidth - dw) / 2;
+                              const dX = posX + openingX0 + (innerWidth - dw) / 2;
                               const dY = posY + el.y + (isBottomInZone && isBottomOuter && !isInsetFront ? th : 0) + drawerComps.bottomClearance;
                               const bY = dY + drawerComps.bottomRecess;
                               const boxStartZ = zForFront - L;
@@ -1391,7 +1352,7 @@ export function update3D() {
                               // (core/layout.js). Pudło szuflady centrujemy względem wnętrza
                               // KORPUSU (posX + th), nie względem frontu, żeby się nie przesuwało
                               // w bok przy samej zmianie stylu frontu.
-                              const dX = posX + th + (innerWidth - dw) / 2;
+                              const dX = posX + openingX0 + (innerWidth - dw) / 2;
 
                               // NAPRAWA: dno szuflady ma siedzieć tuż nad wieńcem dolnym korpusu
                               // (albo tuż nad frontem szuflady niżej w stosie), nie kilkanaście mm
@@ -1424,8 +1385,9 @@ export function update3D() {
 
                           if (dHoles && dHoles.slideSideHoles) {
                               const slideZOffset = isInternal ? (innerFrontThick + innerSetback) : 0; 
-                              const leftHoleX = posX + el.x - th/2;
-                              const rightHoleX = posX + el.x + el.w + th/2;
+                              // Prowadnice na ścianach wnęki (bok albo przegroda), nie przy krawędzi frontu.
+                              const leftHoleX = posX + openingX0 - th/2;
+                              const rightHoleX = posX + openingX1 + th/2;
 
                               dHoles.slideSideHoles.forEach(h => {
                                   let calcY = isTopBottomFull ? h.y - th : h.y;
@@ -1445,30 +1407,8 @@ export function update3D() {
                   
                   else if (el.subtype.includes('drzwi')) {
                       if (isXrayMode) {
-                          let obstacles = [];
-                          const modAbsX = parseFloat(mod.position.x) || 0;
-                          const modLegH = (mod.legs && mod.legs.active) ? (parseFloat(mod.legs.height) || 0) : 0;
-                          const modAbsY = (parseFloat(mod.position.y) || 0) + modLegH;
-
-                          state.project.modules.forEach(otherMod => {
-                              const otherAbsX = parseFloat(otherMod.position.x) || 0;
-                              const otherLegH = (otherMod.legs && otherMod.legs.active) ? (parseFloat(otherMod.legs.height) || 0) : 0;
-                              const otherAbsY = (parseFloat(otherMod.position.y) || 0) + otherLegH;
-
-                              if (Math.abs(modAbsX - otherAbsX) < 10) {
-                                  const dy = otherAbsY - modAbsY;
-                                  if (otherMod.elements) {
-                                      otherMod.elements.forEach(e => {
-                                          if (e.typ === 'poziom' || e.subtype === 'szuflada-wewnetrzna') {
-                                              obstacles.push({ ...e, y: e.y + dy });
-                                          }
-                                      });
-                                  }
-                                  const otherH = parseFloat(otherMod.dimensions.height);
-                                  obstacles.push({ typ: 'poziom', y: dy, h: th, isStructural: true });
-                                  obstacles.push({ typ: 'poziom', y: dy + otherH - th, h: th, isStructural: true });
-                              }
-                          });
+                          // Te same przeszkody co rysunek wierceń (engine/cabinet.js): szafki w tym samym X, Z i obrocie.
+                          const obstacles = stackedHingeObstacles(mod, state.project.modules, th);
 
                           const side = el.subtype === 'drzwi-lp' ? (el.id.includes('-L-') ? 'left' : 'right') : (el.openingSide || 'left');
                           const hinges = calculateHinges(el, th, obstacles, side);

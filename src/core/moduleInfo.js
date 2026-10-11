@@ -4,6 +4,7 @@
 // fronty (drzwi z liczbą zawiasów, szuflady z wymiarami frontu i skrzynki: długość,
 // szerokość, wysokość, system), półki. Czysta logika bez DOM - rysuje ją ui/properties.js.
 import { recalculateLayout } from "./layout.js";
+import { corpusInnerDepth } from "./backPanel.js";
 import { calculateHinges } from "./hingeMath.js";
 import { getDrawerBoxInfo } from "./drawerBoxes.js";
 import { num, round1 } from "../utils/math.js";
@@ -24,9 +25,7 @@ export function getModuleSummary(mod, project) {
   const els = mod.elements || [];
   // Głębokość wnętrza BEZ pleców (tak jak głębokość wieńców w liście formatek): przy plecach
   // nakładanych D - grubość HDF, przy plecach w nucie D - cofnięcie - grubość HDF.
-  const backThick = num(project.materials && project.materials.backThickness, 3) || 3;
-  const backP = mod.backPanel || { type: "nakladane", offset: 16 };
-  const innerD = backP.type === "nut" ? D - num(backP.offset, 16) - backThick : D - backThick;
+  const innerD = corpusInnerDepth(mod, project, D);
   const legs = mod.legs && mod.legs.active ? num(mod.legs.height, 100) : 0;
 
   const byPosition = (a, b) => num(a.y) - num(b.y) || num(a.x) - num(b.x);

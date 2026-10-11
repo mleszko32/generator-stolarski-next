@@ -141,12 +141,15 @@ export function getDrawerComponents(systemId, internalWidth, internalDepth, avai
 
 // nl - długość nominalna prowadnicy; dla MOVENTO decyduje o tylnych otworach.
 // zoneBottom - spód wnęki (wierzch wieńca albo półki, na której stoi szuflada).
-export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick, index, isBottom, nl = null, zoneBottom = null) {
-  const config = state.project;
-  const bottomGap = Number(config.front.clearance.bottom ?? 0);
-  
-  const leftGap = Number(config.front.clearance.left ?? config.front.clearance.sides ?? 1.5);
-  const rightGap = Number(config.front.clearance.right ?? config.front.clearance.sides ?? 1.5);
+// clearance - luzy frontu SCALONE z ustawieniami szafki ({ ...project.front.clearance,
+// ...mod.front.clearance }); bez niego tylko luzy projektu (lokalny luz szafki przesuwał
+// otwory frontu względem frontu policzonego w core/layout.js).
+export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick, index, isBottom, nl = null, zoneBottom = null, clearance = null) {
+  const fc = clearance || state.project.front?.clearance || {};
+  const bottomGap = Number(fc.bottom ?? 0);
+
+  const leftGap = Number(fc.left ?? fc.sides ?? 1.5);
+  const rightGap = Number(fc.right ?? fc.sides ?? 1.5);
 
   // Offsety montażowe pobierane są z jedynego wspólnego katalogu
   // (drawerSystems.js), żeby uniknąć rozjazdu wartości między plikami.

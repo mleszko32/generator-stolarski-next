@@ -6,6 +6,7 @@
 // otworów, montaż w izometrii (rozstrzelony + złożony), kolejność montażu i "gdzie w
 // projekcie" (rzut pokoju z góry i widok ściany z podświetloną szafką).
 import { C, FONT } from "./drawingPalette.js";
+import { resolveBackPanel } from "../core/backPanel.js";
 import { escapeHtml } from "../utils/dom.js";
 import { cabinetHoleSpecs } from "../engine/cabinetDrillings.js";
 import { lPanelSVG, lPanelFrame } from "./cornerInstructions2d.js";
@@ -245,7 +246,8 @@ function cabinetSolids(mod, panels, project, explode) {
   if (back) {
     const D = parseFloat(mod.dimensions.depth) || 0;
     const bt = back.thickness;
-    const zb = (mod.backPanel && mod.backPanel.type === "nut") ? D - (parseFloat(mod.backPanel.offset) || 16) - bt : D - bt;
+    const bp = resolveBackPanel(mod, project);
+    const zb = bp.type === "nut" ? D - bp.offset - bt : D - bt;
     const bx0 = (W - back.width) / 2, by0 = (H - back.length) / 2;
     solids.push({ no: no("plecy"), name: back.name, solid: prism(rect(bx0, by0, bx0 + back.width, by0 + back.length), "z", zb, bt), shift: [0, 0, explode], tone: C.amber100 });
   }

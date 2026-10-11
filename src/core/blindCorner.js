@@ -9,6 +9,7 @@
 // przycinane do otworu - po recalculateLayout (core/layout.js wywołuje
 // applyBlindCorner). Czysta logika bez DOM/Three.js.
 import { num } from "../utils/math.js";
+import { corpusInnerDepth } from "./backPanel.js";
 import { checkCornerFitting, getCornerFitting } from "./cornerFittings.js";
 
 export const DEFAULT_BLIND_FRONT = 450;
@@ -169,12 +170,10 @@ export function getBlindStile(mod, project) {
 // Wymiary wnętrza do sprawdzenia okucia.
 export function innerDims(mod, project) {
   const th = num(project.materials && project.materials.boardThickness, 18) || 18;
-  const backThick = num(project.materials && project.materials.backThickness, 3);
-  const bp = mod.backPanel || {};
   const D = num(mod.dimensions && mod.dimensions.depth, 513);
   const H = num(mod.dimensions && mod.dimensions.height, 720);
   return {
-    innerDepth: D - backThick - (bp.type === "nut" ? num(bp.offset) : 0),
+    innerDepth: corpusInnerDepth(mod, project, D),
     innerHeight: H - 2 * th,
   };
 }

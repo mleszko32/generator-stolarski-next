@@ -138,3 +138,29 @@ export function calculateHinges(front, boardThick, obstacles, side) {
 
   return hinges;
 }
+// Przeszkody dla zawiasów drzwi szafki `mod`: półki i szuflady wewnętrzne oraz wieńce
+// wszystkich szafek postawionych w tym samym miejscu (ten sam X, Z i obrót - np. dolny +
+// górny moduł szafy), w układzie Y szafki `mod`. Wspólne dla listy formatek / rysunku
+// wierceń (engine/cabinet.js) i 3D (render/viewer3d.js) - wcześniej 3D sprawdzało samo X
+// i półki szafki z drugiego końca pokoju o tym samym X przesuwały puszki tylko w 3D.
+export function stackedHingeObstacles(mod, modules, boardThick) {
+  const rotOf = (m) => ((parseFloat(m.rotation) || 0) % 360 + 360) % 360;
+  const baseY = (m) => (parseFloat(m.position.y) || 0) + ((m.legs && m.legs.active) ? (parseFloat(m.legs.height) || 0) : 0);
+  const x = parseFloat(mod.position.x) || 0;
+  const z = parseFloat(mod.position.z) || 0;
+  const y = baseY(mod);
+  const obstacles = [];
+  modules.forEach((other) => {
+    if (Math.abs((parseFloat(other.position.x) || 0) - x) >= 10) return;
+    if (Math.abs((parseFloat(other.position.z) || 0) - z) >= 10) return;
+    if (rotOf(other) !== rotOf(mod)) return;
+    const dy = baseY(other) - y;
+    (other.elements || []).forEach((el) => {
+      if (el.typ === 'poziom' || el.subtype === 'szuflada-wewnetrzna') obstacles.push({ ...el, y: el.y + dy });
+    });
+    const otherH = parseFloat(other.dimensions.height) || 0;
+    obstacles.push({ typ: 'poziom', y: dy, h: boardThick, isStructural: true });
+    obstacles.push({ typ: 'poziom', y: dy + otherH - boardThick, h: boardThick, isStructural: true });
+  });
+  return obstacles;
+}
