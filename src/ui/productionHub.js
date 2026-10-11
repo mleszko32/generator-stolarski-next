@@ -422,10 +422,12 @@ function renderInstrukcje(el) {
       </select></div>
       ${rc.rearMode === 'pin' ? `
       <div class="field"><label>Kalibracja: głębokość zmierzonego boku [mm]</label><input type="number" class="rc-f" data-k="calibDepth" value="${rc.calibDepth ?? ''}" placeholder="np. 510"></div>
-      <div class="field"><label>Kalibracja: tylny wkręt od tylnej krawędzi [mm]</label><input type="number" class="rc-f" data-k="calibRear" value="${rc.calibRear ?? ''}" placeholder="np. 45" step="0.5"></div>` : ''}` : ''}
+      <div class="field"><label>Kalibracja: tylny wkręt od tylnej krawędzi [mm]</label><input type="number" class="rc-f" data-k="calibRear" value="${rc.calibRear ?? ''}" placeholder="np. 40" step="0.5"></div>
+      <div class="field"><label>Kalibracja: pin tylnej wiertarki (od tyłu)</label><input type="number" class="rc-f" data-k="calibPin" value="${rc.calibPin ?? ''}" placeholder="np. 7" min="1" max="21"></div>
+      <div class="field"><label>Pin przedniej wiertarki</label><input type="number" class="rc-f" data-k="frontPin" value="${rc.frontPin ?? ''}" placeholder="np. 3" min="1" max="21"></div>` : ''}` : ''}
     </div>
     ${rc.enabled && rc.rearMode === 'pin' && !(rc.calibDepth > 0 && rc.calibRear > 0) ? '<p class="notice-warn fs-xs">Bez kalibracji tylny otwór łączników wypada 29–45 mm od tyłu (najbliższy pin szyny) - rysunki pokazują 37 mm, a karta wiercenia każe sprawdzić pierwszą sztukę. Zmierz raz jeden bok i wpisz dwie liczby wyżej.</p>' : ''}
-    ${rc.enabled && rc.rearMode === 'pin' && rc.calibDepth > 0 && rc.calibRear > 0 ? `<p class="hub-sub">Tylny otwór na pinie (kalibracja ${rc.calibDepth} mm → ${rc.calibRear} mm od tyłu): ${[320, 510, 521, 560].map((D) => `${D} mm → ${Math.round((D - rcRearScrew(D, rc).x) * 10) / 10} mm od tyłu`).join(', ')}.</p>` : ''}
+    ${rc.enabled && rc.rearMode === 'pin' && rc.calibDepth > 0 && rc.calibRear > 0 ? `<p class="hub-sub">Tylny otwór na pinie (kalibracja ${rc.calibDepth} mm → ${rc.calibRear} mm od tyłu): ${[320, 510, 521, 560].map((D) => { const r = rcRearScrew(D, rc); return `${D} mm → ${r.pin ? `pin ${r.pin}, ` : ''}${Math.round((D - r.x) * 10) / 10} mm od tyłu`; }).join('; ')}.</p>`: ''}
     ${mods.length === 0 ? '<p class="hub-empty">Projekt nie ma jeszcze szafek.</p>' : `
     <table class="hub-table">
       <thead><tr><th>Szafka</th><th>Wymiary</th><th></th></tr></thead>

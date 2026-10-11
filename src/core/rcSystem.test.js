@@ -23,26 +23,31 @@ describe("stół RC System - tylny otwór łączników", () => {
     expect(rcRearScrew(510, { rearMode: "pin" })).toEqual({ x: 473, exact: false, range: [29, 45] });
   });
 
-  it("pin z kalibracją z warsztatu (521 -> 34 od tyłu): najbliższy otwór szyny co 16 mm", () => {
-    const s = { rearMode: "pin", calibDepth: 521, calibRear: 34 };
-    expect(rcRearScrew(521, s).x).toBe(487);                    // 34 od tyłu - pomiar
-    expect(510 - rcRearScrew(510, s).x).toBe(39);
-    expect(560 - rcRearScrew(560, s).x).toBe(41);
-    expect(320 - rcRearScrew(320, s).x).toBe(41);
-    expect(537 - rcRearScrew(537, s).x).toBe(34);               // +16 mm głębokości -> ta sama odległość od tyłu
+  it("pin z kalibracją z warsztatu (510, pin 7 -> 470 od przodu = 40 od tyłu): najbliższy otwór szyny", () => {
+    const s = { rearMode: "pin", calibDepth: 510, calibRear: 40, calibPin: 7 };
+    expect(rcRearScrew(510, s)).toEqual({ x: 470, exact: true, pin: 7 });   // pomiar
+    expect(rcRearScrew(521, s)).toMatchObject({ x: 486, pin: 6 });          // 35 od tyłu, pin 6 jak w warsztacie
+    expect(rcRearScrew(320, s)).toMatchObject({ x: 278, pin: 19 });
+    expect(rcRearScrew(560, s)).toMatchObject({ x: 518, pin: 4 });
     for (let D = 300; D <= 650; D++) {
-      const r = D - rcRearScrew(D, s).x;
-      expect(r).toBeGreaterThanOrEqual(29);
-      expect(r).toBeLessThanOrEqual(45);
-      expect(Math.abs((rcRearScrew(D, s).x - 487) % 16)).toBe(0); // zawsze na siatce szyny
+      const r = rcRearScrew(D, s);
+      expect(D - r.x).toBeGreaterThanOrEqual(29);
+      expect(D - r.x).toBeLessThanOrEqual(45);
+      expect(Math.abs((r.x - 470) % 16)).toBe(0);                          // zawsze na siatce szyny
+      if (r.pin !== null) expect(r.x).toBe(470 + (7 - r.pin) * 16);
     }
   });
 
+  it("bez numeru pinu w kalibracji - samo położenie; pin spoza szyny -> null", () => {
+    expect(rcRearScrew(510, { rearMode: "pin", calibDepth: 510, calibRear: 40 }).pin).toBeNull();
+    expect(rcRearScrew(1200, { rearMode: "pin", calibDepth: 510, calibRear: 40, calibPin: 7 }).pin).toBeNull();
+  });
+
   it("domyślna kalibracja = pomiar z warsztatu; puste pola jej nie kasują; nadpisanie tylko gdy stół włączony", () => {
-    expect(getRcSettings({})).toMatchObject({ enabled: false, rearMode: "pin", calibDepth: 521, calibRear: 34 });
-    expect(getRcSettings({ rcSystem: { calibDepth: null, calibRear: "" } })).toMatchObject({ calibDepth: 521, calibRear: 34 });
+    expect(getRcSettings({})).toMatchObject({ enabled: false, rearMode: "pin", calibDepth: 510, calibRear: 40, calibPin: 7, frontPin: 3 });
+    expect(getRcSettings({ rcSystem: { calibDepth: null, calibRear: "" } })).toMatchObject({ calibDepth: 510, calibRear: 40 });
     expect(rcRearOverride(510, { rcSystem: { enabled: false } })).toBeNull();
-    expect(rcRearOverride(510, { rcSystem: { enabled: true } })).toBe(471);
+    expect(rcRearOverride(510, { rcSystem: { enabled: true } })).toBe(470);
     expect(rcRearOverride(510, { rcSystem: { enabled: true, rearMode: "stop" } })).toBe(473);
   });
 

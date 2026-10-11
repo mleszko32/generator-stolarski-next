@@ -50,12 +50,14 @@ function rcCardHtml(panels) {
     const pair = shot.length === 2 ? " <span class=\"muted\">(1 wiercenie, 2 wrzeciona)</span>" : "";
     if (row.st.alongFrom !== "przód") return `${pos}${pair}`;
     // Łączniki przy dole / górze: przednia wiertarka od zderzaka, tylna wg trybu, środkowe - pin w szynie.
-    if (i === 0 && Math.abs(shot[0] - RC_FRONT_STOP) < 0.05) return `${pos}${pair} - przednia wiertarka, przód do zderzaka 37`;
+    if (i === 0 && Math.abs(shot[0] - RC_FRONT_STOP) < 0.05) {
+      return `${pos}${pair} - przednia wiertarka${rc.frontPin ? ` (pin ${rc.frontPin})` : ""}, przód do zderzaka 37`;
+    }
     if (i === all.length - 1 && all.length > 1) {
       const r = rcRearScrew(row.depth, rc);
       if (rc.rearMode === "stop") return `${pos}${pair} - tylna wiertarka zderzakiem do tylnej krawędzi`;
       return r.exact
-        ? `${pos}${pair} - tylna wiertarka na pinie w szynie (${fmt(row.depth - r.x)} mm od tyłu)`
+        ? `${pos}${pair} - tylna wiertarka na ${r.pin ? `<b>pinie ${r.pin}</b> (od tyłu)` : "pinie w szynie"} - ${fmt(row.depth - r.x)} mm od tyłu`
         : `${pos}${pair} - tylna wiertarka na najbliższym pinie: otwór ${RC_PIN_RANGE[0]}–${RC_PIN_RANGE[1]} mm od tyłu - <b>sprawdź pierwszą sztukę</b> (dokładnie po kalibracji w hubie)`;
     }
     return `${pos}${pair} - wiertarka zablokowana pinem w szynie (${fmt(shot[0])} mm od przodu)`;
