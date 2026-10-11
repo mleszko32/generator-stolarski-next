@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { baseAndPin, rcRearScrew, rcRearOverride, rcPanelSetups, getRcSettings, rcPinsFor, rcMidGrid, rcMidPinForX } from "./rcSystem.js";
+import { baseAndPin, rcRearScrew, rcRearOverride, rcPanelSetups, getRcSettings, rcPinsFor, rcMidGrid, rcMidPinForX, rcPinSideText } from "./rcSystem.js";
 import { jointSetPositions } from "../engine/carcaseParts.js";
 import { getCabinetPanels } from "../engine/cabinetDrillings.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
@@ -128,5 +128,15 @@ describe("stół RC System - środkowe zestawy łączników", () => {
         expect(lo).toBeGreaterThan(hiPrev);
       }
     }
+  });
+});
+
+describe("stół RC System - strona szyny przy numerze pinu", () => {
+  it("piny przedniej wiertarki i środka po jej stronie, tylne po przeciwnej (domyślnie przednia po lewej)", () => {
+    const s = getRcSettings({});
+    expect(s.frontSide).toBe("lewa");
+    expect(rcPinSideText(16, "przód", s)).toBe("pin 16 po lewej (strona przedniej wiertarki)");
+    expect(rcPinSideText(7, "tył", s)).toBe("pin 7 po prawej (strona tylnej wiertarki)");
+    expect(rcPinSideText(7, "tył", { frontSide: "prawa" })).toBe("pin 7 po lewej (strona tylnej wiertarki)");
   });
 });

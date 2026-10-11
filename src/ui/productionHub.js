@@ -31,7 +31,7 @@ import { mountKosztorys } from "./kosztorysModal.js";
 import { collectDrawerBoxes, getDrawerBoxSettings, JOIN_METHODS, LAMELLO } from "../core/drawerBoxBuild.js";
 import { openDrawerBoxDrawings } from "./drawerBoxDrawings.js";
 import { openCabinetInstructions, supportsInstructions } from "./cabinetInstructions.js";
-import { getRcSettings, rcRearScrew } from "../core/rcSystem.js";
+import { getRcSettings, rcRearScrew, rcPinSideText } from "../core/rcSystem.js";
 
 const SECTIONS = [
   { id: 'formatki', label: 'Formatki', icon: 'ti-list-details' },
@@ -416,6 +416,10 @@ function renderInstrukcje(el) {
     <div class="field-grid" style="margin:12px 0">
       <label class="hub-sub"><input type="checkbox" id="rc-on" ${rc.enabled ? 'checked' : ''}/> Wiercę na stole RC System (karta wiercenia w instrukcjach)</label>
       ${rc.enabled ? `
+      <div class="field"><label>Przednia wiertarka stoi (patrząc na szynę)</label><select id="rc-front-side">
+        <option value="lewa" ${rc.frontSide !== 'prawa' ? 'selected' : ''}>po lewej</option>
+        <option value="prawa" ${rc.frontSide === 'prawa' ? 'selected' : ''}>po prawej</option>
+      </select></div>
       <div class="field"><label>Tylna wiertarka</label><select id="rc-rear">
         <option value="pin" ${rc.rearMode === 'pin' ? 'selected' : ''}>Na pinie w szynie (co 16 mm)</option>
         <option value="stop" ${rc.rearMode === 'stop' ? 'selected' : ''}>Zderzakiem do tylnej krawędzi (37 mm)</option>
@@ -423,14 +427,14 @@ function renderInstrukcje(el) {
       ${rc.rearMode === 'pin' ? `
       <div class="field"><label>Kalibracja: głębokość zmierzonego boku [mm]</label><input type="number" class="rc-f" data-k="calibDepth" value="${rc.calibDepth ?? ''}" placeholder="np. 510"></div>
       <div class="field"><label>Kalibracja: tylny wkręt od tylnej krawędzi [mm]</label><input type="number" class="rc-f" data-k="calibRear" value="${rc.calibRear ?? ''}" placeholder="np. 40" step="0.5"></div>
-      <div class="field"><label>Kalibracja: pin tylnej wiertarki (od tyłu)</label><input type="number" class="rc-f" data-k="calibPin" value="${rc.calibPin ?? ''}" placeholder="np. 7" min="1" max="21"></div>
+      <div class="field"><label>Kalibracja: pin tylnej wiertarki (od jej końca szyny)</label><input type="number" class="rc-f" data-k="calibPin" value="${rc.calibPin ?? ''}" placeholder="np. 7" min="1" max="21"></div>
       <div class="field"><label>Kalibracja: pin przedniej wiertarki</label><input type="number" class="rc-f" data-k="calibFrontPin" value="${rc.calibFrontPin ?? ''}" placeholder="np. 3" min="1" max="21"></div>
-      <div class="field"><label>Kalibracja środka: pin (od przodu)</label><input type="number" class="rc-f" data-k="calibMidPin" value="${rc.calibMidPin ?? ''}" placeholder="np. 16" min="1" max="21"></div>
+      <div class="field"><label>Kalibracja środka: pin (od końca przedniej wiertarki)</label><input type="number" class="rc-f" data-k="calibMidPin" value="${rc.calibMidPin ?? ''}" placeholder="np. 16" min="1" max="21"></div>
       <div class="field"><label>Kalibracja środka: tylny otwór od przodu [mm]</label><input type="number" class="rc-f" data-k="calibMidX" value="${rc.calibMidX ?? ''}" placeholder="np. 277" step="0.5"></div>` : ''}
       <div class="field"><label>Pin przedniej wiertarki przy pracy</label><input type="number" class="rc-f" data-k="frontPin" value="${rc.frontPin ?? ''}" placeholder="np. 3" min="1" max="21"></div>` : ''}
     </div>
     ${rc.enabled && rc.rearMode === 'pin' && !(rc.calibDepth > 0 && rc.calibRear > 0) ? '<p class="notice-warn fs-xs">Bez kalibracji tylny otwór łączników wypada 29–45 mm od tyłu (najbliższy pin szyny) - rysunki pokazują 37 mm, a karta wiercenia każe sprawdzić pierwszą sztukę. Zmierz raz jeden bok i wpisz dwie liczby wyżej.</p>' : ''}
-    ${rc.enabled && rc.rearMode === 'pin' && rc.calibDepth > 0 && rc.calibRear > 0 ? `<p class="hub-sub">Tylny otwór na pinie (kalibracja ${rc.calibDepth} mm → ${rc.calibRear} mm od tyłu): ${[320, 510, 521, 560].map((D) => { const r = rcRearScrew(D, rc); return `${D} mm → ${r.pin ? `przednia pin ${r.frontPin}, tylna pin ${r.pin}, ` : ''}${Math.round((D - r.x) * 10) / 10} mm od tyłu`; }).join('; ')}. Pin przedniej wiertarki nie zmienia położenia otworów - tylny pin przesuwa się razem z nim (przednia 2 zamiast 3 = tylna o 1 niżej).</p>`: ''}
+    ${rc.enabled && rc.rearMode === 'pin' && rc.calibDepth > 0 && rc.calibRear > 0 ? `<p class="hub-sub">Tylny otwór na pinie (kalibracja ${rc.calibDepth} mm → ${rc.calibRear} mm od tyłu): ${[320, 510, 521, 560].map((D) => { const r = rcRearScrew(D, rc); return `${D} mm → ${r.pin ? `przednia: ${rcPinSideText(r.frontPin, 'przód', rc)}, tylna: ${rcPinSideText(r.pin, 'tył', rc)}, ` : ''}${Math.round((D - r.x) * 10) / 10} mm od tyłu`; }).join('; ')}. Pin przedniej wiertarki nie zmienia położenia otworów - tylny pin przesuwa się razem z nim (przednia 2 zamiast 3 = tylna o 1 niżej).</p>`: ''}
     ${mods.length === 0 ? '<p class="hub-empty">Projekt nie ma jeszcze szafek.</p>' : `
     <table class="hub-table">
       <thead><tr><th>Szafka</th><th>Wymiary</th><th></th></tr></thead>
@@ -446,6 +450,7 @@ function renderInstrukcje(el) {
     </table>`}`;
   el.querySelector('#rc-on')?.addEventListener('change', (e) => saveRc({ enabled: e.target.checked }));
   el.querySelector('#rc-rear')?.addEventListener('change', (e) => saveRc({ rearMode: e.target.value }));
+  el.querySelector('#rc-front-side')?.addEventListener('change', (e) => saveRc({ frontSide: e.target.value }));
   el.querySelectorAll('.rc-f').forEach((i) => i.addEventListener('change', () => { const v = parseFloat(i.value); saveRc({ [i.dataset.k]: Number.isFinite(v) && v > 0 ? v : null }); }));
   el.querySelector('#in-all')?.addEventListener('click', () => openCabinetInstructions(ok, p.name));
   el.querySelectorAll('.in-open').forEach(btn => btn.addEventListener('click', () => openCabinetInstructions(mods.filter(m => m.id === btn.dataset.id), p.name)));

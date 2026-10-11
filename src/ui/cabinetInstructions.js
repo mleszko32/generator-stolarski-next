@@ -20,7 +20,7 @@ import { cornerAssemblySVG, cornerStepsHtml } from "../render/cornerInstructions
 import { getSlopePanels, getSlopeConstruction } from "../engine/slopeDrillings.js";
 import { slopeAssemblySVG, slopeStepsHtml } from "../render/slopeInstructions2d.js";
 import { WORKSHOP_CSS } from "./drawerBoxDrawings.js";
-import { getRcSettings, rcPanelSetups, rcRearScrew, rcMidPinForX, RC_FRONT_STOP, RC_PIN_RANGE } from "../core/rcSystem.js";
+import { getRcSettings, rcPanelSetups, rcRearScrew, rcMidPinForX, rcPinSideText, RC_FRONT_STOP, RC_PIN_RANGE } from "../core/rcSystem.js";
 
 const fmt = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
 const TYPE = { base_cabinet: "Szafka dolna", upper_cabinet: "Szafka wisząca", tall_cabinet: "Słupek", corner_cabinet: "Szafka narożna", slope_cabinet: "Szafka pod skos" };
@@ -53,20 +53,20 @@ function rcCardHtml(panels) {
     if (i === 0 && Math.abs(shot[0] - RC_FRONT_STOP) < 0.05) {
       // Pin przedniej wiertarki z doboru dla tej głębokości (zwykle ten, na którym się pracuje).
       const fp = rc.rearMode === "pin" ? rcRearScrew(row.depth, rc).frontPin : rc.frontPin;
-      return `${pos}${pair} - przednia wiertarka${fp ? ` (pin ${fp})` : ""}, przód do zderzaka 37`;
+      return `${pos}${pair} - przednia wiertarka${fp ? ` (${rcPinSideText(fp, "przód", rc)})` : ""}, przód do zderzaka 37`;
     }
     if (i === all.length - 1 && all.length > 1) {
       const r = rcRearScrew(row.depth, rc);
       if (rc.rearMode === "stop") return `${pos}${pair} - tylna wiertarka zderzakiem do tylnej krawędzi`;
       return r.exact
-        ? `${pos}${pair} - tylna wiertarka na ${r.pin ? `<b>pinie ${r.pin}</b> (od tyłu)` : "pinie w szynie"} - ${fmt(row.depth - r.x)} mm od tyłu`
+        ? `${pos}${pair} - tylna wiertarka, ${r.pin ? `<b>${rcPinSideText(r.pin, "tył", rc)}</b>` : "na pinie w szynie"} - ${fmt(row.depth - r.x)} mm od tyłu`
         : `${pos}${pair} - tylna wiertarka na najbliższym pinie: otwór ${RC_PIN_RANGE[0]}–${RC_PIN_RANGE[1]} mm od tyłu - <b>sprawdź pierwszą sztukę</b> (dokładnie po kalibracji w hubie)`;
     }
     // Środkowe zestawy: tylna wiertarka przesunięta do przodu, przednią stroną do pinu
     // (od pinu do wiertła 37 mm, core/rcSystem.js: rcMidPinForX).
     const mp = rcMidPinForX(Math.max(...shot), rc);
     return mp
-      ? `${pos}${pair} - tylna wiertarka przesunięta do przodu, przednią stroną do <b>pinu ${mp.pin}</b> (licząc od ${mp.from === "tył" ? "tyłu" : "przodu"})`
+      ? `${pos}${pair} - tylna wiertarka przesunięta do przodu, przednią stroną do pinu: <b>${rcPinSideText(mp.pin, mp.from, rc)}</b>`
       : `${pos}${pair} - wiertarka zablokowana pinem w szynie (${fmt(shot[0])} mm od przodu)`;
   };
   const body = rows.map((row) => `<tr>

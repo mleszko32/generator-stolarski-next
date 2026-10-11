@@ -61,8 +61,18 @@ export const RC_SPINDLE = 32;            // rozstaw wrzecion wiertarki
 // przodu formatki przy tylnej wiertarce opartej przednią stroną o pin calibMidPin, liczony od
 // PRZEDNIEGO końca szyny (warsztat: formatka 510, przednia pin 3, środek pin 16 -> 245/277).
 export const RC_DEFAULT_CALIB = { calibDepth: 510, calibRear: 40, calibPin: 7, calibFrontPin: 3, frontPin: 3, calibMidX: 277, calibMidPin: 16 };
+// Strona stołu (patrząc na szynę), po której stoi przednia wiertarka - szyna jest numerowana
+// od obu końców, więc karta wiercenia mówi, po której stronie liczyć pin (warsztat: lewa).
+export const RC_DEFAULT_FRONT_SIDE = "lewa";
+
+// Opis pinu z jego końcem szyny: from 'przód' = strona przedniej wiertarki, 'tył' = tylnej.
+export function rcPinSideText(pin, from, settings) {
+  const frontSide = (settings && settings.frontSide) === "prawa" ? "prawa" : "lewa";
+  const side = from === "przód" ? frontSide : (frontSide === "lewa" ? "prawa" : "lewa");
+  return `pin ${pin} po ${side === "lewa" ? "lewej" : "prawej"} (strona ${from === "przód" ? "przedniej" : "tylnej"} wiertarki)`;
+}
 export const RC_RAIL_PINS = 21; // otwory 1…20 od każdego końca + nienumerowany środkowy (21)
-const DEFAULTS = { enabled: false, rearMode: "pin", ...RC_DEFAULT_CALIB };
+const DEFAULTS = { enabled: false, rearMode: "pin", frontSide: RC_DEFAULT_FRONT_SIDE, ...RC_DEFAULT_CALIB };
 // Zakres, w którym może wypaść tylny otwór na pinie (najbliższy otwór szyny co 16 mm).
 export const RC_PIN_RANGE = [RC_FRONT_STOP - RC_RAIL_STEP / 2, RC_FRONT_STOP + RC_RAIL_STEP / 2];
 
