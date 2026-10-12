@@ -159,6 +159,7 @@ describe("Lamello w skośnym sztorcu (slopeBevelGroove)", () => {
     expect(b.fromLow).toBe(6);                        // (9 - 7·0,6) / 0,8
     expect(b.shift).toBe(5.3);                        // 7 · tg = 5,25
     expect(b.wall).toBe(2);                           // (18 - (7·0,8 + 14·0,6)) / 2
+    expect(b.discAngle).toBe(53.1);                   // tarcza Lamello: kąt bok - skośna płyta
     expect(slopeBevelGroove(55, 18, lam).wall).toBeGreaterThan(1);    // przy 18 mm P-14 mieści się zawsze
     expect(slopeBevelGroove(45, 16, lam).wall).toBeLessThan(1);
   });
@@ -175,5 +176,6 @@ describe("Lamello w skośnym sztorcu (slopeBevelGroove)", () => {
     expect(lam.notes.some((n) => n.includes("nie mieści się"))).toBe(slopeBevelGroove(g.angle, 18, LAMELLO.tenso_p14).wall < 1);
     const bok = byId(getSlopePanels(base, state.project).panels, "bok-wysoki");
     expect(bok.note).toContain("od niższej krawędzi sztorca");
+    expect(getSlopeDrillings(base, state.project).notes.some((n) => n.includes("tarczy kątów Lamello ustaw"))).toBe(true);
   });
 });

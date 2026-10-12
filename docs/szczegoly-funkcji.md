@@ -81,7 +81,11 @@ półek stałych; przy skośnym czole uwaga w `notes` (sprawdzić na próbce). R
 `slopeBevelGroove(kąt, th, lam)`: oś `fromLow` od niższej krawędzi sztorca tak, żeby pochylony rowek leżał na środku grubości boku
 (wycentrowany na sztorcu P-14 przy 18 mm i skosie od ~30° wychodzi z boku), `shift` = o ile rowek w skośnej płycie jest bliżej
 jej dolnego końca niż oś boku, `wall` < 1 mm → ostrzeżenie. Przekrój `slopeBevelSectionSVG` (render/slopeDrawing2d.js) w
-instrukcji montażu i w „Rysunkach cięcia i nawiertów”. Okucia: „Łącznik Lamello …” szt. = liczba rowków w formatkach
+instrukcji montażu i w „Rysunkach cięcia i nawiertów”. Ustawienie maszyny wg tarczy kątów Lamello (Art. 369143, zdjęcia z warsztatu): `discAngle` = 90° − skos
+(kąt bok – skośna płyta), lewa kolumna 22,5°–85° — bok/przegroda to płyta ze skośnym końcem (krok 1: rowek z podkładką
+0/2/4 mm z tarczy, ogranicznik wychylny na kąt), skośna płyta to płyta bazowa (łącznik prostopadle do niej; krok 2–4: pomiar A + B,
+frezowanie lica z ogranicznikiem na końcu płyty). Łącznik i podkładkę dla grubości podaje awers tarczy (np. 35° / 18 mm → P-10),
+program tylko przypomina w `notes`; `fromLow` to propozycja geometryczna, położenie sprawdza pomiar A. Okucia: „Łącznik Lamello …” szt. = liczba rowków w formatkach
 poziomych zamiast „Złącze korpusowe”.
 
 ## Stół RC System

@@ -682,7 +682,12 @@ export function getSlopeJoin(mod, config) {
 // z boku - dlatego oś rowka przesunięta w stronę niższej krawędzi sztorca tak, żeby rowek (7 mm
 // szerokości, depth głębokości) leżał na środku grubości boku. Zwraca (mm): width - szerokość sztorca,
 // fromLow - oś rowka od niższej krawędzi sztorca (mierzone po sztorcu), shift - o ile oś rowka w
-// skośnej płycie leży bliżej jej dolnego końca niż oś boku, wall - najcieńsza ścianka boku przy rowku.
+// skośnej płycie leży bliżej jej dolnego końca niż oś boku, wall - najcieńsza ścianka boku przy rowku,
+// discAngle - kąt między bokiem a skośną płytą (90° - skos) do ustawienia na tarczy kątów Lamello
+// (Art. 369143): lewa kolumna 22,5°-85° - płyta ze skośnym końcem (bok / przegroda) stoi na licu płyty
+// bazowej (skośna płyta), łącznik prostopadle do płyty bazowej. Łącznik i podkładkę (0/2/4 mm) dla
+// danej grubości podaje tarcza; fromLow to tylko geometryczna propozycja - położenie rowka w boku
+// wyznacza podkładka, a rowek w skośnej płycie ustawia się z pomiaru A + B (krok 2-3 tarczy).
 const LAMELLO_GROOVE_W = 7;
 export function slopeBevelGroove(angleDeg, th, lam) {
   const r = angleDeg * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
@@ -692,6 +697,7 @@ export function slopeBevelGroove(angleDeg, th, lam) {
     fromLow: r1((th / 2 - lam.depth / 2 * s) / c),
     shift: r1(lam.depth / 2 * Math.tan(r)),
     wall: r1((th - span) / 2),
+    discAngle: r1(90 - angleDeg),
   };
 }
 
@@ -817,6 +823,8 @@ export function getSlopeDrillings(mod, config, opts = {}) {
   });
   if (join) {
     const bev = slopeBevelGroove(g.angle, th, join.lam);
+    notes.push(`${join.lam.name} przy skośnej płycie: na tarczy kątów Lamello ustaw ${bev.discAngle}° (lewa kolumna 22,5°-85°) i odczytaj łącznik oraz podkładkę dla płyty ${th} mm - jeśli tarcza wskazuje inny łącznik (np. P-10 zamiast P-14), zmień wybór w panelu szafki.`);
+    if (bev.discAngle < 22.5) notes.push(`Kąt między bokiem a skosem ${bev.discAngle}° jest mniejszy niż 22,5° - poniżej zakresu tarczy Lamello; łącz skos inaczej.`);
     if (bev.wall < 1) notes.push(`${join.lam.name} w skośnym sztorcu (skos ${r1(g.angle)}°): rowek prostopadły do sztorca nie mieści się w płycie ${th} mm (ścianka ${bev.wall} mm) - użyj P-10 albo łącz skos inaczej.`);
   }
   // Clamex przy skosie: klucz w licu płyty pionowej pod jej skośnym czołem (na stronie bez
