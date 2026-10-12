@@ -16,7 +16,7 @@
 // płyty; płyta pozioma / skośna - x wzdłuż płyty (dno: od lewej krawędzi szafki, skos: od dolnego
 // końca), z od przodu.
 import { recalculateLayout } from "../core/layout.js";
-import { getSlopeGeometry, getSlopeDrillings, getSlopeBoards, getSlopeDividers, getSlopeShelfPieces, getSlopeCabinetParts, getSlopeFronts, getSlopeJoin } from "../core/slopeCabinet.js";
+import { getSlopeGeometry, getSlopeDrillings, getSlopeBoards, getSlopeDividers, getSlopeShelfPieces, getSlopeCabinetParts, getSlopeFronts, getSlopeJoin, slopeBevelGroove } from "../core/slopeCabinet.js";
 import { jointSetsFor } from "./carcaseParts.js";
 import { cabinetHoleSpecs } from "./cabinetDrillings.js";
 import { num, round1 } from "../utils/math.js";
@@ -72,9 +72,14 @@ export function getSlopePanels(mod, project) {
   // od wierzchu skosu w czoło górne, bez kołków - koniec cięty pod kątem).
   const onBottom = (fc) => Math.abs(fc.y0 - th) < 1;
   const reachesSlope = (fc) => fc.y0 + fc.height >= g.under(g.lowSide === "right" ? g.W - fc.x : fc.x) - 1;
+  // Lamello w skośnym sztorcu: rowek prostopadle do sztorca, oś przesunięta do niższej krawędzi.
+  const bev = join ? slopeBevelGroove(g.angle, th, join.lam) : null;
+  const bevelNote = (fc) => (bev && reachesSlope(fc)
+    ? `góra: rowki ${join.lam.name} w skośnym sztorcu (szer. ${fmtMm(bev.width)}) - Zeta P2 oparta płasko na sztorcu, rowek prostopadle do niego, oś ${fmtMm(bev.fromLow)} mm od niższej krawędzi sztorca (nie na środku - patrz przekrój)`
+    : "");
   const edgeHoles = (fc, topH) => [
     ...(onBottom(fc) ? jointKinds.map(([z, kind]) => ({ edge: "dolne", x: round1(z), y: 0, kind, ...edgeSpec(kind), to: "dno" })) : []),
-    ...(reachesSlope(fc) ? (join ? lamZ.map((z) => ({ edge: "gorne", x: round1(z), y: round1(topH), kind: "lamello", ...edgeSpec("lamello"), to: "skos" }))
+    ...(reachesSlope(fc) ? (join ? lamZ.map((z) => ({ edge: "gorne", x: round1(z), y: round1(topH), kind: "lamello", ...edgeSpec("lamello"), to: "skos (skośny sztorc)", bevel: bev }))
       : sets.map((s) => ({ edge: "gorne", x: round1(s.screw), y: round1(topH), kind: "wkret", ...edgeSpec("wkret"), to: "skos" }))) : []),
   ];
 
@@ -87,7 +92,7 @@ export function getSlopePanels(mod, project) {
     panels.push({
       id, kind: "bok", name, qty: 1, length: depth, width: round1(fc.height), thickness: th, frontOnRight: fc.frontOnRight,
       holes: [...faceHoles(fc), ...edgeHoles(fc, fc.height)],
-      note: [`wysokość strony wewnętrznej; stoi na dnie`, cutNote(b) && `góra: ${cutNote(b)} (zewnętrzna ${fmtMm(name === "Bok wysoki" ? b.b[1] : b.a[1])})`].filter(Boolean).join("; "),
+      note: [`wysokość strony wewnętrznej; stoi na dnie`, cutNote(b) && `góra: ${cutNote(b)} (zewnętrzna ${fmtMm(name === "Bok wysoki" ? b.b[1] : b.a[1])})`, bevelNote(fc)].filter(Boolean).join("; "),
     });
   });
 
@@ -106,7 +111,7 @@ export function getSlopePanels(mod, project) {
       id: `przegroda-${i + 1}`, kind: "przegroda", name, qty: 1, length: depth, width: round1(h), thickness: th,
       holes: [...(l ? faceHoles(l, "lewa") : []), ...(r ? faceHoles(r, "prawa") : []), ...(r || l ? edgeHoles(r || l, h) : [])],
       note: [onBottom(r || l) ? "stoi na dnie" : "stoi na półce - mocowanie dołu ustal na miejscu",
-        tilt ? `góra: cięcie pod kątem, piła ${fmtDeg(tilt)} (strona od skosu ${fmtMm(d.hLeft)}, od wysokiego boku ${fmtMm(d.hRight)})` : ""].filter(Boolean).join("; "),
+        tilt ? `góra: cięcie pod kątem, piła ${fmtDeg(tilt)} (strona od skosu ${fmtMm(d.hLeft)}, od wysokiego boku ${fmtMm(d.hRight)})` : "", (r || l) ? bevelNote(r || l) : ""].filter(Boolean).join("; "),
     });
   });
 
@@ -178,6 +183,7 @@ export function getSlopeConstruction(mod, project) {
     blendy: fronts.filter((f) => f.type === "blenda").length,
     dividers: getSlopeDividers(mod, th).length,
     join: getSlopeJoin(mod, project),
+    bevel: getSlopeJoin(mod, project) ? slopeBevelGroove(g.angle, th, getSlopeJoin(mod, project).lam) : null,
     fixedShelves: els.filter((e) => e.typ === "poziom" && e.isStructural).length,
     movableShelves: els.filter((e) => e.typ === "poziom" && !e.isStructural).length,
   };

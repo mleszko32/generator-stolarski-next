@@ -87,6 +87,7 @@ function lamelloStepsHtml(cons, has) {
   const steps = [
     "Wytnij płyty z końcami ciętymi pod kątem (skos, góra boków i przegród, półki i dno przy skosie) wg „Rysunków cięcia i nawiertów” - pochylenie piły jest w opisie formatki.",
     `Frezarką Zeta P2 (głębokość ${lam.depth} mm) wyfrezuj rowki ${lam.name} wg rysunków: w licu dna i od spodu skośnej płyty, w czołach dolnych i górnych (skośnych) ${pieces}` + (cons.fixedShelves ? ", w czołach półek stałych i w licu ścian pod półki" : "") + `. Rowek ma ok. ${len} mm długości; środek rowka = wymiar na rysunku.`,
+    cons.bevel ? `Rowki w skośnych sztorcach (góra boków${has("przegroda") ? " i przegród" : ""}): Zeta P2 oparta płasko na sztorcu, rowek prostopadle do niego, oś ${String(cons.bevel.fromLow).replace(".", ",")} mm od niższej krawędzi sztorca (szer. sztorca ${String(cons.bevel.width).replace(".", ",")} mm) - nie na środku, bo pochylony rowek wyszedłby z boku; patrz przekrój pod rysunkiem montażu.` : null,
     "Nawierć pozostałe otwory (prowadnice, zawiasy, podpórki).",
     lam.clamex ? `Wywierć otwory Ø6 na klucz (przyrząd Lamello do Clamex P), ${String(lam.keyFromEdge).replace(".", ",")} mm od krawędzi, aż do rowka - w licu ${pieces} przy dnie i przy skosie` + (cons.fixedShelves ? ", od spodu półek stałych" : "") + "." : null,
     lam.clamex ? "Włóż łączniki Clamex w rowki (wg instrukcji Lamello), drugie połówki w rowki drugiej formatki." : `Nałóż klej do rowków i włóż łączniki ${lam.name} (samozaciskowe - bez ścisków).`,

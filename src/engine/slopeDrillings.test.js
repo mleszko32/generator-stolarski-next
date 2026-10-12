@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { getSlopePanels, getSlopeConstruction } from "./slopeDrillings.js";
-import { buildSlopeElements } from "../core/slopeCabinet.js";
+import { buildSlopeElements, slopeBevelGroove, getSlopeDrillings, getSlopeGeometry } from "../core/slopeCabinet.js";
+import { LAMELLO } from "../core/lamello.js";
 import { recalculateLayout } from "../core/layout.js";
 import { calculateProjectHardware } from "./hardware.js";
 import { state } from "../core/state.js";
@@ -149,3 +150,30 @@ describe("szafka pod skos łączona na Lamello (mod.slopeJoin)", () => {
   });
 });
 const round = (v) => Math.round(v * 10) / 10;
+
+describe("Lamello w skośnym sztorcu (slopeBevelGroove)", () => {
+  it("oś rowka przesunięta do niższej krawędzi, rowek na środku grubości boku", () => {
+    const lam = LAMELLO.tenso_p14;
+    const b = slopeBevelGroove(36.87, 18, lam);       // skos 3:4
+    expect(b.width).toBe(22.5);
+    expect(b.fromLow).toBe(6);                        // (9 - 7·0,6) / 0,8
+    expect(b.shift).toBe(5.3);                        // 7 · tg = 5,25
+    expect(b.wall).toBe(2);                           // (18 - (7·0,8 + 14·0,6)) / 2
+    expect(slopeBevelGroove(55, 18, lam).wall).toBeGreaterThan(1);    // przy 18 mm P-14 mieści się zawsze
+    expect(slopeBevelGroove(45, 16, lam).wall).toBeLessThan(1);
+  });
+
+  it("rowek w skośnej płycie leży nad rowkiem sztorca, za ciasny rowek = ostrzeżenie", () => {
+    const base = slopeMod();
+    const plain = getSlopeDrillings(base, state.project).plans.find((p) => p.name.startsWith("Skos")).holes.map((h) => h.x);
+    base.slopeJoin = "tenso_p14";
+    const g = getSlopeGeometry(base, 18);
+    const lam = getSlopeDrillings(base, state.project);
+    const xs = [...new Set(lam.plans.find((p) => p.name.startsWith("Skos")).holes.map((h) => h.x))];
+    const shift = slopeBevelGroove(g.angle, 18, LAMELLO.tenso_p14).shift;
+    expect(xs.map((x) => Math.round((x + shift) * 10) / 10)).toEqual([...new Set(plain)].map((x) => Math.round(x * 10) / 10));
+    expect(lam.notes.some((n) => n.includes("nie mieści się"))).toBe(slopeBevelGroove(g.angle, 18, LAMELLO.tenso_p14).wall < 1);
+    const bok = byId(getSlopePanels(base, state.project).panels, "bok-wysoki");
+    expect(bok.note).toContain("od niższej krawędzi sztorca");
+  });
+});

@@ -18,6 +18,8 @@ import {
 import { getCornerPanels, getCornerConstruction } from "../engine/cornerDrillings.js";
 import { cornerAssemblySVG, cornerStepsHtml } from "../render/cornerInstructions2d.js";
 import { getSlopePanels, getSlopeConstruction } from "../engine/slopeDrillings.js";
+import { slopeBevelGroove } from "../core/slopeCabinet.js";
+import { slopeBevelSectionSVG } from "../render/slopeDrawing2d.js";
 import { slopeAssemblySVG, slopeStepsHtml } from "../render/slopeInstructions2d.js";
 import { WORKSHOP_CSS } from "./drawerBoxDrawings.js";
 import { getRcSettings, rcPanelSetups, rcRearScrew, rcMidPinForX, rcPinSideText, RC_FRONT_STOP, RC_PIN_RANGE, RC_MAX_DEPTH } from "../core/rcSystem.js";
@@ -153,10 +155,11 @@ function slopeCard(mod, idx, layouts) {
     dims: `${fmt(cons.W)} × ${fmt(cons.H)} × ${fmt(cons.D)}`,
     lead: `${escapeHtml(TYPE[mod.type])} · ${escapeHtml(consText)} · płyta ${fmt(th)} mm${cons.drawers ? ` · szuflady: ${cons.drawers}` : ""}${cons.doors ? ` · drzwi: ${cons.doors}` : ""}${cons.blendy ? ` · blendy: ${cons.blendy}` : ""}`,
     assembly: slopeAssemblySVG(mod, panels, project), steps: slopeStepsHtml(cons, panels), warnings: notes,
+    extraHtml: cons.join ? `<h3>Połączenie skosu z bokami</h3><div class="card">${slopeBevelSectionSVG(cons.angle, th, cons.join.lam, slopeBevelGroove(cons.angle, th, cons.join.lam))}</div>` : "",
     extraNote: "Płyty z końcami ciętymi pod kątem są tu narysowane jako prostokąty (wymiar = dłuższa krawędź, wysokość boku = strona wewnętrzna) - kąty i obrysy na „Rysunkach cięcia i nawiertów” (przycisk w panelu szafki)." });
 }
 
-function cardHtml({ mod, idx, layouts, panels, th, scale, dims, lead, assembly, steps, extraNote = "", warnings = [] }) {
+function cardHtml({ mod, idx, layouts, panels, th, scale, dims, lead, assembly, steps, extraNote = "", warnings = [], extraHtml = "" }) {
   const project = state.project;
   const partsRows = panels.map((p, i) => `<tr><td>${i + 1}</td><td><b>${escapeHtml(p.name)}</b>${p.note ? `<div class="muted">${escapeHtml(p.note)}</div>` : ""}</td><td>${p.qty}</td><td>${fmt(p.length)} × ${fmt(p.width)} × ${fmt(p.thickness)}</td></tr>`).join("");
   const svgs = panelSVGs(panels, scale);
@@ -177,6 +180,7 @@ function cardHtml({ mod, idx, layouts, panels, th, scale, dims, lead, assembly, 
     </div>
     ${rcCardHtml(panels)}
     <div class="assembly"><div class="card">${assembly}</div><div><h3>Kolejność montażu</h3>${steps}</div></div>
+    ${extraHtml}
     ${cabinetLegendHtml(panels, th)}
     <p class="muted">Na ekranie rysunki formatek są powiększone do okna. Na wydruku są w skali <b>1:${scale}</b> (wszystkie tak samo) - ustaw skalę 100% / „Rzeczywisty rozmiar”, wtedy 1 cm na papierze = ${scale} cm formatki.</p>
     <div class="grid">${svgs.map((s) => `<div class="card">${s}</div>`).join("")}</div>

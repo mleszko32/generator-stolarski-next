@@ -676,6 +676,25 @@ export function getSlopeJoin(mod, config) {
   return { id, lam, len, positions: (depth) => lamelloPositions(depth, lam, edge, len) };
 }
 
+// Rowek Lamello w skośnym sztorcu (górny koniec boku / przegrody ścięty pod kątem skosu): Zeta P2
+// opiera się na sztorcu, rowek idzie prostopadle do niego, więc w boku jest pochylony o kąt skosu
+// w stronę wysokiego końca. Wycentrowany na sztorcu przy P-14 / 18 mm / skosie od ~30° wychodzi
+// z boku - dlatego oś rowka przesunięta w stronę niższej krawędzi sztorca tak, żeby rowek (7 mm
+// szerokości, depth głębokości) leżał na środku grubości boku. Zwraca (mm): width - szerokość sztorca,
+// fromLow - oś rowka od niższej krawędzi sztorca (mierzone po sztorcu), shift - o ile oś rowka w
+// skośnej płycie leży bliżej jej dolnego końca niż oś boku, wall - najcieńsza ścianka boku przy rowku.
+const LAMELLO_GROOVE_W = 7;
+export function slopeBevelGroove(angleDeg, th, lam) {
+  const r = angleDeg * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+  const span = LAMELLO_GROOVE_W * c + lam.depth * s;     // zajęta grubość boku (w poziomie)
+  return {
+    width: r1(th / c),
+    fromLow: r1((th / 2 - lam.depth / 2 * s) / c),
+    shift: r1(lam.depth / 2 * Math.tan(r)),
+    wall: r1((th - span) / 2),
+  };
+}
+
 const edgeJointSets = (depth) => [{ screw: 37, dowel: 69 }, { screw: depth - 37, dowel: depth - 69 }];
 export function getSlopeDrillings(mod, config, opts = {}) {
   const jointSets = opts.jointSets || edgeJointSets;
@@ -792,8 +811,14 @@ export function getSlopeDrillings(mod, config, opts = {}) {
     if (seen.has(key)) return;
     seen.add(key);
     const cxReal = fc.name.startsWith('Przegroda') ? (fc.side === 'lewa' ? fc.x + th / 2 : fc.x - th / 2) : (fc.dir === 'L' ? fc.x + th / 2 : fc.x - th / 2);
-    joint(slopeHoles, (nAt(cxReal) - topStart) / cosA, false);
+    // Lamello: oś rowka w płycie = oś rowka w sztorcu boku (slopeBevelGroove), nie oś boku.
+    const lamShift = join ? slopeBevelGroove(g.angle, th, join.lam).shift : 0;
+    joint(slopeHoles, (nAt(cxReal) - topStart) / cosA - lamShift, false);
   });
+  if (join) {
+    const bev = slopeBevelGroove(g.angle, th, join.lam);
+    if (bev.wall < 1) notes.push(`${join.lam.name} w skośnym sztorcu (skos ${r1(g.angle)}°): rowek prostopadły do sztorca nie mieści się w płycie ${th} mm (ścianka ${bev.wall} mm) - użyj P-10 albo łącz skos inaczej.`);
+  }
   // Clamex przy skosie: klucz w licu płyty pionowej pod jej skośnym czołem (na stronie bez
   // otworów do dna przy przegrodzie - jedna strona wystarcza).
   if (join && join.lam.clamex) {

@@ -308,3 +308,50 @@ export function slopePlanSVG(plan, grooveLen = 75) {
   });
   return svgWrap(-20 * k, -62 * k, L + 220 * k, D + (130 + sorted.length * 16) * k, body);
 }
+
+// Przekrój połączenia skośnej płyty z bokiem na Lamello (widok od frontu, wzdłuż rowka):
+// górny koniec boku ścięty pod kątem skosu (sztorc), skośna płyta na nim, rowek prostopadły do
+// sztorca w obu płytach z osią fromLow od niższej krawędzi (core/slopeCabinet.js: slopeBevelGroove).
+// Niski koniec skosu po lewej. Jednostki rysunku = mm.
+export function slopeBevelSectionSVG(angleDeg, th, lam, bev) {
+  const a = angleDeg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+  const u = [c, s], n = [-s, c];                         // wzdłuż sztorca / prostopadle (w płytę skosu)
+  const P = (base, du, dn) => [base[0] + u[0] * du + n[0] * dn, base[1] + u[1] * du + n[1] * dn];
+  const Y = (y) => -y;                                   // y w górę -> SVG
+  const pts = (arr) => arr.map(([x, y]) => `${r1(x)},${r1(Y(y))}`).join(' ');
+  const below = 34, ext = 26;
+  const side = [[0, -below], [th, -below], [th, th * Math.tan(a)], [0, 0]];
+  const board = [P([0, 0], -ext, 0), P([0, 0], bev.width + ext, 0), P([0, 0], bev.width + ext, th), P([0, 0], -ext, th)];
+  const m = P([0, 0], bev.fromLow, 0);                   // oś rowka na sztorcu
+  const gSide = [P(m, -3.5, 0), P(m, 3.5, 0), P(m, 3.5, -lam.depth), P(m, -3.5, -lam.depth)];
+  const gBoard = [P(m, -3.5, 0), P(m, 3.5, 0), P(m, 3.5, lam.depth), P(m, -3.5, lam.depth)];
+  const fs = 2.6, sw = 0.35;
+  let b = '';
+  b += `<polygon points="${pts(board)}" fill="${C.slate100}" stroke="${C.slate600}" stroke-width="${sw}"/>`;
+  b += `<polygon points="${pts(side)}" fill="${C.stone200}" stroke="${C.slate600}" stroke-width="${sw}"/>`;
+  [gSide, gBoard].forEach((g) => { b += `<polygon points="${pts(g)}" fill="${C.orange600}" fill-opacity="0.45" stroke="${C.orange600}" stroke-width="${sw}"/>`; });
+  // Oś rowka (prostopadle do sztorca) i wymiar od niższej krawędzi sztorca.
+  const ax0 = P(m, 0, -lam.depth - 4), ax1 = P(m, 0, lam.depth + 4);
+  b += `<line x1="${r1(ax0[0])}" y1="${r1(Y(ax0[1]))}" x2="${r1(ax1[0])}" y2="${r1(Y(ax1[1]))}" stroke="${C.red600}" stroke-width="0.25" stroke-dasharray="1.2,0.8"/>`;
+  const d0 = P([0, 0], 0, -5), d1 = P(m, 0, -5);
+  b += `<line x1="${r1(d0[0])}" y1="${r1(Y(d0[1]))}" x2="${r1(d1[0])}" y2="${r1(Y(d1[1]))}" stroke="${C.blue700}" stroke-width="0.3"/>`;
+  [d0, d1].forEach((p) => { b += `<circle cx="${r1(p[0])}" cy="${r1(Y(p[1]))}" r="0.5" fill="${C.blue700}"/>`; });
+  const t0 = P(P([0, 0], bev.fromLow / 2, -9), 0, 0);
+  b += `<text x="${r1(t0[0])}" y="${r1(Y(t0[1]))}" font-size="${fs}" fill="${C.blue700}" font-weight="bold" text-anchor="middle" transform="rotate(${r1(-angleDeg)} ${r1(t0[0])} ${r1(Y(t0[1]))})">${fmt(bev.fromLow)}</text>`;
+  const tw = P([0, 0], bev.width / 2, 3.2);
+  b += `<text x="${r1(tw[0])}" y="${r1(Y(tw[1]))}" font-size="${fs * 0.85}" fill="${C.slate600}" text-anchor="middle" transform="rotate(${r1(-angleDeg)} ${r1(tw[0])} ${r1(Y(tw[1]))})">sztorc ${fmt(bev.width)}</text>`;
+  b += `<text x="${r1(th / 2)}" y="${r1(below - 6)}" font-size="${fs}" fill="${C.slate700}" text-anchor="middle">bok ${fmt(th)}</text>`;
+  const tb = P([0, 0], bev.width + ext - 2, th / 2);
+  b += `<text x="${r1(tb[0])}" y="${r1(Y(tb[1]))}" font-size="${fs}" fill="${C.slate700}" text-anchor="end" transform="rotate(${r1(-angleDeg)} ${r1(tb[0])} ${r1(Y(tb[1]))})">skośna płyta · ${fmt(angleDeg)}°</text>`;
+  b += `<text x="${r1(-ext * c)}" y="${r1(below + 1)}" font-size="${fs * 0.85}" fill="${C.slate500}">← niski koniec skosu</text>`;
+  // Ramka widoku z wszystkich punktów.
+  const all = [...side, ...board, ax0, ax1];
+  const xs = all.map((p) => p[0]), ys = all.map((p) => Y(p[1]));
+  let x0 = Math.min(...xs) - 4, x1 = Math.max(...xs) + 4;
+  const y0 = Math.min(...ys) - 8, y1 = Math.max(...ys) + 6;
+  const minW = 90;                                       // tytuł mieści się w ramce
+  if (x1 - x0 < minW) { const e = (minW - (x1 - x0)) / 2; x0 -= e; x1 += e; }
+  const head = `<text x="${r1((x0 + x1) / 2)}" y="${r1(y0 + 4)}" font-size="${fs * 1.15}" fill="${C.blue900}" font-weight="bold" text-anchor="middle">PRZEKRÓJ: ${escapeHtml(lam.name.toUpperCase())} W SKOŚNYM SZTORCU</text>`;
+  return `<svg viewBox="${r1(x0)} ${r1(y0)} ${r1(x1 - x0)} ${r1(y1 - y0)}" xmlns="http://www.w3.org/2000/svg" font-family="${FONT}" style="width:100%;height:auto;max-width:420px">`
+    + `<rect x="${r1(x0)}" y="${r1(y0)}" width="${r1(x1 - x0)}" height="${r1(y1 - y0)}" fill="${C.white}"/>${head}${b}</svg>`;
+}

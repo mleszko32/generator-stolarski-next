@@ -9,10 +9,10 @@
 import { state } from "../core/state.js";
 import { escapeHtml, openHtmlWindow } from "../utils/dom.js";
 import { round1 } from "../utils/math.js";
-import { getSlopeBoards, getSlopeShapes, getSlopeGeometry, getSlopeDrillings, getSlopeJoin } from "../core/slopeCabinet.js";
+import { getSlopeBoards, getSlopeShapes, getSlopeGeometry, getSlopeDrillings, getSlopeJoin, slopeBevelGroove } from "../core/slopeCabinet.js";
 import { jointSetsFor } from "../engine/carcaseParts.js";
 import { recalculateLayout } from "../core/layout.js";
-import { slopeBoardSVG, slopeShapeSVG, slopeFaceSVG, slopeFacePairSVG, slopePlanSVG } from "../render/slopeDrawing2d.js";
+import { slopeBoardSVG, slopeShapeSVG, slopeFaceSVG, slopeFacePairSVG, slopePlanSVG, slopeBevelSectionSVG } from "../render/slopeDrawing2d.js";
 
 const fmt = (v) => String(round1(v)).replace('.', ',');
 
@@ -103,6 +103,7 @@ export function openSlopeCutDrawings(mod) {
     ${index([...faceCards, ...planCards])}
     <h3>Ściany płyt pionowych</h3>
     <div class="grid">${faceCards.map((c) => `<div class="card${c.wide ? ' wide' : ''}" id="${c.id}">${c.html}</div>`).join('') || '<p>Brak nawiertów.</p>'}</div>
+    ${join ? `<h3>Połączenie skosu z bokami</h3><div class="card">${slopeBevelSectionSVG(g.angle, th, join.lam, slopeBevelGroove(g.angle, th, join.lam))}</div>` : ''}
     <h3>Rzuty płyt z łącznikami</h3>
     ${planCards.map((c) => `<div class="card" id="${c.id}">${c.html}</div>`).join('')}`;
 

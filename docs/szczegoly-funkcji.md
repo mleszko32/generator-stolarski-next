@@ -77,7 +77,11 @@ wkręt) albo Tenso / Clamex P-10 / P-14 z frezarki Zeta P2. `getSlopeJoin(mod, c
 ta sama frezarka), rozstaw `lamelloPositions` wzdłuż głębokości płyt. Rowki (`lamello`) zastępują wszystkie kołki i wkręty: lico dna,
 spód skośnej płyty, czoła dolne i górne (skośne) boków i przegród, czoła półek stałych + lico ścian pod nimi. Clamex: otwór na klucz Ø6
 (`klucz`, `keyFromEdge` od krawędzi) w licu boku / przegrody (przy przegrodzie tylko na jednej stronie) przy dnie i pod skosem, od spodu
-półek stałych; przy skośnym czole uwaga w `notes` (sprawdzić na próbce). Okucia: „Łącznik Lamello …” szt. = liczba rowków w formatkach
+półek stałych; przy skośnym czole uwaga w `notes` (sprawdzić na próbce). Rowek w skośnym sztorcu (góra boku / przegrody) jest prostopadły do sztorca —
+`slopeBevelGroove(kąt, th, lam)`: oś `fromLow` od niższej krawędzi sztorca tak, żeby pochylony rowek leżał na środku grubości boku
+(wycentrowany na sztorcu P-14 przy 18 mm i skosie od ~30° wychodzi z boku), `shift` = o ile rowek w skośnej płycie jest bliżej
+jej dolnego końca niż oś boku, `wall` < 1 mm → ostrzeżenie. Przekrój `slopeBevelSectionSVG` (render/slopeDrawing2d.js) w
+instrukcji montażu i w „Rysunkach cięcia i nawiertów”. Okucia: „Łącznik Lamello …” szt. = liczba rowków w formatkach
 poziomych zamiast „Złącze korpusowe”.
 
 ## Stół RC System
