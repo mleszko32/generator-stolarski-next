@@ -87,7 +87,9 @@ instrukcji montażu i w „Rysunkach cięcia i nawiertów”. Ustawienie maszyny
 frezowanie lica z ogranicznikiem na końcu płyty). Łącznik i podkładkę dla grubości podaje awers tarczy (np. 35° / 18 mm → P-10),
 tabela awersu (odczyt ze zdjęć: kąty 22,5–100°, płyty 16/18/19/22 mm) jest w `core/lamello.js: lamelloDiscSetting` —
 `slopeBevelGroove().disc` daje łącznik i podkładkę, ostrzeżenie w `notes` i w panelu skosu, gdy wybrany łącznik różni się od tarczy
-(np. 18 mm: P-10 do 35°, P-14 od 40°); `fromLow` to propozycja geometryczna, położenie sprawdza pomiar A. Okucia: „Łącznik Lamello …” szt. = liczba rowków w formatkach
+(np. 18 mm: P-10 do 35°, P-14 od 40°); `fromLow` to propozycja geometryczna, położenie sprawdza pomiar A. Zeta przy sztorcu (zdjęcie z warsztatu): płyta
+czołowa płasko na sztorcu, ogranicznik z podkładką na licu od strony niskiego końca skosu (stąd „niższa krawędź”). Pomiar: ~52°,
+podkładka 4 mm, P-14, 18 mm → oś ~7 mm (program 6) — tolerancja ±1 mm (`LAMELLO_POS_TOL`), `wallTol` = ścianka przy osi +1 mm. Okucia: „Łącznik Lamello …” szt. = liczba rowków w formatkach
 poziomych zamiast „Złącze korpusowe”.
 
 ## Stół RC System

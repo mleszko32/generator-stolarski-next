@@ -337,7 +337,7 @@ export function slopeBevelSectionSVG(angleDeg, th, lam, bev) {
   b += `<line x1="${r1(d0[0])}" y1="${r1(Y(d0[1]))}" x2="${r1(d1[0])}" y2="${r1(Y(d1[1]))}" stroke="${C.blue700}" stroke-width="0.3"/>`;
   [d0, d1].forEach((p) => { b += `<circle cx="${r1(p[0])}" cy="${r1(Y(p[1]))}" r="0.5" fill="${C.blue700}"/>`; });
   const t0 = P(P([0, 0], bev.fromLow / 2, -9), 0, 0);
-  b += `<text x="${r1(t0[0])}" y="${r1(Y(t0[1]))}" font-size="${fs}" fill="${C.blue700}" font-weight="bold" text-anchor="middle" transform="rotate(${r1(-angleDeg)} ${r1(t0[0])} ${r1(Y(t0[1]))})">${fmt(bev.fromLow)}</text>`;
+  b += `<text x="${r1(t0[0])}" y="${r1(Y(t0[1]))}" font-size="${fs}" fill="${C.blue700}" font-weight="bold" text-anchor="middle" transform="rotate(${r1(-angleDeg)} ${r1(t0[0])} ${r1(Y(t0[1]))})">${fmt(bev.fromLow)} ±1</text>`;
   const tw = P([0, 0], bev.width / 2, 3.2);
   b += `<text x="${r1(tw[0])}" y="${r1(Y(tw[1]))}" font-size="${fs * 0.85}" fill="${C.slate600}" text-anchor="middle" transform="rotate(${r1(-angleDeg)} ${r1(tw[0])} ${r1(Y(tw[1]))})">sztorc ${fmt(bev.width)}</text>`;
   b += `<text x="${r1(th / 2)}" y="${r1(below - 6)}" font-size="${fs}" fill="${C.slate700}" text-anchor="middle">bok ${fmt(th)}</text>`;

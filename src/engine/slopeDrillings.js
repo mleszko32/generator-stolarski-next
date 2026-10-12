@@ -75,7 +75,7 @@ export function getSlopePanels(mod, project) {
   // Lamello w skośnym sztorcu: rowek prostopadle do sztorca, oś przesunięta do niższej krawędzi.
   const bev = join ? slopeBevelGroove(g.angle, th, join.lam) : null;
   const bevelNote = (fc) => (bev && reachesSlope(fc)
-    ? `góra: rowki ${join.lam.name} w skośnym sztorcu (szer. ${fmtMm(bev.width)}) - płyta pod kątem wg tarczy Lamello ${fmtDeg(bev.discAngle)} (lewa kolumna, krok 1: ${bev.disc && bev.disc.depth ? `podkładka ${bev.disc.spacer} mm` : "podkładka z tarczy"}, ogranicznik na kąt); oś rowka ok. ${fmtMm(bev.fromLow)} mm od niższej krawędzi sztorca - sprawdź po włożeniu łącznika (pomiar A)`
+    ? `góra: rowki ${join.lam.name} w skośnym sztorcu (szer. ${fmtMm(bev.width)}) - płyta pod kątem wg tarczy Lamello ${fmtDeg(bev.discAngle)} (lewa kolumna, krok 1: ${bev.disc && bev.disc.depth ? `podkładka ${bev.disc.spacer} mm` : "podkładka z tarczy"}, ogranicznik z podkładką na licu od strony niskiego końca skosu, płyta czołowa maszyny na sztorcu); oś rowka ok. ${fmtMm(bev.fromLow)} mm (±1) od krawędzi tego lica - sprawdź po włożeniu łącznika (pomiar A)`
     : "");
   const edgeHoles = (fc, topH) => [
     ...(onBottom(fc) ? jointKinds.map(([z, kind]) => ({ edge: "dolne", x: round1(z), y: 0, kind, ...edgeSpec(kind), to: "dno" })) : []),
