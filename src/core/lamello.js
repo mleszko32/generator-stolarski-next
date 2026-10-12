@@ -35,3 +35,29 @@ export function lamelloPositions(h, lam, edge = LAMELLO_EDGE, len = lam.groove) 
   const n = Math.ceil((h - 2 * e) / LAMELLO_MAX_SPACING) + 1;
   return Array.from({ length: n }, (_, i) => round1(e + (h - 2 * e) * i / (n - 1)));
 }
+
+// Tarcza kątów Lamello (Art. 369143), awers, odczyt ze zdjęć z warsztatu: dla kąta między płytami
+// i grubości płyty - łącznik (10 = P-10, 14 = P-14, null = brak) i podkładka pod maszynę [mm].
+// Wiersz: [kąt, 16 mm, 18 mm, 19 mm, 22 mm], każda komórka [łącznik, podkładka].
+const DISC_TH = [16, 18, 19, 22];
+const DISC = [
+  [22.5, [10, 2], [10, 2], [14, 2], [14, 0]],
+  [30, [10, 2], [10, 2], [14, 2], [14, 2]],
+  [35, [null, 0], [10, 2], [10, 2], [14, 2]],
+  ...[40, 45, 50, 55, 60].map((a) => [a, [10, 4], [14, 4], [14, 4], [14, 4]]),
+  ...[65, 70, 75, 80].map((a) => [a, [14, 4], [14, 4], [14, 4], [14, 4]]),
+  ...[85, 90].map((a) => [a, [14, 2], [14, 0], [14, 0], [14, 0]]),
+  ...[95, 100].map((a) => [a, [10, 2], [14, 2], [14, 2], [14, 0]]),
+];
+
+// Ustawienie z tarczy dla kąta (najbliższa kreska tarczy) i grubości płyty (najbliższa z 16/18/19/22,
+// najwyżej 1 mm różnicy). null - poza tarczą (kąt < 22,5° albo > 100°, inna grubość).
+// Wynik: { angle (kreska tarczy), thickness, connector: 'P-10' | 'P-14' | null, depth, spacer }.
+export function lamelloDiscSetting(angle, th) {
+  if (!(angle >= 22.5 - 1e-9 && angle <= 100 + 2.5)) return null;
+  const ti = DISC_TH.reduce((b, t, i) => (Math.abs(t - th) < Math.abs(DISC_TH[b] - th) ? i : b), 0);
+  if (Math.abs(DISC_TH[ti] - th) > 1) return null;
+  const row = DISC.reduce((b, r) => (Math.abs(r[0] - angle) < Math.abs(b[0] - angle) ? r : b), DISC[0]);
+  const [depth, spacer] = row[ti + 1];
+  return { angle: row[0], thickness: DISC_TH[ti], connector: depth ? `P-${depth}` : null, depth, spacer };
+}

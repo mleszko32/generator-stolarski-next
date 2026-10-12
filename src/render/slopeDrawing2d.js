@@ -351,7 +351,7 @@ export function slopeBevelSectionSVG(angleDeg, th, lam, bev) {
   const y0 = Math.min(...ys) - 8, y1 = Math.max(...ys) + 9;
   const minW = 90;                                       // tytuł mieści się w ramce
   if (x1 - x0 < minW) { const e = (minW - (x1 - x0)) / 2; x0 -= e; x1 += e; }
-  b += `<text x="${r1(-ext * c)}" y="${r1(below + 5)}" font-size="${fs * 0.85}" fill="${C.red600}">tarcza kątów Lamello: ${fmt(bev.discAngle)}° (lewa kolumna) - łącznik i podkładka wg tarczy</text>`;
+  b += `<text x="${r1(-ext * c)}" y="${r1(below + 5)}" font-size="${fs * 0.85}" fill="${C.red600}">tarcza kątów Lamello: ${fmt(bev.discAngle)}° (lewa kolumna)${bev.disc && bev.disc.depth ? ` - ${bev.disc.connector}, podkładka ${bev.disc.spacer} mm` : ' - łącznik i podkładka wg tarczy'}</text>`;
   const head = `<text x="${r1((x0 + x1) / 2)}" y="${r1(y0 + 4)}" font-size="${fs * 1.15}" fill="${C.blue900}" font-weight="bold" text-anchor="middle">PRZEKRÓJ: ${escapeHtml(lam.name.toUpperCase())} W SKOŚNYM SZTORCU</text>`;
   return `<svg viewBox="${r1(x0)} ${r1(y0)} ${r1(x1 - x0)} ${r1(y1 - y0)}" xmlns="http://www.w3.org/2000/svg" font-family="${FONT}" style="width:100%;height:auto;max-width:420px">`
     + `<rect x="${r1(x0)}" y="${r1(y0)}" width="${r1(x1 - x0)}" height="${r1(y1 - y0)}" fill="${C.white}"/>${head}${b}</svg>`;

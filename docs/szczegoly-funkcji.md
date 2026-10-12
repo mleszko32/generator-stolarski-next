@@ -85,7 +85,9 @@ instrukcji montażu i w „Rysunkach cięcia i nawiertów”. Ustawienie maszyny
 (kąt bok – skośna płyta), lewa kolumna 22,5°–85° — bok/przegroda to płyta ze skośnym końcem (krok 1: rowek z podkładką
 0/2/4 mm z tarczy, ogranicznik wychylny na kąt), skośna płyta to płyta bazowa (łącznik prostopadle do niej; krok 2–4: pomiar A + B,
 frezowanie lica z ogranicznikiem na końcu płyty). Łącznik i podkładkę dla grubości podaje awers tarczy (np. 35° / 18 mm → P-10),
-program tylko przypomina w `notes`; `fromLow` to propozycja geometryczna, położenie sprawdza pomiar A. Okucia: „Łącznik Lamello …” szt. = liczba rowków w formatkach
+tabela awersu (odczyt ze zdjęć: kąty 22,5–100°, płyty 16/18/19/22 mm) jest w `core/lamello.js: lamelloDiscSetting` —
+`slopeBevelGroove().disc` daje łącznik i podkładkę, ostrzeżenie w `notes` i w panelu skosu, gdy wybrany łącznik różni się od tarczy
+(np. 18 mm: P-10 do 35°, P-14 od 40°); `fromLow` to propozycja geometryczna, położenie sprawdza pomiar A. Okucia: „Łącznik Lamello …” szt. = liczba rowków w formatkach
 poziomych zamiast „Złącze korpusowe”.
 
 ## Stół RC System

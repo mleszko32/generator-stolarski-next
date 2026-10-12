@@ -30,7 +30,7 @@
 import { drawerSystems } from './drawerSystems.js';
 import { getDrawerComponents, getWoodenDrawerHeights, drawerComponentsToParts, drawerHardwareKey, calculateDrawerHoles } from './drawerMath.js';
 import { calculateHinges } from './hingeMath.js';
-import { LAMELLO, lamelloGrooveLen, lamelloPositions, LAMELLO_EDGE } from './lamello.js';
+import { LAMELLO, lamelloGrooveLen, lamelloPositions, LAMELLO_EDGE, lamelloDiscSetting } from './lamello.js';
 
 const MIN_PIECE = 50;   // krótsze kawałki pomijamy (nie da się ich zrobić)
 const r1 = (v) => Math.round(v * 10) / 10;
@@ -698,6 +698,7 @@ export function slopeBevelGroove(angleDeg, th, lam) {
     shift: r1(lam.depth / 2 * Math.tan(r)),
     wall: r1((th - span) / 2),
     discAngle: r1(90 - angleDeg),
+    disc: lamelloDiscSetting(90 - angleDeg, th),   // łącznik i podkładka z tarczy (null - poza tarczą)
   };
 }
 
@@ -823,7 +824,10 @@ export function getSlopeDrillings(mod, config, opts = {}) {
   });
   if (join) {
     const bev = slopeBevelGroove(g.angle, th, join.lam);
-    notes.push(`${join.lam.name} przy skośnej płycie: na tarczy kątów Lamello ustaw ${bev.discAngle}° (lewa kolumna 22,5°-85°) i odczytaj łącznik oraz podkładkę dla płyty ${th} mm - jeśli tarcza wskazuje inny łącznik (np. P-10 zamiast P-14), zmień wybór w panelu szafki.`);
+    const dsc = bev.disc;
+    if (dsc && !dsc.depth) notes.push(`Tarcza kątów Lamello: przy ${dsc.angle}° i płycie ${dsc.thickness} mm nie ma łącznika P - łącz skos inaczej.`);
+    else if (dsc && dsc.depth !== join.lam.depth) notes.push(`Tarcza kątów Lamello: przy ${dsc.angle}° i płycie ${dsc.thickness} mm łącznik ${dsc.connector} (podkładka ${dsc.spacer} mm), a wybrany jest ${join.lam.name} - zmień łącznik w panelu szafki.`);
+    else if (!dsc && bev.discAngle >= 22.5) notes.push(`${join.lam.name} przy skośnej płycie: płyta ${th} mm spoza tarczy kątów Lamello (16/18/19/22 mm) - łącznik i podkładkę ustal na próbce.`);
     if (bev.discAngle < 22.5) notes.push(`Kąt między bokiem a skosem ${bev.discAngle}° jest mniejszy niż 22,5° - poniżej zakresu tarczy Lamello; łącz skos inaczej.`);
     if (bev.wall < 1) notes.push(`${join.lam.name} w skośnym sztorcu (skos ${r1(g.angle)}°): rowek prostopadły do sztorca nie mieści się w płycie ${th} mm (ścianka ${bev.wall} mm) - użyj P-10 albo łącz skos inaczej.`);
   }

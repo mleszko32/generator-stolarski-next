@@ -176,6 +176,17 @@ describe("Lamello w skośnym sztorcu (slopeBevelGroove)", () => {
     expect(lam.notes.some((n) => n.includes("nie mieści się"))).toBe(slopeBevelGroove(g.angle, 18, LAMELLO.tenso_p14).wall < 1);
     const bok = byId(getSlopePanels(base, state.project).panels, "bok-wysoki");
     expect(bok.note).toContain("od niższej krawędzi sztorca");
-    expect(getSlopeDrillings(base, state.project).notes.some((n) => n.includes("tarczy kątów Lamello ustaw"))).toBe(true);
+    expect(slopeBevelGroove(g.angle, 18, LAMELLO.tenso_p14).disc).toMatchObject({ angle: 55, connector: "P-14", spacer: 4 });
+  });
+});
+
+describe("Lamello w skosie - zgodność z tarczą kątów", () => {
+  it("niski skos (kąt bok - skos 35°) przy 18 mm: tarcza P-10, wybrany P-14 = ostrzeżenie", () => {
+    const mod = slopeMod({ width: 1000, height: 1430, dividers: [], shelves: [] });   // skos ok. 55° -> tarcza 35°
+    mod.slopeJoin = "tenso_p14";
+    const notes = getSlopeDrillings(mod, state.project).notes;
+    expect(notes.some((n) => n.includes("łącznik P-10 (podkładka 2 mm)"))).toBe(true);
+    mod.slopeJoin = "tenso_p10";
+    expect(getSlopeDrillings(mod, state.project).notes.some((n) => n.includes("zmień łącznik"))).toBe(false);
   });
 });

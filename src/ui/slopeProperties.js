@@ -13,7 +13,7 @@ import { propHeaderHtml, sectionHtml, bindSections, positionRotationHtml, bindMo
 import { toggleInteriorEditor } from "./interiorEditor.js";
 import { escapeHtml } from "../utils/dom.js";
 import { round1, evalDimensionExpr } from "../utils/math.js";
-import { getSlopeGeometry, getSlopeSettings, getSlopeFronts, getSlopeFrontSettings, SLOPE_JOINS, getSlopeJoin } from "../core/slopeCabinet.js";
+import { getSlopeGeometry, getSlopeSettings, getSlopeFronts, getSlopeFrontSettings, SLOPE_JOINS, getSlopeJoin, slopeBevelGroove } from "../core/slopeCabinet.js";
 import { recalculateLayout } from "../core/layout.js";
 import { drawerSystems } from "../core/drawerSystems.js";
 import { openSlopeCutDrawings } from "./slopeCutDrawings.js";
@@ -96,6 +96,14 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
       <div class="hint mb-8">${join
         ? `Rowki frezarką Zeta P2 (gł. ${join.lam.depth} mm, długość ${String(join.len).replace('.', ',')} mm, oś skrajnego ${String(join.positions(1000)[0]).replace('.', ',')} mm od krawędzi - jak w skrzynkach szuflad: hub → Skrzynki szuflad). Dno, skośna płyta i półki stałe bez wkrętów na widoku.`
         : 'Kołki + wkręty w tych samych miejscach co w zwykłej szafce (skos przykręcany od wierzchu).'}</div>
+      ${(() => {
+        if (!join) return '';
+        const disc = slopeBevelGroove(g.angle, th, join.lam).disc;
+        if (!disc) return `<div class="notice-warn fs-xs mb-8">Kąt bok - skos ${round1(90 - g.angle)}° albo płyta ${th} mm poza tarczą kątów Lamello - łącznik i podkładkę ustal na próbce.</div>`;
+        if (!disc.depth) return `<div class="notice-warn fs-xs mb-8">Tarcza Lamello: przy ${disc.angle}° i płycie ${disc.thickness} mm nie ma łącznika P.</div>`;
+        const ok = disc.depth === join.lam.depth;
+        return `<div class="${ok ? 'hint' : 'notice-warn fs-xs'} mb-8">Tarcza kątów Lamello: ${disc.angle}° (bok - skos), płyta ${disc.thickness} mm → <b>${disc.connector}</b>, podkładka <b>${disc.spacer} mm</b>${ok ? '' : ` - wybrany ${escapeHtml(join.lam.name)}, zmień łącznik`}.</div>`;
+      })()}
 
       <hr class="divider">
 
