@@ -130,7 +130,7 @@ export function getSlopePanels(mod, project) {
   const slope = plan("Skos");
   const slopeBoard = board("Skos (wieniec skośny)");
   panels.push({
-    id: "skos", kind: "poziom", name: "Skos (wieniec skośny)", qty: 1, length: round1(slope.length), width: depth, thickness: th, fromLabel: "od dolnego końca",
+    id: "skos", kind: "poziom", name: "Skos (wieniec skośny)", qty: 1, length: round1(slope.length), width: depth, thickness: th, fromLabel: join ? "od dolnej krawędzi spodu" : "od dolnego końca",
     holes: licoHoles(slope),
     note: [join ? `kąt skosu ${fmtDeg(g.angle)}; rowki ${join.lam.name} od spodu (strona widoczna bez łączników), w górnych końcach boków i przegród rowki w skośnym czole` : `kąt skosu ${fmtDeg(g.angle)}; wkręty od wierzchu (strona widoczna) w górne końce boków i przegród`, cutNote(slopeBoard) && `końce: ${cutNote(slopeBoard)}`].filter(Boolean).join("; "),
   });

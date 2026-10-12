@@ -165,19 +165,20 @@ describe("Lamello w skośnym sztorcu (slopeBevelGroove)", () => {
     expect(slopeBevelGroove(45, 16, lam).wall).toBeLessThan(1);
   });
 
-  it("rowek w skośnej płycie leży nad rowkiem sztorca, za ciasny rowek = ostrzeżenie", () => {
-    const base = slopeMod();
-    const plain = getSlopeDrillings(base, state.project).plans.find((p) => p.name.startsWith("Skos")).holes.map((h) => h.x);
+  it("rowek w skośnej płycie: po spodzie od dolnej krawędzi spodu (trójkąt - koniec cięty poziomo)", () => {
+    // Szafka z warsztatu (Bronisze): 1690 × 1300, trójkąt, przegroda 546-564 (oś 555), skos 37,6°.
+    const base = slopeMod({ width: 1690, height: 1300, depth: 713, dividers: [546, 1109], shelves: [] });
     base.slopeJoin = "tenso_p14";
     const g = getSlopeGeometry(base, 18);
     const lam = getSlopeDrillings(base, state.project);
-    const xs = [...new Set(lam.plans.find((p) => p.name.startsWith("Skos")).holes.map((h) => h.x))];
-    const shift = slopeBevelGroove(g.angle, 18, LAMELLO.tenso_p14).shift;
-    expect(xs.map((x) => Math.round((x + shift) * 10) / 10)).toEqual([...new Set(plain)].map((x) => Math.round(x * 10) / 10));
+    const plan = lam.plans.find((p) => p.name.startsWith("Skos"));
+    expect(plan.fromLabel).toBe("wzdłuż spodu od dolnej krawędzi spodu");
+    // (546 + 6 · cos - (18 + 18 / cos) / tg) / cos
+    expect([...new Set(plan.holes.map((h) => Math.round(h.x * 10) / 10))]).toContain(628.1);
     expect(lam.notes.some((n) => n.includes("nie mieści się"))).toBe(slopeBevelGroove(g.angle, 18, LAMELLO.tenso_p14).wall < 1);
     const bok = byId(getSlopePanels(base, state.project).panels, "bok-wysoki");
     expect(bok.note).toContain("od strony niskiego końca skosu");
-    expect(slopeBevelGroove(g.angle, 18, LAMELLO.tenso_p14).disc).toMatchObject({ angle: 55, connector: "P-14", spacer: 4 });
+    expect(slopeBevelGroove(g.angle, 18, LAMELLO.tenso_p14).disc).toMatchObject({ angle: 50, connector: "P-14", spacer: 4 });
   });
 });
 

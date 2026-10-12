@@ -79,8 +79,9 @@ spód skośnej płyty, czoła dolne i górne (skośne) boków i przegród, czoł
 (`klucz`, `keyFromEdge` od krawędzi) w licu boku / przegrody (przy przegrodzie tylko na jednej stronie) przy dnie i pod skosem, od spodu
 półek stałych; przy skośnym czole uwaga w `notes` (sprawdzić na próbce). Rowek w skośnym sztorcu (góra boku / przegrody) jest prostopadły do sztorca —
 `slopeBevelGroove(kąt, th, lam)`: oś `fromLow` od niższej krawędzi sztorca tak, żeby pochylony rowek leżał na środku grubości boku
-(wycentrowany na sztorcu P-14 przy 18 mm i skosie od ~30° wychodzi z boku), `shift` = o ile rowek w skośnej płycie jest bliżej
-jej dolnego końca niż oś boku, `wall` < 1 mm → ostrzeżenie. Przekrój `slopeBevelSectionSVG` (render/slopeDrawing2d.js) w
+(wycentrowany na sztorcu P-14 przy 18 mm i skosie od ~30° wychodzi z boku), rowki w skośnej płycie są liczone **po spodzie od dolnej
+krawędzi spodu** (lico boku od strony niskiego końca + `fromLow`; w trójkącie spód zaczyna się w (th + c) / k, bo koniec płyty
+stoi na dnie cięty poziomo — pomiar z warsztatu, szafka 1690 × 1300: przegroda 546–564 → 628,1), `wall` < 1 mm → ostrzeżenie. Przekrój `slopeBevelSectionSVG` (render/slopeDrawing2d.js) w
 instrukcji montażu i w „Rysunkach cięcia i nawiertów”. Ustawienie maszyny wg tarczy kątów Lamello (Art. 369143, zdjęcia z warsztatu): `discAngle` = 90° − skos
 (kąt bok – skośna płyta), lewa kolumna 22,5°–85° — bok/przegroda to płyta ze skośnym końcem (krok 1: rowek z podkładką
 0/2/4 mm z tarczy, ogranicznik wychylny na kąt), skośna płyta to płyta bazowa (łącznik prostopadle do niej; krok 2–4: pomiar A + B,

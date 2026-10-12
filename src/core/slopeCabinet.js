@@ -815,8 +815,13 @@ export function getSlopeDrillings(mod, config, opts = {}) {
   // Skośna płyta: wkręty przez płytę w górne końce boków i przegród sięgających
   // do skosu (bez kołków - końce są cięte pod kątem). Pozycja wzdłuż wierzchu
   // płyty od jej dolnego końca.
+  // Lamello: rowki są na SPODZIE płyty - pozycja wzdłuż spodu od jego dolnej krawędzi (tam leży
+  // maszyna i tam przykłada się ogranicznik). Spód zaczyna się w x = 0 (trapez, koniec cięty
+  // pionowo) albo tam, gdzie spód dochodzi do wierzchu dna (trójkąt, koniec cięty poziomo).
   const cosA = Math.cos(g.angle * Math.PI / 180);
   const topStart = g.isTriangle ? th / g.k : 0;
+  const underStart = g.isTriangle ? (th + g.c) / g.k : 0;
+  const bev = join ? slopeBevelGroove(g.angle, th, join.lam) : null;
   const slopeHoles = [];
   const reachesSlope = (fc) => fc.y0 + fc.height >= g.under(nAt(fc.x)) - 1;
   const seen = new Set();
@@ -825,9 +830,9 @@ export function getSlopeDrillings(mod, config, opts = {}) {
     if (seen.has(key)) return;
     seen.add(key);
     const cxReal = fc.name.startsWith('Przegroda') ? (fc.side === 'lewa' ? fc.x + th / 2 : fc.x - th / 2) : (fc.dir === 'L' ? fc.x + th / 2 : fc.x - th / 2);
-    // Lamello: oś rowka w płycie = oś rowka w sztorcu boku (slopeBevelGroove), nie oś boku.
-    const lamShift = join ? slopeBevelGroove(g.angle, th, join.lam).shift : 0;
-    joint(slopeHoles, (nAt(cxReal) - topStart) / cosA - lamShift, false);
+    // Lamello: oś rowka w płycie = oś rowka w sztorcu (fromLow od lica od strony niskiego końca).
+    if (join) joint(slopeHoles, (nAt(cxReal) - th / 2 + bev.fromLow * cosA - underStart) / cosA, false);
+    else joint(slopeHoles, (nAt(cxReal) - topStart) / cosA, false);
   });
   if (join) {
     const bev = slopeBevelGroove(g.angle, th, join.lam);
@@ -846,7 +851,11 @@ export function getSlopeDrillings(mod, config, opts = {}) {
     notes.push(`${join.lam.name} przy skośnej płycie: czoło boku jest cięte pod kątem - otwór na klucz wierć ${join.lam.keyFromEdge} mm od krawędzi wewnętrznej, a położenie sprawdź na próbce.`);
   }
   const topLen = g.isTriangle ? (g.W - th / g.k) / cosA : Math.hypot(g.W, g.H - g.L);
-  plans.push({ name: 'Skos (wieniec skośny)', length: topLen, width: depth, holes: slopeHoles, fromLabel: 'wzdłuż wierzchu od dolnego końca' });
+  // Długość spodu (Lamello): trójkąt - krótszy o oba ukośne końce, trapez - jak wierzch.
+  const underLen = g.isTriangle ? topLen - th / g.k - th * g.k : topLen;
+  plans.push(join
+    ? { name: 'Skos (wieniec skośny)', length: underLen, width: depth, holes: slopeHoles, fromLabel: 'wzdłuż spodu od dolnej krawędzi spodu' }
+    : { name: 'Skos (wieniec skośny)', length: topLen, width: depth, holes: slopeHoles, fromLabel: 'wzdłuż wierzchu od dolnego końca' });
 
   // frontOnRight - jak widzi tę stronę stolarz stojący we wnęce: ściana zwrócona
   // w lewo (wnęka po lewej) ma front po prawej, zwrócona w prawo - po lewej.
