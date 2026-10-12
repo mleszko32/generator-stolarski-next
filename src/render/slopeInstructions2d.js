@@ -79,8 +79,35 @@ export function slopeAssemblySVG(mod, panels, project) {
 }
 
 // Kolejność montażu szafki pod skos (engine/slopeDrillings.js: getSlopeConstruction).
+// Korpus na Lamello P (core/slopeCabinet.js: getSlopeJoin): rowki frezarką Zeta P2 w obu
+// formatkach, Tenso na klej (samozaciskowe), Clamex rozbieralne - dokręcane kluczem przez otwór Ø6.
+function lamelloStepsHtml(cons, has) {
+  const lam = cons.join.lam, len = String(cons.join.len).replace(".", ",");
+  const pieces = "boków" + (has("przegroda") ? " i przegród" : "");
+  const steps = [
+    "Wytnij płyty z końcami ciętymi pod kątem (skos, góra boków i przegród, półki i dno przy skosie) wg „Rysunków cięcia i nawiertów” - pochylenie piły jest w opisie formatki.",
+    `Frezarką Zeta P2 (głębokość ${lam.depth} mm) wyfrezuj rowki ${lam.name} wg rysunków: w licu dna i od spodu skośnej płyty, w czołach dolnych i górnych (skośnych) ${pieces}` + (cons.fixedShelves ? ", w czołach półek stałych i w licu ścian pod półki" : "") + `. Rowek ma ok. ${len} mm długości; środek rowka = wymiar na rysunku.`,
+    "Nawierć pozostałe otwory (prowadnice, zawiasy, podpórki).",
+    lam.clamex ? `Wywierć otwory Ø6 na klucz (przyrząd Lamello do Clamex P), ${String(lam.keyFromEdge).replace(".", ",")} mm od krawędzi, aż do rowka - w licu ${pieces} przy dnie i przy skosie` + (cons.fixedShelves ? ", od spodu półek stałych" : "") + "." : null,
+    lam.clamex ? "Włóż łączniki Clamex w rowki (wg instrukcji Lamello), drugie połówki w rowki drugiej formatki." : `Nałóż klej do rowków i włóż łączniki ${lam.name} (samozaciskowe - bez ścisków).`,
+    "Postaw na dnie bok wysoki" + (has("bok-niski") ? ", bok niski" : "") + (has("przegroda") ? " i przegrody" : "") + (lam.clamex ? " i dokręć łączniki kluczem." : " i dociśnij."),
+    cons.fixedShelves ? (lam.clamex ? "Wsuń półki stałe na łączniki i dokręć kluczem od spodu." : "Wsuń półki stałe na łączniki z klejem.") : null,
+    "Nałóż skośną płytę na górne końce boków" + (has("przegroda") ? " i przegród" : "") + (cons.isTriangle ? " (dolny koniec oparty na dnie)" : "") + (lam.clamex ? " i dokręć łączniki kluczem - wierzch skosu bez otworów." : " - wierzch skosu bez wkrętów."),
+    "Sprawdź przekątne korpusu (kąt prosty przy dnie i wysokim boku).",
+    "Przybij lub przykręć plecy o obrysie pod skos od tyłu (wyrównują korpus).",
+    cons.legs ? `Przykręć nóżki (${cons.legsHeight} mm)${cons.plinth ? " i zatrzaski cokołu" : ""}.` : null,
+    cons.drawers ? "Przykręć prowadnice szuflad w otworach (patrz boki / przegrody); skrzynki szuflad wg instrukcji „Skrzynki szuflad”." : null,
+    cons.doors ? "Przykręć prowadniki zawiasów w otworach, zawiasy w puszkach frontów, zawieś drzwi." : null,
+    cons.blendy ? "Przykręć blendy (fronty docięte do skosu) od wewnątrz." : null,
+    cons.movableShelves ? "Wciśnij podpórki i połóż półki ruchome." : null,
+    cons.drawers || cons.doors ? "Wyreguluj fronty (szczeliny równe, także wzdłuż skosu)." : null,
+  ].filter(Boolean);
+  return `<ol class="steps">${steps.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ol>`;
+}
+
 export function slopeStepsHtml(cons, panels) {
   const has = (prefix) => panels.some((p) => p.id.startsWith(prefix));
+  if (cons.join) return lamelloStepsHtml(cons, has);
   const steps = [
     "Wytnij płyty z końcami ciętymi pod kątem (skos, góra boków i przegród, półki i dno przy skosie) wg „Rysunków cięcia i nawiertów” - pochylenie piły jest w opisie formatki.",
     "Nawierć formatki wg rysunków (pozycje od przodu i od spodu formatki).",

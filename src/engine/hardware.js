@@ -6,7 +6,7 @@ import { state } from "../core/state.js";
 import { drawerHardwareKey } from "../core/drawerMath.js";
 import { drawerSpec } from "../core/drawerSpec.js";
 import { calculateHinges } from "../core/hingeMath.js";
-import { getSlopeDrawerHardware, getSlopeFronts } from "../core/slopeCabinet.js";
+import { getSlopeDrawerHardware, getSlopeFronts, getSlopeJoin } from "../core/slopeCabinet.js";
 import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "./edgeBanding.js";
 import { recalculateAllLayouts } from "../core/layout.js";
 import { calculateAllProjectParts } from "./cabinet.js";
@@ -44,7 +44,6 @@ export function calculateProjectHardware() {
     }
 
     const joinKey = `Złącze korpusowe (Kołek 8x30 + Konfirmat)`;
-    if (!hardwareList[joinKey]) hardwareList[joinKey] = { name: joinKey, qty: 0, unit: 'kpl.' };
     // Faktyczna liczba zestawów z otworów korpusu (engine/cabinetDrillings.js - wieńce, trawersy,
     // półki stałe, mocowanie przegród; rozstaw wg engine/carcaseParts.js: jointSetPositions).
     // Każdy zestaw ma jeden wkręt, liczony raz - w formatce poziomej (czoło / lico) albo trawersie
@@ -53,11 +52,19 @@ export function calculateProjectHardware() {
     const corpusPanels = mod.type === "corner_cabinet" ? getCornerPanels(mod, config)
       : mod.type === "slope_cabinet" ? getSlopePanels(mod, config).panels
       : getCabinetPanels(mod, config);
-    const joinSets = corpusPanels.length
-      ? corpusPanels.filter((pn) => pn.kind === "poziom" || pn.kind === "polka" || pn.kind === "trawers-pion" || pn.kind === "poziom-L")
-          .reduce((n, pn) => n + pn.holes.filter((h) => h.kind === "wkret").length, 0)
-      : 8;
-    hardwareList[joinKey].qty += joinSets;
+    const horizontal = corpusPanels.filter((pn) => pn.kind === "poziom" || pn.kind === "polka" || pn.kind === "trawers-pion" || pn.kind === "poziom-L");
+    const countKind = (kind) => horizontal.reduce((n, pn) => n + pn.holes.filter((h) => h.kind === kind).length, 0);
+    // Skos łączony na Lamello (core/slopeCabinet.js: getSlopeJoin): jeden łącznik na rowek
+    // w formatce poziomej (dno, skośna płyta, czoła półek stałych).
+    const slopeJoin = mod.type === "slope_cabinet" ? getSlopeJoin(mod, config) : null;
+    if (slopeJoin) {
+      const lamKey = `Łącznik Lamello ${slopeJoin.lam.name}`;
+      if (!hardwareList[lamKey]) hardwareList[lamKey] = { name: lamKey, qty: 0, unit: 'szt.' };
+      hardwareList[lamKey].qty += countKind("lamello");
+    } else {
+      if (!hardwareList[joinKey]) hardwareList[joinKey] = { name: joinKey, qty: 0, unit: 'kpl.' };
+      hardwareList[joinKey].qty += corpusPanels.length ? countKind("wkret") : 8;
+    }
 
     // Okucia narożne (core/cornerFittings.js): wysuw szafki ślepej (wersja lewa/prawa
     // wg strony ślepej) albo karuzela szafki narożnej L.

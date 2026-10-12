@@ -203,7 +203,9 @@ export function cabinetLegendHtml(panels, th) {
   const size = (o) => (o.groove ? `rowek ${fmt(o.d)} × ${fmt(o.groove)}, gł. ${fmt(o.depth)}` : o.depth == null ? `Ø${fmt(o.d)} przelot` : `Ø${fmt(o.d)} × ${fmt(o.depth)}`);
   const kinds = [...new Set(panels.flatMap((p) => p.holes.map((h) => h.kind)))];
   return `<div class="legend">${kinds.map((k) => {
-    const sp = spec[k] || {};
+    // Rodzaje spoza cabinetHoleSpecs (rowek Lamello, klucz Clamex w skosie) - rozmiar z samego otworu.
+    const sample = (edge) => panels.flatMap((p) => p.holes).find((h) => h.kind === k && (edge ? h.edge && h.edge !== "lico" : !h.edge || h.edge === "lico"));
+    const sp = spec[k] || { face: sample(false), edge: sample(true) };
     const parts = [sp.side || sp.face ? `płaszczyzna ${size(sp.side || sp.face)}` : null, sp.edge ? `czoło ${size(sp.edge)}` : null].filter(Boolean);
     return `<span><i style="background:${KIND[k].color}"></i><b>${escapeHtml(sp.label || KIND[k].label)}</b>${parts.length ? ` - ${parts.join(", ")}` : ""}</span>`;
   }).join("")}

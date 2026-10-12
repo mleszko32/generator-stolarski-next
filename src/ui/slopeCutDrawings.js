@@ -9,7 +9,7 @@
 import { state } from "../core/state.js";
 import { escapeHtml, openHtmlWindow } from "../utils/dom.js";
 import { round1 } from "../utils/math.js";
-import { getSlopeBoards, getSlopeShapes, getSlopeGeometry, getSlopeDrillings } from "../core/slopeCabinet.js";
+import { getSlopeBoards, getSlopeShapes, getSlopeGeometry, getSlopeDrillings, getSlopeJoin } from "../core/slopeCabinet.js";
 import { jointSetsFor } from "../engine/carcaseParts.js";
 import { recalculateLayout } from "../core/layout.js";
 import { slopeBoardSVG, slopeShapeSVG, slopeFaceSVG, slopeFacePairSVG, slopePlanSVG } from "../render/slopeDrawing2d.js";
@@ -54,6 +54,8 @@ export function openSlopeCutDrawings(mod) {
   const angled = boards.filter(({ board: b }) => b.tiltStart || b.tiltEnd);
   const shapes = getSlopeShapes(mod, config);
   const drill = getSlopeDrillings(mod, config, { jointSets: (depth) => jointSetsFor(mod, config, depth) });
+  const join = getSlopeJoin(mod, config);
+  const grooveLen = join ? join.len : undefined;
   // Płyty z nawiertami; przegroda zawsze z obiema stronami (nawet gdy jedna pusta).
   const drilledNames = new Set(drill.faces.filter((fc) => fc.holes.length).map((fc) => fc.name));
   const faces = drill.faces.filter((fc) => drilledNames.has(fc.name));
@@ -91,12 +93,12 @@ export function openSlopeCutDrawings(mod) {
   const faceCards = [...drilledNames].map((name, i) => {
     const own = faces.filter((fc) => fc.name === name);
     const l = own.find((fc) => fc.side === 'lewa'), r = own.find((fc) => fc.side === 'prawa');
-    const html = l && r ? slopeFacePairSVG(l, r) : own.map((fc) => slopeFaceSVG(fc)).join('');
+    const html = l && r ? slopeFacePairSVG(l, r, grooveLen) : own.map((fc) => slopeFaceSVG(fc, grooveLen)).join('');
     return { id: `nawierty-${i}`, label: l && r ? `${name} (obie strony)` : `${name} — ${own[0].side}`, html, wide: !!(l && r) };
   });
-  const planCards = drill.plans.map((pl, i) => ({ id: `rzut-${i}`, label: `${pl.name} — łączniki`, html: slopePlanSVG(pl) }));
+  const planCards = drill.plans.map((pl, i) => ({ id: `rzut-${i}`, label: `${pl.name} — łączniki`, html: slopePlanSVG(pl, grooveLen) }));
   const nawierty = `
-    <p class="lead">Te same wzory co w zwykłej szafce: prowadnice szuflad (MOVENTO wg katalogu Blum), podpórki półek (3 otwory co 32 mm), konfirmat + kołek, puszki zawiasów. Wysokości od dołu danej płyty, odległości od frontu. Każdy rysunek pokazuje jedną stronę płyty — pod tytułem napisane, w którą stronę patrzy.</p>
+    <p class="lead">Te same wzory co w zwykłej szafce: prowadnice szuflad (MOVENTO wg katalogu Blum), podpórki półek (3 otwory co 32 mm), ${join ? `łączniki Lamello ${escapeHtml(join.lam.name)} (rowek 7 × ${fmt(join.len)} mm, gł. ${join.lam.depth} mm, frezarka Zeta P2)` : 'konfirmat + kołek'}, puszki zawiasów. Wysokości od dołu danej płyty, odległości od frontu. Każdy rysunek pokazuje jedną stronę płyty — pod tytułem napisane, w którą stronę patrzy.</p>
     ${drill.notes.map((n) => `<div class="warn">${escapeHtml(n)}</div>`).join('')}
     ${index([...faceCards, ...planCards])}
     <h3>Ściany płyt pionowych</h3>

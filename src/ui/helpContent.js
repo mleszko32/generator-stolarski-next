@@ -182,7 +182,9 @@ export const HELP_SECTIONS = [
         <li><b>Szafka ślepa</b> - zwykła szafka z włączoną opcją w sekcji <b>Narożnik</b>: strona
         ślepa, szerokość drzwi, sposób mocowania drzwi (listwa, zaślepka, bok) i okucie narożne.</li>
         <li><b>Szafka pod skos</b> - wymiary wysokiej i niskiej strony; wnętrze dzieli się jak w
-        zwykłej szafce, a skos przycina półki i fronty. Rysunki cięć skosu są w prawym panelu.</li>
+        zwykłej szafce, a skos przycina półki i fronty. Rysunki cięć skosu są w prawym panelu. W sekcji
+        Wymiary <b>Łączenie korpusu</b>: kołek + wkręt albo Lamello Tenso / Clamex (rowki frezarką Zeta P2,
+        bez wkrętów na wierzchu skosu) - rysunki nawiertów, instrukcja montażu i okucia liczą się wg wyboru.</li>
       </ul>`,
   },
   {

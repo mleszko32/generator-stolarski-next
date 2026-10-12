@@ -145,6 +145,7 @@ function slopeCard(mod, idx, layouts) {
     cons.isTriangle ? "trójkąt (skos do dna)" : `niski bok ${fmt(cons.L)} mm`,
     `skos ${fmt(cons.angle)}°, niska strona ${cons.lowSide === "left" ? "z lewej" : "z prawej"}`,
     "dno nakładane, boki i przegrody na dnie",
+    cons.join ? `łączenie Lamello ${cons.join.lam.name}` : "łączenie kołek + wkręt",
     "plecy nakładane",
     cons.legs ? `nóżki ${cons.legsHeight} mm${cons.plinth ? " + cokół" : ""}` : "bez nóżek",
   ].join(" · ");

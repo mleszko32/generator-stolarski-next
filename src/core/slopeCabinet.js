@@ -30,6 +30,7 @@
 import { drawerSystems } from './drawerSystems.js';
 import { getDrawerComponents, getWoodenDrawerHeights, drawerComponentsToParts, drawerHardwareKey, calculateDrawerHoles } from './drawerMath.js';
 import { calculateHinges } from './hingeMath.js';
+import { LAMELLO, lamelloGrooveLen, lamelloPositions, LAMELLO_EDGE } from './lamello.js';
 
 const MIN_PIECE = 50;   // krótsze kawałki pomijamy (nie da się ich zrobić)
 const r1 = (v) => Math.round(v * 10) / 10;
@@ -647,13 +648,34 @@ const SHELF_PIN_DROP = 2.5;   // jak w render/viewer2d.js
 // Nawierty szafki pod skos:
 // - faces: ściany płyt pionowych (bok wysoki, bok niski, obie strony przegród)
 //   { name, side, height, width, holes: [{ x (od frontu), y (od dołu płyty), type }] },
-//   type: 'drawer' | 'shelf' | 'screw' | 'dowel' | 'hinge';
+//   type: 'drawer' | 'shelf' | 'screw' | 'dowel' | 'hinge' | 'lamello' (rowek P) | 'key' (Clamex);
 // - plans: rzut płyty poziomej/skośnej z łącznikami do płyt pionowych
 //   { name, length, width, holes: [{ x (wzdłuż płyty), z (od frontu), type }] };
 // - notes: ostrzeżenia (np. szuflada bez boku do przykręcenia prowadnicy).
 // opts.jointSets(depth) -> [{ screw, dowel }] (mm od frontu) - rozmieszczenie zestawów łączników;
 // wołający z engine/ podaje engine/carcaseParts.js: jointSetsFor (jak w zwykłej szafce), bez niego
 // skrajne zestawy 37 / 69 od frontu i od tyłu (core/ nie importuje engine/).
+// Łączenie korpusu skosu: mod.slopeJoin - 'standard' (kołek + wkręt, jak zwykła szafka) albo
+// łącznik Lamello P z frezarki Zeta P2 (klucze jak LAMELLO). Długość rowka i oś od końca formatki
+// z ustawień skrzynek szuflad (project.drawerBox: lamelloGroove / lamelloEdge) - to ta sama frezarka.
+export const SLOPE_JOINS = {
+  standard: 'Kołek + wkręt (jak zwykła szafka)',
+  tenso_p10: 'Lamello Tenso P-10 (na klej, niewidoczne)',
+  tenso_p14: 'Lamello Tenso P-14 (na klej, niewidoczne)',
+  clamex_p10: 'Lamello Clamex P-10 (rozbieralne)',
+  clamex_p14: 'Lamello Clamex P-14 (rozbieralne)',
+};
+// null = kołek + wkręt; inaczej { id, lam, len (długość rowka), positions(depth) - osie rowków od frontu }.
+export function getSlopeJoin(mod, config) {
+  const id = mod && mod.slopeJoin;
+  if (!id || !Object.prototype.hasOwnProperty.call(LAMELLO, id)) return null;
+  const lam = LAMELLO[id];
+  const db = (config && config.drawerBox) || {};
+  const len = lamelloGrooveLen(lam, db);
+  const edge = parseFloat(db.lamelloEdge) > 0 ? parseFloat(db.lamelloEdge) : LAMELLO_EDGE;
+  return { id, lam, len, positions: (depth) => lamelloPositions(depth, lam, edge, len) };
+}
+
 const edgeJointSets = (depth) => [{ screw: 37, dowel: 69 }, { screw: depth - 37, dowel: depth - 69 }];
 export function getSlopeDrillings(mod, config, opts = {}) {
   const jointSets = opts.jointSets || edgeJointSets;
@@ -666,6 +688,14 @@ export function getSlopeDrillings(mod, config, opts = {}) {
   const sys = String(f.drawerSystem || 'merivobox').toLowerCase();
   const nAt = (x) => (g.lowSide === 'right' ? g.W - x : x);   // punkt rzeczywisty -> układ skosu
   const notes = [];
+  // Lamello: rowki zamiast kołków i wkrętów (getSlopeJoin); Clamex - otwór na klucz w licu
+  // płyty z rowkiem w czole (boki/przegrody przy dnie i skosie, półki stałe od spodu).
+  const join = getSlopeJoin(mod, config);
+  const lamZ = join ? join.positions(depth) : [];
+  if (join) {
+    if (th < join.lam.minFace) notes.push(`${join.lam.name}: rowek w płaszczyźnie wymaga płyty min. ${join.lam.minFace} mm (jest ${th} mm).`);
+    if (th < join.lam.minEdge) notes.push(`${join.lam.name}: rowek w krawędzi wymaga płyty min. ${join.lam.minEdge} mm (jest ${th} mm).`);
+  }
 
   // Ściany płyt pionowych: x ściany (rzeczywiste), w którą stronę patrzy
   // ('R' - wnętrze po prawej, 'L' - po lewej), spód płyty i wysokość ściany.
@@ -715,7 +745,9 @@ export function getSlopeDrillings(mod, config, opts = {}) {
     [faceAt(x0, 'R'), faceAt(x1, 'L')].forEach((fc) => {
       if (!fc) return;
       if (y + th > fc.y0 + fc.height + 0.5) return;   // półka ponad skosem przy tej ścianie
-      if (el.isStructural) {
+      if (el.isStructural && join) {
+        lamZ.forEach((z) => put(fc, { x: z, y: y + th / 2, type: 'lamello' }));
+      } else if (el.isStructural) {
         jointSets(depth).forEach((set) => {
           put(fc, { x: set.screw, y: y + th / 2, type: 'screw' });
           put(fc, { x: set.dowel, y: y + th / 2, type: 'dowel' });
@@ -732,6 +764,7 @@ export function getSlopeDrillings(mod, config, opts = {}) {
 
   // Rzuty płyt z łącznikami do płyt pionowych (zestawy wkręt + kołek wg jointSets).
   const joint = (holes, x, withDowels = true) => {
+    if (join) { lamZ.forEach((z) => holes.push({ x, z, type: 'lamello' })); return; }
     jointSets(depth).forEach((set) => {
       holes.push({ x, z: set.screw, type: 'screw' });
       if (withDowels) holes.push({ x, z: set.dowel, type: 'dowel' });
@@ -742,6 +775,7 @@ export function getSlopeDrillings(mod, config, opts = {}) {
   faces.filter((fc) => fc.side !== 'lewa' && Math.abs(fc.y0 - th) < 1).forEach((fc) => {
     const cx = fc.name.startsWith('Przegroda') ? fc.x - th / 2 : (fc.dir === 'L' ? fc.x + th / 2 : fc.x - th / 2);
     joint(bottomHoles, cx);
+    if (join && join.lam.clamex) lamZ.forEach((z) => fc.holes.push({ x: z, y: join.lam.keyFromEdge, type: 'key' }));
   });
   const plans = [{ name: 'Dno (wieniec dolny)', length: g.W, width: depth, holes: bottomHoles, fromLabel: 'od lewej krawędzi' }];
 
@@ -760,6 +794,12 @@ export function getSlopeDrillings(mod, config, opts = {}) {
     const cxReal = fc.name.startsWith('Przegroda') ? (fc.side === 'lewa' ? fc.x + th / 2 : fc.x - th / 2) : (fc.dir === 'L' ? fc.x + th / 2 : fc.x - th / 2);
     joint(slopeHoles, (nAt(cxReal) - topStart) / cosA, false);
   });
+  // Clamex przy skosie: klucz w licu płyty pionowej pod jej skośnym czołem (na stronie bez
+  // otworów do dna przy przegrodzie - jedna strona wystarcza).
+  if (join && join.lam.clamex) {
+    faces.filter((fc) => reachesSlope(fc) && fc.side !== 'lewa').forEach((fc) => lamZ.forEach((z) => fc.holes.push({ x: z, y: fc.height - join.lam.keyFromEdge, type: 'key' })));
+    notes.push(`${join.lam.name} przy skośnej płycie: czoło boku jest cięte pod kątem - otwór na klucz wierć ${join.lam.keyFromEdge} mm od krawędzi wewnętrznej, a położenie sprawdź na próbce.`);
+  }
   const topLen = g.isTriangle ? (g.W - th / g.k) / cosA : Math.hypot(g.W, g.H - g.L);
   plans.push({ name: 'Skos (wieniec skośny)', length: topLen, width: depth, holes: slopeHoles, fromLabel: 'wzdłuż wierzchu od dolnego końca' });
 

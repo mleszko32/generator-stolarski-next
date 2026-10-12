@@ -101,3 +101,51 @@ describe("instrukcja szafki pod skos - formatki z otworami", () => {
     expect(join.qty).toBe(24);
   });
 });
+
+describe("szafka pod skos łączona na Lamello (mod.slopeJoin)", () => {
+  // Głębokość płyt 597, oś skrajnego 60 od krawędzi, rozstaw maks. 300 -> 3 rowki.
+  const Z = [60, 298.5, 537];
+
+  it("Tenso P-14: rowki zamiast kołków i wkrętów w dnie, skosie, czołach boków i półkach stałych", () => {
+    const mod = slopeMod();
+    mod.slopeJoin = "tenso_p14";
+    mod.elements.find((e) => e.typ === "poziom").isStructural = true;
+    const { panels } = getSlopePanels(mod, state.project);
+    const all = panels.flatMap((p) => p.holes);
+    expect(all.some((h) => h.kind === "wkret" || h.kind === "kolek")).toBe(false);
+    const dno = byId(panels, "dno");
+    expect([...new Set(dno.holes.map((h) => h.z))]).toEqual(Z);
+    expect(dno.holes.every((h) => h.kind === "lamello" && h.groove === 75 && h.depth === 14)).toBe(true);
+    const bok = byId(panels, "bok-wysoki");
+    expect(bok.holes.filter((h) => h.edge === "dolne").map((h) => h.x)).toEqual(Z);
+    expect(bok.holes.filter((h) => h.edge === "gorne").map((h) => h.x)).toEqual(Z);
+    expect(byId(panels, "skos").holes.every((h) => h.kind === "lamello")).toBe(true);
+    const shelf = panels.find((p) => p.kind === "polka" && p.structural);
+    expect(shelf.holes.length).toBeGreaterThan(0);
+    expect(shelf.holes.every((h) => h.kind === "lamello")).toBe(true);
+    expect(all.some((h) => h.kind === "klucz")).toBe(false);
+  });
+
+  it("Clamex P-14: otwory na klucz w licu boku przy dnie i skosie; lista okuć liczy łączniki", () => {
+    const mod = slopeMod();
+    mod.slopeJoin = "clamex_p14";
+    const { panels, notes } = getSlopePanels(mod, state.project);
+    const bok = byId(panels, "bok-wysoki");
+    const keys = bok.holes.filter((h) => h.kind === "klucz");
+    expect(keys.map((h) => h.y)).toEqual([7.5, 7.5, 7.5, ...Z.map(() => round(bok.width - 7.5))]);
+    expect(notes.some((n) => n.includes("Clamex P-14"))).toBe(true);
+    const grooves = ["dno", "skos"].reduce((n, id) => n + byId(panels, id).holes.filter((h) => h.kind === "lamello").length, 0);
+    const hw = calculateProjectHardware();
+    expect(hw.find((h) => h.name === "Łącznik Lamello Clamex P-14").qty).toBe(grooves);
+    expect(hw.some((h) => h.name.startsWith("Złącze korpusowe"))).toBe(false);
+    expect(getSlopeConstruction(mod, state.project).join.lam.name).toBe("Clamex P-14");
+  });
+
+  it("nieznana wartość = kołek + wkręt", () => {
+    const mod = slopeMod();
+    mod.slopeJoin = "__proto__";
+    const { panels } = getSlopePanels(mod, state.project);
+    expect(byId(panels, "dno").holes.some((h) => h.kind === "wkret")).toBe(true);
+  });
+});
+const round = (v) => Math.round(v * 10) / 10;

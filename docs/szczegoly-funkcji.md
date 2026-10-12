@@ -71,6 +71,15 @@ Rysunki `render/slopeInstructions2d.js`: montaż w izometrii z wielokątów `get
 = kolejność formatek, patrz `slopeSolids`), `slopeStepsHtml`. Ostrzeżenia `notes` (np. brak boku na prowadnicę) na górze
 karty. Lista okuć liczy złącza skosu z otworów (dno, skos, półki stałe) zamiast ryczałtu 8.
 
+Łączenie korpusu skosu na Lamello: `mod.slopeJoin` (`SLOPE_JOINS`, sekcja Wymiary panelu skosu) — `standard` (kołek +
+wkręt) albo Tenso / Clamex P-10 / P-14 z frezarki Zeta P2. `getSlopeJoin(mod, config)` bierze dane łącznika z `core/lamello.js`
+(wspólne ze skrzynkami szuflad), długość rowka i oś skrajnego od krawędzi z `project.drawerBox` (`lamelloGroove` / `lamelloEdge` —
+ta sama frezarka), rozstaw `lamelloPositions` wzdłuż głębokości płyt. Rowki (`lamello`) zastępują wszystkie kołki i wkręty: lico dna,
+spód skośnej płyty, czoła dolne i górne (skośne) boków i przegród, czoła półek stałych + lico ścian pod nimi. Clamex: otwór na klucz Ø6
+(`klucz`, `keyFromEdge` od krawędzi) w licu boku / przegrody (przy przegrodzie tylko na jednej stronie) przy dnie i pod skosem, od spodu
+półek stałych; przy skośnym czole uwaga w `notes` (sprawdzić na próbce). Okucia: „Łącznik Lamello …” szt. = liczba rowków w formatkach
+poziomych zamiast „Złącze korpusowe”.
+
 ## Stół RC System
 
 **Stół RC System** (rcsystem.pl, ręczny stół do nawiercania): `core/rcSystem.js` (czyste, z testami) — otwory bazowe

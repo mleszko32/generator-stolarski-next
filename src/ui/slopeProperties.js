@@ -13,7 +13,7 @@ import { propHeaderHtml, sectionHtml, bindSections, positionRotationHtml, bindMo
 import { toggleInteriorEditor } from "./interiorEditor.js";
 import { escapeHtml } from "../utils/dom.js";
 import { round1, evalDimensionExpr } from "../utils/math.js";
-import { getSlopeGeometry, getSlopeSettings, getSlopeFronts, getSlopeFrontSettings } from "../core/slopeCabinet.js";
+import { getSlopeGeometry, getSlopeSettings, getSlopeFronts, getSlopeFrontSettings, SLOPE_JOINS, getSlopeJoin } from "../core/slopeCabinet.js";
 import { recalculateLayout } from "../core/layout.js";
 import { drawerSystems } from "../core/drawerSystems.js";
 import { openSlopeCutDrawings } from "./slopeCutDrawings.js";
@@ -25,6 +25,7 @@ const SUBTYPE_LABELS = { szuflada: 'Szuflada', 'szuflada-wewnetrzna': 'Szuflada 
 export function renderSlopeModuleProperties(rightSidebar, mod) {
   const th = parseFloat(state.project.materials?.boardThickness) || 18;
   const s = getSlopeSettings(mod);
+  const join = getSlopeJoin(mod, state.project);
   const g = getSlopeGeometry(mod, th);
   const d = mod.dimensions;
   const fs = getSlopeFrontSettings(mod, state.project);
@@ -85,6 +86,16 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
         <button type="button" class="seg-btn btn-slope-side${g.lowSide === 'right' ? ' active' : ''}" data-side="right">Po prawej</button>
       </div>
       <div class="hint">Kąt skosu: <b>${round1(g.angle)}°</b> · ${g.isTriangle ? 'trójkąt' : 'trapez'} · dno nakładane</div>
+
+      <h3>Łączenie korpusu</h3>
+      <div class="property-group">
+        <select id="input-slope-join">
+          ${Object.entries(SLOPE_JOINS).map(([id, label]) => `<option value="${id}" ${id === (join ? join.id : 'standard') ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="hint mb-8">${join
+        ? `Rowki frezarką Zeta P2 (gł. ${join.lam.depth} mm, długość ${String(join.len).replace('.', ',')} mm, oś skrajnego ${String(join.positions(1000)[0]).replace('.', ',')} mm od krawędzi - jak w skrzynkach szuflad: hub → Skrzynki szuflad). Dno, skośna płyta i półki stałe bez wkrętów na widoku.`
+        : 'Kołki + wkręty w tych samych miejscach co w zwykłej szafce (skos przykręcany od wierzchu).'}</div>
 
       <hr class="divider">
 
@@ -212,6 +223,11 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
     if (el) { if (e.target.value === 'blenda') el.slopeBlenda = true; else delete el.slopeBlenda; }
     refresh();
   }));
+
+  document.getElementById('input-slope-join')?.addEventListener('change', (e) => {
+    if (e.target.value === 'standard') delete mod.slopeJoin; else mod.slopeJoin = e.target.value;
+    refresh();
+  });
 
   // --- Szuflady ---
   document.getElementById('input-slope-drawer-system')?.addEventListener('change', (e) => {

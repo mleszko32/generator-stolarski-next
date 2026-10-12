@@ -159,6 +159,15 @@ const HOLE = {
   screw: { color: C.purple600, r: 1.5, label: 'konfirmat' },
   dowel: { color: C.purple600, r: 4, label: 'kołek' },
   hinge: { color: C.green600, r: 2.5, label: 'zawias' },
+  lamello: { color: C.orange600, r: 3.5, label: 'rowek Lamello P' },
+  key: { color: C.red600, r: 3, label: 'otwór na klucz Clamex' },
+};
+// Rowek Lamello P (szerokość 7 mm, długość wg łącznika - core/slopeCabinet.js: getSlopeJoin)
+// jako prostokąt wzdłuż głębokości płyty; along - 'x' (ściana płyty pionowej) albo 'y' (rzut).
+const LAMELLO_W = 7;
+const grooveRect = (cx, cy, len, along, color) => {
+  const [w, h] = along === 'x' ? [len, LAMELLO_W] : [LAMELLO_W, len];
+  return `<rect x="${r1(cx - w / 2)}" y="${r1(cy - h / 2)}" width="${r1(w)}" height="${r1(h)}" rx="1" fill="${color}" fill-opacity="0.35" stroke="${color}" stroke-width="1"/>`;
 };
 
 const svgWrap = (minX, minY, w, h, body) =>
@@ -177,7 +186,7 @@ function legendSvg(types, x, y) {
 }
 
 // Ściana płyty pionowej, front po lewej (jak "BOK LEWY" zwykłej szafki).
-export function slopeFaceSVG(face) {
+export function slopeFaceSVG(face, grooveLen = 75) {
   const D = face.width, H = face.height;
   // Front tam, gdzie widzi go stolarz stojący we wnęce (face.frontOnRight) - dwie
   // strony przegrody stoją obok siebie frontami do siebie, jak na rysunku boku
@@ -201,6 +210,7 @@ export function slopeFaceSVG(face) {
       body += `<text x="${r1(X(h.x) + (rev ? -8 : 8))}" y="${r1(sy(h.y) + 4)}" text-anchor="${rev ? 'end' : 'start'}">${getDimText(h.y, H, st.color)}</text>`;
       return;
     }
+    if (h.type === 'lamello') { body += grooveRect(X(h.x), sy(h.y), grooveLen, 'x', st.color); return; }
     body += `<circle cx="${r1(X(h.x))}" cy="${r1(sy(h.y))}" r="${st.r}" fill="${st.color}"/>`;
   });
 
@@ -208,7 +218,8 @@ export function slopeFaceSVG(face) {
   // krawędzi), prowadnice, łączniki - kolejno coraz dalej od płyty.
   const uniq = (arr) => [...new Set(arr.map((v) => r1(v)))].sort((a, b) => a - b);
   const drawerYs = uniq(face.holes.filter((h) => h.type === 'drawer').map((h) => h.y));
-  const corpusYs = uniq(face.holes.filter((h) => h.type === 'screw').map((h) => h.y));
+  const corpusYs = uniq(face.holes.filter((h) => h.type === 'screw' || h.type === 'lamello').map((h) => h.y));
+  const keyYs = uniq(face.holes.filter((h) => h.type === 'key').map((h) => h.y));
   const shelfAll = face.holes.filter((h) => h.type === 'shelf');
   const shelfCenters = uniq(shelfAll.filter((h) => h.center).map((h) => h.y));
   const backEdge = rev ? 0 : D;
@@ -235,7 +246,8 @@ export function slopeFaceSVG(face) {
     writeCol(uniq(shelfAll.map((h) => h.y)), C.orange600, true, (y) => (shelfCenters.includes(y) ? 1 : 0.6));
   }
   if (drawerYs.length) writeCol(drawerYs, C.sky600, false);
-  if (corpusYs.length) writeCol(corpusYs, C.purple600, true);
+  if (corpusYs.length) writeCol(corpusYs, face.holes.some((h) => h.type === 'lamello') ? C.orange600 : C.purple600, true);
+  if (keyYs.length) writeCol(keyYs, C.red600, false);
   // Odległości od frontu nad płytą.
   uniq(face.holes.map((h) => h.x)).forEach((x, i) => {
     body += `<text x="${r1(X(x))}" y="${-6 - (i % 2) * 11}" font-size="9" fill="${C.slate500}" text-anchor="middle">${fmt(x)}</text>`;
@@ -250,15 +262,15 @@ export function slopeFaceSVG(face) {
 
 // Obie strony jednej przegrody obok siebie, frontami do siebie: lewa strona
 // (front po prawej) i prawa strona (front po lewej).
-export function slopeFacePairSVG(left, right) {
-  return `<div class="pair">${slopeFaceSVG(left)}${slopeFaceSVG(right)}</div>`;
+export function slopeFacePairSVG(left, right, grooveLen) {
+  return `<div class="pair">${slopeFaceSVG(left, grooveLen)}${slopeFaceSVG(right, grooveLen)}</div>`;
 }
 
 // Rzut płyty poziomej / skośnej z łącznikami - jak rzut wieńca zwykłej szafki
 // (render/viewer2d.js: drawPionMountViews): przód u góry, wymiary pozycji pod spodem.
-export function slopePlanSVG(plan) {
+export function slopePlanSVG(plan, grooveLen = 75) {
   const L = plan.length, D = plan.width;
-  const color = C.purple600;
+  const color = plan.holes.some((h) => h.type === 'lamello') ? C.orange600 : C.purple600;
   // Długie płyty (dno, skos ~2 m) - napisy i znaczniki powiększone proporcjonalnie,
   // żeby po zmieszczeniu rysunku na kartce były czytelne jak rzut wieńca ~600 mm.
   const k = Math.max(1, L / 700);
@@ -270,8 +282,9 @@ export function slopePlanSVG(plan) {
   body += `<text x="${r1(L / 2)}" y="${r1(D + 20 * k)}" font-size="${f(11)}" fill="${C.slate400}" font-weight="bold" text-anchor="middle" letter-spacing="1">TYŁ</text>`;
   const xs = new Set();
   plan.holes.forEach((h) => {
-    body += `<circle cx="${r1(h.x)}" cy="${r1(h.z)}" r="${f(HOLE[h.type].r)}" fill="${color}"/>`;
-    if (h.type === 'screw') xs.add(r1(h.x));
+    if (h.type === 'lamello') body += grooveRect(h.x, h.z, grooveLen, 'y', HOLE.lamello.color);
+    else body += `<circle cx="${r1(h.x)}" cy="${r1(h.z)}" r="${f(HOLE[h.type].r)}" fill="${color}"/>`;
+    if (h.type === 'screw' || h.type === 'lamello') xs.add(r1(h.x));
   });
   const sorted = [...xs].sort((a, b) => a - b);
   sorted.forEach((x, i) => {

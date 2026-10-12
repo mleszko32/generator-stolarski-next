@@ -16,13 +16,13 @@
 // płyty; płyta pozioma / skośna - x wzdłuż płyty (dno: od lewej krawędzi szafki, skos: od dolnego
 // końca), z od przodu.
 import { recalculateLayout } from "../core/layout.js";
-import { getSlopeGeometry, getSlopeDrillings, getSlopeBoards, getSlopeDividers, getSlopeShelfPieces, getSlopeCabinetParts, getSlopeFronts } from "../core/slopeCabinet.js";
+import { getSlopeGeometry, getSlopeDrillings, getSlopeBoards, getSlopeDividers, getSlopeShelfPieces, getSlopeCabinetParts, getSlopeFronts, getSlopeJoin } from "../core/slopeCabinet.js";
 import { jointSetsFor } from "./carcaseParts.js";
 import { cabinetHoleSpecs } from "./cabinetDrillings.js";
 import { num, round1 } from "../utils/math.js";
 
-const KIND_OF = { drawer: "prowadnica", shelf: "podporka", screw: "wkret", dowel: "kolek", hinge: "zawias" };
-const TO = { prowadnica: "prowadnica szuflady", podporka: "półka ruchoma", wkret: "półka stała", kolek: "półka stała", zawias: "prowadnik zawiasu" };
+const KIND_OF = { drawer: "prowadnica", shelf: "podporka", screw: "wkret", dowel: "kolek", hinge: "zawias", lamello: "lamello", key: "klucz" };
+const TO = { prowadnica: "prowadnica szuflady", podporka: "półka ruchoma", wkret: "półka stała", kolek: "półka stała", zawias: "prowadnik zawiasu", lamello: "półka stała", klucz: "łącznik Clamex" };
 const fmtDeg = (v) => `${String(round1(v)).replace(".", ",")}°`;
 const fmtMm = (v) => String(round1(v)).replace(".", ",");
 
@@ -48,16 +48,23 @@ export function getSlopePanels(mod, project) {
   const drill = getSlopeDrillings(mod, project, { jointSets: () => sets });
   const boards = getSlopeBoards(mod, project);
   const board = (name) => boards.find((b) => b.name === name);
-  const spec = cabinetHoleSpecs(th);
+  // Lamello (mod.slopeJoin): rowek P w obu formatkach zamiast kołka i wkrętu, Clamex z otworem
+  // na klucz Ø6 do rowka (core/slopeCabinet.js: getSlopeJoin).
+  const join = getSlopeJoin(mod, project);
+  const lamZ = join ? join.positions(depth) : [];
+  const spec = { ...cabinetHoleSpecs(th), ...(join ? (() => {
+    const gr = { d: 7, depth: join.lam.depth, groove: join.len };
+    return { lamello: { face: gr, edge: gr, label: `Lamello ${join.lam.name}` }, klucz: { face: { d: 6, depth: null, note: "do rowka" }, label: "otwór na klucz Clamex" } };
+  })() : {}) };
   const faceSpec = (k) => spec[k].face;
   const edgeSpec = (k) => spec[k].edge;
   const sortHoles = (a, b) => a[0] - b[0];
-  const jointKinds = sets.flatMap((s) => [[s.screw, "wkret"], [s.dowel, "kolek"]]).sort(sortHoles);
+  const jointKinds = join ? lamZ.map((z) => [z, "lamello"]) : sets.flatMap((s) => [[s.screw, "wkret"], [s.dowel, "kolek"]]).sort(sortHoles);
 
   // Otwory jednej ściany płyty pionowej (getSlopeDrillings: faces) w formacie instrukcji.
   const faceHoles = (fc, side = null) => fc.holes.flatMap((h) => {
     const kind = KIND_OF[h.type];
-    const base = { x: round1(h.x), kind, ...faceSpec(kind), to: TO[kind], ...(side ? { side } : {}) };
+    const base = { x: round1(h.x), kind, ...faceSpec(kind), to: TO[kind], ...(kind === "lamello" ? { orient: "h" } : {}), ...(side ? { side } : {}) };
     if (kind === "zawias") return [-16, 16].map((dy) => ({ ...base, y: round1(h.y + dy), hingeY: round1(h.y) }));
     return [{ ...base, y: round1(h.y), ...(kind === "podporka" ? { center: !!h.center } : {}) }];
   });
@@ -67,7 +74,8 @@ export function getSlopePanels(mod, project) {
   const reachesSlope = (fc) => fc.y0 + fc.height >= g.under(g.lowSide === "right" ? g.W - fc.x : fc.x) - 1;
   const edgeHoles = (fc, topH) => [
     ...(onBottom(fc) ? jointKinds.map(([z, kind]) => ({ edge: "dolne", x: round1(z), y: 0, kind, ...edgeSpec(kind), to: "dno" })) : []),
-    ...(reachesSlope(fc) ? sets.map((s) => ({ edge: "gorne", x: round1(s.screw), y: round1(topH), kind: "wkret", ...edgeSpec("wkret"), to: "skos" })) : []),
+    ...(reachesSlope(fc) ? (join ? lamZ.map((z) => ({ edge: "gorne", x: round1(z), y: round1(topH), kind: "lamello", ...edgeSpec("lamello"), to: "skos" }))
+      : sets.map((s) => ({ edge: "gorne", x: round1(s.screw), y: round1(topH), kind: "wkret", ...edgeSpec("wkret"), to: "skos" }))) : []),
   ];
 
   const panels = [];
@@ -112,14 +120,14 @@ export function getSlopePanels(mod, project) {
   panels.push({
     id: "dno", kind: "poziom", name: "Dno (wieniec dolny)", qty: 1, length: round1(bottom.length), width: depth, thickness: th, fromLabel: "od lewej",
     holes: licoHoles(bottom),
-    note: ["nakładane na całą szerokość; wkręty od spodu", cutNote(board("Dno (wieniec dolny)")) && `koniec przy skosie: ${cutNote(board("Dno (wieniec dolny)"))}`].filter(Boolean).join("; "),
+    note: [join ? `nakładane na całą szerokość; rowki ${join.lam.name} od góry` : "nakładane na całą szerokość; wkręty od spodu", cutNote(board("Dno (wieniec dolny)")) && `koniec przy skosie: ${cutNote(board("Dno (wieniec dolny)"))}`].filter(Boolean).join("; "),
   });
   const slope = plan("Skos");
   const slopeBoard = board("Skos (wieniec skośny)");
   panels.push({
     id: "skos", kind: "poziom", name: "Skos (wieniec skośny)", qty: 1, length: round1(slope.length), width: depth, thickness: th, fromLabel: "od dolnego końca",
     holes: licoHoles(slope),
-    note: [`kąt skosu ${fmtDeg(g.angle)}; wkręty od wierzchu (strona widoczna) w górne końce boków i przegród`, cutNote(slopeBoard) && `końce: ${cutNote(slopeBoard)}`].filter(Boolean).join("; "),
+    note: [join ? `kąt skosu ${fmtDeg(g.angle)}; rowki ${join.lam.name} od spodu (strona widoczna bez łączników), w górnych końcach boków i przegród rowki w skośnym czole` : `kąt skosu ${fmtDeg(g.angle)}; wkręty od wierzchu (strona widoczna) w górne końce boków i przegród`, cutNote(slopeBoard) && `końce: ${cutNote(slopeBoard)}`].filter(Boolean).join("; "),
   });
 
   // --- Półki: stałe - łączniki w czołach przy ścianach (lewa / prawa krawędź w widoku od frontu) ---
@@ -135,6 +143,7 @@ export function getSlopePanels(mod, project) {
       [["lewe", faceAt(x0, false), 0], ["prawe", faceAt(x1, true), round1(long)]].forEach(([ed, fc, x]) => {
         if (!fc || y + th > fc.y0 + fc.height + 0.5) return;
         jointKinds.forEach(([z, kind]) => holes.push({ edge: ed, x, z: round1(z), kind, ...edgeSpec(kind), to: ed === "lewe" ? "ściana z lewej" : "ściana z prawej" }));
+        if (join && join.lam.clamex) lamZ.forEach((z) => holes.push({ edge: "lico", x: round1(ed === "lewe" ? join.lam.keyFromEdge : long - join.lam.keyFromEdge), z: round1(z), kind: "klucz", ...faceSpec("klucz"), to: "od spodu półki" }));
       });
     }
     const tilt = Math.abs(long - short) > 0.05 ? Math.atan(Math.abs(long - short) / th) * 180 / Math.PI : 0;
@@ -168,6 +177,7 @@ export function getSlopeConstruction(mod, project) {
     doors: fronts.filter((f) => f.type === "drzwi").length,
     blendy: fronts.filter((f) => f.type === "blenda").length,
     dividers: getSlopeDividers(mod, th).length,
+    join: getSlopeJoin(mod, project),
     fixedShelves: els.filter((e) => e.typ === "poziom" && e.isStructural).length,
     movableShelves: els.filter((e) => e.typ === "poziom" && !e.isStructural).length,
   };

@@ -231,6 +231,8 @@ tokenów powiązań `corner-A-*`/`corner-B-*`.
 **Szafka pod skos** (`type: 'slope_cabinet'`): `core/slopeCabinet.js` (czyste, z testami) + `render/slopeCabinet3d.js`
 + `ui/slopeProperties.js`. Wnętrze to zwykłe `mod.elements`, a skos dopiero przycina wynik `recalculateLayout`.
 `engine/cabinet.js` i `hardware.js` dla skosu NIE idą przez zwykłe `getInteriorParts`/`getFrontsAndDrawers`.
+Łączenie korpusu skosu: `mod.slopeJoin` (kołek + wkręt albo Lamello Tenso/Clamex P — `getSlopeJoin`, dane łączników w
+`core/lamello.js`, wspólne ze skrzynkami szuflad).
 
 **Skrzynki szuflad (MOVENTO)**: `core/drawerBoxBuild.js` (czyste, z testami) zbiera skrzynki drewniane z całego
 projektu (`getDrawerBoxInfo` z `core/drawerBoxes.js`, skos przez `getSlopeFronts`), scala identyczne i liczy otwory
