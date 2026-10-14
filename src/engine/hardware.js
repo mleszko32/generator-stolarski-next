@@ -15,6 +15,7 @@ import { getCornerPanels } from "./cornerDrillings.js";
 import { getSlopePanels } from "./slopeDrillings.js";
 import { getBlindCorner, blindGeometry, BLIND_MOUNTS } from "../core/blindCorner.js";
 import { getCornerFitting } from "../core/cornerFittings.js";
+import { wardrobeRodLength } from "../core/slopeNiche.js";
 
 export function calculateProjectHardware() {
   recalculateAllLayouts();
@@ -41,6 +42,15 @@ export function calculateProjectHardware() {
         if (!hardwareList[legKey]) hardwareList[legKey] = { name: legKey, qty: 0, unit: 'szt.' };
         hardwareList[legKey].qty += 1;
       }
+    }
+
+    // Drążek garderobowy (zabudowa wnęki pod skosem, core/slopeNiche.js) + 2 wsporniki.
+    if (mod.wardrobeRod) {
+      const rodKey = `Drążek garderobowy L=${wardrobeRodLength(mod, board)} mm`;
+      if (!hardwareList[rodKey]) hardwareList[rodKey] = { name: rodKey, qty: 0, unit: 'szt.' };
+      hardwareList[rodKey].qty += 1;
+      if (!hardwareList['Wspornik drążka']) hardwareList['Wspornik drążka'] = { name: 'Wspornik drążka', qty: 0, unit: 'szt.' };
+      hardwareList['Wspornik drążka'].qty += 2;
     }
 
     const joinKey = `Złącze korpusowe (Kołek 8x30 + Konfirmat)`;

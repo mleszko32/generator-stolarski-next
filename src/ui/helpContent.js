@@ -61,6 +61,7 @@ export const HELP_SECTIONS = [
       <h4>Narzędzia</h4>
       <ul>
         <li><b>Rozmieść szafki (ściana / L / U)</b> - wypełnia ścianę albo całą kuchnię szafkami (patrz rozdział „Rozmieszczanie na ścianie”).</li>
+        <li><b>Zabudowa wnęki pod skosem</b> - rząd prostokątnych szafek pod skosem (poddasze). Podajesz ścianę kolanową, gdzie skos dochodzi do sufitu, wysokość sufitu, luz pod skosem i szerokości szafek; wysokość każdej szafki to najniższy punkt sufitu nad nią minus luz. Okno pokazuje widok z przodu z wymiarami (też do druku) i zestawienie formatek. Po pomiarze na miejscu otwórz okno ponownie, popraw liczby i kliknij „Przelicz zabudowę” - szafki zabudowy zostaną zastąpione nowymi.</li>
         <li><b>Biblioteka szafek</b> - zapisane szablony szafek (z wnętrzem); eksport i import pliku JSON przenosi je na inny komputer.</li>
         <li><b>Zbuduj projekt ze zdjęcia (AI)</b> - zdjęcie odręcznego szkicu zamienia się w szafki. Wymaga zalogowania.</li>
         <li><b>Produkcja i raporty</b> - listy, rysunki, rozkrój, okucia, kontrola i kosztorys.</li>

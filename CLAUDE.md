@@ -234,6 +234,13 @@ tokenów powiązań `corner-A-*`/`corner-B-*`.
 Łączenie korpusu skosu: `mod.slopeJoin` (kołek + wkręt albo Lamello Tenso/Clamex P — `getSlopeJoin`, dane łączników w
 `core/lamello.js`, wspólne ze skrzynkami szuflad).
 
+**Zabudowa wnęki pod skosem** (prostokątne szafki o schodkowych wysokościach, NIE `slope_cabinet`):
+`core/slopeNiche.js` (czyste, z testami) — `ceilingAt` (skos liniowy do `slopeRun`, dalej płaski sufit),
+`nicheModuleSlots` (wysokość od podłogi = najniższy sufit nad szafką − luz), `buildSlopeNicheModules` (wnętrze
+przez `zoneTree`: półki stałe + `assignFront`/`addEvenShelves`; `mod.wardrobeRod` → drążek na liście okuć),
+`applySlopeNiche` (zastępuje szafki z polem `slopeNiche`, ustawienia w `project.slopeNiche`, siedzisko = blat
+projektu). Widok z przodu `render/slopeNicheDrawing.js`, okno `ui/slopeNicheModal.js` (Narzędzia).
+
 **Skrzynki szuflad (MOVENTO)**: `core/drawerBoxBuild.js` (czyste, z testami) zbiera skrzynki drewniane z całego
 projektu (`getDrawerBoxInfo` z `core/drawerBoxes.js`, skos przez `getSlopeFronts`), scala identyczne i liczy otwory
 łączników wg `project.drawerBox`; rysunki `render/drawerBoxDrawing2d.js`, okno `ui/drawerBoxDrawings.js`.

@@ -5,6 +5,7 @@ import { openProductionHub } from "./productionHub.js";
 import { escapeHtml } from "../utils/dom.js";
 import { openModuleLibrary } from "./moduleLibraryModal.js";
 import { openWallFillModal } from "./wallFillModal.js";
+import { openSlopeNicheModal } from "./slopeNicheModal.js";
 import { snapSidePanel } from "../core/sidePanelSnap.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { renderInteriorEditorIfVisible } from "./interiorEditor.js";
@@ -151,6 +152,7 @@ export function updateSidebar() {
       <div class="panel-head"><h2>Narzędzia</h2></div>
       <div class="btn-stack">
         <button id="btn-wall-fill" class="btn btn-sm btn-block" title="Wypełnij ścianę albo całą kuchnię L/U szafkami: narożniki, podział, blendy, kolizje z szafkami, oknami i drzwiami"><i class="ti ti-layout-columns" aria-hidden="true"></i> Rozmieść szafki (ściana / L / U)</button>
+        <button id="btn-slope-niche" class="btn btn-sm btn-block" title="Rząd prostokątnych szafek pod skosem (poddasze): wysokości liczone ze skosu, widok z przodu z wymiarami i zestawienie formatek"><i class="ti ti-stairs" aria-hidden="true"></i> Zabudowa wnęki pod skosem</button>
         <button id="btn-module-library" class="btn btn-sm btn-block" title="Własne szablony szafek: zapisz skonfigurowaną szafkę i wstawiaj ją do projektów"><i class="ti ti-books" aria-hidden="true"></i> Biblioteka szafek</button>
         <button id="btn-import-ai" class="btn btn-sm btn-block"><i class="ti ti-wand" aria-hidden="true"></i> Zbuduj projekt ze zdjęcia (AI)</button>
         <input type="file" id="input-ai-image" accept="image/png, image/jpeg" style="display: none;" />
@@ -248,6 +250,7 @@ export function updateSidebar() {
     btnModuleLibrary.addEventListener('click', () => openModuleLibrary(() => { initPropertiesPanel(); update3D(); updateSidebar(); }));
   }
 
+  document.getElementById('btn-slope-niche')?.addEventListener('click', () => openSlopeNicheModal(() => { initPropertiesPanel(); update3D(); updateSidebar(); }));
   document.getElementById('btn-wall-fill')?.addEventListener('click', () => openWallFillModal(() => { initPropertiesPanel(); update3D(); updateSidebar(); }));
 
   const btnAddBlenda = document.getElementById('btn-add-blenda');
