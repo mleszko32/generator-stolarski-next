@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { state } from '../core/state.js';
 import { getWorldFootprint } from '../core/layout.js';
 import { getSlopeCabinetPolygons } from '../core/slopeCabinet.js';
-import { addPrism, isXrayMode } from './meshBuilders.js';
+import { addPrism, addLegsAndPlinth, isXrayMode } from './meshBuilders.js';
 
 // frontsVisible - przełącznik "fronty" z podglądu 3D; skrzynki szuflad są
 // widoczne, gdy fronty są schowane albo w trybie przezroczystym.
@@ -46,6 +46,12 @@ export function renderSlopeCabinet(mod, isActive, th, parentGroup, frontsVisible
     // zFront liczone od płaszczyzny frontu korpusu (z = D) w głąb.
     addPrism(s.points, D - s.zFront - s.depth, s.depth, s.kind, isActive, ud, innerGroup);
   });
+
+  // Nóżki i cokół jak pod zwykłą szafką (y = 0 na podłodze).
+  const legsGroup = new THREE.Group();
+  legsGroup.position.set(-W / 2, -H / 2 - baseOffsetY, -D / 2);
+  modGroup.add(legsGroup);
+  addLegsAndPlinth(mod, W, D, parseFloat(state.project.materials?.boardThickness) || 18, isActive, legsGroup);
 
   parentGroup.add(modGroup);
 }

@@ -234,9 +234,12 @@ tokenów powiązań `corner-A-*`/`corner-B-*`.
 Łączenie korpusu skosu: `mod.slopeJoin` (kołek + wkręt albo Lamello Tenso/Clamex P — `getSlopeJoin`, dane łączników w
 `core/lamello.js`, wspólne ze skrzynkami szuflad).
 
-**Zabudowa wnęki pod skosem** (prostokątne szafki o schodkowych wysokościach, NIE `slope_cabinet`):
-`core/slopeNiche.js` (czyste, z testami) — `ceilingAt` (skos liniowy do `slopeRun`, dalej płaski sufit),
-`nicheModuleSlots` (wysokość od podłogi = najniższy sufit nad szafką − luz), `buildSlopeNicheModules` (wnętrze
+**Zabudowa wnęki pod skosem** (rząd szafek pod skosem poddasza): `core/slopeNiche.js` (czyste, z testami) —
+`ceilingAt` (skos liniowy do `slopeRun`, dalej płaski sufit), `nicheModuleSlots` (`niche.shape`: `'skos'` —
+szafka pod rosnącym skosem to `slope_cabinet` trapez, niski bok = sufit nad lewą krawędzią − luz, wysoki = nad prawą;
+wszystkie szafki zabudowy na nóżkach z cokołem — nóżki/cokół rysuje wspólne `addLegsAndPlinth` z `meshBuilders.js`, a
+cokół `slope_cabinet` liczy się w biegu cokołu w `calculateAllProjectParts`; szafka z siedziskiem i pod płaskim sufitem prostokątna; `'prostokat'` — schodki, wysokość = najniższy sufit
+nad szafką − luz), `buildSlopeNicheModules` (wnętrze
 przez `zoneTree`: półki stałe + `assignFront`/`addEvenShelves`; `mod.wardrobeRod` → drążek na liście okuć),
 `applySlopeNiche` (zastępuje szafki z polem `slopeNiche`, ustawienia w `project.slopeNiche`, siedzisko = blat
 projektu). Widok z przodu `render/slopeNicheDrawing.js`, okno `ui/slopeNicheModal.js` (Narzędzia).

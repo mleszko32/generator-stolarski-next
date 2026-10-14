@@ -1,11 +1,13 @@
 // src/core/slopeNiche.js
 //
-// Zabudowa wnęki pod skosem z prostokątnych szafek o schodkowych wysokościach
-// (np. poddasze: niska ściana kolanowa z lewej, skos, potem płaski sufit). W
-// przeciwieństwie do szafki pod skos (core/slopeCabinet.js) żadna płyta nie jest
-// cięta skośnie - każda szafka jest zwykłym słupkiem/szafką dolną, a jej wysokość
-// wynika z sufitu nad jej LEWĄ krawędzią (najniższy punkt nad szafką, bo skos rośnie
-// w prawo) minus luz pod skosem. Ustawienia trzymamy w project.slopeNiche, więc po
+// Zabudowa wnęki pod skosem rzędem szafek (np. poddasze: niska ściana kolanowa z
+// lewej, skos, potem płaski sufit). Dwa kształty (niche.shape):
+//  'skos'      - szafka pod skosem to szafka pod skos (core/slopeCabinet.js, trapez):
+//                niski bok = sufit nad lewą krawędzią minus luz, wysoki = nad prawą
+//                (wysokości od podłogi - korpus jest niższy o nóżki);
+//                szafki pod płaskim sufitem i z siedziskiem zostają prostokątne,
+//  'prostokat' - schodki: każda szafka to zwykły słupek / szafka dolna o wysokości z
+//                najniższego punktu sufitu nad nią minus luz. Ustawienia trzymamy w project.slopeNiche, więc po
 // pomiarze na miejscu wystarczy zmienić liczby wnęki i przeliczyć zabudowę.
 //
 // Wnętrze szafek budują funkcje edytora wnętrza (core/zoneTree.js: półki stałe na
@@ -29,6 +31,7 @@ export const DEFAULT_SLOPE_NICHE = {
   ceilingHeight: 2460,// wysokość płaskiego sufitu
   clearance: 50,      // luz między szafką a skosem
   roundTo: 1,         // zaokrąglenie wysokości szafki w dół (mm)
+  shape: 'skos',      // 'skos' (szafki pod skos) | 'prostokat' (schodki)
   modules: [
     { key: 'A', width: 600, seat: true, sections: [{ type: 'szuflady', count: 3 }] },
     { key: 'B', width: 600, sections: [{ type: 'szuflady', count: 3, h: 1020 }, { type: 'otwarta' }] },
@@ -76,8 +79,13 @@ export function nicheModuleSlots(niche) {
   return (niche.modules || []).map((m) => {
     const width = Math.max(150, num(m.width, 600));
     const ceiling = minCeiling(niche, x, x + width);
-    const height = Math.floor((ceiling - num(niche.clearance)) / step) * step;
-    const slot = { key: m.key, x, width, ceiling, height, gapLeft: ceilingAt(niche, x) - height, gapRight: ceilingAt(niche, x + width) - height };
+    const down = (c) => Math.floor((c - num(niche.clearance)) / step) * step;
+    const height = down(ceiling);
+    const cL = ceilingAt(niche, x), cR = ceilingAt(niche, x + width);
+    // Szafka pod skos tylko pod rosnącym skosem (cięciwa sufitu wklęsłego leży pod nim)
+    // i bez siedziska (siedzisko musi być poziome).
+    const slope = niche.shape !== 'prostokat' && !m.seat && cR - cL >= 20;
+    const slot = { key: m.key, x, width, ceiling, height, slope, heightLow: down(cL), heightHigh: slope ? down(cR) : height };
     x += width;
     return slot;
   });
@@ -126,16 +134,18 @@ export function buildSlopeNicheModules(niche, project) {
   return (niche.modules || []).map((spec, idx) => {
     const slot = slots[idx];
     const seat = !!spec.seat;
-    const mod = createModuleObject(seat ? 'base_cabinet' : 'tall_cabinet');
+    const mod = slot.slope ? slopeModuleObject(slot) : createModuleObject(seat ? 'base_cabinet' : 'tall_cabinet');
     mod.id = 'mod-' + Date.now().toString(36) + idx + Math.random().toString(36).slice(2, 6);
     mod.name = `Wnęka ${spec.key}`;
     mod.slopeNiche = spec.key;
-    // Szafka dolna pod siedzisko stoi na tych samych nóżkach co słupki obok.
+    // Wszystkie szafki zabudowy na tych samych nóżkach z cokołem (jak dolne w kuchni),
+    // żeby szuflady w sąsiednich szafkach były w jednej linii.
     mod.legs = createModuleObject('tall_cabinet').legs;
     const legH = mod.legs.active ? num(mod.legs.height, 100) : 0;
     const seatTh = seat ? num(worktop.thickness, 38) : 0;
-    const H = Math.max(200, slot.height - legH - seatTh);
+    const H = Math.max(200, slot.heightHigh - legH - seatTh);
     mod.dimensions = { width: slot.width, height: H, depth: num(niche.carcaseDepth, 650) };
+    if (slot.slope) mod.slope.lowHeight = Math.max(0, slot.heightLow - legH);
     mod.position = { x: slot.x, y: 0, z: 0 };
 
     const sections = (spec.sections || []).filter((s) => SECTION_TYPES.includes(s.type));
@@ -169,6 +179,20 @@ export function buildSlopeNicheModules(niche, project) {
     });
     return mod;
   });
+}
+
+// Pusta szafka pod skos (trapez, niski bok z lewej) - pola jak w addSlopeModule; nóżki,
+// wysokości i lowHeight (korpusu, bez nóżek) ustawia buildSlopeNicheModules.
+function slopeModuleObject(slot) {
+  return {
+    type: 'slope_cabinet',
+    rotation: 0,
+    backPanel: { type: "nakladane", offset: 20, grooveDepth: 7, nutBuild: "all", clearance: 2 },
+    legs: { active: false, height: 100, plinth: false, plinthOffset: 40 },
+    front: {},
+    slope: { lowSide: 'left', lowHeight: slot.heightLow, drawerBox: 'A' },
+    elements: [],
+  };
 }
 
 // Wstawia (albo przelicza) zabudowę w projekcie: usuwa szafki poprzedniej zabudowy

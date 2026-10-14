@@ -262,3 +262,37 @@ export function addCornerPanel(shape, thickness, y, isActiveModule, userData, pa
   mesh.add(line);
   parentGroup.add(mesh);
 }
+
+// Nóżki (4, z ręcznymi korektami wysokości) i listwa cokołu pod szafką. Grupa ma układ
+// szafki: x od lewego boku, y = 0 na podłodze, z od tyłu (z = 0) do czoła korpusu (z = D).
+// Wspólne dla zwykłej szafki (render/viewer3d.js) i szafki pod skos (slopeCabinet3d.js).
+export function addLegsAndPlinth(mod, W, D, th, isActive, group) {
+  if (!(mod.legs && mod.legs.active)) return;
+  const legH = parseFloat(mod.legs.height) || 100;
+  // Ręczna korekta wysokości pojedynczej nóżki (patrz ui/properties.js, zakładka
+  // "Nóżki / Blendy" — lista "Nóżka N" z edytowalną wysokością). Indeksy 0-3 =
+  // Tył-L, Tył-P, Przód-L, Przód-P, w tej samej kolejności co addBox() niżej —
+  // ta sama kolejność jest też w engine/hardware.js (calculateProjectHardware).
+  const legOverrides = mod.legs.heightOverrides || {};
+  const legHeightFor = (i) => {
+    const ov = legOverrides[i];
+    return (ov !== undefined && ov !== null && ov !== '') ? (parseFloat(ov) || legH) : legH;
+  };
+  const rootY = 0.5;
+  const udPlinth = { moduleId: mod.id, type: 'plinth' };
+  const parsedOffset = parseFloat(mod.legs.plinthOffset);
+  const offset = Number.isFinite(parsedOffset) ? parsedOffset : 40;
+  const plinthThick = th;
+  const frontFaceZ = D;
+  const frontLegZ = mod.legs.plinth ? frontFaceZ - offset - plinthThick - 30 : frontFaceZ - 80;
+  const clampedFrontLegZ = Math.max(90, frontLegZ);
+
+  addBox(30, legHeightFor(0), 30, 50, rootY, 50, 'corpus', false, udPlinth, group);
+  addBox(30, legHeightFor(1), 30, W - 80, rootY, 50, 'corpus', false, udPlinth, group);
+  addBox(30, legHeightFor(2), 30, 50, rootY, clampedFrontLegZ, 'corpus', false, udPlinth, group);
+  addBox(30, legHeightFor(3), 30, W - 80, rootY, clampedFrontLegZ, 'corpus', false, udPlinth, group);
+
+  if (mod.legs.plinth) {
+    addBox(W, legH, plinthThick, 0, rootY, frontFaceZ - offset - plinthThick, 'plinth', isActive, udPlinth, group);
+  }
+}

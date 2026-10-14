@@ -175,7 +175,7 @@ export function collectProjectParts() {
   // co dałoby jedną fikcyjną, za długą listwę cokołu zamiast dwóch krótkich
   // (po jednej na czoło każdego ramienia). Render 3D na razie też nie rysuje
   // cokołu narożnika (patrz renderCornerCabinet) - tylko same nóżki.
-  const baseCabinets = config.modules.filter(m => m.legs && m.legs.active && m.legs.plinth && m.type !== 'corner_cabinet' && m.type !== 'slope_cabinet');
+  const baseCabinets = config.modules.filter(m => m.legs && m.legs.active && m.legs.plinth && m.type !== 'corner_cabinet');
 
   // Tylko szafki o TEJ SAMEJ orientacji (rotation) mogą fizycznie stać w jednym,
   // ciągłym biegu cokołu - stoją wtedy pod tą samą ścianą. Dla rotation 0/180

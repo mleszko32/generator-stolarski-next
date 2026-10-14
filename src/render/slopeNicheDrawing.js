@@ -4,9 +4,11 @@
 // szafki z cokołem, frontami, półkami i drążkiem oraz wymiary (szerokości szafek, wysokości
 // od podłogi, luz pod skosem, ściana kolanowa, sufit, długość skosu). Samodzielne SVG
 // (okno + druk) - kolory z drawingPalette.js. Fronty muszą mieć policzony layout
-// (recalculateLayout) przed wywołaniem.
+// (recalculateLayout) przed wywołaniem. Szafki pod skos (slope_cabinet) rysujemy z ich
+// wielokątów (core/slopeCabinet.js) - fronty docięte skosem, front-trójkąt jako blenda.
 import { C, FONT_UI } from "./drawingPalette.js";
 import { ceilingAt, nicheModuleSlots } from "../core/slopeNiche.js";
+import { getSlopeCabinetPolygons, getSlopeFronts } from "../core/slopeCabinet.js";
 import { escapeHtml } from "../utils/dom.js";
 import { num } from "../utils/math.js";
 
@@ -48,16 +50,58 @@ export function generateSlopeNicheSVG(niche, modules, opts = {}) {
   const outline = [[0, 0], [W, 0], [W, num(niche.ceilingHeight)], [Math.min(run, W), ceilingAt(niche, Math.min(run, W))], [0, num(niche.leftHeight)]];
   s += `<polygon points="${outline.map(([x, y]) => `${X(x)},${Y(y)}`).join(' ')}" fill="${C.slate50}" stroke="${C.slate800}" stroke-width="5"/>`;
 
+  // Wielokąt w układzie szafki (x od lewego boku x0, y od spodu korpusu y0).
+  const poly = (x0, y0, pts, fill, stroke, w = 2, extra = '') =>
+    `<polygon points="${pts.map(([x, y]) => `${X(x0 + x)},${Y(y0 + y)}`).join(' ')}" fill="${fill}" stroke="${stroke}" stroke-width="${w}"${extra}/>`;
+  const config = opts.project || { materials: { boardThickness: th, backThickness: 3 }, front: {} };
+
+  // Cokół / nóżki pod szafką.
+  const legsOf = (mod) => (mod.legs && mod.legs.active ? num(mod.legs.height, 100) : 0);
+  const plinth = (mod, x0, w) => {
+    const legH = legsOf(mod);
+    if (legH <= 0) return '';
+    let o = `<rect x="${X(x0)}" y="${Y(legH)}" width="${w}" height="${legH}" fill="${C.slate200}" stroke="${C.slate500}" stroke-width="2"/>`;
+    if (mod.legs.plinth) o += text(X(x0 + w / 2), Y(legH / 2) + fsS / 3, 'cokół', { size: fsS * 0.8, color: C.slate500 });
+    return o;
+  };
+
+  // Szafka pod skos: cokół, obrys, płyty, półki i docięte fronty.
+  const slopeModule = (mod, slot) => {
+    const x0 = slot.x, y0 = legsOf(mod);
+    const P = getSlopeCabinetPolygons(mod, config);
+    let o = plinth(mod, x0, num(mod.dimensions.width)) + poly(x0, y0, P.back, C.white, C.slate700, 3);
+    P.polys.forEach((pg) => { o += poly(x0, y0, pg.points, pg.kind === 'shelf' ? C.slate300 : C.slate200, C.slate500, 1.5); });
+    getSlopeFronts(mod, config).forEach((f) => {
+      if (f.type === 'brak' || !f.shape.points.length) return;
+      const isDrawer = f.type === 'szuflada', isBlenda = f.type === 'blenda';
+      const fill = isBlenda ? C.slate300 : isDrawer ? C.amber100 : C.blue50;
+      const stroke = isBlenda ? C.slate600 : isDrawer ? C.amber700 : C.blue700;
+      o += poly(x0, y0, f.shape.points, fill, stroke, 2.5, ' fill-opacity="0.75"');
+      const xs = f.shape.points.map((q) => q[0]), ys = f.shape.points.map((q) => q[1]);
+      const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+      if (f.shape.h > 120) o += text(X(x0 + cx), Y(y0 + cy) + fsS / 3, isBlenda ? 'blenda' : `${r1(f.shape.w)}×${r1(f.shape.h)}`, { size: fsS * 0.8, color: stroke });
+    });
+    return o;
+  };
+
   // Szafki.
   const slots = nicheModuleSlots(niche);
   modules.forEach((mod, i) => {
     const slot = slots[i];
     if (!slot) return;
+    if (mod.type === 'slope_cabinet') {
+      s += slopeModule(mod, slot);
+      // Wysokości od podłogi (korpus + nóżki).
+      const hL = legsOf(mod) + num(mod.slope && mod.slope.lowHeight), hH = legsOf(mod) + num(mod.dimensions.height);
+      s += text(X(slot.x + slot.width / 2), Y(hH) - 30, `${slot.key}  H ${r1(hL)}–${r1(hH)}`, { size: fs, weight: 700 });
+      s += text(X(slot.x) + 10, Y(hL) - 80, `luz ${r1(ceilingAt(niche, slot.x) - hL)}`, { size: fsS * 0.75, anchor: 'start', color: C.slate500 });
+      s += dimV(X(slot.x) + 40, Y(0), Y(hL), `${r1(hL)}`, 1);
+      s += dimV(X(slot.x + slot.width) - 40, Y(0), Y(hH), `${r1(hH)}`, -1);
+      return;
+    }
     const x0 = slot.x, w = num(mod.dimensions.width), H = num(mod.dimensions.height);
-    const legH = mod.legs && mod.legs.active ? num(mod.legs.height, 100) : 0;
-    const plinthOff = mod.legs && mod.legs.plinth ? num(mod.legs.plinthOffset, 40) : 0;
-    if (legH > 0) s += `<rect x="${X(x0)}" y="${Y(legH)}" width="${w}" height="${legH}" fill="${C.slate200}" stroke="${C.slate500}" stroke-width="2"/>`;
-    if (legH > 0 && plinthOff) s += text(X(x0 + w / 2), Y(legH / 2) + fsS / 3, 'cokół', { size: fsS * 0.8, color: C.slate500 });
+    const legH = legsOf(mod);
+    s += plinth(mod, x0, w);
     // Korpus.
     s += `<rect x="${X(x0)}" y="${Y(legH + H)}" width="${w}" height="${H}" fill="${C.white}" stroke="${C.slate700}" stroke-width="3"/>`;
     // Półki (ruchome za drzwiami - przerywane).

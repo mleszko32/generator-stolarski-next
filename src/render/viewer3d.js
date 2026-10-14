@@ -20,7 +20,7 @@ import { snapSidePanel } from '../core/sidePanelSnap.js';
 import { snapModulePosition, sweepSelection, boxesOverlap, getSidePanelBox } from '../core/moduleDrag.js';
 import { refreshModuleInfoCard } from '../ui/moduleInfoPanel.js';
 import { initPropertiesPanel } from '../ui/properties.js';
-import { mats, worktopMat, disposeObject, createLabelSprite, addBox, addHole, addHardware, isXrayMode, setXrayMode } from './meshBuilders.js';
+import { mats, worktopMat, disposeObject, createLabelSprite, addBox, addHole, addHardware, addLegsAndPlinth, isXrayMode, setXrayMode } from './meshBuilders.js';
 import { renderCornerCabinet } from './cornerCabinet3d.js';
 import { renderSlopeCabinet } from './slopeCabinet3d.js';
 import { getBlindPanel, getBlindStile, blindGeometry, PARALLEL_PLATE_INSET } from '../core/blindCorner.js';
@@ -1517,37 +1517,8 @@ export function update3D() {
           addBox(blindStile.w, blindStile.h, blindStile.thickness, posX + blindStile.x, posY + blindStile.y, posZ + D - blindStile.thickness, 'corpus', isActive, udCorp, innerGroup);
       }
 
-      if (mod.legs && mod.legs.active) {
-          const legH = parseFloat(mod.legs.height) || 100;
-          // Ręczna korekta wysokości pojedynczej nóżki (patrz ui/properties.js, zakładka
-          // "Nóżki / Blendy" — lista "Nóżka N" z edytowalną wysokością). Indeksy 0-3 =
-          // Tył-L, Tył-P, Przód-L, Przód-P, w tej samej kolejności co addBox() niżej —
-          // ta sama kolejność jest też w engine/hardware.js (calculateProjectHardware).
-          const legOverrides = mod.legs.heightOverrides || {};
-          const legHeightFor = (i) => {
-              const ov = legOverrides[i];
-              return (ov !== undefined && ov !== null && ov !== '') ? (parseFloat(ov) || legH) : legH;
-          };
-          const rootY = 0.5;
-          const udPlinth = { moduleId: mod.id, type: 'plinth' };
-          const parsedOffset = parseFloat(mod.legs.plinthOffset);
-          const offset = Number.isFinite(parsedOffset) ? parsedOffset : 40;
-          const plinthThick = th;
-          const frontFaceZ = posZ + D;
-          const frontLegZ = mod.legs.plinth
-              ? frontFaceZ - offset - plinthThick - 30
-              : frontFaceZ - 80;
-          const clampedFrontLegZ = Math.max(posZ + 90, frontLegZ);
-
-          addBox(30, legHeightFor(0), 30, posX + 50, rootY, posZ + 50, 'corpus', false, udPlinth, innerGroup);
-          addBox(30, legHeightFor(1), 30, posX + W - 80, rootY, posZ + 50, 'corpus', false, udPlinth, innerGroup);
-          addBox(30, legHeightFor(2), 30, posX + 50, rootY, clampedFrontLegZ, 'corpus', false, udPlinth, innerGroup);
-          addBox(30, legHeightFor(3), 30, posX + W - 80, rootY, clampedFrontLegZ, 'corpus', false, udPlinth, innerGroup);
-
-          if (mod.legs.plinth) {
-              addBox(W, legH, plinthThick, posX, rootY, frontFaceZ - offset - plinthThick, 'plinth', isActive, udPlinth, innerGroup);
-          }
-      }
+      // Nóżki i cokół (wspólne ze szafką pod skos - meshBuilders.js: addLegsAndPlinth).
+      addLegsAndPlinth(mod, W, D, th, isActive, innerGroup);
 
       cabinetGroup.add(modGroup);
   });

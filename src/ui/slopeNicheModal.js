@@ -1,5 +1,5 @@
 // src/ui/slopeNicheModal.js
-// Okno "Zabudowa wnęki pod skosem": wymiary wnęki (ściana kolanowa, skos, sufit), luz
+// Okno "Zabudowa wnęki pod skosem": kształt szafek (pod skos / schodki), wymiary wnęki, luz
 // pod skosem i szerokości szafek A-E; wysokości szafek liczone z funkcji skosu
 // (core/slopeNiche.js). Podgląd widoku z przodu z wymiarami i zestawienie formatek
 // liczone na bieżąco; "Wstaw / przelicz" zastępuje poprzednią zabudowę w projekcie.
@@ -60,10 +60,13 @@ export function openSlopeNicheModal(onChange) {
 
   const { bodyEl, close } = openModal({
     title: "Zabudowa wnęki pod skosem",
-    subtitle: "Prostokątne szafki o wysokościach liczonych ze skosu (najniższy punkt nad szafką minus luz). Po pomiarze na miejscu zmień liczby i przelicz.",
+    subtitle: "Szafki dopasowane do skosu (trapez: sufit nad bokami minus luz) albo prostokątne schodki. Po pomiarze na miejscu zmień liczby i przelicz.",
     width: 1100,
     body: `
       <div class="field-row" style="flex-wrap:wrap">
+        <div class="field"><label>Kształt szafek</label><select class="input" data-niche-shape>
+          <option value="skos"${niche.shape !== "prostokat" ? " selected" : ""}>Dopasowane do skosu</option>
+          <option value="prostokat"${niche.shape === "prostokat" ? " selected" : ""}>Prostokątne (schodki)</option></select></div>
         ${NICHE_FIELDS.map(([k, label]) => `<div class="field"><label>${label} (mm)</label><input class="input" type="number" data-niche="${k}" step="1" value="${num(niche[k])}"></div>`).join("")}
       </div>
       <table class="hub-table" id="sn-modules"></table>
@@ -87,6 +90,7 @@ export function openSlopeNicheModal(onChange) {
 
   function svg() {
     return generateSlopeNicheSVG(niche, built, {
+      project: state.project,
       boardThickness: num(state.project.materials.boardThickness, 18),
       seatThickness: num(getWorktopSettings(state.project).thickness, 38),
     });
@@ -95,12 +99,12 @@ export function openSlopeNicheModal(onChange) {
   function renderModules() {
     const slots = nicheModuleSlots(niche);
     bodyEl.querySelector("#sn-modules").innerHTML = `
-      <thead><tr><th>Szafka</th><th>Szerokość</th><th class="num">X od lewej</th><th class="num">Sufit nad szafką</th><th class="num">Wysokość od podłogi</th><th class="num">Korpus</th><th>Wnętrze (od dołu)</th></tr></thead>
+      <thead><tr><th>Szafka</th><th>Szerokość</th><th class="num">X od lewej</th><th class="num">Sufit nad szafką</th><th class="num">Wysokość od podłogi</th><th>Kształt</th><th class="num">Korpus</th><th>Wnętrze (od dołu)</th></tr></thead>
       <tbody>${(niche.modules || []).map((m, i) => {
         const s = slots[i], mod = built[i];
         return `<tr><td><b>${escapeHtml(m.key)}</b></td>
           <td><input class="input" type="number" data-mod="${i}" step="10" value="${num(m.width)}" style="width:90px"></td>
-          <td class="num">${s.x}</td><td class="num">${Math.round(s.ceiling)}</td><td class="num"><b>${s.height}</b></td>
+          <td class="num">${s.x}</td><td class="num">${Math.round(s.ceiling)}</td><td class="num"><b>${s.slope ? `${s.heightLow}–${s.heightHigh}` : s.height}</b></td><td>${s.slope ? "pod skos" : "prostokątna"}</td>
           <td class="num">${mod ? mod.dimensions.height : ""}</td>
           <td>${escapeHtml(describeSections(m))}</td></tr>`;
       }).join("")}</tbody>`;
@@ -134,7 +138,8 @@ export function openSlopeNicheModal(onChange) {
 
   bodyEl.addEventListener("change", (e) => {
     const t = e.target;
-    if (t.dataset.niche) niche[t.dataset.niche] = num(t.value, niche[t.dataset.niche]);
+    if (t.dataset.nicheShape !== undefined) niche.shape = t.value;
+    else if (t.dataset.niche) niche[t.dataset.niche] = num(t.value, niche[t.dataset.niche]);
     else if (t.dataset.mod !== undefined) niche.modules[+t.dataset.mod].width = Math.max(150, num(t.value, 600));
     else return;
     refresh();

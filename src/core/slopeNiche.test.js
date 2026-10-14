@@ -10,6 +10,7 @@ import { buildZoneTree } from "./zoneTree.js";
 import { calculateModuleParts } from "../engine/cabinet.js";
 
 const niche = () => getSlopeNicheSettings({});
+const rect = () => ({ ...niche(), shape: "prostokat" });
 
 describe("slopeNiche", () => {
   beforeEach(() => { state.project = freshProject({ sidePanels: [] }); });
@@ -46,7 +47,7 @@ describe("slopeNiche", () => {
   });
 
   it("buduje szafki z wnętrzem odtwarzalnym przez drzewo wnęk", () => {
-    const mods = buildSlopeNicheModules(niche(), state.project);
+    const mods = buildSlopeNicheModules(rect(), state.project);
     expect(mods.map((m) => m.type)).toEqual(["base_cabinet", "tall_cabinet", "tall_cabinet", "tall_cabinet", "tall_cabinet"]);
     // Wysokość całkowita: nóżki + korpus (+ blat siedziska w A).
     const legs = mods[1].legs.height;
@@ -80,5 +81,33 @@ describe("slopeNiche", () => {
     expect(removed).toBe(5);
     expect(state.project.modules.length).toBe(3);
     expect(DEFAULT_SLOPE_NICHE.modules.length).toBe(5);
+  });
+
+  it("dopasowane do skosu: B-D to szafki pod skos (trapez), A z siedziskiem i E pod sufitem prostokątne", () => {
+    const slots = nicheModuleSlots(niche());
+    expect(slots.map((s) => s.slope)).toEqual([false, true, true, true, false]);
+    expect(slots.map((s) => [s.heightLow, s.heightHigh])).toEqual([[1050, 1050], [1376, 1702], [1702, 2029], [2029, 2410], [2410, 2410]]);
+    const mods = buildSlopeNicheModules(niche(), state.project);
+    expect(mods.map((m) => m.type)).toEqual(["base_cabinet", "slope_cabinet", "slope_cabinet", "slope_cabinet", "tall_cabinet"]);
+    const d = mods[3];
+    // Na nóżkach jak reszta: wysokości od podłogi = nóżki + korpus.
+    expect(d.legs.active).toBe(true);
+    expect(d.slope).toEqual({ lowSide: "left", lowHeight: 2029 - d.legs.height, drawerBox: "A" });
+    expect(d.dimensions.height + d.legs.height).toBe(2410);
+    // Szuflady w jednej linii z prostokątną E (ta sama wysokość nóżek i sekcji szuflad).
+    const firstDrawerY = (m) => { recalculateLayout(m); return Math.min(...m.elements.filter((e) => e.subtype === "szuflada").map((e) => e.y)); };
+    expect(firstDrawerY(d)).toBeCloseTo(firstDrawerY(mods[4]));
+    mods.forEach((m) => {
+      expect(() => buildZoneTree(m)).not.toThrow();
+      recalculateLayout(m);
+      expect(calculateModuleParts(m).parts.length).toBeGreaterThan(3);
+    });
+    // Szuflady na dole szafek pod skos mają realne fronty.
+    expect(mods[1].elements.filter((e) => e.subtype === "szuflada").every((f) => f.h > 200)).toBe(true);
+  });
+
+  it("bez skosu sufitu (płaski) nie robi szafek pod skos", () => {
+    const flat = { ...niche(), leftHeight: 2460 };
+    expect(nicheModuleSlots(flat).some((s) => s.slope)).toBe(false);
   });
 });
