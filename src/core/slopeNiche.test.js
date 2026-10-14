@@ -4,6 +4,7 @@ import { freshProject } from "../test/fixtures.js";
 import {
   DEFAULT_SLOPE_NICHE, ceilingAt, nicheModuleSlots, nicheWidthDiff, sectionHeights,
   buildSlopeNicheModules, applySlopeNiche, getSlopeNicheSettings,
+  nextNicheKey, addNicheModule, newNicheSection, moveInList,
 } from "./slopeNiche.js";
 import { recalculateLayout } from "./layout.js";
 import { buildZoneTree } from "./zoneTree.js";
@@ -109,5 +110,31 @@ describe("slopeNiche", () => {
   it("bez skosu sufitu (płaski) nie robi szafek pod skos", () => {
     const flat = { ...niche(), leftHeight: 2460 };
     expect(nicheModuleSlots(flat).some((s) => s.slope)).toBe(false);
+  });
+
+  it("edycja listy: wolna litera, nowa szafka z resztą wnęki, przesuwanie, sekcje", () => {
+    const n = niche();
+    expect(nextNicheKey(n)).toBe("F");
+    // Po usunięciu E zostaje 800 mm - nowa szafka je wypełnia.
+    n.modules.pop();
+    const e = addNicheModule(n);
+    expect(e).toMatchObject({ key: "E", width: 800 });
+    // Wnęka pełna (reszta < 300) - domyślne 600.
+    expect(addNicheModule(n)).toMatchObject({ key: "F", width: 600 });
+  });
+
+  it("szafka A bez siedziska dopasowana do skosu", () => {
+    const n = niche();
+    n.modules[0].seat = false;
+    const slots = nicheModuleSlots(n);
+    expect(slots[0].slope).toBe(true);
+    expect([slots[0].heightLow, slots[0].heightHigh]).toEqual([1050, 1376]);
+    expect(buildSlopeNicheModules(n, state.project)[0].type).toBe("slope_cabinet");
+    expect(newNicheSection("szuflady")).toEqual({ type: "szuflady", count: 2, h: 680 });
+    expect(newNicheSection("cokolwiek")).toEqual({ type: "drzwi-lp" });
+    const list = [1, 2, 3];
+    expect(moveInList(list, 0, -1)).toBe(false);
+    expect(moveInList(list, 0, 1)).toBe(true);
+    expect(list).toEqual([2, 1, 3]);
   });
 });

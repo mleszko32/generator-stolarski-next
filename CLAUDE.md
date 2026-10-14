@@ -242,7 +242,7 @@ cokół `slope_cabinet` liczy się w biegu cokołu w `calculateAllProjectParts`;
 nad szafką − luz), `buildSlopeNicheModules` (wnętrze
 przez `zoneTree`: półki stałe + `assignFront`/`addEvenShelves`; `mod.wardrobeRod` → drążek na liście okuć),
 `applySlopeNiche` (zastępuje szafki z polem `slopeNiche`, ustawienia w `project.slopeNiche`, siedzisko = blat
-projektu). Widok z przodu `render/slopeNicheDrawing.js`, okno `ui/slopeNicheModal.js` (Narzędzia).
+projektu). Edycja listy szafek/sekcji w oknie: `addNicheModule`, `newNicheSection`, `moveInList`. Widok z przodu `render/slopeNicheDrawing.js`, okno `ui/slopeNicheModal.js` (Narzędzia).
 
 **Skrzynki szuflad (MOVENTO)**: `core/drawerBoxBuild.js` (czyste, z testami) zbiera skrzynki drewniane z całego
 projektu (`getDrawerBoxInfo` z `core/drawerBoxes.js`, skos przez `getSlopeFronts`), scala identyczne i liczy otwory

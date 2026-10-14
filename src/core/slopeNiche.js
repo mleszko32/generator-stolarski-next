@@ -41,7 +41,44 @@ export const DEFAULT_SLOPE_NICHE = {
   ],
 };
 
-const SECTION_TYPES = ['szuflady', 'drzwi', 'drzwi-lp', 'otwarta'];
+export const SECTION_TYPES = ['szuflady', 'drzwi', 'drzwi-lp', 'otwarta'];
+
+// ---------------------------------------------------------------------------
+// Edycja listy szafek w oknie (ui/slopeNicheModal.js) - na obiekcie niche w miejscu.
+// ---------------------------------------------------------------------------
+
+// Pierwsza wolna litera (A, B, ... Z, potem A2, B2 ...) - klucz to nazwa szafki "Wnęka X".
+export function nextNicheKey(niche) {
+  const used = new Set((niche.modules || []).map((m) => String(m.key)));
+  for (let round = 1; ; round++) {
+    for (let c = 65; c <= 90; c++) {
+      const k = String.fromCharCode(c) + (round > 1 ? round : '');
+      if (!used.has(k)) return k;
+    }
+  }
+}
+
+// Nowa szafka na końcu rzędu: szerokość = to, co zostało we wnęce (min 300), 2 szuflady + drzwi.
+export function addNicheModule(niche) {
+  const left = num(niche.width) - (niche.modules || []).reduce((sum, m) => sum + num(m.width), 0);
+  const mod = { key: nextNicheKey(niche), width: left >= 300 ? left : 600, sections: [{ type: 'szuflady', count: 2, h: 680 }, { type: 'drzwi-lp' }] };
+  (niche.modules = niche.modules || []).push(mod);
+  return mod;
+}
+
+// Nowa sekcja danego typu (na górze szafki, czyli na końcu listy - sekcje są od dołu).
+export function newNicheSection(type = 'drzwi-lp') {
+  const t = SECTION_TYPES.includes(type) ? type : 'drzwi-lp';
+  return t === 'szuflady' ? { type: t, count: 2, h: 680 } : { type: t };
+}
+
+// Przesuwa element tablicy o dir (-1 / +1); zwraca true, gdy się przesunął.
+export function moveInList(list, index, dir) {
+  const j = index + dir;
+  if (!Array.isArray(list) || index < 0 || index >= list.length || j < 0 || j >= list.length) return false;
+  [list[index], list[j]] = [list[j], list[index]];
+  return true;
+}
 
 // Ustawienia wnęki z projektu scalone z domyślnymi (głęboka kopia - edycja w oknie nie
 // rusza DEFAULT_SLOPE_NICHE).
