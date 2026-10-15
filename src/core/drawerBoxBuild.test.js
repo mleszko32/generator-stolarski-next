@@ -207,6 +207,15 @@ describe("skrzynki szuflad - dno połączone z tyłem i przodem", () => {
     expect(tp).toEqual(dno.filter((h) => h.to === "tył").map((h) => h.x));
   });
 
+  it("rozstaw łączników boku z tyłem/czołem (edgeSpacing): mniej kołków, 0 = wg wysokości", () => {
+    const sideEdge = (drawerBox) => buildDrawerBox({ comps: comps(350), system: movento, isB: false }, getDrawerBoxSettings({ drawerBox }))
+      .panels.find((p) => p.id === "tyl-przod").holes.filter((h) => h.edge === "lewe").length;
+    const auto = sideEdge({ join: "kolek_wkret" });
+    expect(auto).toBeGreaterThan(3);
+    expect(sideEdge({ join: "kolek_wkret", edgeSpacing: 0 })).toBe(auto);
+    expect(sideEdge({ join: "kolek_wkret", edgeSpacing: 150 })).toBe(3);
+  });
+
   it("własny rozstaw łączników z tyłem i przodem (bottomFBSpacing), 0 = jak z bokami", () => {
     const count = (drawerBox) => {
       const box = buildDrawerBox({ comps: comps(150), system: movento, isB: false }, getDrawerBoxSettings({ drawerBox }));

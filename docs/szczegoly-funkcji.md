@@ -24,7 +24,8 @@ Stare dane (`slope.columns`/`dividers`/`shelves`) zamienia `migrateSlopeModule` 
 drewniane z całego projektu (zwykłe szafki przez `getDrawerBoxInfo` z `core/drawerBoxes.js` — położenie
 i wymiary skrzynki w widoku od frontu, te same wzory co 3D i lista formatek; skos przez `getSlopeFronts`, też
 skrzynka B), scala identyczne i liczy otwory: łączniki wg `project.drawerBox` (domyślnie kołek +
-wkręt na przemian; konfirmat / kołki / wkręty; odstępy to ustawienia, bo pochodzą z poradników;
+wkręt na przemian; konfirmat / kołki / wkręty; liczba łączników boku z tyłem/czołem wg wysokości (`jointCount`) albo z
+maks. rozstawu `edgeSpacing`; odstępy to ustawienia, bo pochodzą z poradników;
 albo Lamello P z frezarki Zeta P2 — `LAMELLO`: Tenso/Clamex P-10/P-14, rowek na powierzchni
 75 mm dla P-14 i 60 mm dla P-10 (pomiary z warsztatu), oś łącznika 60 mm od końca formatki
 (`lamelloEdge`, min. producenta 32/37), rozstaw maks. 300, Clamex z otworem Ø6 na klucz od wnętrza skrzynki) oraz

@@ -54,7 +54,8 @@ export const JOIN_METHODS = {
 const DEFAULTS = {
   join: "kolek_wkret",
   edge: 25,          // oś skrajnego łącznika tyłu/czoła od górnej i dolnej krawędzi [mm]
-  bottomEdge: 80,    // oś skrajnego łącznika dna od przodu i tyłu [mm] (min. 80 - strefa sprzęgieł/zaczepów MOVENTO)
+  edgeSpacing: 0,    // maks. rozstaw łączników boku z tyłem/czołem [mm]; 0 = liczba wg wysokości (jointCount)
+  bottomEdge: 80,   // oś skrajnego łącznika dna od przodu i tyłu [mm] (min. 80 - strefa sprzęgieł/zaczepów MOVENTO)
   bottomSpacing: 150, // maks. rozstaw łączników dna z bokami [mm]
   bottomFBSpacing: 0, // maks. rozstaw łączników dna z tyłem i przodem [mm]; 0 = jak z bokami
   screwLength: 50,   // wkręt / konfirmat [mm]
@@ -113,7 +114,10 @@ export function jointPositions(h, edge, n) {
 
 function jointsOn(h, settings) {
   if (LAMELLO[settings.join]) return lamelloPositions(h, LAMELLO[settings.join], settings.lamelloEdge, lamelloGrooveLen(LAMELLO[settings.join], settings)).map((p) => ({ p, kind: "lamello" }));
-  const n = settings.join === "kolek_wkret" ? Math.max(2, jointCount(h)) : jointCount(h);
+  const sp = num(settings.edgeSpacing, 0);
+  const auto = settings.join === "kolek_wkret" ? Math.max(2, jointCount(h)) : jointCount(h);
+  // edgeSpacing > 0: liczba z maks. rozstawu między skrajnymi (min. 2), zamiast tabeli jointCount
+  const n = sp > 0 ? Math.max(2, Math.ceil((h - 2 * Math.min(settings.edge, h / 4)) / Math.max(30, sp)) + 1) : auto;
   const kinds = kindsFor(settings.join, n);
   return jointPositions(h, settings.edge, n).map((p, i) => ({ p, kind: kinds[i] }));
 }
