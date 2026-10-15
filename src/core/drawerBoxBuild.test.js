@@ -207,6 +207,19 @@ describe("skrzynki szuflad - dno połączone z tyłem i przodem", () => {
     expect(tp).toEqual(dno.filter((h) => h.to === "tył").map((h) => h.x));
   });
 
+  it("własny rozstaw łączników z tyłem i przodem (bottomFBSpacing), 0 = jak z bokami", () => {
+    const count = (drawerBox) => {
+      const box = buildDrawerBox({ comps: comps(150), system: movento, isB: false }, getDrawerBoxSettings({ drawerBox }));
+      const dno = box.panels.find((p) => p.id === "dno").holes;
+      return { fb: dno.filter((h) => h.to === "tył").length, side: dno.filter((h) => h.edge === "lewe").length, skw: box.skw };
+    };
+    const base = count({ join: "kolek_wkret" });
+    expect(count({ join: "kolek_wkret", bottomFBSpacing: 0 }).fb).toBe(base.fb);
+    const wide = count({ join: "kolek_wkret", bottomFBSpacing: 1000 });
+    expect(wide.fb).toBe(2);
+    expect(wide.side).toBe(base.side);
+  });
+
   it("Lamello: rowki w licu dna i w dolnej krawędzi tył/przód, cały rowek poza strefą sprzęgieł (75 mm); Clamex z kluczem nad dnem", () => {
     const box = boxWith("clamex_p14");
     const tp = box.panels.find((p) => p.id === "tyl-przod").holes;

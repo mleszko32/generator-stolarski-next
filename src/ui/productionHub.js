@@ -364,7 +364,8 @@ function renderRysunki(el) {
 const DB_FIELDS = [
   ['edge', 'Łącznik tyłu/czoła od krawędzi [mm]'],
   ['bottomEdge', 'Łącznik dna od przodu i tyłu [mm] (min. 80)'],
-  ['bottomSpacing', 'Maks. rozstaw łączników dna [mm]'],
+  ['bottomSpacing', 'Maks. rozstaw łączników dna z bokami [mm]'],
+  ['bottomFBSpacing', 'Maks. rozstaw łączników dna z tyłem i przodem [mm] (0 = jak z bokami)'],
   ['screwLength', 'Długość wkrętu / konfirmatu [mm]'],
   ['dowelLength', 'Długość kołka Ø8 [mm]'],
   ['lamelloEdge', 'Lamello: oś łącznika od końca formatki [mm]'],
@@ -396,7 +397,7 @@ function renderSkrzynki(el) {
       </tr>`).join('')}</tbody>
     </table>` : '<p class="hub-empty">Brak skrzynek szuflad drewnianych. Rysunki dotyczą szuflad Blum MOVENTO — wybierz ten system szuflad w szafce (Szuflady → System szuflad) albo w ustawieniach projektu.</p>'}`;
   el.querySelector('#db-join').addEventListener('change', e => save({ join: e.target.value }));
-  el.querySelectorAll('.db-f').forEach(i => i.addEventListener('change', () => { const v = parseFloat(i.value); if (v > 0 || (i.dataset.k === 'lamelloGroove' && v === 0)) save({ [i.dataset.k]: v }); }));
+  el.querySelectorAll('.db-f').forEach(i => i.addEventListener('change', () => { const v = parseFloat(i.value); if (v > 0 || (['lamelloGroove', 'bottomFBSpacing'].includes(i.dataset.k) && v === 0)) save({ [i.dataset.k]: v }); }));
   el.querySelector('#db-open')?.addEventListener('click', () => openDrawerBoxDrawings(boxes, s, p.name));
 }
 

@@ -55,7 +55,8 @@ const DEFAULTS = {
   join: "kolek_wkret",
   edge: 25,          // oś skrajnego łącznika tyłu/czoła od górnej i dolnej krawędzi [mm]
   bottomEdge: 80,    // oś skrajnego łącznika dna od przodu i tyłu [mm] (min. 80 - strefa sprzęgieł/zaczepów MOVENTO)
-  bottomSpacing: 150, // maks. rozstaw łączników dna [mm]
+  bottomSpacing: 150, // maks. rozstaw łączników dna z bokami [mm]
+  bottomFBSpacing: 0, // maks. rozstaw łączników dna z tyłem i przodem [mm]; 0 = jak z bokami
   screwLength: 50,   // wkręt / konfirmat [mm]
   dowelLength: 30,   // kołek Ø8 [mm]
   lamelloEdge: 60,   // Lamello: oś łącznika od końca formatki [mm] (min. producenta 32/37)
@@ -139,7 +140,8 @@ export const MOVENTO_ZONE = 75;
 export const FRONT_BACK_SIDE_CLEAR = 80;
 const lamelloZoneEdge = (lam, settings, len) => Math.max(num(settings.lamelloEdge, DEFAULTS.lamelloEdge), MOVENTO_ZONE + len / 2);
 
-// Łączniki dna z tyłem i przodem (stoją na dnie), w poprzek szerokości w; rozstaw jak dno-bok.
+// Łączniki dna z tyłem i przodem (stoją na dnie), w poprzek szerokości w; własny rozstaw
+// (bottomFBSpacing), bez ustawienia jak dno-bok.
 function frontBackJoints(w, settings) {
   const lam = LAMELLO[settings.join];
   if (lam) {
@@ -147,7 +149,8 @@ function frontBackJoints(w, settings) {
     return lamelloPositions(w, lam, lamelloZoneEdge(lam, settings, len), len).map((p) => ({ p, kind: "lamello" }));
   }
   const e = Math.min(Math.max(FRONT_BACK_SIDE_CLEAR, num(settings.bottomEdge, 50)), w / 2);
-  const n = w - 2 * e < 40 ? 1 : Math.max(2, Math.ceil((w - 2 * e) / Math.max(50, settings.bottomSpacing)) + 1);
+  const spacing = num(settings.bottomFBSpacing, 0) > 0 ? settings.bottomFBSpacing : settings.bottomSpacing;
+  const n = w - 2 * e < 40 ? 1 : Math.max(2, Math.ceil((w - 2 * e) / Math.max(50, spacing)) + 1);
   const kinds = kindsFor(settings.join, n);
   const ps = n === 1 ? [round1(w / 2)] : Array.from({ length: n }, (_, i) => round1(e + (w - 2 * e) * i / (n - 1)));
   return ps.map((p, i) => ({ p, kind: kinds[i] }));
