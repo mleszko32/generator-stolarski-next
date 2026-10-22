@@ -159,7 +159,7 @@ export function openTechnicalDrawing() {
                               <option value="0.5">Kilka kartek: 1:2</option>
                               <option value="0.25">Kilka kartek: 1:4</option>
                           </select>
-                          <button class="btn-print" onclick="printPart()" title="Drukuje wybraną (kliknięta na korpusie) formatkę z odwiertami na kartkach A4">Drukuj formatkę (A4)</button>
+                          <button class="btn-print" onclick="printPart()" title="Drukuje wybraną (kliknięta na korpusie) formatkę z odwiertami na kartkach A4; przy włączonym widoku frontów - fronty z nawiertami">Drukuj formatkę (A4)</button>
                       </div>
                   </div>
                   ${tabsHtml}
@@ -297,8 +297,25 @@ export function openTechnicalDrawing() {
                   // arkusze (zakładka 8 mm) w skali nie mniejszej niż 1:4, żeby opisy
                   // (wysokości otworów) zostały czytelne - stąd auto nie zmniejsza dalej.
                   var currentDetailId = 'detail-left';
+                  var lastPartId = 'detail-left';
                   var showDetailRaw = showDetail;
-                  showDetail = function (id) { showDetailRaw(id); if (id) currentDetailId = id; };
+                  showDetail = function (id) { showDetailRaw(id); if (id) { currentDetailId = id; lastPartId = id; } };
+                  // Włączony widok frontów (zewn./wewn.) staje się formatką do wydruku -
+                  // wcześniej drukował się zawsze ostatnio kliknięty element korpusu,
+                  // więc nawiertów frontów (puszki zawiasów, mocowanie frontu szuflady)
+                  // nie dało się wydrukować. Po wyłączeniu wraca poprzedni wybór.
+                  var toggleFrontView = toggleFront;
+                  toggleFront = function (id, btn) {
+                      toggleFrontView(id, btn);
+                      var el = document.getElementById(id);
+                      if (el && el.style.display !== 'none') { currentDetailId = id; return; }
+                      if (currentDetailId !== id) return;
+                      var other = ['detail-front', 'detail-front-inner'].filter(function (f) {
+                          var o = document.getElementById(f);
+                          return f !== id && o && o.style.display !== 'none';
+                      })[0];
+                      currentDetailId = other || lastPartId;
+                  };
 
                   var PRINT_META = ${printMetaJson};
 
@@ -323,8 +340,10 @@ export function openTechnicalDrawing() {
                       var titleEl = g.querySelector('text[font-size="16"]');
                       var title = titleEl ? titleEl.textContent : 'Formatka';
                       var pr = g.querySelector('rect');
+                      var isFrontView = currentDetailId.indexOf('detail-front') === 0;
                       var dims = '';
-                      if (pr) {
+                      // Widok frontów to kilka formatek naraz - wymiar pierwszego prostokąta byłby mylący.
+                      if (pr && !isFrontView) {
                           var pw = parseFloat(pr.getAttribute('width')), ph = parseFloat(pr.getAttribute('height'));
                           dims = fmtN(Math.max(pw, ph)) + ' × ' + fmtN(Math.min(pw, ph)) + ' mm';
                       }
@@ -430,7 +449,10 @@ export function openTechnicalDrawing() {
                       var ratio = Math.round((1 / s) * 10) / 10;
                       var scaleTxt = '1:' + String(ratio).replace('.', ',');
                       var barMm = 100 * s;
-                      var legend = '<span class="legend">'
+                      var legend = isFrontView ? '<span class="legend">'
+                          + '<span><i class="dot" style="background:#16a34a"></i>puszka zawiasu Ø35</span>'
+                          + '<span><i class="dot" style="background:#dc2626"></i>mocowanie frontu szuflady</span></span>'
+                          : '<span class="legend">'
                           + '<span><i class="dot" style="background:#9333ea"></i>kołek Ø8 + wkręt Ø3</span>'
                           + '<span><i class="dot" style="background:#ea580c"></i>podpórka półki Ø5</span>'
                           + '<span><i class="dot" style="background:#0284c7"></i>prowadnica szuflady Ø5</span>'

@@ -198,7 +198,7 @@ export const HELP_SECTIONS = [
         <li><b>Formatki</b> - zbiorcza lista formatek z okleiną (kliknij krawędź ikonki, żeby ją
         przełączyć; środek ikonki = dookoła / brak) i eksport CSV.</li>
         <li><b>Rozkrój i etykiety</b> - plan rozkroju na arkusze, etykiety do druku.</li>
-        <li><b>Rysunki 2D</b> - rysunki formatek z wierceniami (wydruk pojedynczej formatki na A4).</li>
+        <li><b>Rysunki 2D</b> - rysunki formatek z wierceniami (wydruk pojedynczej formatki na A4; przy włączonym widoku „Fronty Zewn.” / „Fronty Wewn.” drukują się fronty z nawiertami zawiasów i szuflad).</li>
         <li><b>Skrzynki szuflad</b> - rysunki skrzynek drewnianych (MOVENTO) z otworami łączników.</li>
         <li><b>Instrukcje montażu</b> - kolejność składania i rysunki każdej szafki. Po zaznaczeniu
         „Wiercę na stole RC System” dochodzi karta wiercenia: która krawędź do pinów, otwór bazowy z pinem
