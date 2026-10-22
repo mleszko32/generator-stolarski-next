@@ -522,13 +522,15 @@ function drawOuterFronts(ctx) {
       const fWidth = front.w || cabWidth;
       const fSvgX = frontX + front.relX + (front.x || 0);
 
+      // Fronty sąsiednich szafek grupy są tylko tłem - wydruk A4 (ui/technicalDrawing.js) je pomija.
+      if (isForeign) svg += `<g class="foreign-front">`;
       svg += `<rect x="${fSvgX}" y="${elSvgY}" width="${fWidth}" height="${front.h}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5" ${strokeDash} />`;
 
       const hingeSide = isDoor ? doorHingeSide(front) : null;
       let labelText = isDrawer ? `Szuflada` : `Drzwi ${hingeSide === 'right' ? 'prawe' : 'lewe'}`;
       if (isForeign) labelText += ` (z: ${escapeHtml(front.sourceModName)})`;
       svg += `<text x="${fSvgX + fWidth/2}" y="${elSvgY + front.h/2}" font-size="12" fill="${isForeign ? C.slate400 : C.slate800}" font-weight="bold" text-anchor="middle">${labelText}</text>`;
-      if (isDoor) svg += `<text x="${fSvgX + fWidth/2}" y="${elSvgY + front.h/2 + 16}" font-size="10" fill="${isForeign ? C.slate400 : C.green700}" text-anchor="middle">zawiasy z ${hingeSide === 'right' ? 'prawej' : 'lewej'}</text>`;
+      if (isDoor) svg += `<text class="front-sub" x="${fSvgX + fWidth/2}" y="${elSvgY + front.h/2 + 16}" font-size="10" fill="${isForeign ? C.slate400 : C.green700}" text-anchor="middle">zawiasy z ${hingeSide === 'right' ? 'prawej' : 'lewej'}</text>`;
 
       if (isDoor && mountingData) {
         svg += `<g class="layer-holes-hinge">`;
@@ -577,6 +579,7 @@ function drawOuterFronts(ctx) {
         }
         svg += `</g>`;
       }
+      if (isForeign) svg += `</g>`;
   });
   svg += `</g>`;
 
