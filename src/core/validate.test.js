@@ -127,3 +127,41 @@ describe("kolizje wnętrza: półka w strefie szuflad", () => {
     expect(findInteriorCollisions(mod)).toHaveLength(1);
   });
 });
+
+describe("szuflada za niska na skrzynkę", () => {
+  const stack = (distribution, n) => Array.from({ length: n }, (_, i) =>
+    fullZoneFront({ id: `front-d${i}`, subtype: "szuflada", frontIndex: i, distribution }));
+
+  it("8 szuflad Merivobox w szafce 720 to błąd (dolna wnęka < 85,5 mm)", () => {
+    setProject(freshProject({ modules: [baseModule({ elements: stack("1:1:1:1:1:1:1:1", 8) })] }));
+    expect(has(validateProject(), "error", "najniższa szuflada")).toBe(true);
+  });
+
+  it("3 szuflady w szafce 720 są poprawne", () => {
+    setProject(freshProject({ modules: [baseModule({ elements: stack("1:1:1", 3) })] }));
+    expect(has(validateProject(), "error", "najniższa szuflada")).toBe(false);
+  });
+
+  it("MOVENTO: za niska wnęka na skrzynkę drewnianą", () => {
+    const p = freshProject({ modules: [baseModule({ elements: stack("1:1:1:1:1:1:1:1", 8) })] });
+    p.front.drawerSystem = "movento_katalog";
+    setProject(p);
+    expect(has(validateProject(), "error", "skrzynkę drewnianą")).toBe(true);
+  });
+});
+
+describe("formatka a arkusz po obrzeżu", () => {
+  it("bok 2790 mm nie mieści się w arkuszu 2800 z obrzeżem 10 mm", () => {
+    const p = freshProject({ modules: [baseModule({ dimensions: { width: 600, height: 2790, depth: 513 } })] });
+    p.room = { width: 4000, depth: 3000, height: 3000 };
+    setProject(p);
+    expect(has(validateProject(), "error", "po obrzeżu")).toBe(true);
+  });
+
+  it("bok 2780 mm się mieści", () => {
+    const p = freshProject({ modules: [baseModule({ dimensions: { width: 600, height: 2780, depth: 513 } })] });
+    p.room = { width: 4000, depth: 3000, height: 3000 };
+    setProject(p);
+    expect(has(validateProject(), "error", "po obrzeżu")).toBe(false);
+  });
+});

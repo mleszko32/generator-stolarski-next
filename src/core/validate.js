@@ -167,6 +167,11 @@ export function validateProject(project = state.project) {
             if (!spec.fitsDepth) {
               add("error", mod, `Szuflada: prowadnica NL ${spec.nl} nie mieści się w szafce (dostępna głębokość ${Math.round(spec.maxDepth)} mm) - zmień system szuflad albo głębokość szafki.`);
             }
+            if (!spec.fitsHeight) {
+              add("error", mod, spec.minSpace !== null
+                ? `Szuflada: wnęka ma ${Math.round(spec.availableSpace)} mm wysokości, a najniższa szuflada tego systemu potrzebuje ${spec.minSpace} mm - zwiększ front albo zmień podział.`
+                : `Szuflada: wnęka ma ${Math.round(spec.availableSpace)} mm wysokości - za mało na skrzynkę drewnianą (bok min. 60 mm + luzy 23 mm).`);
+            }
           }
           if (el.subtype === "szuflada-wewnetrzna") return;
           const fw = num(el.w), fh = num(el.h);
@@ -248,11 +253,14 @@ export function validateProject(project = state.project) {
     }
     const cp = project.cutPlan || {};
     const sheetW = num(cp.sheetW, 2800), sheetH = num(cp.sheetH, 2070);
-    const long = Math.max(sheetW, sheetH), short = Math.min(sheetW, sheetH);
+    // Plan rozkroju (engine/nesting.js) układa formatki w arkuszu minus obrzeże z obu stron.
+    const trimRaw = parseFloat(cp.trim);
+    const trim = trimRaw >= 0 ? trimRaw : 10;
+    const long = Math.max(sheetW, sheetH) - 2 * trim, short = Math.min(sheetW, sheetH) - 2 * trim;
     const tooBig = parts.filter((p) => p.category !== "Blat" && (Math.max(num(p.length), num(p.width)) > long || Math.min(num(p.length), num(p.width)) > short));
     if (tooBig.length) {
       const names = [...new Set(tooBig.map((p) => `${p.name} (${Math.round(num(p.length))}×${Math.round(num(p.width))})`))].slice(0, 4).join(", ");
-      add("error", null, `${tooBig.length} formatek nie mieści się na arkuszu ${sheetW}×${sheetH} mm: ${names}.`);
+      add("error", null, `${tooBig.length} formatek nie mieści się na arkuszu ${sheetW}×${sheetH} mm (po obrzeżu ${trim} mm z każdej strony): ${names}.`);
     }
   }
 }

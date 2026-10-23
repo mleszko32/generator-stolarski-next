@@ -66,10 +66,19 @@ export function drawerSpec(mod, el, project) {
   // calculateNominalLength zwraca najkrótszą prowadnicę z serii także wtedy, gdy nie mieści
   // się ona w szafce (np. wisząca 300 mm) - tu wychodzi to na jaw (kontrola projektu).
   const fitsDepth = nl <= maxDepth - NL_SAFETY;
+  // Na wysokość: getDrawerVariant przy za niskiej wnęce po cichu bierze najniższy wariant,
+  // a skrzynka drewniana ustawia comps.fits - tu jedno pole dla kontroli projektu.
+  const sysData = drawerSystems[system];
+  const minSpace = sysData && !sysData.woodenBox
+    ? Math.min(...Object.values(sysData.variants || {}).map((v) => v.minSpace))
+    : null;
+  const fitsHeight = comps
+    ? (comps.woodenBox ? comps.fits !== false : !(minSpace !== null && Number.isFinite(minSpace) && availableSpace < minSpace))
+    : true;
 
   return {
     system, th, isInternal, isInset, innerThick, innerSetback,
-    availableSpace, simulatedSpace, depth, maxDepth, nl, fitsDepth,
+    availableSpace, simulatedSpace, depth, maxDepth, nl, fitsDepth, fitsHeight, minSpace,
     openingX0, openingX1, openingW,
     comps,
   };
