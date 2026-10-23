@@ -86,6 +86,20 @@ describe("history (cofnij/wprzód)", () => {
     expect(currentName()).toBe("Szafka A");
   });
 
+  it("redo() tuż po zmianie (przed debounce'em) nie gubi tej zmiany", () => {
+    setName("A");
+    scheduleCheckpoint();
+    vi.advanceTimersByTime(DEBOUNCE_MS + 10);
+    undo();
+
+    state.project.modules[0].name = "B (nowa gałąź)";
+    scheduleCheckpoint();
+    expect(redo()).toBe(false);
+    expect(currentName()).toBe("B (nowa gałąź)");
+    expect(undo()).toBe(true);
+    expect(currentName()).toBe("Szafka A");
+  });
+
   it("nowa zmiana po undo() czyści stos redo", () => {
     setName("A");
     scheduleCheckpoint();

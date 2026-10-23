@@ -104,19 +104,22 @@ export function undo() {
   redoStack.push(lastSnapshot);
   const prev = undoStack.pop();
   applySnapshot(prev);
-  lastSnapshot = prev;
+  lastSnapshot = snapshotNow(); // po migracjach z applySnapshot - inaczej każda migracja wyglądała jak nowa zmiana
   notify();
   return true;
 }
 
 // Ponawia cofnięty krok. Zwraca true, jeśli coś się zmieniło.
 export function redo() {
-  if (redoStack.length === 0) return false;
   clearTimeout(debounceTimer);
+  // Jak w undo(): niedokończona zmiana po cofnięciu to nowa gałąź historii - zatwierdzenie
+  // czyści redoStack, więc ponowienie jej nie nadpisze (wcześniej znikała bez śladu).
+  commitCheckpoint();
+  if (redoStack.length === 0) return false;
   undoStack.push(lastSnapshot);
   const next = redoStack.pop();
   applySnapshot(next);
-  lastSnapshot = next;
+  lastSnapshot = snapshotNow();
   notify();
   return true;
 }
