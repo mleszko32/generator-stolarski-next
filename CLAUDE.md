@@ -175,7 +175,7 @@ Wszystkie panele renderują się przez przypisanie szablonów tekstowych do `inn
   (`initPropertiesPanel()` wybiera właściwy). Wszystkie składają panel z tych samych klocków
   `ui/propertiesShell.js` (przyklejony nagłówek z nazwą, zwijane sekcje ze wspólnym stanem
   otwarcia, blok pozycja + obrót z `bindModulePosition`) — nowy rodzaj szafki też ma z nich
-  korzystać. Usuwanie jest tylko na liście w lewym panelu, nie w prawym. Karty „Szuflady —
+  korzystać. Zmiana szerokości szafki odsuwa tylko szafki z tego samego rzędu (`shiftRowAfterResize` w `core/layout.js`: ten sam obrót, nachodzenie w poprzek i w pionie). Usuwanie jest tylko na liście w lewym panelu, nie w prawym. Karty „Szuflady —
   ustawienia ręczne” (wariant/wysokość boku, NL, wymiary frontu, szuflada wewnętrzna) są w
   `ui/drawerSettings.js`, wspólne dla zwykłej szafki i skosu (skos podaje własne `sideInfo`
   ze skrzynki liczonej pod skosem; `core/slopeCabinet.js` honoruje `forceVariant`/`forceNL`).
@@ -373,7 +373,7 @@ zaślepce ma `parallelMount`, więc otwory prowadników nie trafiają na bok (`c
 
 **Kontrola projektu**: `core/validate.js` (`validateProject`) zasila sekcję huba „Kontrola
 projektu” (`ui/projectCheck.js`): kolizje, granice pokoju, za szerokie drzwi/półki, formatki
-niemieszczące się w płycie, otwory. Narożniki: `core/cornerChecks.js` (czyste, z testami) — front przy narożniku
+niemieszczące się w płycie (arkusz minus obrzeże `cutPlan.trim`, jak w rozkroju), szuflady za płytkie (`drawerSpec().fitsDepth`) i za niskie (`fitsHeight`: wnęka < najniższy wariant systemu, MOVENTO `comps.fits`), otwory. Narożniki: `core/cornerChecks.js` (czyste, z testami) — front przy narożniku
 vs lico frontów prostopadłego ciągu (błąd, gdy zachodzi; ostrzeżenie < 30 mm), szafka narożna L w kolizjach jako
 dwa ramiona (`footprintBoxes`), przejście między dolnymi ciągami naprzeciw siebie (< 1200 ostrzeżenie, < 1067 błąd).
 
