@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { recalculateLayout, recalculateAllLayouts, getTraverseConfig, getWorldFootprint, clampModuleToRoom, migrateLegacyRoom, restModuleOnNeighbors } from "./layout.js";
+import { recalculateLayout, recalculateAllLayouts, getTraverseConfig, getWorldFootprint, clampModuleToRoom, migrateLegacyRoom, restModuleOnNeighbors, shiftRowAfterResize } from "./layout.js";
 import { freshProject, baseModule, setProject } from "../test/fixtures.js";
 
 // Pełny korpus 600 x 720, płyta 18 -> wnętrze baseZone 18..582 / 18..702.
@@ -261,5 +261,35 @@ describe("recalculateLayout — kolejność powiązanych frontów", () => {
     recalculateLayout(mod);
     expect({ y: top.y, h: top.h }).toEqual(once);
     expect(top.baseZone.minY).toBeCloseTo(bot.y + bot.h, 5);
+  });
+});
+
+describe("shiftRowAfterResize", () => {
+  const at = (id, x, z = 0, extra = {}) => baseModule({ id, position: { x, y: 0, z }, ...extra });
+  let a, right, otherWall, upper, rotated;
+  beforeEach(() => {
+    a = at("a", 0);
+    right = at("right", 600);
+    otherWall = at("other", 1200, 2500, { rotation: 180 });
+    upper = baseModule({ id: "upper", position: { x: 600, y: 1450, z: 0 }, legs: { active: false } });
+    rotated = at("rot", 1500, 0, { rotation: 90 });
+    setProject(freshProject({ modules: [a, right, otherWall, upper, rotated] }));
+  });
+
+  it("odsuwa tylko sąsiada z tego samego rzędu", () => {
+    shiftRowAfterResize(a, 800);
+    expect(right.position.x).toBe(800);
+    expect(otherWall.position.x).toBe(1200);
+    expect(upper.position.x).toBe(600);
+    expect(rotated.position.x).toBe(1500);
+  });
+
+  it("wpisywanie po znaku nie przesuwa szafek z innych ścian", () => {
+    const far = at("far", 700, 1000);
+    setProject(freshProject({ modules: [a, right, far] }));
+    shiftRowAfterResize(a, 80); a.dimensions.width = 80;
+    shiftRowAfterResize(a, 800); a.dimensions.width = 800;
+    expect(right.position.x).toBe(800);
+    expect(far.position.x).toBe(700);
   });
 });

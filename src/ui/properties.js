@@ -4,7 +4,7 @@ import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
 import { calculateParts } from "../engine/cabinet.js";
 import { calculateHinges } from "../core/hingeMath.js";
-import { getTraverseConfig, clampModuleToRoom, restModuleOnNeighbors } from "../core/layout.js";
+import { getTraverseConfig, clampModuleToRoom, restModuleOnNeighbors, shiftRowAfterResize } from "../core/layout.js";
 import { getDrawerBoxInfo } from "../core/drawerBoxes.js";
 import { escapeHtml } from "../utils/dom.js";
 import { evalDimensionExpr, fmtMm } from "../utils/math.js";
@@ -491,12 +491,12 @@ function setupEventListeners() {
   const nutOptions = document.getElementById('nut-options');
   if (backType && nutOptions) {
     backType.addEventListener('change', (e) => {
-        getSelectedMods().forEach(mod => { mod.backPanel.type = e.target.value; });
+        getSelectedMods().forEach(mod => { mod.backPanel = mod.backPanel || {}; mod.backPanel.type = e.target.value; });
         nutOptions.style.display = e.target.value === 'nut' ? 'block' : 'none'; updateAll();
     });
   }
   const nutBuildInput = document.getElementById('input-nut-build');
-  if (nutBuildInput) nutBuildInput.addEventListener('change', (e) => { getSelectedMods().forEach(mod => { mod.backPanel.nutBuild = e.target.value; }); updateAll(); });
+  if (nutBuildInput) nutBuildInput.addEventListener('change', (e) => { getSelectedMods().forEach(mod => { mod.backPanel = mod.backPanel || {}; mod.backPanel.nutBuild = e.target.value; }); updateAll(); });
 
   const findFront = (frontId) => {
     const mod = getActiveModule();
@@ -684,7 +684,6 @@ function setupEventListeners() {
             if (id === 'width') {
               if (val < 50) return;
               const oldWidth = parseFloat(mod.dimensions.width) || 0;
-              const delta = val - oldWidth;
               const th = parseFloat(state.project.materials.boardThickness) || 18;
               const innerOldX = oldWidth - 2 * th;
               const innerNewX = val - 2 * th;
@@ -703,10 +702,8 @@ function setupEventListeners() {
                       }
                   });
               }
+              shiftRowAfterResize(mod, val);
               mod.dimensions.width = val;
-              state.project.modules.forEach(otherMod => {
-                if (otherMod.id !== mod.id && otherMod.position.x >= (mod.position.x + oldWidth - 1)) otherMod.position.x += delta;
-              });
             }
 
             if (id === 'height') {
@@ -744,6 +741,7 @@ function setupEventListeners() {
             if (id === 'front-right') mod.front.clearance.right = val;
             if (id === 'front-top') mod.front.clearance.top = val;
             if (id === 'front-bottom') mod.front.clearance.bottom = val;
+            if ((id === "back-offset" || id === "back-groove") && !mod.backPanel) mod.backPanel = {};
             if (id === 'back-offset') mod.backPanel.offset = val;
             if (id === 'back-groove') mod.backPanel.grooveDepth = val;
         });

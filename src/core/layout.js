@@ -78,6 +78,37 @@ export function getModuleBox(mod) {
   return { x0, x1: x0 + worldW, y0, y1: y0 + H, z0, z1: z0 + worldD };
 }
 
+// Zmiana szerokości szafki (pole „Szerokość” w prawym panelu) odsuwa sąsiadów z tego
+// samego rzędu stojących za jej prawą krawędzią. Wołaj PRZED wpisaniem nowej szerokości
+// do mod.dimensions. Rząd = ten sam obrót, nachodzenie w poprzek rzędu i w pionie.
+// Wcześniej przesuwało każdą szafkę o większym X w całym pokoju (też z innych ścian),
+// a przy wpisywaniu po znaku („8” → „80” → „800”) pośrednie szerokości łapały szafki
+// leżące między nimi i zostawiały je przesunięte.
+export function shiftRowAfterResize(mod, newWidth, modules = state.project.modules) {
+  const EPS = 0.5;
+  const box = getModuleBox(mod);
+  const { rotation } = getWorldFootprint(mod);
+  const alongZ = rotation === 90 || rotation === 270;
+  const oldWidth = parseFloat(mod.dimensions.width) || 0;
+  const delta = newWidth - oldWidth;
+  if (!delta) return;
+  const start = alongZ ? box.z0 : box.x0;
+  (modules || []).forEach((other) => {
+    if (other === mod || other.id === mod.id) return;
+    if (getWorldFootprint(other).rotation !== rotation) return;
+    const o = getModuleBox(other);
+    const crossOverlap = alongZ
+      ? Math.min(box.x1, o.x1) - Math.max(box.x0, o.x0)
+      : Math.min(box.z1, o.z1) - Math.max(box.z0, o.z0);
+    const yOverlap = Math.min(box.y1, o.y1) - Math.max(box.y0, o.y0);
+    if (crossOverlap <= EPS || yOverlap <= EPS) return;
+    const key = alongZ ? 'z' : 'x';
+    const pos = parseFloat(other.position[key]) || 0;
+    if (pos < start + oldWidth - 1) return;
+    other.position[key] = pos + delta;
+  });
+}
+
 // Stawianie szafy z dwóch modułów jeden NA DRUGIM (np. dolny + górny, ten
 // sam odcisk X/Z) - ustawienie wysokości (position.y) ręcznie w polu "Wysokość
 // od podłogi" (ui/properties.js) samo w sobie nie sprawdzało kolizji z niczym,
