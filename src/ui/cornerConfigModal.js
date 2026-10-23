@@ -198,7 +198,7 @@ export function openCornerConfigModal(mod) {
 
   const holesEl = modal.querySelector('#corner-shelf-holes');
   function renderShelfHoles() {
-    holesEl.innerHTML = `<div class="hint" style="margin:0 0 2px 0;">Rysunki formatekszafki (widok z góry / z boku) - wymiary i nawierty jak w rysunkach zwykłych szafek.</div>${generateCornerPartsDrawings(mod)}`;
+    holesEl.innerHTML = `<div class="hint" style="margin:0 0 2px 0;">Rysunki formatek szafki (widok z góry / z boku) - wymiary i nawierty jak w rysunkach zwykłych szafek.</div>${generateCornerPartsDrawings(mod)}`;
   }
   renderShelvesList();
 

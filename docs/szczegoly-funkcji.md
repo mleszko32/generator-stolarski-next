@@ -37,6 +37,8 @@ uwaga — Blum podaje je szablonem T65.1000.02, bez wymiarów. Rysunki: `render/
 bez Three.js, żeby się drukował; `assemblyStepsHtml` — kolejność montażu wg sposobu łączenia),
 okno `ui/drawerBoxDrawings.js`, sekcja huba „Skrzynki szuflad”. Rysunki formatek jednej skrzynki są w jednej
 skali (`drawingScale`: 1:4 / 1:5 / 1:10 / 1:20, żeby zmieściły się na A4; wymiary SVG w mm), nie rozciągane do karty.
+Wysokości otworów boków i tyłu/czoła opisane od bliższej krawędzi z drugą w nawiasie (`hDim`: „66 DÓŁ (284)”, krócej niż
+`dimText` boków szafek, żeby typowa skrzynka została w 1:4); w skrzynce B wysokość każdej krawędzi osobno (`edgeH`).
 Przy każdej skrzynce „Gdzie w szafce”: `box.locations` (szafki + id frontów) i `cabinetFrontView` (obrys i fronty
 szafki od frontu, też skos) rysowane przez `cabinetLocatorSVG` z podświetlonymi, ponumerowanymi szufladami.
 

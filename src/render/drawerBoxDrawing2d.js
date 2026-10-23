@@ -11,17 +11,31 @@ import { holeSpecs } from "../core/drawerBoxBuild.js";
 import { r1, fmt, KIND, text, line, dash, dimH, dimV, wrap, title, uniq, faceHole, edgeHole, proj, move, prism, solidsSvg } from "./workshopDrawing.js";
 export { cabinetLocatorSVG } from "./workshopDrawing.js";
 
-// Bok widziany od wewnątrz skrzynki: przód po lewej, wymiary od przodu i od spodu.
+// Bok widziany od wewnątrz skrzynki: przód po lewej, wymiary od przodu, wysokości od bliższej
+// krawędzi (DÓŁ/GÓRA, druga w nawiasie) jak na rysunkach boków szafek.
 // Jedna skala dla wszystkich rysunków formatek skrzynki (prawdziwe proporcje między nimi):
 // najmniejsza z 1:4 / 1:5 / 1:10 / 1:20, przy której każdy rysunek mieści się na A4
 // (ok. 185 × 250 mm pola wydruku). Rozmiary jak w wrap() poszczególnych rysunków.
 const SCALES = [4, 5, 10, 20];
 export function drawingScale(box) {
-  const sizes = box.panels.map((p) => (p.kind === "bok" ? [p.length + 120, p.width + 112]
-    : p.kind === "dno" ? [p.length + 150, p.width + 112] : [p.length + 140, p.width + 114]));
+  const sizes = box.panels.map((p) => (p.kind === "bok" ? [p.length + 175, p.width + 112]
+    : p.kind === "dno" ? [p.length + 150, p.width + 112] : [p.length + 200, p.width + 114]));
   return SCALES.find((n) => sizes.every(([w, h]) => w / n <= 185 && h / n <= 250)) || SCALES[SCALES.length - 1];
 }
 const scaleNote = (scale) => (scale ? ` · skala 1:${scale}` : "");
+
+// Wysokość otworu od bliższej krawędzi (DÓŁ/GÓRA, wyróżniona) i od drugiej w nawiasie, jak na
+// rysunkach boków szafek, ale krócej („66 DÓŁ (284)”), żeby rysunki zostały w skali 1:4.
+function hDim(x, y, localY, edgeHeight, anchor = "start") {
+  const bottom = localY <= edgeHeight / 2;
+  const primary = bottom ? localY : edgeHeight - localY, secondary = bottom ? edgeHeight - localY : localY;
+  return `<text x="${r1(x)}" y="${r1(y)}" font-family="${FONT}" text-anchor="${anchor}">`
+    + `<tspan fill="${C.slate700}" font-size="10" font-weight="bold">${fmt(primary)}</tspan> `
+    + `<tspan fill="${C.slate600}" font-size="8">${bottom ? "DÓŁ" : "GÓRA"}</tspan> `
+    + `<tspan fill="${C.slate400}" font-size="8">(${fmt(secondary)})</tspan></text>`;
+}
+// Wysokość krawędzi tyłu/czoła przy x (skrzynka B - niski i wysoki bok mają różne wysokości).
+const edgeH = (panel, x) => Math.max(...panel.points.filter(([px]) => Math.abs(px - x) < 0.5).map(([, py]) => py), 0) || panel.width;
 
 export function sideSVG(box, panel, startNo = 1, scale = null) {
   const L = panel.length, H = panel.width, t = box.t, r = box.recess;
@@ -43,10 +57,10 @@ export function sideSVG(box, panel, startNo = 1, scale = null) {
     b += line(x, 0, x, -8 - (i % 2) * 12, C.slate300) + text(x, -11 - (i % 2) * 12, fmt(x), { size: 10, color: C.slate600 });
   });
   uniq(panel.holes.map((h) => h.y)).forEach((y) => {
-    b += line(L, Y(y), L + 32, Y(y), C.slate300, dash) + text(L + 36, Y(y) + 4, fmt(y), { size: 10, color: C.slate600, anchor: "start" });
+    b += line(L, Y(y), L + 32, Y(y), C.slate300, dash) + hDim(L + 36, Y(y) + 4, y, H);
   });
   b += dimH(0, L, H + 18, fmt(L)) + dimV(-22, 0, H, fmt(H));
-  return wrap(-40, -80, L + 120, H + 112, b, scale);
+  return wrap(-40, -80, L + 175, H + 112, b, scale);
 }
 
 // Dno w rzucie z góry: przód po lewej, lewy bok u góry. Otwory w czołach (krawędziach).
@@ -90,17 +104,17 @@ export function plateSVG(box, panel, startNo = 1, scale = null) {
       : h.edge === "lewe" ? edgeHole(0, Y(h.y), 1, 0, h) : edgeHole(W, Y(h.y), -1, 0, h);
   });
   uniq(panel.holes.filter((h) => h.edge === "lewe").map((h) => h.y)).forEach((y) => {
-    b += line(0, Y(y), -26, Y(y), C.slate300, dash) + text(-30, Y(y) + 4, fmt(y), { size: 10, color: C.slate600, anchor: "end" });
+    b += line(0, Y(y), -10, Y(y), C.slate300, dash) + hDim(-14, Y(y) + 4, y, edgeH(panel, 0), "end");
   });
   uniq(panel.holes.filter((h) => h.edge === "prawe").map((h) => h.y)).forEach((y) => {
-    b += line(W, Y(y), W + 26, Y(y), C.slate300, dash) + text(W + 30, Y(y) + 4, fmt(y), { size: 10, color: C.slate600, anchor: "start" });
+    b += line(W, Y(y), W + 10, Y(y), C.slate300, dash) + hDim(W + 14, Y(y) + 4, y, edgeH(panel, W));
   });
   // Położenia łączników w dolnej krawędzi (od lewej) - pod formatką.
   uniq(panel.holes.filter((h) => h.edge === "dolne").map((h) => h.x)).forEach((x) => {
     b += line(x, H, x, H + 10, C.slate300) + text(x, H + 21, fmt(x), { size: 10, color: C.slate600 });
   });
   b += dimH(0, W, H + 40, fmt(W));
-  return wrap(-70, -62, W + 140, H + 114, b, scale);
+  return wrap(-100, -62, W + 200, H + 114, b, scale);
 }
 
 // Legenda: kolor, łącznik i rozmiary otworów (w płaszczyźnie / w czole) - zastępuje tabelę otworów.
