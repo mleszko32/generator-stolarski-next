@@ -13,6 +13,7 @@ import { showAlert, openModal } from "../utils/modal.js";
 import { sanitizeAiModules, buildModulesFromAi } from "../core/aiSketchImport.js";
 import { getIdToken } from "../core/storage.js";
 import { clampModuleToRoom } from "../core/layout.js";
+import { parseFurnitureJson, insertFurniture } from "../core/furnitureImport.js";
 
 // Okno oczekiwania na wynik AI (wspólne openModal, bez zamykania w trakcie).
 let aiLoader = null;
@@ -154,7 +155,9 @@ export function updateSidebar() {
         <button id="btn-wall-fill" class="btn btn-sm btn-block" title="Wypełnij ścianę albo całą kuchnię L/U szafkami: narożniki, podział, blendy, kolizje z szafkami, oknami i drzwiami"><i class="ti ti-layout-columns" aria-hidden="true"></i> Rozmieść szafki (ściana / L / U)</button>
         <button id="btn-slope-niche" class="btn btn-sm btn-block" title="Rząd prostokątnych szafek pod skosem (poddasze): wysokości liczone ze skosu, widok z przodu z wymiarami i zestawienie formatek"><i class="ti ti-stairs" aria-hidden="true"></i> Zabudowa wnęki pod skosem</button>
         <button id="btn-module-library" class="btn btn-sm btn-block" title="Własne szablony szafek: zapisz skonfigurowaną szafkę i wstawiaj ją do projektów"><i class="ti ti-books" aria-hidden="true"></i> Biblioteka szafek</button>
-        <button id="btn-import-ai" class="btn btn-sm btn-block"><i class="ti ti-wand" aria-hidden="true"></i> Zbuduj projekt ze zdjęcia (AI)</button>
+        <button id="btn-import-furniture" class="btn btn-sm btn-block" title="Wstaw cały mebel (kilka korpusów, blendy) z pliku JSON - szafki trafiają do projektu jako jedna grupa"><i class="ti ti-file-import" aria-hidden="true"></i> Wstaw mebel z pliku</button>
+        <input type="file" id="input-furniture" accept="application/json,.json" multiple style="display: none;" />
+        <button id="btn-import-ai"class="btn btn-sm btn-block"><i class="ti ti-wand" aria-hidden="true"></i> Zbuduj projekt ze zdjęcia (AI)</button>
         <input type="file" id="input-ai-image" accept="image/png, image/jpeg" style="display: none;" />
         ${modules.length > 0 ? `<button id="btn-production" class="btn btn-sm btn-block btn-primary"><i class="ti ti-building-factory-2" aria-hidden="true"></i> Produkcja i raporty</button>` : ''}
       </div>
@@ -252,6 +255,27 @@ export function updateSidebar() {
 
   document.getElementById('btn-slope-niche')?.addEventListener('click', () => openSlopeNicheModal(() => { initPropertiesPanel(); update3D(); updateSidebar(); }));
   document.getElementById('btn-wall-fill')?.addEventListener('click', () => openWallFillModal(() => { initPropertiesPanel(); update3D(); updateSidebar(); }));
+
+  const furnitureInput = document.getElementById('input-furniture');
+  document.getElementById('btn-import-furniture')?.addEventListener('click', () => furnitureInput.click());
+  furnitureInput?.addEventListener('change', async () => {
+    const files = Array.from(furnitureInput.files || []);
+    furnitureInput.value = '';
+    const bad = [];
+    let last = null;
+    for (const file of files) {
+      const furniture = parseFurnitureJson(await file.text());
+      if (!furniture) { bad.push(file.name); continue; }
+      last = insertFurniture(state.project, furniture);
+    }
+    if (last && last.length) {
+      state.activeModuleId = last[0].id;
+      state.selectedModules = new Set(last.map(m => m.id));
+      state.activeSidePanelId = null;
+    }
+    initPropertiesPanel(); update3D(); updateSidebar();
+    if (bad.length) showAlert(`To nie jest plik mebla: ${bad.join(', ')}`, 'Wstaw mebel z pliku');
+  });
 
   const btnAddBlenda = document.getElementById('btn-add-blenda');
   if (btnAddBlenda) {

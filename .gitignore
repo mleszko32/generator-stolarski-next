@@ -25,3 +25,6 @@ dist-ssr
 
 # Lokalne ustawienia Claude Code
 .claude/
+
+# Pliki mebli z projektów klientów (dane inwestorów)
+meble-import/

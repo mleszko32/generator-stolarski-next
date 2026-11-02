@@ -407,6 +407,11 @@ przenoszenia między komputerami). Wstawianie idzie przez `addModuleFromTemplate
 `cloneModuleWithNewIds` (`core/state.js`), które przemapowują id elementów **oraz** odwołania
 `baseZone.bound*` między elementami (używane też przez `duplicateModule`).
 
+**Mebel z pliku**: `core/furnitureImport.js` (czyste, z testami) + przycisk „Wstaw mebel z pliku” w Narzędziach. Plik
+`{ format: "gsn-furniture", name, modules, sidePanels }` (pozycje względem mebla) — mebel staje na prawo od istniejących
+szafek, moduły przez `cloneModuleWithNewIds`, wspólne `groupId`. Pliki mebli z rysunków klientów leżą w `meble-import/`
+(poza gitem).
+
 **Baza cen**: `core/priceLibrary.js` (rząd przycisków na górze Kosztorysu,
 `ui/kosztorysModal.js`) — jedna migawka `project.pricing` w `localStorage` (ceny płyt/okuć,
 cennik materiałów frontów), którą można zapisać z jednego projektu i zastosować w innym, żeby
