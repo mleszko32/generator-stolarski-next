@@ -263,6 +263,11 @@ rysunek 2D, instrukcje, okucia. Szczegóły w docs/szczegoly-funkcji.md.
 wylot (sprawdza kilka orientacji, wybiera najmniej arkuszy), wyświetlane przez
 `ui/cutPlanModal.js`.
 
+**Eksport FC2**: `engine/fc2Export.js` (czysta, z testami) — plik importu FC2 (bez nagłówka, `;`, 12 kolumn: symbol
+materiału, dł., szer., ilość, opis ≤ 50 znaków bez polskich liter, okleina L/P/G/D, 2× CNC, pogrubienie). Dłuższe krawędzie =
+góra/dół. Symbole w `project.fc2Export` (kategoria, fronty po `Front:<materialId>`); przycisk „Zapisz plik FC2” w
+`ui/csvEditor.js`.
+
 **DXF frontów na CNC**: `engine/frontsDxf.js` (czysta, z testami) — formatki kategorii „Front” ułożone przez
 `nestPartsFree` (MaxRects), osobno dla każdego materiału frontu, zapis DXF R12; karta `ui/frontsDxfPanel.js`.
 

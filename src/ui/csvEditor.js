@@ -5,6 +5,8 @@ import { state } from "../core/state.js";
 import { escapeHtml, downloadFile } from "../utils/dom.js";
 import { openModal, showAlert } from "../utils/modal.js";
 import { getPartEdges, describeEdges } from "../engine/edgeBanding.js";
+import { buildFc2Csv, fc2SymbolSlots, getFc2Settings } from "../engine/fc2Export.js";
+import { scheduleCheckpoint } from "../core/history.js";
 
 const DISPLAY_FILTERS = [
     { value: 'all', label: 'Wszystko' },
@@ -15,9 +17,10 @@ const DISPLAY_FILTERS = [
 ];
 const CAT_ORDER = { 'Korpus': 1, 'Front': 2, 'Szuflada': 3, 'Plecy': 4, 'Inne': 5 };
 
-function rowHtml(cat, name, length, width, qty, source, edges) {
+// meta: { materialId, edges } - nie edytowane w tabeli, potrzebne do eksportu FC2.
+function rowHtml(cat, name, length, width, qty, source, edges, meta = {}) {
     return `
-      <tr data-category="${escapeHtml(cat)}">
+      <tr data-category="${escapeHtml(cat)}" data-mat="${escapeHtml(meta.materialId || '')}" data-edges="${escapeHtml(JSON.stringify(meta.edges || [true, true, true, true]))}">
         <td><input type="text" class="input csv-cat-input" data-cat="${escapeHtml(cat)}" value="${escapeHtml(cat)}"></td>
         <td><input type="text" class="input" value="${escapeHtml(name)}"></td>
         <td><input type="number" class="input" value="${length}"></td>
@@ -36,8 +39,10 @@ function openCsvEditorModal(partsList) {
 
     const rows = partsList.map(p => rowHtml(
         p.category || 'Inne', p.name, p.length, p.width, p.qty, (p.modules || []).join(' + '),
-        describeEdges(getPartEdges(p, rules))
+        describeEdges(getPartEdges(p, rules)), { materialId: p.materialId, edges: getPartEdges(p, rules) }
     )).join('');
+    const fc2 = getFc2Settings(state.project);
+    const fc2Slots = fc2SymbolSlots(partsList, state.project);
 
     const dlg = openModal({
         title: 'Menedżer formatek (Pre-flight)',
@@ -55,10 +60,20 @@ function openCsvEditorModal(partsList) {
                 </tr></thead>
                 <tbody id="csv-editor-tbody">${rows}</tbody>
               </table>
-            </div>`,
+            </div>
+            <details class="fc2-settings" style="margin-top:12px">
+              <summary><b>Eksport FC2</b> - symbole materiałów i okleiny (zapamiętywane w projekcie)</summary>
+              <div class="fc2-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:8px">
+                ${fc2Slots.map(sl => `<label class="field"><span>${escapeHtml(sl.label)}</span><input type="text" class="input fc2-symbol" data-key="${escapeHtml(sl.key)}" value="${escapeHtml(fc2.symbols[sl.key] || '')}" placeholder="${escapeHtml(sl.label)}"></label>`).join('')}
+                <label class="field"><span>Symbol okleiny</span><input type="text" class="input" id="fc2-edge" value="${escapeHtml(fc2.edgeSymbol)}"></label>
+                <label class="field" style="align-self:end"><span><input type="checkbox" id="fc2-bolding" ${fc2.bolding ? 'checked' : ''}> Pogrubienie (kol. 12 = 1)</span></label>
+              </div>
+              <div class="hint">Okleina: dłuższe krawędzie = góra/dół, krótsze = lewa/prawa. Puste pole symbolu = nazwa pozycji. Opis bez polskich liter, maks. 50 znaków.</div>
+            </details>`,
         footer: [
             { label: 'Dodaj pusty wiersz', icon: 'plus', onClick: () => addRow() },
             { label: 'Anuluj' },
+            { label: 'Zapisz plik FC2', icon: 'file-export', onClick: (close) => saveFc2(close) },
             { label: 'Zapisz plik CSV', kind: 'primary', icon: 'device-floppy', onClick: (close) => saveCsv(close) },
         ],
     });
@@ -145,6 +160,34 @@ function openCsvEditorModal(partsList) {
         const projName = state.project.name.replace(/\s+/g, '_');
         const fileNameSuffix = filterMode === 'all' ? 'Cale_Zlecenie' : filterMode;
         downloadFile(`Formatki_${fileNameSuffix}_${projName}.csv`, csvContent, 'text/csv;charset=utf-8;');
+        close();
+    }
+
+    // Eksport FC2: te same wiersze co CSV (z poprawkami z tabeli i filtrem kategorii), symbole z
+    // pól pod tabelą. Okleina z ustawień krawędzi formatki; wpisane ręcznie „dookoła”/„brak” wygrywa.
+    function saveFc2(close) {
+        const symbols = {};
+        root.querySelectorAll('.fc2-symbol').forEach(inp => { if (inp.value.trim()) symbols[inp.getAttribute('data-key')] = inp.value.trim(); });
+        const settings = { symbols: { ...getFc2Settings(state.project).symbols, ...symbols }, edgeSymbol: root.querySelector('#fc2-edge').value.trim(), bolding: root.querySelector('#fc2-bolding').checked };
+        root.querySelectorAll('.fc2-symbol').forEach(inp => { if (!inp.value.trim()) delete settings.symbols[inp.getAttribute('data-key')]; });
+        state.project.fc2Export = settings;
+        scheduleCheckpoint();
+
+        const rows = [];
+        root.querySelectorAll('#csv-editor-tbody tr').forEach(tr => {
+            const inputs = tr.querySelectorAll('input');
+            const category = inputs[0].value.trim();
+            if (displayFilter !== 'all' && category !== displayFilter) return;
+            const edgeText = inputs[6].value.trim();
+            let edges;
+            try { edges = JSON.parse(tr.getAttribute('data-edges')); } catch (e) { edges = [true, true, true, true]; }
+            if (edgeText === 'dookoła') edges = [true, true, true, true];
+            if (edgeText === 'brak') edges = [false, false, false, false];
+            rows.push({ category, name: inputs[1].value, length: inputs[2].value, width: inputs[3].value, qty: inputs[4].value, materialId: tr.getAttribute('data-mat') || undefined, edges });
+        });
+        const projName = state.project.name.replace(/s+/g, '_');
+        const fileNameSuffix = displayFilter === 'all' ? 'Cale_Zlecenie' : displayFilter;
+        downloadFile(`FC2_${fileNameSuffix}_${projName}.csv`, buildFc2Csv(rows, state.project, settings), 'text/csv;charset=utf-8;');
         close();
     }
 
