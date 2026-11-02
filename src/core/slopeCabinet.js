@@ -415,7 +415,8 @@ function doorSide(fr) {
 function frontName(fr) {
   const rect = fr.shape.kind === 'prostokat';
   if (fr.type === 'blenda') return rect ? 'Blenda' : `Blenda skos (${fr.text})`;
-  if (fr.type === 'drzwi') return rect ? `Drzwi ${doorSide(fr) === 'prawe' ? 'Prawe' : 'Lewe'}` : `Drzwi ${doorSide(fr)} skos (${fr.text})`;
+  // Prostokątne lewe i prawe drzwi to ta sama formatka (jak w engine/cabinet.js); skośne są lustrzane.
+  if (fr.type === 'drzwi') return rect ? 'Drzwi' : `Drzwi ${doorSide(fr)} skos (${fr.text})`;
   const base = fr.subtype === 'szuflada-wewnetrzna' ? 'Front szuflady wewn.' : 'Front szuflady';
   return rect ? base : `${base} skos (${fr.text})`;
 }

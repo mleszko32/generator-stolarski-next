@@ -353,13 +353,11 @@ function getFrontsAndDrawers(mod, config) {
     let partName = "Front";
     if (front.subtype === 'szuflada') { partName = `Front szuflady`; } 
     else if (front.subtype === 'szuflada-wewnetrzna') { partName = `Front szuflady wewn.`; } 
-    else if (front.subtype === 'drzwi') {
-      // Strona zawiasów: lewe/prawe to różne formatki (inne rozmieszczenie otworów pod zawiasy).
-      partName = `Drzwi ${(front.openingSide || 'left') === 'right' ? 'Prawe' : 'Lewe'}`;
-    } 
-    else if (front.subtype === 'drzwi-lp') {
-      const side = front.id.includes('-L-') ? 'Lewe' : 'Prawe';
-      partName = `Drzwi ${side}`;
+    else if (front.subtype === 'drzwi' || front.subtype === 'drzwi-lp') {
+      // Bez strony zawiasów w nazwie: lewe i prawe drzwi tego samego wymiaru to jedna
+      // formatka do zamówienia (sumują się na liście); stronę zawiasów i otwory podają
+      // rysunki wierceń (mountingData) i lista okuć.
+      partName = 'Drzwi';
     }
 
     parts.push({ name: partName, length: parseFloat((front.h || 0).toFixed(1)), width: parseFloat((front.w || 0).toFixed(1)), qty: 1, category: "Front", materialId: front.materialId });
