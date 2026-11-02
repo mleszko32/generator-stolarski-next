@@ -15,7 +15,7 @@ import { openingInstrumental, WALL_LOCATIVE } from "./openings.js";
 import { num } from "../utils/math.js";
 import { drawerSpec } from "./drawerSpec.js";
 import { getRcSettings, RC_MAX_DEPTH } from "./rcSystem.js";
-import { resolveBackPanel } from "./backPanel.js";
+import { sideDepthOf } from "./backPanel.js";
 import { checkBlindCorner, innerDims } from "./blindCorner.js";
 import { checkCornerFitting, getCornerFitting } from "./cornerFittings.js";
 import { cornerFrontIssues, footprintBoxes, passageIssues } from "./cornerChecks.js";
@@ -115,7 +115,7 @@ export function validateProject(project = state.project) {
     }
     // Stół RC System przyjmuje formatki do RC_MAX_DEPTH - głębszego boku nie nawierci się na nim.
     if (getRcSettings(project).enabled && mod.type !== "corner_cabinet") {
-      const sideDepth = resolveBackPanel(mod, project).type === "nut" ? dep : dep - num(project.materials && project.materials.backThickness, 3);
+      const sideDepth = sideDepthOf(mod, project, dep);
       if (sideDepth > RC_MAX_DEPTH) add("warn", mod, `Bok ma ${Math.round(sideDepth)} mm głębokości - więcej niż ${RC_MAX_DEPTH} mm, które przyjmuje stół RC System; wierć poza stołem.`);
     }
     if (mod.type !== "corner_cabinet" && w < 100) {

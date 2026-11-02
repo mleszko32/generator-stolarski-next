@@ -1189,10 +1189,14 @@ export function update3D() {
       const udBack = { moduleId: mod.id, type: 'corpus', part: 'back' }; 
 
       const backP = resolveBackPanel(mod, state.project);
-      const backThick = 3; 
-      
+      const backThick = backP.type === 'wpuszczane' ? backP.thickness : 3;
+
       let sideD, tbD, backZ;
-      if (backP.type === 'nut') {
+      if (backP.type === 'wpuszczane') {
+          sideD = D;
+          tbD = D - backThick;
+          backZ = posZ;
+      } else if (backP.type === 'nut') {
           sideD = D;
           tbD = D - backP.offset - backThick; 
           backZ = posZ + backP.offset;
@@ -1226,7 +1230,9 @@ export function update3D() {
           }
       }
 
-      addBox(W - 4, H - 4, backThick, posX + 2, posY + 2, backZ, 'hdf', isActive, udBack, innerGroup);
+      // Plecy wpuszczane: płyta korpusu między bokami i wieńcami.
+      if (backP.type === 'wpuszczane') addBox(W - 2*th, H - 2*th, backThick, posX + th, posY + th, backZ, 'corpus', isActive, udBack, innerGroup);
+      else addBox(W - 4, H - 4, backThick, posX + 2, posY + 2, backZ, 'hdf', isActive, udBack, innerGroup);
 
       const hwAxis = isTopBottomFull ? 'y' : 'x';
       const jointXs = [posX + th/2, posX + W - th/2];

@@ -13,7 +13,10 @@ export const BACK_PANEL_DEFAULTS = Object.freeze({
   grooveDepth: 6,  // głębokość nutu
   clearance: 2,    // luz płyty pleców w nucie (na stronę)
   nutBuild: "all", // które płyty mają nut: all | sides | top_bottom
+  thickness: 18,   // grubość pleców wpuszczanych (płyta korpusu między bokami i wieńcami)
 });
+
+const BACK_TYPES = ["nakladane", "nut", "wpuszczane"];
 
 // Scalone ustawienia pleców: domyślne < project.backPanel < mod.backPanel, liczby jako liczby.
 export function resolveBackPanel(mod, project) {
@@ -23,18 +26,32 @@ export function resolveBackPanel(mod, project) {
     ...((mod && mod.backPanel) || {}),
   };
   return {
-    type: bp.type === "nut" ? "nut" : "nakladane",
+    type: BACK_TYPES.includes(bp.type) ? bp.type : "nakladane",
     offset: num(bp.offset, BACK_PANEL_DEFAULTS.offset),
     grooveDepth: num(bp.grooveDepth, BACK_PANEL_DEFAULTS.grooveDepth),
     clearance: num(bp.clearance, BACK_PANEL_DEFAULTS.clearance),
     nutBuild: ["all", "sides", "top_bottom"].includes(bp.nutBuild) ? bp.nutBuild : BACK_PANEL_DEFAULTS.nutBuild,
+    thickness: num(bp.thickness, BACK_PANEL_DEFAULTS.thickness) || BACK_PANEL_DEFAULTS.thickness,
   };
+}
+
+// Grubość płyty pleców: wpuszczane - własna (płyta korpusu), pozostałe - HDF z ustawień projektu.
+export function backThicknessOf(mod, project) {
+  const bp = resolveBackPanel(mod, project);
+  if (bp.type === "wpuszczane") return bp.thickness;
+  return num(project && project.materials && project.materials.backThickness, 3) || 3;
+}
+
+// Głębokość boku: plecy nakładane przykrywają tył boków (bok krótszy o plecy), w nucie i
+// wpuszczane mieszczą się między bokami (bok na całą głębokość szafki).
+export function sideDepthOf(mod, project, depth = num(mod.dimensions && mod.dimensions.depth)) {
+  return resolveBackPanel(mod, project).type === "nakladane" ? depth - backThicknessOf(mod, project) : depth;
 }
 
 // Głębokość wieńców korpusu (bez płyty pleców; przy plecach w nucie jeszcze bez cofnięcia
 // nutu) dla podanej głębokości szafki - od niej liczą się półki, przegrody i szuflady.
 export function corpusInnerDepth(mod, project, depth = num(mod.dimensions && mod.dimensions.depth)) {
-  const backThick = num(project && project.materials && project.materials.backThickness, 3) || 3;
+  const backThick = backThicknessOf(mod, project);
   const bp = resolveBackPanel(mod, project);
   return bp.type === "nut" ? depth - bp.offset - backThick : depth - backThick;
 }

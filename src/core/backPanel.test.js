@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { resolveBackPanel, corpusInnerDepth, BACK_PANEL_DEFAULTS } from "./backPanel.js";
+import { resolveBackPanel, corpusInnerDepth, sideDepthOf, BACK_PANEL_DEFAULTS } from "./backPanel.js";
+import { getCorpusParts } from "../engine/carcaseParts.js";
 import { getBackPanelParts } from "../engine/carcaseParts.js";
 import { freshProject, baseModule } from "../test/fixtures.js";
 
@@ -10,7 +11,7 @@ describe("resolveBackPanel", () => {
 
   it("uzupełnia brakujące pola i zamienia napisy na liczby", () => {
     const bp = resolveBackPanel({ backPanel: { type: "nut", offset: "20" } }, freshProject());
-    expect(bp).toEqual({ type: "nut", offset: 20, grooveDepth: 6, clearance: 2, nutBuild: "all" });
+    expect(bp).toEqual({ type: "nut", offset: 20, grooveDepth: 6, clearance: 2, nutBuild: "all", thickness: 18 });
   });
 
   it("szafka nadpisuje ustawienia projektu", () => {
@@ -34,5 +35,28 @@ describe("plecy w nucie bez głębokości nutu (np. szafka z importu szkicu AI)"
     const [plecy] = getBackPanelParts(mod, freshProject());
     // 600 - 2*18 + 2*6 - 2*2 = 572; 720 - 2*18 + 2*6 - 2*2 = 692
     expect(plecy).toMatchObject({ length: 692, width: 572 });
+  });
+});
+
+describe("plecy wpuszczane", () => {
+  const mod = () => baseModule({ dimensions: { width: 550, height: 694, depth: 500 }, backPanel: { type: "wpuszczane", thickness: 18 } });
+
+  it("bok na całą głębokość, wieńce krótsze o plecy", () => {
+    const project = freshProject();
+    expect(sideDepthOf(mod(), project)).toBe(500);
+    expect(corpusInnerDepth(mod(), project)).toBe(482);
+    const parts = getCorpusParts(mod(), project);
+    expect(parts.find((p) => p.name === "Bok (L/P)").width).toBe(500);
+    expect(parts.find((p) => p.name === "W550").width).toBe(482);
+  });
+
+  it("plecy to formatka korpusu między bokami i wieńcami", () => {
+    expect(getBackPanelParts(mod(), freshProject())).toEqual([
+      { name: "Plecy wpuszczane 694x550", length: 658, width: 514, qty: 1, category: "Korpus" },
+    ]);
+  });
+
+  it("nakładane bez zmian: bok krótszy o HDF", () => {
+    expect(sideDepthOf(baseModule({ dimensions: { width: 600, height: 720, depth: 513 } }), freshProject())).toBe(510);
   });
 });

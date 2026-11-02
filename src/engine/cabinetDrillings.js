@@ -16,7 +16,7 @@
 // - formatka pozioma (wieniec, półka, trawers poziomy): rzut z góry, x od lewej krawędzi
 //   formatki, z od przodu; otwory w czołach mają edge 'lewe' / 'prawe' / 'przednie' / 'tylne'.
 import { calculateModuleParts } from "./cabinet.js";
-import { resolveBackPanel, corpusInnerDepth } from "../core/backPanel.js";
+import { resolveBackPanel, corpusInnerDepth, backThicknessOf, sideDepthOf } from "../core/backPanel.js";
 import { recalculateLayout, getTraverseConfig } from "../core/layout.js";
 import { jointSetsFor } from "./carcaseParts.js";
 import { num, round1 } from "../utils/math.js";
@@ -47,13 +47,13 @@ export function getCabinetPanels(mod, project) {
   if (!mod || mod.type === "corner_cabinet" || mod.type === "slope_cabinet") return [];
   recalculateLayout(mod);
   const th = num(project.materials && project.materials.boardThickness, 18) || 18;
-  const backThick = num(project.materials && project.materials.backThickness, 3) || 3;
+  const backThick = backThicknessOf(mod, project);
   const W = num(mod.dimensions.width), H = num(mod.dimensions.height), D = num(mod.dimensions.depth);
   const cons = { joinType: "boki_przelotowe", topType: "pelny", traverseWidth: 100, ...(project.construction || {}), ...(mod.construction || {}) };
   const isFull = cons.joinType === "wience_przelotowe";       // wieńce na całą szerokość, boki między nimi
   const backP = resolveBackPanel(mod, project);
   const sideH = isFull ? H - 2 * th : H;
-  const sideD = backP.type === "nut" ? D : D - backThick;
+  const sideD = sideDepthOf(mod, project, D);
   const tbDepth = corpusInnerDepth(mod, project, D);
   const tbW = isFull ? W : W - 2 * th;
   const spec = cabinetHoleSpecs(th);
@@ -224,9 +224,12 @@ export function getCabinetPanels(mod, project) {
   }
 
   // --- Plecy (bez otworów; sposób montażu w uwadze) ---
-  const back = parts.find((p) => p.category === "Plecy");
-  if (back) panels.push({ id: "plecy", kind: "plecy", name: "Plecy (HDF)", qty: 1, length: back.length, width: back.width, thickness: backThick, holes: [],
-    note: backP.type === "nut" ? `w nucie (głęb. ${num(backP.grooveDepth, 6)} mm, ${num(backP.offset, 16)} mm od tyłu) - wsunąć przed zamknięciem korpusu` : "nakładane - przybić / przykręcić od tyłu po złożeniu korpusu" });
+  const inset = backP.type === "wpuszczane";
+  const back = parts.find((p) => (inset ? String(p.name).startsWith("Plecy wpuszczane") : p.category === "Plecy"));
+  const backNote = inset ? `wpuszczane między boki i wieńce, tył równo z tyłem boków (płyta ${backThick} mm) - przykręcić przez boki i wieńce`
+    : backP.type === "nut" ? `w nucie (głęb. ${num(backP.grooveDepth, 6)} mm, ${num(backP.offset, 16)} mm od tyłu) - wsunąć przed zamknięciem korpusu`
+    : "nakładane - przybić / przykręcić od tyłu po złożeniu korpusu";
+  if (back) panels.push({ id: "plecy", kind: "plecy", name: inset ? "Plecy wpuszczane" : "Plecy (HDF)", qty: 1, length: back.length, width: back.width, thickness: backThick, holes: [], note: backNote });
 
   return panels;
 }

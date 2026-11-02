@@ -3,7 +3,7 @@
 // Formatki i wiercenia korpusu prostokątnej szafki (boki, wieńce, trawersy, plecy) -
 // wydzielone z engine/cabinet.js. Używane też przez engine/cornerParts.js.
 import { getTraverseConfig } from "../core/layout.js";
-import { resolveBackPanel, corpusInnerDepth } from "../core/backPanel.js";
+import { resolveBackPanel, corpusInnerDepth, sideDepthOf } from "../core/backPanel.js";
 import { rcRearOverride, rcMidGrid } from "../core/rcSystem.js";
 
 // Zestawy łączników korpusu (wkręt + kołek) na połączeniu o długości `depth` (wieniec / półka
@@ -188,13 +188,10 @@ export function getCorpusParts(mod, config) {
   const parts = [];
   const { width, height, depth } = mod.dimensions;
   const board = config.materials.boardThickness;
-  const backThick = config.materials.backThickness;
-  const backP = resolveBackPanel(mod, config);
-
   const construction = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(config.construction || {}), ...(mod.construction || {}) };
   const isTopBottomFullWidth = construction.joinType === 'wience_przelotowe';
 
-  const sideDepth = backP.type === 'nut' ? depth : depth - backThick;
+  const sideDepth = sideDepthOf(mod, config, parseFloat(depth) || 0);
   const sideHeight = isTopBottomFullWidth ? height - (board * 2) : height;
   parts.push({ name: "Bok (L/P)", length: parseFloat(sideHeight.toFixed(1)), width: sideDepth, qty: 2, category: "Korpus" });
 
@@ -242,6 +239,10 @@ export function getBackPanelParts(mod, config) {
       ? width - (board * 2) + (backP.grooveDepth * 2) - totalClearance : width - 4;
     hdfHeight = (currentNutBuild === 'all' || currentNutBuild === 'top_bottom')
       ? height - (board * 2) + (backP.grooveDepth * 2) - totalClearance : height - 4;
+  } else if (backP.type === 'wpuszczane') {
+    // Płyta korpusu (domyślnie 18 mm) wpuszczona od tyłu między boki i wieńce - formatka
+    // kategorii Korpus (ten sam materiał i cena co korpus), nie HDF.
+    return [{ name: `Plecy wpuszczane ${height}x${width}`, length: parseFloat((height - board * 2).toFixed(1)), width: parseFloat((width - board * 2).toFixed(1)), qty: 1, category: "Korpus" }];
   } else {
     hdfWidth = width - 4; hdfHeight = height - 4;
   }
