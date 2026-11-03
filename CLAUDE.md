@@ -153,6 +153,9 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
     `disposeObject` ich nie zwalnia); nie modyfikuj geometrii siatki po `addBox`.
   - `cornerCabinet3d.js` — `renderCornerCabinet(mod, isActive, th, parentGroup)`.
   - `measureTool.js` — miarka; scenę/kamerę/raycaster dostaje raz przez `initMeasureTool()`.
+  - `dimensions3d.js` — przycisk „Wymiary”: rysuje odcinki z czystego `core/dimensions3d.js` (`computeDimensions`:
+    łańcuchy szerokości wzdłuż ścian — rząd stojący i wiszący osobno, wymiar całkowity, wysokości przy końcu
+    ściany — oraz wymiary i odstępy zaznaczonej szafki); przebudowa w `update3D()` (`rebuildDimensions`).
   - Przyciąganie i kolizje przy przeciąganiu szafek są w `core/moduleDrag.js` (czyste, z
     testami): najbliższy kandydat (w tym fronty równo), a przeciągana szafka zatrzymuje się
     na sąsiadach — sąsiedzi nigdy nie są odpychani. Shift w trakcie ruchu blokuje jedną oś.

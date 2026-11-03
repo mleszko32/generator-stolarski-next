@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { resolveBackPanel } from '../core/backPanel.js';
 import { bottomSetbackOf, sideFloorExt } from '../engine/carcaseParts.js';
+import { computeDimensions } from '../core/dimensions3d.js';
+import { buildDimensionGroup } from './dimensions3d.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { state, DEFAULT_ROOM, frontBodyGap } from '../core/state.js';
@@ -41,6 +43,20 @@ let isWorktopsVisible = true;   // blaty
 let showLabels = true;
 try { showLabels = localStorage.getItem('viewerShowLabels') !== '0'; } catch (e) {}
 let labelsGroup;
+// Wymiary (przycisk „Wymiary”): łańcuchy wzdłuż ścian + zaznaczona szafka (core/dimensions3d.js).
+let dimsGroup;
+let showDims = false;
+try { showDims = localStorage.getItem('viewerShowDims') === '1'; } catch (e) {}
+
+function rebuildDimensions() {
+  if (!dimsGroup) return;
+  while (dimsGroup.children.length > 0) {
+    const old = dimsGroup.children[0];
+    dimsGroup.remove(old);
+    disposeObject(old);
+  }
+  if (showDims) buildDimensionGroup(computeDimensions(state.project, state.activeModuleId), dimsGroup);
+}
 
 // Odczyt stanu przycisku "Ukryj/Pokaż fronty zewn." dla ui/interiorEditor.js -
 // ten sam przełącznik ma teraz ukrywać fronty także we Wnętrzu 2D, nie tylko
@@ -316,6 +332,10 @@ export function init3DViewer() {
   labelsGroup = new THREE.Group();
   labelsGroup.visible = showLabels;
   scene.add(labelsGroup);
+
+  // Wymiary - tak samo osobna grupa wprost w scenie (przełączanie bez przebudowy szafek).
+  dimsGroup = new THREE.Group();
+  scene.add(dimsGroup);
 
   reframeCameraToRoom();
 
@@ -761,6 +781,18 @@ export function init3DViewer() {
   toggleMeasureBtn.onclick = () => toggleMeasureMode();
   setMeasureButton(toggleMeasureBtn);
 
+  const toggleDimsBtn = document.createElement('button');
+  toggleDimsBtn.innerHTML = '<i class="ti ti-ruler-2" aria-hidden="true"></i> Wymiary';
+  toggleDimsBtn.title = 'Łańcuchy wymiarów wzdłuż ścian i wymiary zaznaczonej szafki';
+  toggleDimsBtn.className = 'btn view-btn' + (showDims ? ' active' : '');
+  toggleDimsBtn.onclick = () => {
+      showDims = !showDims;
+      try { localStorage.setItem('viewerShowDims', showDims ? '1' : '0'); } catch (e) {}
+      toggleDimsBtn.classList.toggle('active', showDims);
+      rebuildDimensions();
+      requestRender();
+  };
+
   const labelsBtnHtml = (on) => `<i class="ti ti-tag" aria-hidden="true"></i> ${on ? 'Ukryj nazwy' : 'Pokaż nazwy'}`;
   const toggleLabelsBtn = document.createElement('button');
   toggleLabelsBtn.innerHTML = labelsBtnHtml(showLabels);
@@ -783,6 +815,7 @@ export function init3DViewer() {
   uiOverlay.appendChild(toggleLabelsBtn);
   uiOverlay.appendChild(toggleInteriorBtn);
   uiOverlay.appendChild(toggleMeasureBtn);
+  uiOverlay.appendChild(toggleDimsBtn);
   // NAPRAWA: overlay wpięty w .center-panel (nie w #editor-3d-container), bo
   // przełącznik "Wnętrze 2D" chowa cały #editor-3d-container display:none —
   // gdyby overlay był jego dzieckiem, przycisk powrotu do 3D zniknąłby razem z nim.
@@ -1552,6 +1585,8 @@ export function update3D() {
           labelsGroup.add(label);
       });
   }
+
+  rebuildDimensions();
 
   // Boki dokładane (core/state.js: addSidePanel) - samodzielne, płaskie
   // obiekty projektu (NIE dzieci żadnego modGroup, jak blenda), bo mają

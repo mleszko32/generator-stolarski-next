@@ -89,6 +89,7 @@ export const HELP_SECTIONS = [
         <li><b>Ukryj nazwy</b> - etykiety z nazwami nad szafkami.</li>
         <li><b>Wnętrze 2D</b> - edytor wnętrza zaznaczonej szafki (widok od frontu).</li>
         <li><b>Miarka</b> - kliknij dwa punkty, żeby zmierzyć odległość; przyciąga do narożników płyt.</li>
+        <li><b>Wymiary</b> - łańcuchy wymiarów wzdłuż ścian jak na rysunku technicznym (szafki stojące przy podłodze, osobno wiszące i nadstawki, z wymiarem całkowitym), wysokości przy końcu ściany (cokół, korpusy, sufit) oraz wymiary zaznaczonej szafki (niebieskie) i jej odległości do sąsiadów lub ściany (pomarańczowe).</li>
       </ul>
       <h4>Grupy</h4>
       <p>Kilka zaznaczonych szafek (Shift + klik) można połączyć przyciskiem <b>Połącz zaznaczone w grupę</b>
