@@ -50,9 +50,9 @@ describe("plecy wpuszczane", () => {
     expect(parts.find((p) => p.name === "W550").width).toBe(482);
   });
 
-  it("plecy to formatka korpusu między bokami i wieńcami", () => {
+  it("plecy to formatka korpusu między bokami, za wieńcami, na całą wysokość", () => {
     expect(getBackPanelParts(mod(), freshProject())).toEqual([
-      { name: "Plecy wpuszczane 694x550", length: 658, width: 514, qty: 1, category: "Korpus" },
+      { name: "Plecy wpuszczane 694x550", length: 694, width: 514, qty: 1, category: "Korpus" },
     ]);
   });
 
@@ -62,7 +62,7 @@ describe("plecy wpuszczane", () => {
     expect(sideDepthOf(m, project)).toBe(403);
     expect(corpusInnerDepth(m, project)).toBe(365);
     expect(getCorpusParts(m, project).find((p) => p.name === "W420").width).toBe(365);
-    expect(getBackPanelParts(m, project)[0]).toMatchObject({ length: 2014, width: 384 });
+    expect(getBackPanelParts(m, project)[0]).toMatchObject({ length: 2050, width: 384 });
   });
 
   it("nakładane bez zmian: bok krótszy o HDF", () => {

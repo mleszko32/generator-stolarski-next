@@ -252,9 +252,10 @@ export function getBackPanelParts(mod, config) {
     hdfHeight = (currentNutBuild === 'all' || currentNutBuild === 'top_bottom')
       ? height - (board * 2) + (backP.grooveDepth * 2) - totalClearance : height - 4;
   } else if (backP.type === 'wpuszczane') {
-    // Płyta korpusu (domyślnie 18 mm) wpuszczona od tyłu między boki i wieńce - formatka
-    // kategorii Korpus (ten sam materiał i cena co korpus), nie HDF.
-    return [{ name: `Plecy wpuszczane ${height}x${width}`, length: parseFloat((height - board * 2).toFixed(1)), width: parseFloat((width - board * 2).toFixed(1)), qty: 1, category: "Korpus" }];
+    // Płyta korpusu (domyślnie 18 mm) wpuszczona od tyłu między boki, za wieńcami (wieńce są
+    // płytsze o plecy - corpusInnerDepth), więc na całą wysokość korpusu. Wcześniej H - 2 płyty
+    // zostawiało szczeliny za wieńcami. Formatka kategorii Korpus (materiał i cena korpusu), nie HDF.
+    return [{ name: `Plecy wpuszczane ${height}x${width}`, length: parseFloat(Number(height).toFixed(1)), width: parseFloat((width - board * 2).toFixed(1)), qty: 1, category: "Korpus" }];
   } else {
     hdfWidth = width - 4; hdfHeight = height - 4;
   }

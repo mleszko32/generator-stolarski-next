@@ -230,7 +230,7 @@ export function getCabinetPanels(mod, project) {
   // --- Plecy (bez otworów; sposób montażu w uwadze) ---
   const inset = backP.type === "wpuszczane";
   const back = parts.find((p) => (inset ? String(p.name).startsWith("Plecy wpuszczane") : p.category === "Plecy"));
-  const backNote = inset ? `wpuszczane między boki i wieńce, ${backP.insetOffset > 0 ? `cofnięte o ${backP.insetOffset} mm od tyłu boków` : "tył równo z tyłem boków"} (płyta ${backThick} mm) - przykręcić przez boki i wieńce`
+  const backNote = inset ? `wpuszczane między boki, za wieńcami, na całą wysokość, ${backP.insetOffset > 0 ? `cofnięte o ${backP.insetOffset} mm od tyłu boków` : "tył równo z tyłem boków"} (płyta ${backThick} mm) - przykręcić przez boki i wieńce`
     : backP.type === "nut" ? `w nucie (głęb. ${num(backP.grooveDepth, 6)} mm, ${num(backP.offset, 16)} mm od tyłu) - wsunąć przed zamknięciem korpusu`
     : "nakładane - przybić / przykręcić od tyłu po złożeniu korpusu";
   if (back) panels.push({ id: "plecy", kind: "plecy", name: inset ? "Plecy wpuszczane" : "Plecy (HDF)", qty: 1, length: back.length, width: back.width, thickness: backThick, holes: [], note: backNote });
