@@ -16,6 +16,7 @@ import { num } from "../utils/math.js";
 import { drawerSpec } from "./drawerSpec.js";
 import { getRcSettings, RC_MAX_DEPTH } from "./rcSystem.js";
 import { sideDepthOf } from "./backPanel.js";
+import { shelfStiffener } from "./shelfStiffener.js";
 import { checkBlindCorner, innerDims } from "./blindCorner.js";
 import { checkCornerFitting, getCornerFitting } from "./cornerFittings.js";
 import { cornerFrontIssues, footprintBoxes, passageIssues } from "./cornerChecks.js";
@@ -151,7 +152,7 @@ export function validateProject(project = state.project) {
       elements.forEach((el) => {
         if (el.typ === "poziom") {
           const span = num(el.w);
-          if (span > MAX_SHELF_SPAN) {
+          if (span > MAX_SHELF_SPAN && !shelfStiffener(mod, el, state.project)) {
             add("warn", mod, `Półka szeroka na ${Math.round(span)} mm - powyżej ${MAX_SHELF_SPAN} mm będzie się uginać, rozważ przegrodę pionową.`);
           }
           if (inner && (num(el.y) < inner.minY - OVERLAP_TOL || num(el.y) + num(el.h) > inner.maxY + OVERLAP_TOL)) {

@@ -12,6 +12,7 @@ import { getCornerCorpusParts } from "./cornerParts.js";
 import { getSlopeCabinetParts, getSlopeFrontParts } from "../core/slopeCabinet.js";
 import { getBlindPanel, getBlindStile, blindGeometry, getBlindCorner } from "../core/blindCorner.js";
 import { splitPlinthRun, maxPlinthLength } from "./plinthSplit.js";
+import { shelfStiffener } from "../core/shelfStiffener.js";
 
 export function calculateParts() {
   // Fronty muszą mieć aktualne el.x/y/w/h zanim policzymy z nich formatki.
@@ -324,6 +325,9 @@ function getInteriorParts(mod, config) {
       const realW = fmtMm(el.w || 0);
       parts.push({ name: `P${width} (${realW})`, length: parseFloat((el.w || 0).toFixed(1)), width: innerPartDepthForEl(el) - 5, qty: 1, category: "Korpus" });
     }
+    // Listwa usztywniająca pod długą półką (stałą i ruchomą) - core/shelfStiffener.js.
+    const stiff = shelfStiffener(mod, el, config);
+    if (stiff) parts.push({ name: `Listwa usztywniająca półki`, length: stiff.length, width: stiff.height, qty: 1, category: "Korpus" });
   });
 
   return parts;

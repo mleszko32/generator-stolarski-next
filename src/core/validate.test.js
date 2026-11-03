@@ -55,10 +55,12 @@ describe("validateProject", () => {
     expect(has(res, "warn", "Drzwi szerokie")).toBe(true);
   });
 
-  it("ostrzega o bardzo szerokiej półce", () => {
+  it("ostrzega o bardzo szerokiej półce bez listwy usztywniającej", () => {
     const mod = state.project.modules[0];
     mod.dimensions.width = 1000;
     mod.elements = [{ id: "p1", typ: "poziom", x: 18, y: 300, w: 964, h: 18, isStructural: false }];
+    expect(has(validateProject(), "warn", "Półka szeroka")).toBe(false);
+    mod.construction = { ...(mod.construction || {}), shelfStiffener: { active: false } };
     expect(has(validateProject(), "warn", "Półka szeroka")).toBe(true);
   });
 

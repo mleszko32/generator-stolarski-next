@@ -20,6 +20,7 @@ import { drawerCardsHtml, bindDrawerCards } from "./drawerSettings.js";
 import { propHeaderHtml, sectionHtml, bindSections, setSectionDots, positionRotationHtml } from "./propertiesShell.js";
 import { blindCornerSectionHtml, bindBlindCornerSection } from "./blindCornerProperties.js";
 import { findRowAround } from "../core/wallFill.js";
+import { getStiffenerSettings } from "../core/shelfStiffener.js";
 import { findKitchenRunAround } from "../core/kitchenRun.js";
 import { openWallFillModal } from "./wallFillModal.js";
 
@@ -296,6 +297,11 @@ export function initPropertiesPanel() {
       <div class="prop-box" id="traverse-options" style="display: ${cons.topType !== 'pelny' ? 'block' : 'none'};"><div class="property-group mb-0"><label class="fs-xs">Szerokość trawersu (mm):</label><input type="number" id="input-traverse-width" value="${cons.traverseWidth}" /></div></div>
       <div class="property-group"><label>Wieniec dolny cofnięty o (mm):</label><input type="number" id="input-bottom-setback" value="${cons.bottomSetback ?? 0}" min="0" step="1" title="Wieniec dolny płytszy i cofnięty od przodu - np. szufladki pod blatem biurka: front zachodzi niżej i daje chwyt od spodu. 0 = zwykły wieniec." /></div>
       <div class="property-group"><label>Maks. rozstaw łączników kołek + wkręt (mm):</label><input type="number" id="input-joint-spacing" value="${cons.jointSpacing ?? 250}" min="64" step="1" title="Wieńce, półki stałe i przegrody: skrajne zestawy 37 mm od przodu i tyłu, środkowe dokładane, gdy odstęp przekracza ten rozstaw (w rastrze 32 mm)" /></div>
+      ${(() => {
+        const st = getStiffenerSettings(activeModule, state.project);
+        return `<div class="property-group"><label><input type="checkbox" id="input-stiffener-active" ${st.active ? 'checked' : ''} /> Listwa usztywniająca pod długimi półkami</label></div>
+      <div class="prop-box" title="Listwa z płyty korpusu na sztorc pod półką, przy tylnej krawędzi (profil L) - dla półek stałych i ruchomych dłuższych niż próg"><div class="property-group"><label class="fs-xs">Dla półek dłuższych niż (mm):</label><input type="number" id="input-stiffener-min" value="${st.minLength}" min="1" step="1" /></div><div class="property-group mb-0"><label class="fs-xs">Wysokość listwy (mm):</label><input type="number" id="input-stiffener-height" value="${st.height}" min="1" step="1" /></div></div>`;
+      })()}
 
       ${cons.topType !== 'pelny' ? (() => {
           const trav = getTraverseConfig(cons);
@@ -463,6 +469,21 @@ function setupEventListeners() {
       updateAll();
     });
   }
+
+  // Listwa usztywniająca półki (core/shelfStiffener.js) - ustawienia szafki w mod.construction.shelfStiffener.
+  const setStiffener = (key, value) => {
+    getSelectedMods().forEach(mod => {
+      mod.construction = mod.construction || {};
+      mod.construction.shelfStiffener = { ...(mod.construction.shelfStiffener || {}), [key]: value };
+    });
+    updateAll();
+  };
+  const stiffActive = document.getElementById('input-stiffener-active');
+  if (stiffActive) stiffActive.addEventListener('change', (e) => setStiffener('active', e.target.checked));
+  [['input-stiffener-min', 'minLength'], ['input-stiffener-height', 'height']].forEach(([id, key]) => {
+    const input = document.getElementById(id);
+    if (input) input.addEventListener('change', (e) => { const v = Number(e.target.value); if (v > 0) setStiffener(key, v); });
+  });
 
   const plinthActiveInput = document.getElementById('input-plinth-active');
   if (plinthActiveInput) {

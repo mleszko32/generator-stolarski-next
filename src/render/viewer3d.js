@@ -29,6 +29,7 @@ import { renderSlopeCabinet } from './slopeCabinet3d.js';
 import { getBlindPanel, getBlindStile, blindGeometry, PARALLEL_PLATE_INSET } from '../core/blindCorner.js';
 import { initMeasureTool, isMeasureActive, setMeasureButton, toggleMeasureMode, updateMeasureHover, handleMeasureClick, measureHoverMouse } from './measureTool.js';
 import { showAlert } from "../utils/modal.js";
+import { shelfStiffener } from '../core/shelfStiffener.js';
 
 let alignMode = { active: false, sourceMod: null, sourceEl: null, banner: null };
 let isFrontsVisible = true;
@@ -1316,6 +1317,9 @@ export function update3D() {
 
               if (el.typ === 'poziom') {
                   addBox(el.w, el.h, shelfDepth, posX + el.x, posY + el.y, innerZ, 'shelf', isActive, udElement, innerGroup);
+                  // Listwa usztywniająca od spodu, przy tylnej krawędzi (core/shelfStiffener.js).
+                  const stiff = shelfStiffener(mod, el, state.project);
+                  if (stiff) addBox(el.w, stiff.height, stiff.thickness, posX + el.x, posY + el.y - stiff.height, innerZ, 'shelf', isActive, udElement, innerGroup);
 
                   if (isXrayMode) {
                       const isStruct = el.isStructural;
