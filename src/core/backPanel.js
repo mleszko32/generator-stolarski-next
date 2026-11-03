@@ -14,6 +14,7 @@ export const BACK_PANEL_DEFAULTS = Object.freeze({
   clearance: 2,    // luz płyty pleców w nucie (na stronę)
   nutBuild: "all", // które płyty mają nut: all | sides | top_bottom
   thickness: 18,   // grubość pleców wpuszczanych (płyta korpusu między bokami i wieńcami)
+  insetOffset: 0,  // cofnięcie pleców wpuszczanych od tyłu boków (np. szczelina do ściany)
 });
 
 const BACK_TYPES = ["nakladane", "nut", "wpuszczane"];
@@ -32,6 +33,7 @@ export function resolveBackPanel(mod, project) {
     clearance: num(bp.clearance, BACK_PANEL_DEFAULTS.clearance),
     nutBuild: ["all", "sides", "top_bottom"].includes(bp.nutBuild) ? bp.nutBuild : BACK_PANEL_DEFAULTS.nutBuild,
     thickness: num(bp.thickness, BACK_PANEL_DEFAULTS.thickness) || BACK_PANEL_DEFAULTS.thickness,
+    insetOffset: Math.max(0, num(bp.insetOffset, 0)),
   };
 }
 
@@ -53,5 +55,7 @@ export function sideDepthOf(mod, project, depth = num(mod.dimensions && mod.dime
 export function corpusInnerDepth(mod, project, depth = num(mod.dimensions && mod.dimensions.depth)) {
   const backThick = backThicknessOf(mod, project);
   const bp = resolveBackPanel(mod, project);
-  return bp.type === "nut" ? depth - bp.offset - backThick : depth - backThick;
+  if (bp.type === "nut") return depth - bp.offset - backThick;
+  if (bp.type === "wpuszczane") return depth - bp.insetOffset - backThick;
+  return depth - backThick;
 }

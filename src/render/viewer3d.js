@@ -1195,8 +1195,8 @@ export function update3D() {
       let sideD, tbD, backZ;
       if (backP.type === 'wpuszczane') {
           sideD = D;
-          tbD = D - backThick;
-          backZ = posZ;
+          tbD = D - backP.insetOffset - backThick;
+          backZ = posZ + backP.insetOffset;
       } else if (backP.type === 'nut') {
           sideD = D;
           tbD = D - backP.offset - backThick; 
@@ -1270,7 +1270,7 @@ export function update3D() {
       const modFront = { ...(state.project.front || {}), ...(mod.front || {}) };
       const isInsetFront = modFront.type === 'wpuszczane';
 
-      const innerZ = backP.type === 'nut' ? backZ + backThick : posZ + backThick;
+      const innerZ = backP.type === 'nakladane' ? posZ + backThick : backZ + backThick;
       // Front wpuszczany wjeżdża w głąb korpusu o swoją grubość (th), więc półki/przegrody
       // muszą się przed nim zatrzymać — inaczej kolidowałyby z nim w tym samym miejscu, gdzie
       // engine/cabinet.js (getInteriorParts) już skraca ich formatki o tę samą wartość.

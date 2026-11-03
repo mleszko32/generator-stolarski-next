@@ -329,6 +329,7 @@ export function initPropertiesPanel() {
       <div class="property-group"><label>Plecy (Tylko dla szafki):</label><select id="input-back-type"><option value="nut" ${backP.type === 'nut' ? 'selected' : ''}>W nucie</option><option value="nakladane" ${backP.type === 'nakladane' ? 'selected' : ''}>Nakładane</option><option value="wpuszczane" ${backP.type === 'wpuszczane' ? 'selected' : ''}>Wpuszczane (płyta między bokami)</option></select></div>
       <div class="prop-box" id="inset-back-options" style="display: ${backP.type === 'wpuszczane' ? 'block' : 'none'};">
         <div class="property-group mb-0"><label class="fs-xs">Grubość pleców (mm):</label><input type="number" id="input-back-thickness" value="${backP.thickness !== undefined ? backP.thickness : 18}" /></div>
+        <div class="property-group mb-0"><label class="fs-xs">Cofnięcie od tyłu boków (mm):</label><input type="number" id="input-back-inset-offset" value="${backP.insetOffset || 0}" /></div>
       </div>
       <div class="prop-box" id="nut-options" style="display: ${backP.type === 'nut' ? 'block' : 'none'};">
         <div class="property-group mb-8"><label style="font-size: 11px; font-weight: bold;">Konstrukcja nutu:</label><select id="input-nut-build"><option value="all" ${(!backP.nutBuild || backP.nutBuild === 'all') ? 'selected' : ''}>Boki i wieńce nutowane</option><option value="sides" ${backP.nutBuild === 'sides' ? 'selected' : ''}>Boki nutowane, wieńce skracane</option><option value="top_bottom" ${backP.nutBuild === 'top_bottom' ? 'selected' : ''}>Wieńce nutowane, boki skracane</option></select></div>
@@ -429,7 +430,7 @@ function setupEventListeners() {
 
   const numberInputs = [
     'pos-x', 'pos-y', 'pos-z', 'traverse-width', 'joint-spacing', 'bottom-setback', 'board-thick', 'width', 'height', 'depth',
-    'front-gap', 'front-body-gap', 'front-left', 'front-right', 'front-top', 'front-bottom', 'back-offset', 'back-groove', 'back-thickness',
+    'front-gap', 'front-body-gap', 'front-left', 'front-right', 'front-top', 'front-bottom', 'back-offset', 'back-groove', 'back-thickness', 'back-inset-offset',
     'legs-height', 'plinth-offset', 'hinge-top', 'hinge-bottom', 'hinge-margin', 'hinge-count',
     'filler-left-w', 'filler-left-h', 'filler-left-d', 'filler-left-y',
     'filler-right-w', 'filler-right-h', 'filler-right-d', 'filler-right-y',
@@ -749,10 +750,11 @@ function setupEventListeners() {
             if (id === 'front-right') mod.front.clearance.right = val;
             if (id === 'front-top') mod.front.clearance.top = val;
             if (id === 'front-bottom') mod.front.clearance.bottom = val;
-            if ((id === "back-offset" || id === "back-groove" || id === "back-thickness") && !mod.backPanel) mod.backPanel = {};
+            if ((id === "back-offset" || id === "back-groove" || id === "back-thickness" || id === "back-inset-offset") && !mod.backPanel) mod.backPanel = {};
             if (id === 'back-offset') mod.backPanel.offset = val;
             if (id === 'back-groove') mod.backPanel.grooveDepth = val;
             if (id === 'back-thickness' && val > 0) mod.backPanel.thickness = val;
+            if (id === 'back-inset-offset') mod.backPanel.insetOffset = Math.max(0, val || 0);
         });
         debouncedUpdateAll();
       });

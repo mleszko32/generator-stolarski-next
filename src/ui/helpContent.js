@@ -108,7 +108,7 @@ export const HELP_SECTIONS = [
         <li><b>Front</b> - nakładane / wpuszczane, luzy, szczelina, materiał frontu.</li>
         <li><b>Szuflady</b> - system szuflad (Blum, GTV, MOVENTO) i ustawienia ręczne
         (wariant wysokości, długość prowadnicy NL, wymiary frontu, szuflada wewnętrzna).</li>
-        <li><b>Konstrukcja</b> - łączenie boków i wieńców, wieniec górny pełny albo trawersy, wieniec dolny cofnięty od przodu (np. szufladki pod blatem biurka z chwytem od spodu), plecy (nakładane / w nucie / wpuszczane - płyta np. 18 mm między bokami i wieńcami, np. do części otwartych).</li>
+        <li><b>Konstrukcja</b> - łączenie boków i wieńców, wieniec górny pełny albo trawersy, wieniec dolny cofnięty od przodu (np. szufladki pod blatem biurka z chwytem od spodu), plecy (nakładane / w nucie / wpuszczane - płyta np. 18 mm między bokami i wieńcami, np. do części otwartych; „Cofnięcie od tyłu boków” zostawia szczelinę między plecami a ścianą, wieńce i półki są wtedy płytsze).</li>
         <li><b>Nóżki</b> - wysokość nóżek i cokół.</li>
         <li><b>Zawiasy</b> - odsunięcia, liczba zawiasów i ręczna pozycja każdego z nich.</li>
         <li><b>Narożnik</b> - szafka ślepa i okucia narożne.</li>

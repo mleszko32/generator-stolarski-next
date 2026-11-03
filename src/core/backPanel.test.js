@@ -11,7 +11,7 @@ describe("resolveBackPanel", () => {
 
   it("uzupełnia brakujące pola i zamienia napisy na liczby", () => {
     const bp = resolveBackPanel({ backPanel: { type: "nut", offset: "20" } }, freshProject());
-    expect(bp).toEqual({ type: "nut", offset: 20, grooveDepth: 6, clearance: 2, nutBuild: "all", thickness: 18 });
+    expect(bp).toEqual({ type: "nut", offset: 20, grooveDepth: 6, clearance: 2, nutBuild: "all", thickness: 18, insetOffset: 0 });
   });
 
   it("szafka nadpisuje ustawienia projektu", () => {
@@ -54,6 +54,15 @@ describe("plecy wpuszczane", () => {
     expect(getBackPanelParts(mod(), freshProject())).toEqual([
       { name: "Plecy wpuszczane 694x550", length: 658, width: 514, qty: 1, category: "Korpus" },
     ]);
+  });
+
+  it("cofnięte od tyłu boków (szczelina do ściany): wieńce krótsze o cofnięcie i plecy, bok bez zmian", () => {
+    const m = baseModule({ dimensions: { width: 420, height: 2050, depth: 403 }, backPanel: { type: "wpuszczane", thickness: 18, insetOffset: 20 } });
+    const project = freshProject();
+    expect(sideDepthOf(m, project)).toBe(403);
+    expect(corpusInnerDepth(m, project)).toBe(365);
+    expect(getCorpusParts(m, project).find((p) => p.name === "W420").width).toBe(365);
+    expect(getBackPanelParts(m, project)[0]).toMatchObject({ length: 2014, width: 384 });
   });
 
   it("nakładane bez zmian: bok krótszy o HDF", () => {
