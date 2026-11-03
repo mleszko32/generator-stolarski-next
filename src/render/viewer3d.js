@@ -1,7 +1,7 @@
 // src/render/viewer3d.js
 import * as THREE from 'three';
 import { resolveBackPanel } from '../core/backPanel.js';
-import { bottomSetbackOf } from '../engine/carcaseParts.js';
+import { bottomSetbackOf, sideFloorExt } from '../engine/carcaseParts.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { state, DEFAULT_ROOM, frontBodyGap } from '../core/state.js';
@@ -1217,8 +1217,9 @@ export function update3D() {
           addBox(th, H - 2*th, sideD, posX, posY + th, sideStartZ, 'corpus', isActive, udCorp, innerGroup); 
           addBox(th, H - 2*th, sideD, posX + W - th, posY + th, sideStartZ, 'corpus', isActive, udCorp, innerGroup); 
       } else {
-          addBox(th, H, sideD, posX, posY, sideStartZ, 'corpus', isActive, udCorp, innerGroup); 
-          addBox(th, H, sideD, posX + W - th, posY, sideStartZ, 'corpus', isActive, udCorp, innerGroup); 
+          const ext = sideFloorExt(mod, state.project);   // bok do podłogi przy szafce na nóżkach
+          addBox(th, H + ext.left, sideD, posX, posY - ext.left, sideStartZ, 'corpus', isActive, udCorp, innerGroup); 
+          addBox(th, H + ext.right, sideD, posX + W - th, posY - ext.right, sideStartZ, 'corpus', isActive, udCorp, innerGroup); 
           addBox(W - 2*th, th, tbD - bottomSB, posX + th, posY, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
           
           if (cons.topType === 'pelny') {

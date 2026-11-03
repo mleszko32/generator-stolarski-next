@@ -109,7 +109,7 @@ export const HELP_SECTIONS = [
         <li><b>Szuflady</b> - system szuflad (Blum, GTV, MOVENTO) i ustawienia ręczne
         (wariant wysokości, długość prowadnicy NL, wymiary frontu, szuflada wewnętrzna).</li>
         <li><b>Konstrukcja</b> - łączenie boków i wieńców, wieniec górny pełny albo trawersy, wieniec dolny cofnięty od przodu (np. szufladki pod blatem biurka z chwytem od spodu), plecy (nakładane / w nucie / wpuszczane - płyta np. 18 mm między bokami, za wieńcami, na całą wysokość, np. do części otwartych; „Cofnięcie od tyłu boków” zostawia szczelinę między plecami a ścianą, wieńce i półki są wtedy płytsze).</li>
-        <li><b>Nóżki</b> - wysokość nóżek i cokół.</li>
+        <li><b>Nóżki</b> - wysokość nóżek i cokół; „Boki do podłogi” (lewy / prawy / oba) przedłuża bok o wysokość nóżek do samej podłogi (np. widoczny bok regału), cokół kończy się wtedy na boku.</li>
         <li><b>Zawiasy</b> - odsunięcia, liczba zawiasów i ręczna pozycja każdego z nich.</li>
         <li><b>Narożnik</b> - szafka ślepa i okucia narożne.</li>
       </ul>

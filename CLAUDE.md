@@ -97,7 +97,8 @@ i tyłu, środkowe gdy odstęp > `construction.jointSpacing` (domyślnie 250 mm)
 rysunek boku 2D, instrukcje montażu i lista okuć, która liczy faktyczne zestawy zamiast ryczałtu;
 `construction.bottomSetback` = wieniec dolny cofnięty od przodu, np. szufladki biurka z chwytem od spodu —
 `bottomSetbackOf`/`bottomJointSets`, uwzględniane też w 3D i instrukcjach; plecy wpuszczane mogą być cofnięte od tyłu
-boków o `backPanel.insetOffset` — szczelina do ściany, `corpusInnerDepth` odejmuje ją od głębokości wieńców),
+boków o `backPanel.insetOffset` — szczelina do ściany, `corpusInnerDepth` odejmuje ją od głębokości wieńców; `legs.sidesToFloor`
+(`sideFloorExt`) — bok szafki na nóżkach do podłogi: dłuższy o nóżki w formatkach, wierceniach i 3D, cokół krótszy o płytę),
 `cornerParts.js` (wszystko o szafce narożnej, też dla rysunków 2D i 3D), `hardware.js`
 (`calculateProjectHardware()` — okucia: nóżki, złącza, komplety szuflad, zawiasy, okleina) i
 `cost.js` (`calculateProjectCost()` — kosztorys). Zależności idą w jedną stronę: `hardware`/`cost`

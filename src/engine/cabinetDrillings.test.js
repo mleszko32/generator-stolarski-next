@@ -11,6 +11,16 @@ const setup = (mod, extra = {}) => {
 const byId = (panels, id) => panels.find((p) => p.id === id);
 
 describe("instrukcja szafki - formatki korpusu z otworami", () => {
+  it("bok do podłogi: dłuższy o nóżki, otwory wieńca dolnego wyżej o nóżki", () => {
+    const mod = baseModule({ legs: { active: true, height: 100, plinth: true, plinthOffset: 0, sidesToFloor: "left" } });
+    const project = setup(mod);
+    const panels = getCabinetPanels(mod, project);
+    expect(byId(panels, "bok-lewy").width).toBe(820);
+    expect(byId(panels, "bok-prawy").width).toBe(720);
+    byId(panels, "bok-lewy").holes.filter((h) => h.to === "wieniec dolny").forEach((h) => expect(h.y).toBe(109));
+    byId(panels, "bok-prawy").holes.filter((h) => h.to === "wieniec dolny").forEach((h) => expect(h.y).toBe(9));
+  });
+
   it("boki: łączniki wieńców (wkręt 37 / kołek 69 od przodu i tyłu, w osi wieńca)", () => {
     const mod = baseModule();
     const project = setup(mod);

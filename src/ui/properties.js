@@ -347,7 +347,8 @@ export function initPropertiesPanel() {
       <div class="prop-box" id="legs-options" style="display: ${activeModule.legs.active ? 'block' : 'none'};">
         <div class="property-group mb-8"><label style="font-size: 11px;">Wysokość nóżek (mm):</label><input type="number" id="input-legs-height" value="${activeModule.legs.height}" /></div>
         <div class="property-group" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;"><input type="checkbox" id="input-plinth-active" ${activeModule.legs.plinth ? 'checked' : ''} style="width: 14px; height: 14px;" /><label style="font-size: 12px;">Generuj cokół przedni</label></div>
-        <div class="property-group mb-0"><label style="font-size: 11px;">Cofnięcie cokołu (mm):</label><input type="number" id="input-plinth-offset" value="${activeModule.legs.plinthOffset}" /></div>
+        <div class="property-group mb-8"><label style="font-size: 11px;">Cofnięcie cokołu (mm):</label><input type="number" id="input-plinth-offset" value="${activeModule.legs.plinthOffset}" /></div>
+        <div class="property-group mb-0"><label style="font-size: 11px;">Boki do podłogi:</label><select id="input-sides-to-floor">${[['none', 'Nie (boki na nóżkach)'], ['left', 'Lewy bok'], ['right', 'Prawy bok'], ['both', 'Oba boki']].map(([v, l]) => `<option value="${v}" ${(activeModule.legs.sidesToFloor || 'none') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
       </div>
 
       ${activeModule.legs.active ? `
@@ -467,6 +468,14 @@ function setupEventListeners() {
   if (plinthActiveInput) {
     plinthActiveInput.addEventListener('change', (e) => {
       getSelectedMods().forEach(mod => { mod.legs.plinth = e.target.checked; });
+      updateAll();
+    });
+  }
+
+  const sidesToFloorInput = document.getElementById('input-sides-to-floor');
+  if (sidesToFloorInput) {
+    sidesToFloorInput.addEventListener('change', (e) => {
+      getSelectedMods().forEach(mod => { mod.legs.sidesToFloor = e.target.value; });
       updateAll();
     });
   }

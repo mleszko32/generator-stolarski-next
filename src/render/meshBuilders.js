@@ -6,6 +6,7 @@
 // "Przezroczysty / Realistyczny" w viewer3d.js), od którego zależą materiały.
 import * as THREE from 'three';
 import { state } from '../core/state.js';
+import { sideFloorExt } from '../engine/carcaseParts.js';
 
 export let isXrayMode = true;
 export function setXrayMode(value) {
@@ -292,7 +293,11 @@ export function addLegsAndPlinth(mod, W, D, th, isActive, group) {
   addBox(30, legHeightFor(2), 30, 50, rootY, clampedFrontLegZ, 'corpus', false, udPlinth, group);
   addBox(30, legHeightFor(3), 30, W - 80, rootY, clampedFrontLegZ, 'corpus', false, udPlinth, group);
 
+  // Bok do podłogi (sideFloorExt): cokół kończy się na nim, nie wchodzi pod bok.
+  const ext = sideFloorExt(mod, state.project);
+  const plinthX0 = ext.left ? th : 0;
+  const plinthW = W - plinthX0 - (ext.right ? th : 0);
   if (mod.legs.plinth) {
-    addBox(W, legH, plinthThick, 0, rootY, frontFaceZ - offset - plinthThick, 'plinth', isActive, udPlinth, group);
+    addBox(plinthW, legH, plinthThick, plinthX0, rootY, frontFaceZ - offset - plinthThick, 'plinth', isActive, udPlinth, group);
   }
 }

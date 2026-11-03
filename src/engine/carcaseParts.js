@@ -196,6 +196,18 @@ export function getPionMountHoles(mod, config) {
   return Object.values(byPanel);
 }
 
+// Boki do podłogi przy szafce na nóżkach (mod.legs.sidesToFloor: none | left | right | both):
+// bok dłuższy o wysokość nóżek, schodzi do podłogi obok cokołu (np. widoczny bok regału).
+// Tylko przy bokach przelotowych (wieńce między bokami). Zwraca przedłużenie każdego boku w mm.
+export function sideFloorExt(mod, config) {
+  const legs = mod.legs || {};
+  const cons = { joinType: "boki_przelotowe", ...((config && config.construction) || {}), ...(mod.construction || {}) };
+  const mode = legs.sidesToFloor || "none";
+  if (!legs.active || mode === "none" || cons.joinType === "wience_przelotowe") return { left: 0, right: 0 };
+  const h = parseFloat(legs.height) || 0;
+  return { left: mode === "left" || mode === "both" ? h : 0, right: mode === "right" || mode === "both" ? h : 0 };
+}
+
 export function getCorpusParts(mod, config) {
   const parts = [];
   const { width, height, depth } = mod.dimensions;
@@ -205,7 +217,9 @@ export function getCorpusParts(mod, config) {
 
   const sideDepth = sideDepthOf(mod, config, parseFloat(depth) || 0);
   const sideHeight = isTopBottomFullWidth ? height - (board * 2) : height;
-  parts.push({ name: "Bok (L/P)", length: parseFloat(sideHeight.toFixed(1)), width: sideDepth, qty: 2, category: "Korpus" });
+  const ext = sideFloorExt(mod, config);
+  if (ext.left === ext.right) parts.push({ name: "Bok (L/P)", length: parseFloat((sideHeight + ext.left).toFixed(1)), width: sideDepth, qty: 2, category: "Korpus" });
+  else [ext.left, ext.right].forEach((e) => parts.push({ name: "Bok (L/P)", length: parseFloat((sideHeight + e).toFixed(1)), width: sideDepth, qty: 1, category: "Korpus" }));
 
   const tbDepth = corpusInnerDepth(mod, config, parseFloat(depth) || 0);
   const tbWidth = isTopBottomFullWidth ? width : width - (board * 2);

@@ -18,7 +18,7 @@
 import { calculateModuleParts } from "./cabinet.js";
 import { resolveBackPanel, corpusInnerDepth, backThicknessOf, sideDepthOf } from "../core/backPanel.js";
 import { recalculateLayout, getTraverseConfig } from "../core/layout.js";
-import { jointSetsFor, bottomSetbackOf } from "./carcaseParts.js";
+import { jointSetsFor, bottomSetbackOf, sideFloorExt } from "./carcaseParts.js";
 import { num, round1 } from "../utils/math.js";
 import { getBlindStile, blindGeometry, getBlindCorner, PARALLEL_PLATE_INSET } from "../core/blindCorner.js";
 
@@ -138,10 +138,14 @@ export function getCabinetPanels(mod, project) {
 
   const panels = [];
   // --- Boki ---
-  panels.push({ id: "bok-lewy", kind: "bok", name: "Bok lewy", qty: 1, length: sideD, width: sideH, thickness: th, frontOnRight: false,
-    holes: [...corpusOnSide, ...sideEdgeHoles, ...verticalFaceHoles(th, true, 0, sideH)] });
-  panels.push({ id: "bok-prawy", kind: "bok", name: "Bok prawy", qty: 1, length: sideD, width: sideH, thickness: th, frontOnRight: true,
-    holes: [...corpusOnSide, ...sideEdgeHoles, ...verticalFaceHoles(W - th, false, 0, sideH)] });
+  // Bok do podłogi (sideFloorExt): dłuższy o nóżki, wszystkie otwory wyżej o tyle samo.
+  const ext = sideFloorExt(mod, project);
+  const lift = (e) => (h) => (e && h.y !== undefined ? { ...h, y: round1(h.y + e) } : h);
+  const floorNote = (e) => (e ? { note: `bok do podłogi - dłuższy o ${e} mm (nóżki), otwory liczone od dołu boku` } : {});
+  panels.push({ id: "bok-lewy", kind: "bok", name: "Bok lewy", qty: 1, length: sideD, width: sideH + ext.left, thickness: th, frontOnRight: false, ...floorNote(ext.left),
+    holes: [...corpusOnSide, ...sideEdgeHoles, ...verticalFaceHoles(th, true, 0, sideH)].map(lift(ext.left)) });
+  panels.push({ id: "bok-prawy", kind: "bok", name: "Bok prawy", qty: 1, length: sideD, width: sideH + ext.right, thickness: th, frontOnRight: true, ...floorNote(ext.right),
+    holes: [...corpusOnSide, ...sideEdgeHoles, ...verticalFaceHoles(W - th, false, 0, sideH)].map(lift(ext.right)) });
 
   // --- Przegrody (obie strony + łączniki w czołach górnym i dolnym, jeśli stała) ---
   els.filter((e) => e.typ === "pion").sort((a, b) => a.x - b.x).forEach((p, i) => {

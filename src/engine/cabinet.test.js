@@ -43,6 +43,20 @@ describe("calculateAllProjectParts — cały projekt", () => {
     expect(plinth).toMatchObject({ length: 600, width: 100, qty: 1 });
   });
 
+  it("boki do podłogi: boki dłuższe o nóżki, cokół między bokami", () => {
+    setProject(freshProject({ modules: [baseModule({ legs: { active: true, height: 100, plinth: true, plinthOffset: 0, sidesToFloor: "both" } })] }));
+    const parts = calculateAllProjectParts();
+    expect(parts.find((p) => p.name === "Bok (L/P)")).toMatchObject({ length: 820, qty: 2 });
+    expect(parts.find((p) => p.name.startsWith("Cokół dolny"))).toMatchObject({ length: 564 });
+  });
+
+  it("tylko lewy bok do podłogi: dwa różne boki, cokół krótszy o jedną płytę", () => {
+    setProject(freshProject({ modules: [baseModule({ legs: { active: true, height: 100, plinth: true, plinthOffset: 0, sidesToFloor: "left" } })] }));
+    const parts = calculateAllProjectParts();
+    expect(parts.filter((p) => p.name === "Bok (L/P)").map((p) => [p.length, p.qty]).sort()).toEqual([[720, 1], [820, 1]]);
+    expect(parts.find((p) => p.name.startsWith("Cokół dolny"))).toMatchObject({ length: 582 });
+  });
+
   it("bok dokładany: wysokość × głębokość; płyta leżąca (półka, blat): szerokość × głębokość", () => {
     setProject(freshProject({ modules: [], sidePanels: [
       { id: "b", name: "noga", position: { x: 0, y: 0, z: 0 }, dimensions: { width: 18, height: 720, depth: 600 } },

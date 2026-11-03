@@ -7,7 +7,7 @@ import { calculateHinges, stackedHingeObstacles } from "../core/hingeMath.js";
 import { fmtMm } from "../utils/math.js";
 import { getWorktopParts } from "../core/worktops.js";
 import { recalculateAllLayouts, getWorldFootprint, getCornerDepths, getModuleBox } from "../core/layout.js";
-import { getCorpusHoles, getPionMountHoles, getCorpusParts, getBackPanelParts } from "./carcaseParts.js";
+import { getCorpusHoles, getPionMountHoles, getCorpusParts, getBackPanelParts, sideFloorExt } from "./carcaseParts.js";
 import { getCornerCorpusParts } from "./cornerParts.js";
 import { getSlopeCabinetParts, getSlopeFrontParts } from "../core/slopeCabinet.js";
 import { getBlindPanel, getBlindStile, blindGeometry, getBlindCorner } from "../core/blindCorner.js";
@@ -208,8 +208,12 @@ export function collectProjectParts() {
           // "along" = pozycja wzdłuż kierunku, w którym rośnie bieg; "runLen" = ile
           // zajmuje w tym kierunku; "crossPos"/"frontCoord" muszą się zgadzać u
           // sąsiada, żeby w ogóle mogły się połączyć w jeden ciągły odcinek.
-          const along = alongZ ? z : x;
-          const runLen = alongZ ? worldD : worldW;
+          // Bok do podłogi: cokół zaczyna się / kończy na boku (grubość płyty mniej z tej strony).
+          const ext = sideFloorExt(mod, config);
+          const thB = parseFloat(config.materials && config.materials.boardThickness) || 18;
+          const cutStart = ext.left ? thB : 0, cutEnd = ext.right ? thB : 0;
+          const along = (alongZ ? z : x) + (alongZ ? 0 : cutStart);
+          const runLen = (alongZ ? worldD : worldW) - (alongZ ? 0 : cutStart + cutEnd);
           const crossPos = alongZ ? x : z;
           const frontCoord = alongZ ? (x + worldW) : (z + worldD);
 
