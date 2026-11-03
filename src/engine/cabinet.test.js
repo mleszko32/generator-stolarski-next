@@ -43,6 +43,16 @@ describe("calculateAllProjectParts — cały projekt", () => {
     expect(plinth).toMatchObject({ length: 600, width: 100, qty: 1 });
   });
 
+  it("bok dokładany: wysokość × głębokość; płyta leżąca (półka, blat): szerokość × głębokość", () => {
+    setProject(freshProject({ modules: [], sidePanels: [
+      { id: "b", name: "noga", position: { x: 0, y: 0, z: 0 }, dimensions: { width: 18, height: 720, depth: 600 } },
+      { id: "p", name: "półka", position: { x: 0, y: 1500, z: 0 }, dimensions: { width: 1200, height: 38, depth: 250 } },
+    ] }));
+    const parts = calculateAllProjectParts();
+    expect(parts.find((p) => p.name.endsWith("noga"))).toMatchObject({ name: "Bok dokładany — noga", length: 720, width: 600 });
+    expect(parts.find((p) => p.name.endsWith("półka"))).toMatchObject({ name: "Płyta pozioma — półka", length: 1200, width: 250 });
+  });
+
   it("scala cokół dwóch stykających się szafek w jeden odcinek", () => {
     setProject(
       freshProject({

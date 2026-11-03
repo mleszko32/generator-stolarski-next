@@ -294,6 +294,7 @@ export function initPropertiesPanel() {
       <div class="property-group"><label>Sposób łączenia:</label><select id="input-join-type"><option value="boki_przelotowe" ${cons.joinType === 'boki_przelotowe' ? 'selected' : ''}>Boki do ziemi (wieńce wpuszczane)</option><option value="wience_przelotowe" ${cons.joinType === 'wience_przelotowe' ? 'selected' : ''}>Wieńce pełne (boki wpuszczane)</option></select></div>
       <div class="property-group"><label>Zamknięcie góry:</label><select id="input-top-type"><option value="pelny" ${cons.topType === 'pelny' ? 'selected' : ''}>Pełny wieniec</option><option value="trawersy_poziom" ${cons.topType === 'trawersy_poziom' ? 'selected' : ''}>Trawersy poziome</option><option value="trawersy_pion" ${cons.topType === 'trawersy_pion' ? 'selected' : ''}>Trawersy pionowe</option></select></div>
       <div class="prop-box" id="traverse-options" style="display: ${cons.topType !== 'pelny' ? 'block' : 'none'};"><div class="property-group mb-0"><label class="fs-xs">Szerokość trawersu (mm):</label><input type="number" id="input-traverse-width" value="${cons.traverseWidth}" /></div></div>
+      <div class="property-group"><label>Wieniec dolny cofnięty o (mm):</label><input type="number" id="input-bottom-setback" value="${cons.bottomSetback ?? 0}" min="0" step="1" title="Wieniec dolny płytszy i cofnięty od przodu - np. szufladki pod blatem biurka: front zachodzi niżej i daje chwyt od spodu. 0 = zwykły wieniec." /></div>
       <div class="property-group"><label>Maks. rozstaw łączników kołek + wkręt (mm):</label><input type="number" id="input-joint-spacing" value="${cons.jointSpacing ?? 250}" min="64" step="1" title="Wieńce, półki stałe i przegrody: skrajne zestawy 37 mm od przodu i tyłu, środkowe dokładane, gdy odstęp przekracza ten rozstaw (w rastrze 32 mm)" /></div>
 
       ${cons.topType !== 'pelny' ? (() => {
@@ -427,7 +428,7 @@ function setupEventListeners() {
   bindSections(rs);
 
   const numberInputs = [
-    'pos-x', 'pos-y', 'pos-z', 'traverse-width', 'joint-spacing', 'board-thick', 'width', 'height', 'depth',
+    'pos-x', 'pos-y', 'pos-z', 'traverse-width', 'joint-spacing', 'bottom-setback', 'board-thick', 'width', 'height', 'depth',
     'front-gap', 'front-body-gap', 'front-left', 'front-right', 'front-top', 'front-bottom', 'back-offset', 'back-groove', 'back-thickness',
     'legs-height', 'plinth-offset', 'hinge-top', 'hinge-bottom', 'hinge-margin', 'hinge-count',
     'filler-left-w', 'filler-left-h', 'filler-left-d', 'filler-left-y',
@@ -684,6 +685,7 @@ function setupEventListeners() {
               mod.legs.plinthOffset = val === null ? 0 : val;
             }
             if (id === 'traverse-width') { mod.construction = mod.construction || {}; mod.construction.traverseWidth = val; }
+            if (id === 'bottom-setback') { mod.construction = mod.construction || {}; mod.construction.bottomSetback = Math.max(0, val || 0); }
             if (id === 'joint-spacing' && val >= 64) { mod.construction = mod.construction || {}; mod.construction.jointSpacing = val; }
             if (id === 'board-thick') state.project.materials.boardThickness = val;
 

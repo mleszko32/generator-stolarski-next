@@ -1,6 +1,7 @@
 // src/render/viewer3d.js
 import * as THREE from 'three';
 import { resolveBackPanel } from '../core/backPanel.js';
+import { bottomSetbackOf } from '../engine/carcaseParts.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { state, DEFAULT_ROOM, frontBodyGap } from '../core/state.js';
@@ -1208,16 +1209,17 @@ export function update3D() {
 
       const sideStartZ = posZ + D - sideD;
       const tbStartZ = posZ + D - tbD;
+      const bottomSB = bottomSetbackOf(mod, state.project);   // wieniec dolny cofnięty od przodu
 
       if (isTopBottomFull) {
-          addBox(W, th, tbD, posX, posY, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
+          addBox(W, th, tbD - bottomSB, posX, posY, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
           addBox(W, th, tbD, posX, posY + H - th, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
           addBox(th, H - 2*th, sideD, posX, posY + th, sideStartZ, 'corpus', isActive, udCorp, innerGroup); 
           addBox(th, H - 2*th, sideD, posX + W - th, posY + th, sideStartZ, 'corpus', isActive, udCorp, innerGroup); 
       } else {
           addBox(th, H, sideD, posX, posY, sideStartZ, 'corpus', isActive, udCorp, innerGroup); 
           addBox(th, H, sideD, posX + W - th, posY, sideStartZ, 'corpus', isActive, udCorp, innerGroup); 
-          addBox(W - 2*th, th, tbD, posX + th, posY, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
+          addBox(W - 2*th, th, tbD - bottomSB, posX + th, posY, tbStartZ, 'corpus', isActive, udCorp, innerGroup); 
           
           if (cons.topType === 'pelny') {
               addBox(W - 2*th, th, tbD, posX + th, posY + H - th, tbStartZ, 'corpus', isActive, udCorp, innerGroup);
@@ -1242,8 +1244,8 @@ export function update3D() {
           const rearZ = tbStartZ + 37;
           const rearDowelZ = tbStartZ + 69;
           
-          addHardware('screw', jx, bottomY, posZ + D - 37, hwAxis, innerGroup);
-          addHardware('dowel', jx, bottomY, posZ + D - 69, hwAxis, innerGroup);
+          addHardware('screw', jx, bottomY, posZ + D - 37 - bottomSB, hwAxis, innerGroup);
+          addHardware('dowel', jx, bottomY, posZ + D - 69 - bottomSB, hwAxis, innerGroup);
           addHardware('screw', jx, bottomY, rearZ, hwAxis, innerGroup);
           addHardware('dowel', jx, bottomY, rearDowelZ, hwAxis, innerGroup);
           

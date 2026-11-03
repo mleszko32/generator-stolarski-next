@@ -85,6 +85,20 @@ describe("getBackPanelParts", () => {
   });
 });
 
+describe("wieniec dolny cofnięty (construction.bottomSetback)", () => {
+  const mod = () => baseModule({ construction: { bottomSetback: 40 } });
+  it("wieniec dolny płytszy o cofnięcie, górny bez zmian", () => {
+    expect(byName(getCorpusParts(mod(), config()), "W600").map((p) => p.width)).toEqual([470, 510]);
+  });
+  it("łączniki dołu liczone od przodu cofniętego wieńca, tylny zestaw na swoim miejscu, góra bez zmian", () => {
+    const holes = getCorpusHoles(mod(), config())[0].holes;
+    const screws = (y) => holes.filter((h) => h.y === y && h.holeType === "screw").map((h) => h.xFromFront);
+    expect(screws(9)[0]).toBe(77);
+    expect(screws(9).at(-1)).toBe(473);
+    expect(screws(711)[0]).toBe(37);
+  });
+});
+
 describe("getCorpusHoles", () => {
   const holesOf = (mod, cfg) => getCorpusHoles(mod, cfg)[0].holes;
 

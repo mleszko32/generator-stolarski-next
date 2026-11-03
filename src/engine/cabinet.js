@@ -445,11 +445,15 @@ function getBlendaParts(panel, config) {
 // z frontami, dając realną sumę m² tego dekoru do wyceny.
 function getSidePanelParts(panel, config) {
   if (panel.kind === 'blenda') return getBlendaParts(panel, config);
-  const label = panel.decor ? `Bok dokładany (${panel.decor})` : 'Bok dokładany';
+  // Płyta leżąca (szersza niż wysoka - blat biurka, półka ścienna): formatka szerokość × głębokość.
+  const w = parseFloat(panel.dimensions?.width) || 0, h = parseFloat(panel.dimensions?.height) || 0;
+  const flat = w > h;
+  const kind = flat ? 'Płyta pozioma' : 'Bok dokładany';
+  const label = panel.decor ? `${kind} (${panel.decor})` : kind;
   const name = panel.name ? `${label} — ${panel.name}` : label;
   return [{
     name,
-    length: parseFloat(panel.dimensions?.height) || 0,
+    length: flat ? w : h,
     width: parseFloat(panel.dimensions?.depth) || 0,
     qty: 1,
     category: "Front",

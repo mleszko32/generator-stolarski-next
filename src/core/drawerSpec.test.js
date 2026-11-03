@@ -27,6 +27,12 @@ describe("drawerSpec", () => {
     expect(drawerSpec(mod, drawer(), freshProject()).depth).toBe(510 - 18);
   });
 
+  it("jedyny front nad dnem wnęki (chwyt od spodu): skrzynka ma całą wnękę między wieńcami", () => {
+    const mod = baseModule({ dimensions: { width: 600, height: 120, depth: 580 } });
+    const s = drawerSpec(mod, drawer({ y: 27, h: 90, frontCount: 1, baseZone: { ...zone, maxY: 102 } }), freshProject());
+    expect(s.availableSpace).toBe(84);
+  });
+
   it("ręczne NL nadpisuje dobór", () => {
     expect(drawerSpec(baseModule(), drawer({ forceNL: 400 }), freshProject()).nl).toBe(400);
   });

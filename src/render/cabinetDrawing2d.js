@@ -233,7 +233,7 @@ function cabinetSolids(mod, panels, project, explode) {
   side("bok-prawy", W - th, explode);
   const x0 = isFull ? 0 : th, x1 = isFull ? W : W - th;
   const wd = byId("wieniec-dolny");
-  if (wd) solids.push({ no: no("wieniec-dolny"), name: wd.name, solid: prism(rect(x0, 0, x1, wd.width), "y", 0, th), shift: [0, 0, 0], tone: C.slate200 });
+  if (wd) solids.push({ no: no("wieniec-dolny"), name: wd.name, solid: prism(rect(x0, wd.setback || 0, x1, (wd.setback || 0) + wd.width), "y", 0, th), shift: [0, 0, 0], tone: C.slate200 });
   const wg = byId("wieniec-gorny");
   if (wg) solids.push({ no: no("wieniec-gorny"), name: wg.name, solid: prism(rect(x0, 0, x1, wg.width), "y", H - th, th), shift: [0, explode * 0.5, 0], tone: C.slate200 });
   panels.filter((p) => p.id.startsWith("trawers-")).forEach((p) => {

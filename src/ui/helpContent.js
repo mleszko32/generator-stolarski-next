@@ -108,7 +108,7 @@ export const HELP_SECTIONS = [
         <li><b>Front</b> - nakładane / wpuszczane, luzy, szczelina, materiał frontu.</li>
         <li><b>Szuflady</b> - system szuflad (Blum, GTV, MOVENTO) i ustawienia ręczne
         (wariant wysokości, długość prowadnicy NL, wymiary frontu, szuflada wewnętrzna).</li>
-        <li><b>Konstrukcja</b> - łączenie boków i wieńców, wieniec górny pełny albo trawersy, plecy (nakładane / w nucie / wpuszczane - płyta np. 18 mm między bokami i wieńcami, np. do części otwartych).</li>
+        <li><b>Konstrukcja</b> - łączenie boków i wieńców, wieniec górny pełny albo trawersy, wieniec dolny cofnięty od przodu (np. szufladki pod blatem biurka z chwytem od spodu), plecy (nakładane / w nucie / wpuszczane - płyta np. 18 mm między bokami i wieńcami, np. do części otwartych).</li>
         <li><b>Nóżki</b> - wysokość nóżek i cokół.</li>
         <li><b>Zawiasy</b> - odsunięcia, liczba zawiasów i ręczna pozycja każdego z nich.</li>
         <li><b>Narożnik</b> - szafka ślepa i okucia narożne.</li>
@@ -147,6 +147,7 @@ export const HELP_SECTIONS = [
       <p><b>Bok dokładany</b> to samodzielna płyta w dekorze frontów (np. zakończenie zabudowy).
       <b>Blenda</b> to listwa maskująca między szafką a ścianą albo w narożniku - czoło z
       dekoru frontów i kołnierz mocujący (wybierasz, z której strony).</p>
+      <p>Bok dokładany szerszy niż wysoki (np. blat biurka, półka na ścianie) liczy się na liście formatek jako <b>Płyta pozioma</b> szerokość × głębokość.</p>
       <p>Dodaje się je przyciskami <b>Dodaj</b> w lewym panelu. Przy przeciąganiu przyciągają się
       do boków szafek i do ścian, a nachodzące na szafkę same się z niej wysuwają. Materiał
       wybiera się z cennika materiałów frontów.</p>`,

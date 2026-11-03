@@ -32,6 +32,10 @@ export function drawerSpec(mod, el, project) {
   let availableSpace = h;
   if (y < th) availableSpace -= th;
   if (y + h > H - th) availableSpace -= th;
+  // Jedyny front we wnęce, zaczynający się nad jej dnem (np. szufladki pod blatem biurka z
+  // chwytem od spodu): skrzynka ma całą wnękę między wieńcami, a nie tylko wysokość frontu.
+  const zoneH = num(el.baseZone && el.baseZone.maxY) - num(el.baseZone && el.baseZone.minY);
+  if (!isInternal && (el.frontCount ?? 1) === 1 && el.baseZone && y > num(el.baseZone.minY) && zoneH > availableSpace) availableSpace = zoneH;
 
   // Wymuszony wariant: rysunek wierceń bierze wysokość wariantu, a nie całej wnęki.
   // getDrawerComponents dostaje pełne availableSpace - sam sprawdza, czy wariant się mieści.

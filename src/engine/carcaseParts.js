@@ -50,6 +50,17 @@ export function jointSetPositions(depth, maxSpacing = DEFAULT_JOINT_SPACING, rea
 // Zestawy dla formatki o głębokości depth w danej szafce (rozstaw z konstrukcji, tylny
 // otwór wg stołu RC System, jeśli włączony i skalibrowany / na zderzaku).
 export const jointSetsFor = (mod, config, depth) => jointSetPositions(depth, jointSpacingOf(mod, config), rcRearOverride(depth, config), rcMidGrid(config, depth));
+// Wieniec dolny cofnięty od przodu (construction.bottomSetback, mm) - np. korpus szufladek pod
+// blatem biurka: front zachodzi niżej niż wieniec i daje chwyt od spodu. 0 = zwykły wieniec.
+export const bottomSetbackOf = (mod, config) => {
+  const cons = { ...((config && config.construction) || {}), ...((mod && mod.construction) || {}) };
+  return Math.max(0, parseFloat(cons.bottomSetback) || 0);
+};
+// Zestawy łączników wieńca dolnego (wieniec płytszy o cofnięcie), odległości od przodu boku.
+export const bottomJointSets = (mod, config, depth) => {
+  const sb = bottomSetbackOf(mod, config);
+  return jointSetsFor(mod, config, depth - sb).map((s) => ({ screw: s.screw + sb, dowel: s.dowel + sb }));
+};
 // Głębokość połączenia wieniec / półka stała z bokiem = głębokość wieńca (bez pleców, przy
 // plecach w nucie także bez odsunięcia nutu). Od niej liczą się zestawy łączników - tylny
 // zestaw 37 mm od tyłu WIEŃCA, a nie od tyłu szafki (wcześniej od głębokości szafki: przy
@@ -80,10 +91,11 @@ export function getCorpusHoles(mod, config) {
   };
   // Pełny wieniec: wszystkie zestawy; trawers poziomy: tylko jego skrajny zestaw.
   const addJoint = (y) => sets.forEach((set) => addSet(y, set));
+  const addBottom = (y) => bottomJointSets(mod, config, jointDepth).forEach((set) => addSet(y, set));
 
   if (cons.joinType === 'boki_przelotowe') {
      const bottomY = th / 2;
-     addJoint(bottomY);
+     addBottom(bottomY);
 
      const topY = height - th / 2;
      if (cons.topType === 'pelny') {
@@ -104,7 +116,7 @@ export function getCorpusHoles(mod, config) {
   } else {
      const bottomY = 0;
      const topY = height;
-     addJoint(bottomY);
+     addBottom(bottomY);
 
      if (cons.topType === 'pelny') {
         addJoint(topY);
@@ -152,13 +164,13 @@ export function getPionMountHoles(mod, config) {
   const wieniecOffsetX = cons2.joinType === 'wience_przelotowe' ? 0 : th;
 
   const byPanel = {};
-  const addHoles = (panelKey, panelLabel, panelWidth, panelOffsetX, pionCenterX) => {
-    if (!byPanel[panelKey]) byPanel[panelKey] = { type: 'wieniec-mount', panelKey, panelLabel, panelWidth, panelDepth: topBottomDepth, holes: [] };
+  const addHoles = (panelKey, panelLabel, panelWidth, panelOffsetX, pionCenterX, panelDepth = topBottomDepth) => {
+    if (!byPanel[panelKey]) byPanel[panelKey] = { type: 'wieniec-mount', panelKey, panelLabel, panelWidth, panelDepth, holes: [] };
     const x = pionCenterX - panelOffsetX;
-    jointSetsFor(mod, config, topBottomDepth).forEach((set) => {
+    jointSetsFor(mod, config, panelDepth).forEach((set) => {
       byPanel[panelKey].holes.push(
-        { x, zFromFront: topBottomDepth - set.screw, holeType: 'screw' },
-        { x, zFromFront: topBottomDepth - set.dowel, holeType: 'dowel' }
+        { x, zFromFront: panelDepth - set.screw, holeType: 'screw' },
+        { x, zFromFront: panelDepth - set.dowel, holeType: 'dowel' }
       );
     });
   };
@@ -167,7 +179,7 @@ export function getPionMountHoles(mod, config) {
     const centerX = p.x + p.w / 2;
 
     if (Math.abs(p.y - th) < EPS) {
-      addHoles('wieniec-dolny', 'Wieniec dolny', wieniecWidth, wieniecOffsetX, centerX);
+      addHoles('wieniec-dolny', 'Wieniec dolny', wieniecWidth, wieniecOffsetX, centerX, topBottomDepth - bottomSetbackOf(mod, config));
     } else {
       const below = poziomy.find(s => Math.abs((s.y + s.h) - p.y) < EPS);
       if (below) addHoles(`polka-${below.id}-gora`, 'Półka (spód przegrody)', below.w, below.x, centerX);
@@ -198,7 +210,7 @@ export function getCorpusParts(mod, config) {
   const tbDepth = corpusInnerDepth(mod, config, parseFloat(depth) || 0);
   const tbWidth = isTopBottomFullWidth ? width : width - (board * 2);
 
-  parts.push({ name: `W${width}`, length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1, category: "Korpus" });
+  parts.push({ name: `W${width}`, length: parseFloat(tbWidth.toFixed(1)), width: tbDepth - bottomSetbackOf(mod, config), qty: 1, category: "Korpus" });
 
   if (construction.topType === 'pelny') {
     parts.push({ name: `W${width}`, length: parseFloat(tbWidth.toFixed(1)), width: tbDepth, qty: 1, category: "Korpus" });
