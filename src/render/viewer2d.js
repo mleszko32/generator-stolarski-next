@@ -15,7 +15,7 @@ export const formatVal = (val) => Number(Number(val).toFixed(1));
 // (promień podpórki fi 5) - dzięki temu górna krawędź podpórki jest równo z
 // wysokością półki i wymiar przestrzeni między półkami zostaje dokładny (refaktor
 // rysunku z 3.09 to zgubił i otwory wypadły na samej wysokości półki).
-const SHELF_PIN_DROP = 2.5;
+import { SHELF_PIN_DROP } from '../core/hingeMath.js';
 
 // Opis wysokości otworu w stylu rysunku boku zwykłej szafki: bliższa krawędź
 // (DÓŁ/GÓRA) wyróżniona, druga w nawiasie.

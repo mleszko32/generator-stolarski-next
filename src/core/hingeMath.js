@@ -5,6 +5,12 @@ import { round1 } from '../utils/math.js';
 // Minimalny odstęp osi dwóch puszek 35 mm (z zapasem na prowadniki) i od krawędzi drzwi.
 const MIN_CUP_SPACING = 70;
 const MIN_CUP_EDGE = 30;
+// Otwory podpórek półki ruchomej (jak w engine/cabinetDrillings.js): 2,5 mm pod spodem
+// półki, rząd -32 / 0 / +32 mm. Prowadnik krzyżakowy zajmuje ok. ±25 mm od osi zawiasu,
+// więc środek otworu podpórki musi być co najmniej 30 mm od osi (płytka + promień otworu).
+export const SHELF_PIN_DROP = 2.5;
+export const SHELF_PIN_OFFSETS = [-32, 0, 32];
+const PLATE_PIN_CLEARANCE = 30;
 
 export function calculateHinges(front, boardThick, obstacles, side) {
   const h = round1(front.h); 
@@ -111,6 +117,16 @@ export function calculateHinges(front, boardThick, obstacles, side) {
               if ((plateHoleTop + totalMargin > shelfBottomEdge) && (plateHoleBottom - totalMargin < shelfTopEdge)) {
                 collision = true;
                 break;
+              }
+              // Półka ruchoma: otwory podpórek leżą w tej samej kolumnie 37 mm od przodu co
+              // prowadnik, aż 34,5 mm POD półką (engine/cabinetDrillings.js) - sam margines od
+              // płyty ich nie omijał i prowadnik wchodził na dziurkę regulacji.
+              if (!obs.isStructural && obs.typ === 'poziom') {
+                const hitsPin = SHELF_PIN_OFFSETS.some((dy) => Math.abs(shelfBottomEdge - SHELF_PIN_DROP + dy - testAbsY) < PLATE_PIN_CLEARANCE);
+                if (hitsPin) {
+                  collision = true;
+                  break;
+                }
               }
             } else {
               let obsMin = Number(obs.y);

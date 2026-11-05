@@ -55,6 +55,16 @@ describe("calculateHinges", () => {
       expect(clashes).toBe(false);
     }
   });
+
+  it("prowadnik nie wchodzi na otwory podpórek półki ruchomej (2,5 mm pod półką, co 32 mm)", () => {
+    // Przypadek z warsztatu: środkowy zawias zsunięty marginesem 40 mm pod półkę na 600
+    // (oś 543,9, prowadnik do 559,9) trafiał w podpórkę na 565,5.
+    const ys = [282, 600, 918];
+    const shelves = ys.map((y) => ({ typ: "poziom", y, h: 18, isStructural: false }));
+    const hinges = calculateHinges(door({ y: -1188, h: 2445 }), 18, shelves, "left");
+    const pins = ys.flatMap((y) => [-32, 0, 32].map((dy) => y - 2.5 + dy));
+    hinges.forEach((hg) => pins.forEach((p) => expect(Math.abs(p - hg.y)).toBeGreaterThanOrEqual(30)));
+  });
 });
 
 describe("stackedHingeObstacles", () => {

@@ -21,8 +21,7 @@ import { recalculateLayout, getTraverseConfig } from "../core/layout.js";
 import { jointSetsFor, bottomSetbackOf, sideFloorExt } from "./carcaseParts.js";
 import { num, round1 } from "../utils/math.js";
 import { getBlindStile, blindGeometry, getBlindCorner, PARALLEL_PLATE_INSET } from "../core/blindCorner.js";
-
-const SHELF_PIN_DROP = 2.5;
+import { SHELF_PIN_DROP, SHELF_PIN_OFFSETS } from "../core/hingeMath.js";
 const EPS = 2;
 
 // Średnice i głębokości (jak legenda rysunku 2D: kołek Ø8 + wkręt, podpórki / prowadnice /
@@ -87,7 +86,7 @@ export function getCabinetPanels(mod, project) {
           holes.push({ x: set.dowel, y, kind: "kolek", ...face("kolek"), to: "półka stała" });
         });
       } else {
-        [37, sideD - 37].forEach((hx) => [-32, 0, 32].forEach((dy) => {
+        [37, sideD - 37].forEach((hx) => SHELF_PIN_OFFSETS.forEach((dy) => {
           holes.push({ x: hx, y: round1(cy - SHELF_PIN_DROP + dy - y0), kind: "podporka", ...face("podporka"), to: "półka ruchoma", center: dy === 0 });
         }));
       }
