@@ -21,7 +21,8 @@ Współrzędne wnętrza w mm od lewego dolnego narożnika korpusu.
 PROJEKT W CHMURZE (async — await; wymaga zalogowania)
   projects()                    lista zapisanych projektów
   open(nazwa, {force})          wczytaj projekt (przy niezapisanych zmianach tylko z force: true)
-  save()                        zapisz wczytany projekt pod tą samą nazwą
+  save(nazwa?)                  zapisz wczytany projekt; z nazwą — pierwszy zapis nowego (nie nadpisuje innych)
+  Nowy pusty projekt = przeładowanie strony (bez wczytywania).
 CZYTANIE
   overview()                    spis szafek: wymiary, położenie, półki, fronty
   module(szafka)                pełne dane szafki (JSON)
@@ -75,9 +76,17 @@ export function initAssistantBridge() {
       refresh();
       return hits[0];
     },
-    save: async () => {
-      if (!state.loadedProjectId) throw new Error("Projekt nie ma jeszcze nazwy w chmurze — pierwszy zapis zrób przyciskiem Zapisz.");
-      await saveProjectToCloud(state.loadedProjectId);
+    // save() — pod nazwą wczytanego projektu; save("Nazwa") — pierwszy zapis nowego projektu
+    // (nigdy nie nadpisuje innego, istniejącego projektu).
+    save: async (name) => {
+      let id = state.loadedProjectId;
+      if (name && name !== id) {
+        if ((await getSavedProjectsList()).includes(name)) throw new Error(`Projekt „${name}” już istnieje — nie nadpisuję go.`);
+        id = name;
+        state.project.name = name;
+      }
+      if (!id) throw new Error("Podaj nazwę nowego projektu: save(\"Nazwa\").");
+      await saveProjectToCloud(id);
       return state.loadedProjectId;
     },
     overview: () => api.projectOverview(),
