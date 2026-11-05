@@ -10,7 +10,7 @@ import { state, DEFAULT_ROOM, frontBodyGap } from '../core/state.js';
 
 import { calculateDrawerHoles } from '../core/drawerMath.js';
 import { drawerSpec } from '../core/drawerSpec.js';
-import { calculateHinges, stackedHingeObstacles } from '../core/hingeMath.js';
+import { calculateHinges, stackedHingeObstacles, SHELF_PIN_DROP, SHELF_PIN_OFFSETS } from '../core/hingeMath.js';
 import { recalculateLayout, getTraverseConfig, getWorldFootprint, clampModuleToRoom, getModuleBox } from '../core/layout.js';
 import { buildZoneTree, moveSplit } from '../core/zoneTree.js';
 import { scheduleCheckpoint } from '../core/history.js';
@@ -1344,9 +1344,13 @@ export function update3D() {
                               addHardware('dowel', leftHoleX, holeY, dowelZ, 'x', innerGroup); 
                               addHardware('dowel', rightHoleX, holeY, dowelZ, 'x', innerGroup); 
                           } else {
-                              const supportY = posY + el.y - 2.5; 
-                              addHole(2.5, th, leftHoleX, supportY, hz, 'x', innerGroup); 
-                              addHole(2.5, th, rightHoleX, supportY, hz, 'x', innerGroup); 
+                              // Cały rząd regulacji (-32 / 0 / +32) jak na rysunku boku 2D,
+                              // podpórka w środkowym otworze.
+                              const supportY = posY + el.y - SHELF_PIN_DROP;
+                              SHELF_PIN_OFFSETS.forEach((dy) => {
+                                  addHole(2.5, th, leftHoleX, supportY + dy, hz, 'x', innerGroup);
+                                  addHole(2.5, th, rightHoleX, supportY + dy, hz, 'x', innerGroup);
+                              });
                               addHardware('support', leftHoleX + th/2 + 4, supportY, hz, 'x', innerGroup); 
                               addHardware('support', rightHoleX - th/2 - 4, supportY, hz, 'x', innerGroup); 
                           }
