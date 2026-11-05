@@ -63,7 +63,8 @@ describe("calculateHinges", () => {
     const shelves = ys.map((y) => ({ typ: "poziom", y, h: 18, isStructural: false }));
     const hinges = calculateHinges(door({ y: -1188, h: 2445 }), 18, shelves, "left");
     const pins = ys.flatMap((y) => [-32, 0, 32].map((dy) => y - 2.5 + dy));
-    hinges.forEach((hg) => pins.forEach((p) => expect(Math.abs(p - hg.y)).toBeGreaterThanOrEqual(30)));
+    // Każdy otwór prowadnika (oś ±16) co najmniej 32 mm od każdego otworu podpórki.
+    hinges.forEach((hg) => [hg.y - 16, hg.y + 16].forEach((py) => pins.forEach((p) => expect(Math.abs(p - py)).toBeGreaterThanOrEqual(32 - 0.01))));
   });
 });
 
