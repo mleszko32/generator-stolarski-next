@@ -21,6 +21,7 @@ import { openModal, showAlert } from "./utils/modal.js";
 import { readLocalBackup, clearLocalBackup, startLocalBackup } from "./core/localBackup.js";
 import { applyProjectData } from "./core/storage.js";
 import { openHelp } from "./ui/helpModal.js";
+import { initAssistantBridge } from "./ui/assistantBridge.js";
 
 const navIcon = (name, text) => `<i class="ti ti-${name}" aria-hidden="true"></i> ${text}`;
 
@@ -38,6 +39,7 @@ initPropertiesPanel();
 updateSidebar();
 init3DViewer();
 resetHistory(); // punkt zerowy historii cofnij/wprzód, po pierwszym renderze
+initAssistantBridge(); // window.gsn — pilot dla Claude'a (ui/assistantBridge.js)
 
 // --- COFNIJ / WPRZÓD ---
 const btnUndo = document.getElementById('btn-undo');

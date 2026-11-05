@@ -190,6 +190,12 @@ Wszystkie panele renderują się przez przypisanie szablonów tekstowych do `inn
   dane liczy czyste `core/moduleInfo.js` (`getModuleSummary`: wymiary korpusu/wnętrza, drzwi
   z zawiasami, szuflady z frontem i skrzynką, półki).
 
+**Pilot dla Claude'a**: `window.gsn` (`ui/assistantBridge.js`, logika w czystym `core/assistantApi.js` z testami) —
+nazwane polecenia do zmian w projekcie z przeglądarki (spis szafek, wnęki po ścieżkach a/b z `zoneTree`, półki,
+przegrody, fronty, `set` przez głębokie scalenie, kontrola, otwórz/zapisz z chmury), każde przez standardowe
+odświeżenie. Lista: `gsn.help()`; instrukcja w lokalnym skillu `.claude/skills/pilot-aplikacji` (poza gitem).
+Prośbę o zmianę konkretnego projektu realizuj przez pilota; brakujące polecenie dopisz tam z testem.
+
 **Instrukcja obsługi**: przycisk „Pomoc” na górnym pasku i klawisz F1 (`ui/helpModal.js`); treść rozdziałów
 w `ui/helpContent.js`. Przy zmianie nazwy przycisku/sekcji albo nowej funkcji zaktualizuj właściwy rozdział —
 `helpContent.test.js` pilnuje, żeby nazwy sekcji huba i prawego panelu zgadzały się z instrukcją.
