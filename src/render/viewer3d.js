@@ -1323,7 +1323,7 @@ export function update3D() {
 
                   if (isXrayMode) {
                       const isStruct = el.isStructural;
-                      const frontHoleZ = (posZ + D - 2) - 37;
+                      const frontHoleZ = posZ + D - 37; // 37 mm od przedniej krawędzi boku, jak prowadniki i rysunek 2D
                       const rearHoleZ = innerZ + 37;
                       const holeZs = [frontHoleZ, rearHoleZ]; 
                       
@@ -1367,7 +1367,7 @@ export function update3D() {
                   // faktycznie tam jest, korpus albo sąsiednia półka, wynika już z tego,
                   // że pion zawsze w pełni rozpina swoją wnękę, patrz core/zoneTree.js).
                   if (isXrayMode && el.isStructural) {
-                      const frontHoleZ = (posZ + D - 2) - 37;
+                      const frontHoleZ = posZ + D - 37; // 37 mm od przedniej krawędzi boku, jak prowadniki i rysunek 2D
                       const rearHoleZ = innerZ + 37;
                       const holeZs = [frontHoleZ, rearHoleZ];
 
@@ -1541,13 +1541,13 @@ export function update3D() {
                                       ? (bg.side === 'left' ? bg.stileX1 - PARALLEL_PLATE_INSET : bg.stileX0 + PARALLEL_PLATE_INSET)
                                       : (bg.side === 'left' ? bg.panelX1 - PARALLEL_PLATE_INSET : bg.panelX0 + PARALLEL_PLATE_INSET);
                                   const plateZ = bg.mount === 'listwa' ? posZ + D - th : posZ + D + frontBodyGap(modFront);
-                                  addHole(2.5, 10, posX + edgeX, posY + calcY - 16, plateZ, 'z', innerGroup);
-                                  addHole(2.5, 10, posX + edgeX, posY + calcY + 16, plateZ, 'z', innerGroup);
+                                  addHole(2.5, 10, posX + edgeX, posY + calcY - 16, plateZ, 'z', innerGroup, 'plate');
+                                  addHole(2.5, 10, posX + edgeX, posY + calcY + 16, plateZ, 'z', innerGroup, 'plate');
                                   return;
                               }
                               const plateX = isLeft ? posX + el.x - th/2 : posX + el.x + el.w + th/2;
-                              addHole(2.5, th, plateX, posY + calcY - 16, posZ + D - 37, 'x', innerGroup);
-                              addHole(2.5, th, plateX, posY + calcY + 16, posZ + D - 37, 'x', innerGroup);
+                              addHole(2.5, th, plateX, posY + calcY - 16, posZ + D - 37, 'x', innerGroup, 'plate');
+                              addHole(2.5, th, plateX, posY + calcY + 16, posZ + D - 37, 'x', innerGroup, 'plate');
                           });
                       }
                   }

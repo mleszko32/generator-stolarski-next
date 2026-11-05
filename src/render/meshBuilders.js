@@ -36,10 +36,13 @@ export const mats = {
 };
 export const worktopMat = new THREE.MeshStandardMaterial({ color: 0x8a6a4a, roughness: 0.55, metalness: 0.0 });
 const holeMat = new THREE.MeshBasicMaterial({ color: 0xdc2626 });
+// Otwory prowadników zawiasów innym kolorem - od razu widać, czy nie wchodzą na
+// rząd podpórek półek (ta sama linia 37 mm od przodu).
+const plateHoleMat = new THREE.MeshBasicMaterial({ color: 0x2563eb });
 
 // Materiały współdzielone między klatkami przebudowy (nie wolno ich zwalniać
 // razem z siatką, bo używa ich następna wersja sceny).
-[...Object.values(mats.xray), ...Object.values(mats.solid), worktopMat, holeMat].forEach(m => { m.userData.shared = true; });
+[...Object.values(mats.xray), ...Object.values(mats.solid), worktopMat, holeMat, plateHoleMat].forEach(m => { m.userData.shared = true; });
 
 // Kolory krawędzi mają po jednym wspólnym materiale (wcześniej każdy prostopadłościan
 // tworzył własny, co przy kilkunastu szafkach dawało tysiące materiałów).
@@ -184,10 +187,11 @@ export function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, 
   parentGroup.add(mesh);
 }
 
-export function addHole(radius, depth, x, y, z, rotationAxis, parentGroup) {
-  if (!isXrayMode) return; 
+// kind: 'plate' = otwór prowadnika zawiasu (osobny kolor), inaczej zwykły otwór.
+export function addHole(radius, depth, x, y, z, rotationAxis, parentGroup, kind) {
+  if (!isXrayMode) return;
   const geo = cachedGeometry(`hole|${radius}|${depth}`, () => new THREE.CylinderGeometry(radius, radius, depth, 16));
-  const mesh = new THREE.Mesh(geo, holeMat);
+  const mesh = new THREE.Mesh(geo, kind === 'plate' ? plateHoleMat : holeMat);
   if (rotationAxis === 'x') mesh.rotation.z = Math.PI / 2; 
   if (rotationAxis === 'y') mesh.rotation.x = 0;           
   if (rotationAxis === 'z') mesh.rotation.x = Math.PI / 2; 

@@ -190,14 +190,14 @@ export function renderCornerCabinet(mod, isActive, th, parentGroup) {
               if (front.cornerArm === 'A') {
                   addHole(17.5, 13, depthB + fx + cupOff, cy, frontZA + 6.5, 'z', innerGroup);
                   if (dh.atBok) {
-                      addHole(2.5, th, legA - th / 2, cy - 16, depthA - 37, 'x', innerGroup);
-                      addHole(2.5, th, legA - th / 2, cy + 16, depthA - 37, 'x', innerGroup);
+                      addHole(2.5, th, legA - th / 2, cy - 16, depthA - 37, 'x', innerGroup, 'plate');
+                      addHole(2.5, th, legA - th / 2, cy + 16, depthA - 37, 'x', innerGroup, 'plate');
                   }
               } else {
                   addHole(17.5, 13, frontZB + 6.5, cy, depthA + fx + cupOff, 'x', innerGroup);
                   if (dh.atBok) {
-                      addHole(2.5, th, depthB - 37, cy - 16, legB - th / 2, 'z', innerGroup);
-                      addHole(2.5, th, depthB - 37, cy + 16, legB - th / 2, 'z', innerGroup);
+                      addHole(2.5, th, depthB - 37, cy - 16, legB - th / 2, 'z', innerGroup, 'plate');
+                      addHole(2.5, th, depthB - 37, cy + 16, legB - th / 2, 'z', innerGroup, 'plate');
                   }
               }
           });
