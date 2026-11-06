@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { state } from '../core/state.js';
 import { sideFloorExt } from '../engine/carcaseParts.js';
-import { partColor, isLightColor } from '../core/decorColors.js';
+import { partMaterial, isLightColor } from '../core/decorColors.js';
 
 export let isXrayMode = true;
 export function setXrayMode(value) {
@@ -154,21 +154,43 @@ function buildLabelMaterial(text) {
 }
 
 
-// Materiał bryły: domyślny dla typu, a dla korpusu/półek/frontów z ustawionym dekorem lub
-// materiałem frontu - kopia w kolorze dekoru (core/decorColors.js), z cache po kolorze.
+// Tryb kolorów płyt: 'real' - kolor dekoru / lakieru, 'materials' - kontrastowa paleta po
+// materiałach z legendy (render/viewer3d.js ustawia ją przed przebudową sceny). highlightKey -
+// podświetlony materiał z legendy: reszta brył półprzezroczysta.
+function loadColorMode() {
+  try { return localStorage.getItem('viewerColorMode') === 'materials' ? 'materials' : 'real'; } catch (e) { return 'real'; }
+}
+export let colorMode = loadColorMode();
+export function setColorMode(mode) {
+  colorMode = mode === 'materials' ? 'materials' : 'real';
+  try { localStorage.setItem('viewerColorMode', colorMode); } catch (e) {}
+}
+let materialPalette = new Map();
+export function setMaterialPalette(map) { materialPalette = map || new Map(); }
+export let highlightKey = null;
+export function setHighlightKey(key) { highlightKey = key || null; }
+
+// Materiał bryły: domyślny dla typu, a dla korpusu/półek/frontów/cokołu/skrzynek - kopia w kolorze
+// dekoru albo palety materiałów (core/decorColors.js), przy podświetleniu innego materiału
+// półprzezroczysta; z cache po kolorze.
 const tintCache = new Map();
+const COLORABLE = new Set(['corpus', 'shelf', 'front', 'plinth', 'drawerBox']);
 function materialFor(type, userData) {
   const matObj = isXrayMode ? mats.xray : mats.solid;
   const base = matObj[type] || matObj.corpus;
-  if (type !== 'corpus' && type !== 'shelf' && type !== 'front' && type !== 'plinth' && type !== 'drawerBox') return base;
-  const color = partColor(type, userData, state.project);
-  if (color == null || (isXrayMode && isLightColor(color))) return base;
-  const key = `${isXrayMode ? 'x' : 's'}|${type}|${color}`;
+  const ent = COLORABLE.has(type) ? partMaterial(type, userData, state.project) : null;
+  let color = null;
+  if (ent) color = colorMode === 'materials' ? (materialPalette.get(ent.key) ?? null) : ent.color;
+  if (color != null && colorMode === 'real' && isXrayMode && isLightColor(color)) color = null;
+  const faded = highlightKey != null && (!ent || ent.key !== highlightKey);
+  if (color == null && !faded) return base;
+  const key = `${isXrayMode ? 'x' : 's'}|${type}|${color}|${faded ? 'f' : ''}`;
   let m = tintCache.get(key);
   if (!m) {
     m = base.clone();
-    m.color.setHex(color);
-    if (isXrayMode) m.opacity = Math.max(base.opacity, 0.35);
+    if (color != null) m.color.setHex(color);
+    if (faded) { m.transparent = true; m.opacity = 0.08; m.depthWrite = false; }
+    else if (isXrayMode) m.opacity = Math.max(base.opacity, 0.35);
     m.userData.shared = true;
     tintCache.set(key, m);
   }

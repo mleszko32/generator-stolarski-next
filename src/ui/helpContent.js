@@ -85,6 +85,7 @@ export const HELP_SECTIONS = [
       <h4>Pasek widoku (prawy górny róg)</h4>
       <ul>
         <li><b>Przezroczysty / Realistyczny</b> - szkic z widocznymi wierceniami albo pełne bryły.</li>
+        <li><b>Kolory: rzeczywiste / materiały</b> - kolor dekoru i lakieru (RAL / NCS) albo każdy materiał projektu w innym, wyraźnym kolorze. Legenda w lewym dolnym rogu pokazuje, który kolor to który materiał; kliknięcie pozycji podświetla elementy z tego materiału, ponowne pokazuje wszystko.</li>
         <li><b>Ukryj fronty zewn.</b>, <b>Ukryj boki</b>, <b>Ukryj blendy</b>, <b>Ukryj blaty</b> - osobne przełączniki widoczności.</li>
         <li><b>Ukryj nazwy</b> - etykiety z nazwami nad szafkami.</li>
         <li><b>Wnętrze 2D</b> - edytor wnętrza zaznaczonej szafki (widok od frontu).</li>

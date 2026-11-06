@@ -6,7 +6,7 @@
 // jednolite), a w rodzinie odcień wybiera skrót z nazwy, więc różne dekory różnią się kolorem,
 // a ten sam dekor ma zawsze ten sam kolor. Czyste funkcje (bez Three.js).
 import { moduleKorpusDecor, baseCategory, KORPUS } from "./materialCatalog.js";
-import { plinthMaterial } from "./plinthMaterial.js";
+import { plinthMaterial, moduleFrontMaterialId } from "./plinthMaterial.js";
 import { lacquerColor, lacquerCode } from "./lacquerColors.js";
 
 const FAMILIES = {
@@ -72,83 +72,89 @@ function frontMaterialName(materialId, project) {
   return code ? `${mat.name} ${code}` : mat.name;
 }
 
-// Materiał cokołu szafki jako nazwa + grupa legendy (null = cokół domyślny).
-function plinthLegendEntry(mod, project) {
+// Materiał bryły 3D jako pozycja legendy: { key, group: 'Korpus'|'Front'|'Szuflada', label, color }
+// (color null = kolor domyślny). Ta sama nazwa = ten sam klucz (np. materiał frontów i dekor
+// blendy), szuflady osobno. Klucz łączy legendę z bryłami (tryb „materiały”, podświetlanie).
+const PLAIN_LABEL = { Korpus: "bez dekoru (z projektu)", Front: "standard", Szuflada: "bez dekoru" };
+function entry(group, label, color) {
+  const l = String(label || "").trim();
+  if (!l) return { key: "~" + group.toUpperCase(), group, label: PLAIN_LABEL[group], color: null };
+  return { key: (group === "Szuflada" ? "S:" : "") + l.toUpperCase(), group, label: l, color: color == null ? null : color };
+}
+const frontEntry = (materialId, project) => entry("Front", frontMaterialName(materialId, project), frontMaterialColor(materialId, project));
+const korpusEntry = (decor) => entry("Korpus", decor, decorColor(decor));
+const drawerEntry = (project) => { const d = projectDecor(project, "Szuflada"); return entry("Szuflada", d, decorColor(d)); };
+
+function plinthEntry(mod, project) {
   const pm = plinthMaterial(mod, project);
-  if (pm.category === "Front") return { group: "Front", label: frontMaterialName(pm.materialId, project), color: frontMaterialColor(pm.materialId, project) };
-  const decor = baseCategory(pm.category) === KORPUS && pm.category !== KORPUS ? pm.category.slice(KORPUS.length + 2) : "";
-  return { group: "Korpus", label: decor, color: decorColor(decor) };
+  if (pm.category === "Front") return frontEntry(pm.materialId, project);
+  return korpusEntry(baseCategory(pm.category) === KORPUS && pm.category !== KORPUS ? pm.category.slice(KORPUS.length + 2) : "");
 }
 
-// Legenda kolorów dekorów użytych w projekcie: [{ group: 'Korpus'|'Front', label, color }]
-// (color null = kolor domyślny). Pusta, gdy nic nie ma własnego koloru - wtedy legenda niepotrzebna.
-// Ta sama nazwa (np. materiał frontów i dekor blendy) to jedna pozycja - w grupie Front.
-export function projectDecorLegend(project) {
-  if (!project) return [];
-  const entries = new Map(); // nazwa (wielkie litery) -> { group, label, color }
-  let plainKorpus = false, plainFront = false;
-  const add = (group, label, color) => {
-    if (color == null || !String(label || "").trim()) {
-      if (group === "Front") plainFront = true; else if (group === "Korpus") plainKorpus = true;
-      return;
-    }
-    // szuflady osobno (ten sam dekor co korpus i tak ma być widać przy szufladach)
-    const k = (group === "Szuflada" ? "S:" : "") + String(label).trim().toUpperCase();
-    const prev = entries.get(k);
-    if (!prev || (prev.group === "Korpus" && group === "Front")) entries.set(k, { group, label: String(label).trim(), color });
-  };
-  const list = (project.pricing && project.pricing.frontMaterials) || [];
-  (project.modules || []).forEach((mod) => {
-    const d = korpusDecorOf(mod, project);
-    add("Korpus", d, decorColor(d));
-    if ((mod.elements || []).some((el) => el.typ === "front" && /szuflada/.test(el.subtype || ""))) {
-      const sd = projectDecor(project, "Szuflada");
-      add("Szuflada", sd, decorColor(sd));
-    }
-    (mod.elements || []).forEach((el) => {
-      if (el.typ === "front") add("Front", frontMaterialName(el.materialId, project), frontMaterialColor(el.materialId, project));
-    });
-    if (mod.legs && mod.legs.active && mod.legs.plinth) { const e = plinthLegendEntry(mod, project); add(e.group, e.label, e.color); }
-  });
-  (project.sidePanels || []).forEach((p) => {
-    const d = String(p.decor || "").trim();
-    if (d) { add(p.kind === "blenda" ? "Front" : "Korpus", d, decorColor(d)); return; }
-    if (p.kind === "poziomy") { plainKorpus = true; return; }
-    add("Front", frontMaterialName(p.materialId, project), frontMaterialColor(p.materialId, project));
-  });
-  if (!entries.size) return [];
-  const out = [];
-  const group = (g, plain, plainLabel) => {
-    const items = [...entries.values()].filter((e) => e.group === g).sort((a, b) => a.label.localeCompare(b.label, "pl"));
-    if (!items.length) return;
-    if (plain) out.push({ group: g, label: plainLabel, color: null });
-    items.forEach((e) => out.push(e));
-  };
-  group("Korpus", plainKorpus, "bez dekoru (z projektu)");
-  group("Front", plainFront, (list[0] && list[0].name) || "standard");
-  group("Szuflada", false, "");
-  return out;
+function panelEntry(panel, type, project) {
+  const decor = String(panel.decor || "").trim();
+  if (decor) return entry(panel.kind === "blenda" ? "Front" : "Korpus", decor, decorColor(decor));
+  return type === "front" ? frontEntry(panel.materialId, project) : korpusEntry("");
 }
 
-// Kolor bryły 3D z jej userData (moduleId / elementId / sidePanelId) i typu ('corpus',
-// 'shelf', 'front', 'plinth', 'drawerBox'); null = kolor domyślny materiału.
-export function partColor(type, userData, project) {
+// Materiał bryły z jej userData (moduleId / elementId / sidePanelId) i typu ('corpus', 'shelf',
+// 'front', 'plinth', 'drawerBox'); null = bryła bez materiału z legendy (nóżki, plecy HDF…).
+export function partMaterial(type, userData, project) {
   if (!userData || !project) return null;
   if (userData.sidePanelId) {
     const panel = (project.sidePanels || []).find((p) => p.id === userData.sidePanelId);
-    if (!panel) return null;
-    const decor = String(panel.decor || "").trim();
-    if (decor) return decorColor(decor);
-    return type === "front" ? frontMaterialColor(panel.materialId, project) : null;
+    return panel ? panelEntry(panel, type, project) : null;
   }
   const mod = userData.moduleId && (project.modules || []).find((m) => m.id === userData.moduleId);
   if (!mod) return null;
-  if (userData.type === "plinth") return type === "plinth" ? plinthLegendEntry(mod, project).color : null; // nóżki bez koloru
+  if (userData.type === "plinth") return type === "plinth" ? plinthEntry(mod, project) : null; // nóżki bez materiału
   if (type === "front") {
     const el = userData.elementId && (mod.elements || []).find((e) => e.id === userData.elementId);
-    return el ? frontMaterialColor(el.materialId, project) : null;
+    return frontEntry(el ? el.materialId : moduleFrontMaterialId(mod, project), project);
   }
-  if (type === "corpus" || type === "shelf") return decorColor(korpusDecorOf(mod, project));
-  if (type === "drawerBox") return decorColor(projectDecor(project, "Szuflada"));
+  if (type === "corpus" || type === "shelf") return korpusEntry(korpusDecorOf(mod, project));
+  if (type === "drawerBox") return drawerEntry(project);
   return null;
+}
+
+// Kolor bryły 3D (null = kolor domyślny materiału).
+export function partColor(type, userData, project) {
+  const e = partMaterial(type, userData, project);
+  return e ? e.color : null;
+}
+
+// Legenda materiałów projektu: [{ key, group, label, color }]. Domyślnie tylko grupy, w których
+// coś ma własny kolor (z pozycją domyślną obok); { all: true } - wszystkie materiały (tryb
+// „Kolory: materiały”). Pusta, gdy nie ma czego pokazać.
+export function projectDecorLegend(project, opts = {}) {
+  if (!project) return [];
+  const entries = new Map();
+  const add = (e) => {
+    const prev = entries.get(e.key);
+    if (!prev || (prev.group === "Korpus" && e.group === "Front")) entries.set(e.key, e);
+  };
+  (project.modules || []).forEach((mod) => {
+    add(korpusEntry(korpusDecorOf(mod, project)));
+    (mod.elements || []).forEach((el) => {
+      if (el.typ !== "front") return;
+      add(frontEntry(el.materialId, project));
+      if (/szuflada/.test(el.subtype || "")) add(drawerEntry(project));
+    });
+    if (mod.legs && mod.legs.active && mod.legs.plinth) add(plinthEntry(mod, project));
+  });
+  (project.sidePanels || []).forEach((p) => add(panelEntry(p, p.kind === "poziomy" ? "corpus" : "front", project)));
+  const out = [];
+  ["Korpus", "Front", "Szuflada"].forEach((g) => {
+    const items = [...entries.values()].filter((e) => e.group === g);
+    if (!opts.all && !items.some((e) => e.color != null)) return;
+    items.sort((a, b) => (a.key.startsWith("~") ? -1 : b.key.startsWith("~") ? 1 : a.label.localeCompare(b.label, "pl")));
+    out.push(...items);
+  });
+  return out;
+}
+
+// Kontrastowa paleta trybu „Kolory: materiały” - kolejne materiały legendy, po kolei.
+export const MATERIAL_PALETTE = [0x2563eb, 0x16a34a, 0xea580c, 0x9333ea, 0xdc2626, 0x0891b2, 0xca8a04, 0xdb2777, 0x4b5563, 0x65a30d, 0x7c3aed, 0x0d9488];
+export function materialPaletteMap(legend) {
+  return new Map(legend.map((e, i) => [e.key, MATERIAL_PALETTE[i % MATERIAL_PALETTE.length]]));
 }

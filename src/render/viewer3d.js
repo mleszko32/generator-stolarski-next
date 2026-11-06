@@ -24,14 +24,14 @@ import { snapSidePanel } from '../core/sidePanelSnap.js';
 import { snapModulePosition, sweepSelection, boxesOverlap, getSidePanelBox } from '../core/moduleDrag.js';
 import { refreshModuleInfoCard } from '../ui/moduleInfoPanel.js';
 import { initPropertiesPanel } from '../ui/properties.js';
-import { mats, worktopMat, disposeObject, createLabelSprite, addBox, addHole, addHardware, addLegsAndPlinth, isXrayMode, setXrayMode } from './meshBuilders.js';
+import { mats, worktopMat, disposeObject, createLabelSprite, addBox, addHole, addHardware, addLegsAndPlinth, isXrayMode, setXrayMode, colorMode, setColorMode, setMaterialPalette, highlightKey, setHighlightKey } from './meshBuilders.js';
 import { renderCornerCabinet } from './cornerCabinet3d.js';
 import { renderSlopeCabinet } from './slopeCabinet3d.js';
 import { getBlindPanel, getBlindStile, blindGeometry, PARALLEL_PLATE_INSET } from '../core/blindCorner.js';
 import { initMeasureTool, isMeasureActive, setMeasureButton, toggleMeasureMode, updateMeasureHover, handleMeasureClick, measureHoverMouse } from './measureTool.js';
 import { showAlert } from "../utils/modal.js";
 import { shelfStiffener } from '../core/shelfStiffener.js';
-import { projectDecorLegend } from '../core/decorColors.js';
+import { projectDecorLegend, materialPaletteMap } from '../core/decorColors.js';
 import { escapeHtml } from '../utils/dom.js';
 
 let alignMode = { active: false, sourceMod: null, sourceEl: null, banner: null };
@@ -731,6 +731,18 @@ export function init3DViewer() {
       update3D();
   };
   
+  const colorModeHtml = () => `<i class="ti ti-palette" aria-hidden="true"></i> Kolory: ${colorMode === 'materials' ? 'materiały' : 'rzeczywiste'}`;
+  const colorModeBtn = document.createElement('button');
+  colorModeBtn.className = 'btn view-btn' + (colorMode === 'materials' ? ' active' : '');
+  colorModeBtn.title = 'Rzeczywiste - kolor dekoru / lakieru; materiały - każdy materiał projektu w innym, wyraźnym kolorze (legenda w rogu)';
+  colorModeBtn.innerHTML = colorModeHtml();
+  colorModeBtn.onclick = () => {
+      setColorMode(colorMode === 'materials' ? 'real' : 'materials');
+      colorModeBtn.innerHTML = colorModeHtml();
+      colorModeBtn.classList.toggle('active', colorMode === 'materials');
+      update3D();
+  };
+
   const toggleFrontsBtn = document.createElement('button');
   toggleFrontsBtn.innerHTML = '<i class="ti ti-door" aria-hidden="true"></i> Ukryj fronty zewn.';
   toggleFrontsBtn.className = 'btn view-btn';
@@ -812,6 +824,7 @@ export function init3DViewer() {
   };
 
   uiOverlay.appendChild(toggleBtn);
+  uiOverlay.appendChild(colorModeBtn);
   uiOverlay.appendChild(toggleFrontsBtn);
   uiOverlay.appendChild(toggleSidePanelsBtn);
   uiOverlay.appendChild(toggleBlendsBtn);
@@ -1142,26 +1155,43 @@ function handle3DClick(event) {
   }
 }
 
-// Legenda kolorów dekorów (lewy dolny róg widoku 3D): który kolor płyty to który dekor /
-// materiał frontu w tym projekcie. Ukryta, gdy w projekcie nic nie ma własnego koloru.
+// Legenda materiałów (lewy dolny róg widoku 3D): który kolor płyty to który dekor / materiał
+// frontu. W trybie „Kolory: materiały” wszystkie materiały w kontrastowej palecie. Kliknięcie
+// pozycji podświetla ten materiał (reszta półprzezroczysta), ponowne - pokazuje wszystko.
 let decorLegendEl = null;
 function renderDecorLegend() {
   if (!container) return;
   if (!decorLegendEl) {
     decorLegendEl = document.createElement('div');
     decorLegendEl.className = 'decor-legend';
+    decorLegendEl.addEventListener('click', (e) => {
+      const row = e.target.closest('.decor-legend-row');
+      if (!row) return;
+      const key = row.getAttribute('data-key');
+      setHighlightKey(highlightKey === key ? null : key);
+      update3D();
+    });
+    decorLegendEl.addEventListener('keydown', (e) => {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('.decor-legend-row')) { e.preventDefault(); e.target.click(); }
+    });
     container.appendChild(decorLegendEl);
   }
-  const items = projectDecorLegend(state.project);
+  const all = colorMode === 'materials';
+  const items = projectDecorLegend(state.project, { all });
+  setMaterialPalette(all ? materialPaletteMap(items) : new Map());
+  if (highlightKey && !items.some((it) => it.key === highlightKey)) setHighlightKey(null);
   decorLegendEl.hidden = items.length === 0;
   if (!items.length) { decorLegendEl.innerHTML = ''; return; }
   const hex = (c) => '#' + c.toString(16).padStart(6, '0');
+  const palette = materialPaletteMap(items);
   const defaults = { Korpus: mats.solid.corpus.color.getHex(), Front: mats.solid.front.color.getHex(), Szuflada: mats.solid.drawerBox.color.getHex() };
   const groupNames = { Korpus: 'Płyta korpusu', Front: 'Fronty', Szuflada: 'Szuflady' };
-  let html = '', group = '';
+  let html = `<div class="decor-legend-hint">${highlightKey ? 'Kliknij ponownie, aby pokazać wszystko' : 'Kliknij materiał, aby go podświetlić'}</div>`, group = '';
   items.forEach((it) => {
     if (it.group !== group) { group = it.group; html += `<div class="decor-legend-group">${groupNames[group] || group}</div>`; }
-    html += `<div class="decor-legend-row"><span class="decor-legend-swatch" style="background:${hex(it.color ?? defaults[it.group])}"></span>${escapeHtml(it.label)}</div>`;
+    const color = all ? palette.get(it.key) : (it.color ?? defaults[it.group]);
+    const active = highlightKey === it.key ? ' is-active' : '';
+    html += `<div class="decor-legend-row${active}" data-key="${escapeHtml(it.key)}" role="button" tabindex="0"><span class="decor-legend-swatch" style="background:${hex(color)}"></span>${escapeHtml(it.label)}</div>`;
   });
   decorLegendEl.innerHTML = html;
 }

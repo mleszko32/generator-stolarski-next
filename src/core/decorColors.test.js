@@ -65,3 +65,27 @@ describe("kolor skrzynek szuflad i dekor korpusu projektu", () => {
     expect(leg.find((l) => l.group === "Szuflada").label).toBe("Egger U702 ST9 18mm Kaszmir");
   });
 });
+
+describe("legenda materiałów: tryb wszystkich materiałów i klucze brył", async () => {
+  const { partMaterial, materialPaletteMap, MATERIAL_PALETTE } = await import("./decorColors.js");
+  const project = {
+    pricing: { frontMaterials: [{ id: "default", name: "Standard" }, { id: "lak", name: "Lakier", color: "NCS S 0500-N" }] },
+    modules: [{ id: "a", materials: { korpusDecor: "Egger W1000 PM/ST9 19mm" }, elements: [{ id: "f", typ: "front", materialId: "lak" }] }],
+    sidePanels: [{ id: "b", kind: "blenda", materialId: "lak" }],
+  };
+  it("bryła i legenda mają ten sam klucz materiału", () => {
+    const leg = projectDecorLegend(project, { all: true });
+    const keys = leg.map((e) => e.key);
+    expect(keys).toContain(partMaterial("front", { moduleId: "a", elementId: "f" }, project).key);
+    expect(keys).toContain(partMaterial("corpus", { moduleId: "a" }, project).key);
+    // czoło blendy w tym samym materiale co fronty - jedna pozycja
+    expect(partMaterial("front", { sidePanelId: "b" }, project).key).toBe(partMaterial("front", { moduleId: "a", elementId: "f" }, project).key);
+    expect(partMaterial("corpus", { moduleId: "a", type: "plinth" }, project)).toBeNull(); // nóżki
+  });
+  it("paleta materiałów: każdy materiał inny kolor", () => {
+    const leg = projectDecorLegend(project, { all: true });
+    const pal = materialPaletteMap(leg);
+    expect(new Set(pal.values()).size).toBe(leg.length);
+    expect(pal.get(leg[0].key)).toBe(MATERIAL_PALETTE[0]);
+  });
+});
