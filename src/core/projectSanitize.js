@@ -16,6 +16,8 @@
 const FREE_TEXT_KEYS = new Set([
   "name", "decor", "label", "notes", "contact", "company", "clientName", "number",
   "title", "description", "author", "materialName",
+  // dekory płyt (project.materials.decors, project.materialCatalog - core/materialCatalog.js)
+  "Korpus", "Plecy", "Szuflada", "producer", "code",
 ]);
 // Poddrzewa, w których klucze obiektu są danymi (np. nazwa okucia -> cena) - ich wartości
 // to liczby / tablice wartości logicznych, kluczy nie ruszamy.

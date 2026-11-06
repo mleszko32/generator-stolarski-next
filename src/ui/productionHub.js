@@ -13,6 +13,7 @@ import { calculateProjectCost } from "../engine/cost.js";
 import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE, getPartEdges, withEdges, describeEdges } from "../engine/edgeBanding.js";
 import { edgeIconSvg } from "./edgeBandingUi.js";
 import { scheduleCheckpoint } from "../core/history.js";
+import { catalogLabels, addCatalogDecor, partMaterialLabel, DECOR_CATEGORIES } from "../core/materialCatalog.js";
 import { getCornerDepths, getWorldFootprint } from "../core/layout.js";
 import { update3D, captureViewerSnapshot, captureModuleSnapshot } from "../render/viewer3d.js";
 import { buildOfferHtml, getOfferSettings } from "../core/offer.js";
@@ -67,19 +68,50 @@ function partsTable(rows, showModules) {
       <td>${fmt(r.length)} × ${fmt(r.width)}</td>
       <td class="num">${r.qty}</td>
       ${showModules ? `<td>${escapeHtml((r.modules || []).join(', '))}</td>` : ''}
-      <td>${escapeHtml(r.category || '')}</td>
+      <td>${escapeHtml(partMaterialLabel(r, state.project))}</td>
       <td class="eb-cell" data-r="${idx}" style="white-space:nowrap">${edgeIconSvg(edges, { interactive: true })} <span class="hub-sub">${escapeHtml(describeEdges(edges))}</span></td>
     </tr>`;
     }).join('')}</tbody>
   </table>`;
 }
 
+// Wybór dekorów płyt (Korpus / Plecy / Szuflada) z katalogu - podstawia się w kolumnie „Materiał”.
+// Fronty biorą nazwę z cennika materiałów frontów (Kosztorys), wybieranego przy froncie.
+function materialsBarHtml() {
+  const decors = (state.project.materials && state.project.materials.decors) || {};
+  const options = catalogLabels(state.project).map(l => `<option value="${escapeHtml(l)}"></option>`).join('');
+  return `<div class="prop-box mb-8">
+    <datalist id="decor-catalog">${options}</datalist>
+    <div class="hub-sub mb-8">Materiały płyt (wybierz z listy albo wpisz własny; fronty - z cennika w Kosztorysie):</div>
+    <div class="hub-actions" style="flex-wrap: wrap;">
+      ${DECOR_CATEGORIES.map(cat => `<label class="field hub-sub">${cat}:
+        <input type="text" class="input decor-input" data-cat="${cat}" list="decor-catalog" value="${escapeHtml(decors[cat] || '')}" placeholder="np. Egger W1000 ST9 Biały premium" style="min-width: 260px;" />
+      </label>`).join('')}
+    </div>
+  </div>`;
+}
+
+function bindMaterialsBar(el, rerender) {
+  el.querySelectorAll('.decor-input').forEach(input => {
+    input.addEventListener('change', () => {
+      const v = input.value.trim();
+      if (!state.project.materials.decors) state.project.materials.decors = {};
+      if (v) state.project.materials.decors[input.dataset.cat] = v;
+      else delete state.project.materials.decors[input.dataset.cat];
+      // Wpisany spoza listy trafia do katalogu projektu (podpowiedź przy kolejnych wyborach).
+      if (v) addCatalogDecor(state.project, { name: v });
+      scheduleCheckpoint();
+      rerender();
+    });
+  });
+}
+
 function aggregate(rows) {
   const map = new Map();
   rows.forEach(p => {
-    const key = `${p.category}|${p.name}|${p.length}|${p.width}`;
+    const key = `${p.category}|${p.name}|${p.length}|${p.width}|${p.materialId || ''}`;
     if (map.has(key)) map.get(key).qty += p.qty;
-    else map.set(key, { name: p.name, length: p.length, width: p.width, qty: p.qty, category: p.category });
+    else map.set(key, { name: p.name, length: p.length, width: p.width, qty: p.qty, category: p.category, materialId: p.materialId });
   });
   return [...map.values()];
 }
@@ -128,7 +160,8 @@ function renderFormatki(el) {
       return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
     }).forEach(([name, list]) => {
       const count = list.reduce((s, p) => s + (parseInt(p.qty, 10) || 1), 0);
-      body += `<h4 class="hub-group">${escapeHtml(name)} <span>${count} szt.</span></h4>${partsTable(aggregate(list), false)}`;
+      const head = name === 'Front' ? name : partMaterialLabel({ category: name }, state.project);
+      body += `<h4 class="hub-group">${escapeHtml(head)} <span>${count} szt.</span></h4>${partsTable(aggregate(list), false)}`;
     });
   } else {
     body = partsTable(calculateAllProjectParts(), true);
@@ -148,8 +181,10 @@ function renderFormatki(el) {
         <button type="button" id="hub-csv" class="btn btn-sm">Eksport CSV</button>
       </div>
     </div>
+    ${materialsBarHtml()}
     ${body}`;
   el.querySelector('#hub-group').addEventListener('change', e => { groupMode = e.target.value; renderFormatki(el); });
+  bindMaterialsBar(el, () => renderFormatki(el));
   el.querySelectorAll('.hub-group-thumb[data-module-id]').forEach(img => {
     img.addEventListener('click', () => {
       const id = img.getAttribute('data-module-id');
