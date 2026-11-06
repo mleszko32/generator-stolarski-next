@@ -27,7 +27,7 @@ import { getStiffenerSettings } from "../core/shelfStiffener.js";
 import { findKitchenRunAround } from "../core/kitchenRun.js";
 import { openWallFillModal } from "./wallFillModal.js";
 import { BOARD_BACK_MIN, resolveBackPanel } from "../core/backPanel.js";
-import { catalogLabels, assignFrontMaterialByName, frontMaterialSuggestions } from "../core/materialCatalog.js";
+import { catalogLabels, assignFrontMaterialByName, frontMaterialSuggestions, addCatalogDecor } from "../core/materialCatalog.js";
 import { moduleFrontMaterialId, PLINTH_KORPUS } from "../core/plinthMaterial.js";
 
 // Wybór materiału cokołu (mod.legs.plinthMaterial, core/plinthMaterial.js).
@@ -362,6 +362,9 @@ export function initPropertiesPanel() {
       })() : ''}
 
       <div class="property-group"><label>Plecy (Tylko dla szafki):</label><select id="input-back-type"><option value="nut" ${backP.type === 'nut' ? 'selected' : ''}>W nucie</option><option value="nakladane" ${backP.type === 'nakladane' ? 'selected' : ''}>Nakładane</option><option value="wpuszczane" ${backP.type === 'wpuszczane' ? 'selected' : ''}>Wpuszczane (płyta między bokami)</option></select></div>
+      <div class="property-group" id="back-decor-group" style="display: ${backP.type === 'wpuszczane' ? 'none' : 'block'};"><label class="fs-xs">Materiał pleców HDF (puste = jak w projekcie):</label>
+        <input type="text" class="input" id="input-back-decor" list="back-decor-catalog" value="${escapeHtml((backP && backP.decor) || '')}" placeholder="np. HDF Woodeco HU1506 Kaszmirowy Beż 3mm" />
+        <datalist id="back-decor-catalog">${catalogLabels(state.project).filter(l => /hdf/i.test(l)).map(l => `<option value="${escapeHtml(l)}"></option>`).join('')}</datalist></div>
       <div class="prop-box" id="inset-back-options" style="display: ${backP.type === 'wpuszczane' ? 'block' : 'none'};">
         <div class="property-group mb-0"><label class="fs-xs">Grubość pleców (mm):</label><input type="number" id="input-back-thickness" value="${resolveBackPanel(activeModule, state.project).thickness}" /></div>
         <div class="property-group mb-0"><label class="fs-xs">Cofnięcie od tyłu boków (mm):</label><input type="number" id="input-back-inset-offset" value="${backP.insetOffset || 0}" /></div>
@@ -587,9 +590,22 @@ function setupEventListeners() {
         if (insetOptions) insetOptions.style.display = e.target.value === 'wpuszczane' ? 'block' : 'none';
         const overlayOptions = document.getElementById('overlay-back-options');
         if (overlayOptions) overlayOptions.style.display = e.target.value === 'nakladane' ? 'block' : 'none';
+        const decorGroup = document.getElementById('back-decor-group');
+        if (decorGroup) decorGroup.style.display = e.target.value === 'wpuszczane' ? 'none' : 'block';
         updateAll();
     });
   }
+  // Materiał pleców HDF (np. kaszmir do korpusu U702) - formatki „Plecy: <dekor>”, osobna cena i rozkrój.
+  const backDecor = document.getElementById('input-back-decor');
+  if (backDecor) backDecor.addEventListener('change', (e) => {
+    const v = e.target.value.trim();
+    getSelectedMods().forEach(mod => {
+      mod.backPanel = mod.backPanel || {};
+      if (v) mod.backPanel.decor = v; else delete mod.backPanel.decor;
+    });
+    if (v) addCatalogDecor(state.project, { name: v });
+    updateAll();
+  });
   const nutBuildInput = document.getElementById('input-nut-build');
   if (nutBuildInput) nutBuildInput.addEventListener('change', (e) => { getSelectedMods().forEach(mod => { mod.backPanel = mod.backPanel || {}; mod.backPanel.nutBuild = e.target.value; }); updateAll(); });
 

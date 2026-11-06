@@ -8,11 +8,27 @@
 import { EGGER_SAS_DECORS } from "./data/eggerSasDecors.js";
 import { lacquerCode, lacquerSuggestions } from "./lacquerColors.js";
 
+// Płyty HDF 3 mm z cennika SAS (10.2026) - plecy w kolorze korpusu (HU1506 kaszmir do U702).
+const HDF_SAS_DECORS = [
+  "HDF 110 D-PE Biały korpusowy 3mm",
+  "HDF Kronospan 112 PE Jasny Szary 3mm",
+  "HDF Kronospan 164 PE Antracyt 3mm",
+  "HDF Kronospan 190 PE Czarny 3mm",
+  "HDF Woodeco HB0050 Biały dwustronnie lakierowany 3mm",
+  "HDF Woodeco HD3000 Dąb Sonoma 3mm",
+  "HDF Woodeco HD3016 Dąb Artisan II 3mm",
+  "HDF Woodeco HD3037 Dąb olejowany II 3mm",
+  "HDF Woodeco HU1442 Szary ciemny 3mm",
+  "HDF Woodeco HU1506 Kaszmirowy Beż 3mm",
+];
+
 // Wbudowany katalog: płyty Egger z cennika SAS + HDF; inne dekory dopisuje się jako własne pozycje.
 export const BUILTIN_DECORS = Object.freeze([
   ...EGGER_SAS_DECORS.map((d) => ({ producer: "Egger", code: "", name: d.name })),
   { producer: "", code: "", name: "HDF biały 3 mm" },
+  ...HDF_SAS_DECORS.map((name) => ({ producer: "", code: "", name })),
 ]);
+
 
 export const DECOR_CATEGORIES = ["Korpus", "Plecy", "Szuflada"];
 
@@ -48,14 +64,27 @@ export function korpusCategory(decor) {
   return d ? `${KORPUS}: ${d}` : KORPUS;
 }
 
-// Kategoria bazowa do kolejności i reguł („Korpus: U740 PM” -> „Korpus”).
+// Plecy HDF szafki w innym kolorze (mod.backPanel.decor, np. HDF kaszmir): „Plecy: <dekor>”.
+export const PLECY = "Plecy";
+
+export function plecyCategory(decor) {
+  const d = String(decor || "").trim();
+  return d ? `${PLECY}: ${d}` : PLECY;
+}
+
+// Kategoria bazowa do kolejności i reguł („Korpus: U740 PM” -> „Korpus”, „Plecy: HDF …” -> „Plecy”).
 export function baseCategory(category) {
   const c = String(category || "");
-  return c.startsWith(`${KORPUS}: `) ? KORPUS : c;
+  if (c.startsWith(`${KORPUS}: `)) return KORPUS;
+  return c.startsWith(`${PLECY}: `) ? PLECY : c;
 }
 
 export function moduleKorpusDecor(mod) {
   return String((mod && mod.materials && mod.materials.korpusDecor) || "").trim();
+}
+
+export function moduleBackDecor(mod) {
+  return String((mod && mod.backPanel && mod.backPanel.decor) || "").trim();
 }
 
 // Nazwa materiału formatki do listy: front - pozycja cennika frontów (brak/usunięta = pierwsza,

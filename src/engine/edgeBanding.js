@@ -14,6 +14,8 @@
 // tożsamość co wiersz listy formatek, więc dwa fronty o tych samych wymiarach w różnych
 // materiałach mają osobne ustawienia. Stary klucz bez materiału (projekty sprzed tej
 // zmiany) dalej działa jako zapasowy.
+import { baseCategory } from "../core/materialCatalog.js";
+
 export const EDGE_BANDING_EXCLUDED_CATEGORIES = ['Plecy', 'Blat'];
 // Zapas okleiny doliczany do zamówienia (odpad na końcach, docinanie).
 export const EDGE_BANDING_RESERVE = 0.10;
@@ -22,7 +24,7 @@ export const EDGE_BANDING_RESERVE = 0.10;
 export const EDGE_NAMES = ['dłuższa 1', 'dłuższa 2', 'krótsza 1', 'krótsza 2'];
 
 export function isEdgeBanded(part) {
-  return !EDGE_BANDING_EXCLUDED_CATEGORIES.includes(part.category);
+  return !EDGE_BANDING_EXCLUDED_CATEGORIES.includes(baseCategory(part.category)); // „Plecy: HDF …” też bez okleiny
 }
 
 const baseEdgeKey = (part) => `${part.category}|${part.name}|${part.length}|${part.width}`;

@@ -12,6 +12,8 @@ export const FLAP_BOARD_DENSITY = 660;
 // Puszki zawiasów: oś 21,5 mm od górnej krawędzi frontu, skrajne 100 mm od boków frontu.
 export const FLAP_CUP_FROM_EDGE = 21.5;
 export const FLAP_HINGE_INSET = 100;
+// Prowadnik krzyżakowy 173L6100 pod wieńcem górnym: otwory 37 mm od przodu (jak na boku drzwi).
+export const FLAP_PLATE_FROM_FRONT = 37;
 
 // Siłowniki HK-XS TIP-ON z zakresem współczynnika mocy LF = wysokość frontu [mm] × masa [kg].
 // Zakres 20K1501T jak w opisie zestawu SAS „moc 800 - 1600”; inne siłowniki - dobór ręczny.

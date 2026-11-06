@@ -14,7 +14,7 @@ import { getBlindPanel, getBlindStile, blindGeometry, getBlindCorner } from "../
 import { isFlap } from "../core/liftFlap.js";
 import { splitPlinthRun, maxPlinthLength } from "./plinthSplit.js";
 import { shelfStiffener } from "../core/shelfStiffener.js";
-import { KORPUS, korpusCategory, moduleKorpusDecor } from "../core/materialCatalog.js";
+import { KORPUS, korpusCategory, moduleKorpusDecor, PLECY, plecyCategory, moduleBackDecor } from "../core/materialCatalog.js";
 import { plinthMaterial } from "../core/plinthMaterial.js";
 import { moduleBoardThickness, sidePanelLayers } from "../core/boardThickness.js";
 
@@ -165,7 +165,9 @@ export function collectProjectParts() {
 
     // Dekor korpusu tej szafki: formatki z płyty korpusu -> „Korpus: <dekor>” (fronty, szuflady, HDF bez zmian).
     const korpusCat = korpusCategory(moduleKorpusDecor(mod));
-    allParts.push(...modParts.map(p => ({ ...p, category: p.category === KORPUS ? korpusCat : p.category, moduleName: mod.name })));
+    // Plecy HDF w kolorze wybranym przy szafce (mod.backPanel.decor) -> „Plecy: <dekor>”.
+    const plecyCat = plecyCategory(moduleBackDecor(mod));
+    allParts.push(...modParts.map(p => ({ ...p, category: p.category === KORPUS ? korpusCat : p.category === PLECY ? plecyCat : p.category, moduleName: mod.name })));
   });
 
   // Boki dokładane (core/state.js: addSidePanel) NIE należą do żadnego

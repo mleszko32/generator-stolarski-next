@@ -21,6 +21,18 @@ describe("instrukcja szafki - formatki korpusu z otworami", () => {
     byId(panels, "bok-prawy").holes.filter((h) => h.to === "wieniec dolny").forEach((h) => expect(h.y).toBe(9));
   });
 
+  it("klapa do góry: prowadniki zawiasów pod wieńcem górnym (37 od przodu, ±16), boki bez zawiasów", () => {
+    const mod = baseModule({ elements: [fullZoneFront({ openingSide: "top" })] });
+    const project = setup(mod);
+    const panels = getCabinetPanels(mod, project);
+    const plates = byId(panels, "wieniec-gorny").holes.filter((h) => h.to.startsWith("prowadnik zawiasu klapy"));
+    expect(plates).toHaveLength(4);
+    plates.forEach((h) => expect(h.z).toBe(37));
+    // front 597 szer. od x 1,5: puszki 100 mm od krawędzi frontu -> osie na wieńcu 1,5 + 100 - 18 = 83,5 i 480,5
+    expect(plates.map((h) => h.x)).toEqual([67.5, 99.5, 464.5, 496.5]);
+    expect(byId(panels, "bok-lewy").holes.some((h) => h.kind === "zawias")).toBe(false);
+  });
+
   it("boki: łączniki wieńców (wkręt 37 / kołek 69 od przodu i tyłu, w osi wieńca)", () => {
     const mod = baseModule();
     const project = setup(mod);

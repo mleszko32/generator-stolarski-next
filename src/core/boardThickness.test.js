@@ -36,6 +36,21 @@ describe("grubość płyty z dekoru", () => {
   });
 });
 
+describe("materiał pleców HDF per szafka", () => {
+  it("plecy szafki z dekorem HDF to osobna kategoria „Plecy: …”, bez okleiny", async () => {
+    const { isEdgeBanded } = await import("../engine/edgeBanding.js");
+    setProject(freshProject({
+      modules: [
+        baseModule({ id: "a", name: "A", backPanel: { decor: "HDF Woodeco HU1506 Kaszmirowy Beż 3mm" } }),
+        baseModule({ id: "b", name: "B", position: { x: 600, y: 0, z: 0 } }),
+      ],
+    }));
+    const backs = calculateAllProjectParts().filter((p) => p.name.startsWith("Plecy"));
+    expect(backs.map((p) => p.category).sort()).toEqual(["Plecy", "Plecy: HDF Woodeco HU1506 Kaszmirowy Beż 3mm"]);
+    backs.forEach((p) => expect(isEdgeBanded(p)).toBe(false));
+  });
+});
+
 describe("płyty sklejane (36 mm = 2 × 18 mm)", async () => {
   const { sidePanelLayers, applyPanelDecorThickness } = await import("./boardThickness.js");
   const project = { materials: { boardThickness: 18 } };

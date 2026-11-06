@@ -23,6 +23,7 @@ import { num, round1 } from "../utils/math.js";
 import { getBlindStile, blindGeometry, getBlindCorner, PARALLEL_PLATE_INSET } from "../core/blindCorner.js";
 import { SHELF_PIN_DROP, SHELF_PIN_OFFSETS } from "../core/hingeMath.js";
 import { moduleBoardThickness } from "../core/boardThickness.js";
+import { isFlap, flapHinges, FLAP_PLATE_FROM_FRONT } from "../core/liftFlap.js";
 const EPS = 2;
 
 // Średnice i głębokości (jak legenda rysunku 2D: kołek Ø8 + wkręt, podpórki / prowadnice /
@@ -172,20 +173,29 @@ export function getCabinetPanels(mod, project) {
     return ["lewe", "prawe"].flatMap((ed) => zs.map(([z, kind]) => ({ edge: ed, x: ed === "lewe" ? 0 : round1(tbW), z: round1(z), kind, ...edge(kind), to: ed === "lewe" ? "bok lewy" : "bok prawy" })));
   };
   const fullJoints = setsToKinds(tbDepth);
+  // Klapy do góry (core/liftFlap.js): prowadniki zawiasów od spodu wieńca górnego / trawersu
+  // przedniego - 2 otwory na linii 37 mm od przodu, ±16 mm od osi puszki.
+  const flapPlateHoles = fronts.filter((f) => isFlap(f) && num(f.y) + num(f.h) >= H - th - 5).flatMap((f) =>
+    flapHinges(f).flatMap((hg) => [-16, 16].map((dx) => ({
+      edge: "lico", x: round1(num(f.x) + hg.x + dx - (isFull ? 0 : th)), z: FLAP_PLATE_FROM_FRONT, kind: "zawias", ...face("zawias"),
+      to: "prowadnik zawiasu klapy (od spodu)", hingeX: round1(num(f.x) + hg.x - (isFull ? 0 : th)),
+    }))));
+  const flapNote = flapPlateHoles.length ? { note: "od spodu: prowadniki zawiasów klapy; mocowanie korpusu podnośnika AVENTOS HK-XS na boku wg szablonu Blum" } : {};
   panels.push({ id: "wieniec-dolny", kind: "poziom", name: "Wieniec dolny", qty: 1, length: round1(tbW), width: round1(tbDepth - sb), thickness: th,
     ...(sb ? { setback: sb, note: `cofnięty o ${round1(sb)} mm od przodu boków` } : {}),
     holes: [...sideJoints(sb ? setsToKinds(tbDepth - sb) : fullJoints), ...pionHolesFor("wieniec-dolny", tbDepth - sb), ...(sb ? [] : stileWieniecHoles)] });
   const trav = getTraverseConfig(cons);
   if (cons.topType === "pelny") {
-    panels.push({ id: "wieniec-gorny", kind: "poziom", name: "Wieniec górny", qty: 1, length: round1(tbW), width: round1(tbDepth), thickness: th,
-      holes: [...sideJoints(fullJoints), ...pionHolesFor("wieniec-gorny"), ...stileWieniecHoles] });
+    panels.push({ id: "wieniec-gorny", kind: "poziom", name: "Wieniec górny", qty: 1, length: round1(tbW), width: round1(tbDepth), thickness: th, ...flapNote,
+      holes: [...sideJoints(fullJoints), ...pionHolesFor("wieniec-gorny"), ...stileWieniecHoles, ...flapPlateHoles] });
   } else if (cons.topType === "trawersy_poziom") {
     [["front", "Trawers przedni (poziomy)", 0, [[37, "wkret"], [69, "kolek"]]], ["rear", "Trawers tylny (poziomy)", null, [[tbDepth - 69, "kolek"], [tbDepth - 37, "wkret"]]]].forEach(([key, name, z0, zs]) => {
       if (!trav[key].active) return;
       const tw = num(trav[key].width, 100);
       const start = z0 === null ? tbDepth - tw : 0;
-      panels.push({ id: `trawers-${key}`, kind: "poziom", name, qty: 1, length: round1(tbW), width: round1(tw), thickness: th,
-        holes: sideJoints(zs.map(([z, k]) => [z - start, k])) });
+      const flap = key === "front" && tw > FLAP_PLATE_FROM_FRONT + 10 ? flapPlateHoles : [];
+      panels.push({ id: `trawers-${key}`, kind: "poziom", name, qty: 1, length: round1(tbW), width: round1(tw), thickness: th, ...(flap.length ? flapNote : {}),
+        holes: [...sideJoints(zs.map(([z, k]) => [z - start, k])), ...flap] });
     });
   } else if (cons.topType === "trawersy_pion") {
     [["front", "Trawers przedni (pionowy)"], ["rear", "Trawers tylny (pionowy)"]].forEach(([key, name]) => {
