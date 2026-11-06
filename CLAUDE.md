@@ -318,6 +318,9 @@ kodu przeciągania/przyciągania/listy/właściwości boków dokładanych i daj�
 `migrateLegacyFillers` (wołane z `ensureSidePanelsDefaults`: przy starcie, wczytaniu projektu,
 cofaniu i wstawieniu szablonu z biblioteki) i usuwane — reszta kodu nie czyta już `mod.fillers`.
 Nowa droga wprowadzania modułów do projektu musi też przejść przez `ensureSidePanelsDefaults`.
+**Panel poziomy** (`kind: 'poziomy'`, `addHorizontalPanel`) to też wpis w `project.sidePanels`: płyta leżąca poza
+szafkami (półka/wieniec w niszy), `dimensions.width` = długość X, `height` = grubość, `depth` = Z, `position.y` = spód;
+formatka kategorii Korpus z `defaultEdges` (okleina tylko z przodu), pilot: `gsn.panel("poziomy", {...})`.
 Stronę zawiasów pojedynczych drzwi wybiera się w edytorze wnętrza („Drzwi - zawias z
 lewej/prawej”), nie w zakładce Front.
 

@@ -167,7 +167,7 @@ export function collectProjectParts() {
   // więc trafiają do wspólnej listy formatek projektu, ale nie do
   // calculateParts() (lista formatek AKTYWNEGO modułu).
   (config.sidePanels || []).forEach(panel => {
-    allParts.push(...getSidePanelParts(panel, config).map(p => ({ ...p, moduleName: panel.name || (panel.kind === 'blenda' ? 'Blenda' : 'Bok dokładany') })));
+    allParts.push(...getSidePanelParts(panel, config).map(p => ({ ...p, moduleName: panel.name || (panel.kind === 'blenda' ? 'Blenda' : panel.kind === 'poziomy' ? 'Panel poziomy' : 'Bok dokładany') })));
   });
 
   // Szafka narożna (mod.type === 'corner_cabinet') wyłączona z tego wspólnego
@@ -281,6 +281,7 @@ export function calculateAllProjectParts() {
              width: part.width,
              qty: part.qty,
              materialId: part.materialId,
+             defaultEdges: part.defaultEdges,
              modules: [part.moduleName]
          };
      }
@@ -453,6 +454,19 @@ function getBlendaParts(panel, config) {
 // z frontami, dając realną sumę m² tego dekoru do wyceny.
 function getSidePanelParts(panel, config) {
   if (panel.kind === 'blenda') return getBlendaParts(panel, config);
+  if (panel.kind === 'poziomy') {
+    // Panel poziomy (core/state.js: addHorizontalPanel): płyta korpusu długość × głębokość,
+    // okleina domyślnie tylko na jednej dłuższej krawędzi (przód).
+    const label = panel.decor ? `Panel poziomy (${panel.decor})` : 'Panel poziomy';
+    return [{
+      name: panel.name ? `${label} — ${panel.name}` : label,
+      length: parseFloat(panel.dimensions?.width) || 0,
+      width: parseFloat(panel.dimensions?.depth) || 0,
+      qty: 1,
+      category: "Korpus",
+      defaultEdges: [true, false, false, false],
+    }];
+  }
   // Płyta leżąca (szersza niż wysoka - blat biurka, półka ścienna): formatka szerokość × głębokość.
   const w = parseFloat(panel.dimensions?.width) || 0, h = parseFloat(panel.dimensions?.height) || 0;
   const flat = w > h;

@@ -393,6 +393,7 @@ export function addSlopeModule() {
 // różnią się kształtem (blenda to listwa z czołem i kołnierzem mocującym) i formatkami.
 export function addSidePanel(kind = 'bok') {
   if (kind === 'blenda') return addBlenda();
+  if (kind === 'poziomy') return addHorizontalPanel();
   const newId = 'side-' + Date.now();
   const room = state.project.room || DEFAULT_ROOM;
   const bokCount = state.project.sidePanels.filter(p => p.kind !== 'blenda').length;
@@ -418,6 +419,28 @@ export function addSidePanel(kind = 'bok') {
   state.activeSidePanelId = newId;
   state.activeModuleId = null;
 
+  return newPanel;
+}
+
+// Panel poziomy: samodzielna płyta leżąca (półka/wieniec w niszy, poza szafkami) - bok
+// dokładany położony na płasko. dimensions: width = długość w osi X, height = grubość,
+// depth = głębokość w osi Z; position.y = spód płyty. Formatka z płyty korpusu
+// (engine/cabinet.js: getSidePanelParts), okleina domyślnie na przedniej krawędzi.
+export function addHorizontalPanel() {
+  const newId = 'poziomy-' + Date.now();
+  const count = state.project.sidePanels.filter(p => p.kind === 'poziomy').length;
+  const newPanel = {
+    id: newId,
+    kind: 'poziomy',
+    name: 'Panel poziomy ' + (count + 1),
+    decor: '',
+    position: { x: 0, y: 720, z: 0 },
+    rotation: 0,
+    dimensions: { width: 800, height: parseFloat(state.project.materials?.boardThickness) || 18, depth: 300 },
+  };
+  state.project.sidePanels.push(newPanel);
+  state.activeSidePanelId = newId;
+  state.activeModuleId = null;
   return newPanel;
 }
 

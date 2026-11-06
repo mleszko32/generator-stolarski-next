@@ -1643,7 +1643,8 @@ export function update3D() {
                   else addBox(W, bth, fd, -W / 2, -H / 2, -D / 2, 'corpus', isActiveSide, ud, panelGroup);
               }
           } else {
-              addBox(W, H, D, -W / 2, -H / 2, -D / 2, 'front', isActiveSide, { sidePanelId: panel.id }, panelGroup);
+              // panel poziomy z płyty korpusu, bok dokładany w dekorze frontów
+              addBox(W, H, D, -W / 2, -H / 2, -D / 2, panel.kind === 'poziomy' ? 'corpus' : 'front', isActiveSide, { sidePanelId: panel.id }, panelGroup);
           }
 
           cabinetGroup.add(panelGroup);

@@ -69,8 +69,41 @@ function renderBlendaProperties(rightSidebar, panel) {
   if (flangeSel) flangeSel.addEventListener('change', (e) => { panel.flange = e.target.value; update3D(); updateSidebar(); });
 }
 
+// Panel poziomy (core/state.js: addHorizontalPanel) - płyta korpusu, więc bez cennika frontów.
+function renderHorizontalPanelProperties(rightSidebar, panel) {
+  const d = panel.dimensions;
+  rightSidebar.innerHTML = `
+    ${propHeaderHtml({ name: panel.name, dims: `${d.width}×${d.depth}×${d.height}`, extra: 'panel poziomy', nameId: 'input-side-name', nameLabel: 'Nazwa:' })}
+
+    ${sectionHtml('wymiary', `
+      <h3>Wymiary</h3>
+      <div class="property-group"><label>Długość w osi X (mm):</label><input type="number" id="input-side-width" value="${d.width}" /></div>
+      <div class="property-group"><label>Głębokość w osi Z (mm):</label><input type="number" id="input-side-depth" value="${d.depth}" /></div>
+      <div class="property-group"><label>Grubość płyty (mm):</label><input type="number" id="input-side-height" value="${d.height}" /></div>
+
+      <hr class="divider">
+
+      ${positionRotationHtml({
+        prefix: 'input-side-pos', position: panel.position, rotation: panel.rotation, rotClass: 'btn-side-rotate',
+        yLabel: 'Wysokość spodu płyty (Y) [mm]:',
+        hint: 'Płyta leżąca poza szafkami, np. półka albo wieniec w niszy. Formatka z płyty korpusu, okleina domyślnie na przedniej krawędzi (zmienisz ją w hubie, w tabeli Formatki).',
+      })}
+    `)}
+
+    ${sectionHtml('material', `
+      <h3>Materiał i dekor</h3>
+      <div class="property-group">
+        <label>Dekor (opis do formatki):</label>
+        <input type="text" id="input-side-decor" value="${escapeHtml(panel.decor || '')}" placeholder="pusty = dekor korpusu" />
+      </div>
+    `)}
+  `;
+  bindSidePanelInputs(rightSidebar, panel);
+}
+
 export function renderSidePanelProperties(rightSidebar, panel) {
   if (panel.kind === 'blenda') { renderBlendaProperties(rightSidebar, panel); return; }
+  if (panel.kind === 'poziomy') { renderHorizontalPanelProperties(rightSidebar, panel); return; }
   const d = panel.dimensions;
   rightSidebar.innerHTML = `
     ${propHeaderHtml({ name: panel.name, dims: `${d.width}×${d.height}×${d.depth}`, extra: 'bok dokładany', nameId: 'input-side-name', nameLabel: 'Nazwa:' })}

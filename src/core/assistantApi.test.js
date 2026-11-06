@@ -2,9 +2,35 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   findModule, projectOverview, listZones, zoneAt, splitZone, addShelves, setFront,
   clearFronts, removeDivider, moveDivider, setStructural, patchModule, projectIssues,
+  addPanel, findPanel, patchPanel,
 } from "./assistantApi.js";
 import { state } from "./state.js";
 import { freshProject, setProject, baseModule } from "../test/fixtures.js";
+import { calculateAllProjectParts } from "../engine/cabinet.js";
+import { getPartEdges, withEdges } from "../engine/edgeBanding.js";
+
+describe("panel poziomy (sidePanels kind 'poziomy')", () => {
+  beforeEach(() => setProject(freshProject({ modules: [], sidePanels: [] })));
+
+  it("wstawia płytę leżącą z wymiarami i daje formatkę z płyty korpusu", () => {
+    const p = addPanel("poziomy", { name: "Wieniec nisza", dimensions: { width: 2102, depth: 383 }, position: { x: 1688, y: 2132, z: 0 } });
+    expect(p).toMatchObject({ kind: "poziomy", dimensions: { width: 2102, height: 18, depth: 383 }, position: { x: 1688, y: 2132, z: 0 } });
+    expect(findPanel("wieniec nisza")).toBe(p);
+    const part = calculateAllProjectParts().find((x) => x.name.includes("Wieniec nisza"));
+    expect(part).toMatchObject({ name: "Panel poziomy — Wieniec nisza", length: 2102, width: 383, qty: 1, category: "Korpus" });
+    // okleina domyślnie tylko na jednej dłuższej krawędzi; kliknięcie da się cofnąć do domyślnej
+    expect(getPartEdges(part)).toEqual([true, false, false, false]);
+    expect(withEdges({}, part, [true, false, false, false])).toEqual({});
+  });
+
+  it("zmiana pól i ochrona id / rodzaju", () => {
+    const p = addPanel("poziomy", {});
+    patchPanel(p, { position: { y: 819 } });
+    expect(p.position).toMatchObject({ y: 819 });
+    expect(() => patchPanel(p, { kind: "bok" })).toThrow();
+    expect(() => addPanel("szafa")).toThrow();
+  });
+});
 
 describe("assistantApi — pilot dla Claude'a", () => {
   let mod;

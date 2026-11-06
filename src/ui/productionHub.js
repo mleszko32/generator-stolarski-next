@@ -111,7 +111,7 @@ function aggregate(rows) {
   rows.forEach(p => {
     const key = `${p.category}|${p.name}|${p.length}|${p.width}|${p.materialId || ''}`;
     if (map.has(key)) map.get(key).qty += p.qty;
-    else map.set(key, { name: p.name, length: p.length, width: p.width, qty: p.qty, category: p.category, materialId: p.materialId });
+    else map.set(key, { name: p.name, length: p.length, width: p.width, qty: p.qty, category: p.category, materialId: p.materialId, defaultEdges: p.defaultEdges });
   });
   return [...map.values()];
 }

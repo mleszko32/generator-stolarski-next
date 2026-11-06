@@ -43,6 +43,11 @@ ZMIANY (każda odświeża aplikację; cofnięcie: undo())
   removeDivider(szafka, wnęka)  usuń dzielnik (scala wnękę)
   add(typ)                      nowa szafka: base_cabinet | upper_cabinet | tall_cabinet
   duplicate(szafka) / remove(szafka)
+  panel(rodzaj, pola)           nowy bok / blenda / panel poziomy: rodzaj bok | blenda | poziomy
+                                panel poziomy: dimensions { width: długość X, depth: głębokość Z, height: grubość },
+                                position { x, z, y: spód płyty }, decor; np. panel("poziomy", { name: "Półka",
+                                dimensions: { width: 2102, depth: 300 }, position: { x: 1688, y: 819, z: 0 } })
+  setPanel(nazwa, zmiana) / removePanel(nazwa)
   undo() / redo()               szybka seria poleceń to jeden krok historii`;
 
 function refresh() {
@@ -108,6 +113,14 @@ export function initAssistantBridge() {
     add: change((type) => addModule(type).name),
     duplicate: change((ref) => duplicateModule(mod(ref).id)?.name),
     remove: change((ref) => { const m = mod(ref); deleteModule(m.id); return `Usunięto „${m.name}”`; }),
+    panel: change((kind, props) => JSON.parse(JSON.stringify(api.addPanel(kind, props)))),
+    setPanel: change((ref, patch) => JSON.parse(JSON.stringify(api.patchPanel(api.findPanel(ref), patch)))),
+    removePanel: change((ref) => {
+      const p = api.findPanel(ref);
+      state.project.sidePanels = state.project.sidePanels.filter((x) => x !== p);
+      if (state.activeSidePanelId === p.id) state.activeSidePanelId = null;
+      return `Usunięto „${p.name}”`;
+    }),
 
     undo: () => { const ok = undo(); if (ok) { updateRoom(); refresh(); } return ok; },
     redo: () => { const ok = redo(); if (ok) { updateRoom(); refresh(); } return ok; },

@@ -8,7 +8,7 @@
 // Wnęki adresujemy ścieżką w drzewie BSP wnętrza (core/zoneTree.js): "" = całe wnętrze,
 // potem litery a/b. Przy podziale półką (oś 'h') a = dół, b = góra; przy przegrodzie
 // (oś 'v') a = lewa, b = prawa. Np. "ba" = góra całości, a w niej lewa kolumna.
-import { state } from "./state.js";
+import { state, addSidePanel } from "./state.js";
 import {
   buildZoneTree, splitZoneHorizontal, splitZoneVertical, addEvenShelves,
   assignFront, removeSplit, moveSplit,
@@ -185,6 +185,31 @@ export function patchModule(mod, patch) {
   mergeInto(mod, patch);
   recalculateLayout(mod);
   return mod;
+}
+
+// Bok dokładany / blenda / panel poziomy po id albo nazwie (bez względu na wielkość liter).
+export function findPanel(ref, project = state.project) {
+  const list = project.sidePanels || [];
+  const low = String(ref).toLowerCase();
+  const hit = list.find((p) => p.id === ref) || list.find((p) => String(p.name || "").toLowerCase() === low);
+  if (!hit) throw new Error(`Nie ma boku / blendy / panelu „${ref}”.`);
+  return hit;
+}
+
+// Nowy element project.sidePanels ('bok' | 'blenda' | 'poziomy') z polami z props (głębokie scalenie),
+// np. addPanel("poziomy", { name: "Półka", dimensions: { width: 2102, depth: 300 }, position: { x: 1688, y: 819, z: 0 } }).
+export function addPanel(kind = "bok", props = {}) {
+  if (!["bok", "blenda", "poziomy"].includes(kind)) throw new Error("Rodzaj: bok | blenda | poziomy.");
+  const panel = addSidePanel(kind);
+  if (props) patchPanel(panel, props);
+  return panel;
+}
+
+export function patchPanel(panel, patch) {
+  if (!isPlain(patch)) throw new Error("Zmiana musi być obiektem, np. { position: { y: 2132 } }.");
+  if ("id" in patch || "kind" in patch) throw new Error("Id i rodzaju elementu się nie zmienia.");
+  mergeInto(panel, patch);
+  return panel;
 }
 
 // Błędy i ostrzeżenia z kontroli projektu (bez informacji).

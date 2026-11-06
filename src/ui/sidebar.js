@@ -116,7 +116,10 @@ export function updateSidebar() {
     <section class="panel-section">
       <div class="panel-head">
         <h2>Boki dokładane</h2>
-        <button id="btn-add-side-panel" class="btn btn-sm" title="Dekoracyjny panel niezależny od szafek, np. na cały słup"><i class="ti ti-plus" aria-hidden="true"></i> Dodaj</button>
+        <div class="li-actions">
+          <button id="btn-add-side-panel" class="btn btn-sm" title="Dekoracyjny panel niezależny od szafek, np. na cały słup"><i class="ti ti-plus" aria-hidden="true"></i> Bok</button>
+          <button id="btn-add-horizontal-panel" class="btn btn-sm" title="Płyta leżąca poza szafkami: półka albo wieniec w niszy (płyta korpusu)"><i class="ti ti-plus" aria-hidden="true"></i> Poziomy</button>
+        </div>
       </div>`;
 
   // Boki dokładane i blendy (core/state.js: addSidePanel / addBlenda) - samodzielne
@@ -133,7 +136,10 @@ export function updateSidebar() {
   const boks = state.project.sidePanels.filter(p => p.kind !== 'blenda');
   const blendy = state.project.sidePanels.filter(p => p.kind === 'blenda');
   if (boks.length === 0) html += `<div class="empty-note">Brak boków dokładanych.</div>`;
-  boks.forEach(p => { html += sideItem(p, 'ti-layout-board', 'Bok dokładany', 'Usuń bok dokładany', `${p.dimensions.height} × ${p.dimensions.depth}`); });
+  boks.forEach(p => {
+    if (p.kind === 'poziomy') html += sideItem(p, 'ti-layout-rows', 'Panel poziomy', 'Usuń panel poziomy', `${p.dimensions.width} × ${p.dimensions.depth}, Y ${p.position?.y ?? 0}`);
+    else html += sideItem(p, 'ti-layout-board', 'Bok dokładany', 'Usuń bok dokładany', `${p.dimensions.height} × ${p.dimensions.depth}`);
+  });
 
   html += `
     </section>
@@ -301,6 +307,14 @@ export function updateSidebar() {
       initPropertiesPanel(); update3D(); updateSidebar();
     });
   }
+
+  document.getElementById('btn-add-horizontal-panel')?.addEventListener('click', () => {
+    const panel = addSidePanel('poziomy');
+    const at = snapSidePanel(panel, 0, 0, state.project);
+    panel.position.x = at.x;
+    panel.position.z = at.z;
+    initPropertiesPanel(); update3D(); updateSidebar();
+  });
 
   document.querySelectorAll('.side-panel-item').forEach(el => {
     el.addEventListener('click', (e) => {

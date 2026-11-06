@@ -76,7 +76,7 @@ export function buildOfferHtml({ project, cost, snapshot, now = new Date() }) {
 
   const extras = [];
   if (project.worktop && project.worktop.enabled) extras.push("blat roboczy");
-  const boks = (project.sidePanels || []).filter((p) => p.kind !== "blenda").length;
+  const boks = (project.sidePanels || []).filter((p) => p.kind !== "blenda" && p.kind !== "poziomy").length;
   const blendy = (project.sidePanels || []).filter((p) => p.kind === "blenda").length;
   if (boks) extras.push(`${boks} ${plural(boks, "bok dokładany", "boki dokładane", "boków dokładanych")}`);
   if (blendy) extras.push(`${blendy} ${plural(blendy, "blenda", "blendy", "blend")}`);

@@ -36,6 +36,8 @@ export function edgeKey(part) {
 export function getPartEdges(part, rules = null) {
   const r = rules && (rules[edgeKey(part)] || rules[baseEdgeKey(part)]);
   if (Array.isArray(r) && r.length === 4) return r.map(Boolean);
+  // Formatka może mieć własny domyślny wybór (np. panel poziomy - tylko przód).
+  if (Array.isArray(part.defaultEdges) && part.defaultEdges.length === 4) return part.defaultEdges.map(Boolean);
   const all = isEdgeBanded(part);
   return [all, all, all, all];
 }
@@ -44,10 +46,10 @@ export function getPartEdges(part, rules = null) {
 // Zwraca nową mapę reguł (nie mutuje argumentu).
 export function withEdges(rules, part, edges) {
   const next = { ...(rules || {}) };
-  const def = isEdgeBanded(part);
+  const def = getPartEdges(part, null);
   // Wybór równy domyślnemu usuwa wpis - chyba że zostałby stary klucz bez materiału, który
   // by go nadpisał; wtedy zapisujemy domyślny wybór jawnie.
-  if (edges.every((e) => e === def) && !(part.materialId && next[baseEdgeKey(part)])) delete next[edgeKey(part)];
+  if (edges.every((e, i) => Boolean(e) === def[i]) && !(part.materialId && next[baseEdgeKey(part)])) delete next[edgeKey(part)];
   else next[edgeKey(part)] = edges.map(Boolean);
   return next;
 }
