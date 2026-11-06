@@ -106,7 +106,7 @@ function cabinetCard(mod, idx, layouts) {
   const scale = cabinetDrawingScale(panels);
   const consText = [
     cons.isFull ? "wieńce pełne (boki między wieńcami)" : "boki do ziemi (wieńce między bokami)",
-    cons.topType === "pelny" ? "wieniec górny" : cons.topType === "trawersy_poziom" ? "trawersy poziome" : "trawersy pionowe",
+    cons.topType === "pelny" ? "wieniec górny" : cons.topType === "trawersy_poziom" ? "trawersy poziome" : cons.topType === "brak" ? "bez wieńca górnego (pod blatem)" : "trawersy pionowe",
     cons.backType === "nut" ? "plecy w nucie" : "plecy nakładane",
     cons.legs ? `nóżki ${cons.legsHeight} mm${cons.plinth ? " + cokół" : ""}` : "bez nóżek",
   ].join(" · ");

@@ -23,6 +23,7 @@
 import { moduleBoardThickness } from "./boardThickness.js";
 import { state } from "./state.js";
 import { autoDistributeShelves } from "./shelfMath.js";
+import { topInnerY } from "./topType.js";
 import { getCornerArmRect } from "./layout.js";
 import { getSlopeInnerRect } from "./slopeCabinet.js";
 
@@ -51,9 +52,7 @@ export function getCabinetInnerRect(mod) {
   const W = parseFloat(mod.dimensions.width) || 600;
   const H = parseFloat(mod.dimensions.height) || 720;
   const cons = getConsForModule(mod);
-  const hasTraverses = cons.topType.includes("trawersy");
-  const isVerticalTraverse = cons.topType === "trawersy_pion";
-  const topY = hasTraverses && isVerticalTraverse ? H - (parseFloat(cons.traverseWidth) || 100) : H - th;
+  const topY = topInnerY(cons, H, th);
   return { minX: th, maxX: W - th, minY: th, maxY: topY };
 }
 

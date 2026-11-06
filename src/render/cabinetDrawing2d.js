@@ -324,7 +324,7 @@ export function cabinetStepsHtml(cons, panels) {
     "Wklej kołki w czoła wieńców" + (fixedShelves ? ", półek stałych" : "") + (has("przegroda") ? " i przegród" : "") + (cons.isFull ? " (przy wieńcach przelotowych: w czoła boków)." : "."),
     cons.isFull
       ? "Połóż wieniec dolny, wstaw w niego boki (na kołki) i przykręć wkrętami od spodu wieńca."
-      : "Połóż bok lewy wewnętrzną stroną do góry, wstaw wieniec dolny i " + (cons.topType === "pelny" ? "górny" : "trawersy") + " na kołki.",
+      : "Połóż bok lewy wewnętrzną stroną do góry, wstaw wieniec dolny" + (cons.topType === "brak" ? "" : " i " + (cons.topType === "pelny" ? "górny" : "trawersy")) + " na kołki.",
     has("przegroda") ? "Wstaw przegrody między wieniec / półki i przykręć je przez wieńce." : null,
     has("listwa-slepa") ? "Wstaw listwę szafki ślepej między wieńce (lico równo z czołem korpusu) i przykręć ją przez wieńce." : null,
     fixedShelves ? "Wstaw półki stałe na kołki." : null,
@@ -332,6 +332,7 @@ export function cabinetStepsHtml(cons, panels) {
     cons.isFull
       ? "Nałóż wieniec górny " + (cons.topType === "pelny" ? "" : "/ trawersy ") + "i przykręć wkrętami."
       : "Nałóż bok prawy i skręć korpus wkrętami przez boki.",
+    cons.topType === "brak" ? "Korpus bez wieńca górnego: boki (i przegrody) przykręć od góry do blatu kątownikami / wkrętami." : null,
     "Sprawdź przekątne korpusu (kąt prosty).",
     cons.backType !== "nut" ? "Przybij lub przykręć plecy od tyłu (wyrównują korpus w kącie prostym)." : null,
     cons.legs ? `Przykręć nóżki (${cons.legsHeight} mm)${cons.plinth ? " i zatrzaski cokołu" : ""}.` : null,

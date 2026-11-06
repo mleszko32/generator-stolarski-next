@@ -16,6 +16,7 @@ import { assignFront } from "./zoneTree.js";
 import { getSlopeInnerRect } from "./slopeCabinet.js";
 import { applyBlindCorner } from "./blindCorner.js";
 import { moduleBoardThickness } from "./boardThickness.js";
+import { topInnerY } from "./topType.js";
 
 // Przelicza layout wszystkich modułów projektu. Wołaj przed każdym liczeniem
 // formatek/okuć całego projektu — fronty z sąsiednich modułów też muszą mieć
@@ -253,9 +254,6 @@ export function recalculateLayout(mod) {
   const cBottom = parseFloat(fc.bottom ?? fc.dol ?? 2) || 0;
 
   const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(config.construction || {}), ...(mod.construction || {}) };
-  const hasTraverses = cons.topType.includes('trawersy');
-  const isVerticalTraverse = cons.topType === 'trawersy_pion';
-  const traverseWidth = cons.traverseWidth || 100;
   // Szafka pod skos: granice cab-* z prostokąta wnętrza skosu (wnętrze do
   // najwyższego miejsca pod skosem; skos docina fronty dopiero w core/slopeCabinet.js).
   const slopeRect = mod.type === 'slope_cabinet' ? getSlopeInnerRect(mod, th) : null;
@@ -297,10 +295,7 @@ export function recalculateLayout(mod) {
                   if (id === 'cab-left') return th;
                   if (id === 'cab-right') return width - th;
                   if (id === 'cab-bottom') return th;
-                  if (id === 'cab-top') {
-                      if (hasTraverses) return isVerticalTraverse ? height - traverseWidth : height - th;
-                      return height - th;
-                  }
+                  if (id === 'cab-top') return topInnerY(cons, height, th);
                   const found = mod.elements.find(e => e.id === id);
                   if (found) {
                       if (type === 'minX') return found.x + found.w;
@@ -350,7 +345,7 @@ export function recalculateLayout(mod) {
               const isBottomOuter = minY <= th + 1;
               const isTopOuter = slopeRect
                   ? maxY >= slopeRect.maxY - 1
-                  : maxY >= (hasTraverses && isVerticalTraverse ? height - traverseWidth - 1 : height - th - 1);
+                  : maxY >= topInnerY(cons, height, th) - 1;
 
               // Domyślnie granica wewnętrzna (front kończy się na prawdziwym wieńcu/
               // półce, nie na krawędzi korpusu ani na innym froncie) dzieli szczelinę
@@ -368,7 +363,8 @@ export function recalculateLayout(mod) {
               const overLeft = isLeftOuter ? (isInset ? -cLeft : th - cLeft) : (isBoundLeftFront ? -gapVal : ((th / 2) - (gapVal / 2)));
               const overRight = isRightOuter ? (isInset ? -cRight : th - cRight) : (isBoundRightFront ? -gapVal : ((th / 2) - (gapVal / 2)));
               const overBottom = isBottomOuter ? (isInset ? -cBottom : th - cBottom) : (isBoundBottomFront ? -gapVal : (gapFromAxisBottom !== null ? (th / 2) - gapFromAxisBottom : (th / 2) - (gapVal / 2)));
-              const overTop = isTopOuter ? (isInset ? -cTop : th - cTop) : (isBoundTopFront ? -gapVal : (gapFromAxisTop !== null ? (th / 2) - gapFromAxisTop : (th / 2) - (gapVal / 2)));
+              // bez wieńca górnego front nakładany nie ma czego zakryć u góry - kończy się luz pod górną krawędzią boków
+              const overTop = isTopOuter ? (isInset || cons.topType === 'brak' ? -cTop : th - cTop) : (isBoundTopFront ? -gapVal : (gapFromAxisTop !== null ? (th / 2) - gapFromAxisTop : (th / 2) - (gapVal / 2)));
 
               startX = minX - overLeft;
               totalW = (maxX - minX) + overLeft + overRight;

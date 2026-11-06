@@ -66,7 +66,7 @@ export function getModuleSummary(mod, project) {
   return {
     type: TYPE_LABELS[mod.type] || "Szafka",
     dims: { w: round1(W), h: round1(H), d: round1(D) },
-    inner: { w: round1(W - 2 * th), h: round1(H - 2 * th), d: round1(innerD) },
+    inner: { w: round1(W - 2 * th), h: round1(H - ({ ...(project.construction || {}), ...(mod.construction || {}) }.topType === "brak" ? th : 2 * th)), d: round1(innerD) },
     legs,
     doors,
     drawers,

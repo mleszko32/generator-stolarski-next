@@ -8,7 +8,7 @@
 // Wnęki adresujemy ścieżką w drzewie BSP wnętrza (core/zoneTree.js): "" = całe wnętrze,
 // potem litery a/b. Przy podziale półką (oś 'h') a = dół, b = góra; przy przegrodzie
 // (oś 'v') a = lewa, b = prawa. Np. "ba" = góra całości, a w niej lewa kolumna.
-import { setModuleKorpusDecor } from "./korpusDecorChange.js";
+import { setModuleKorpusDecor, refitInterior } from "./korpusDecorChange.js";
 import { state, addSidePanel } from "./state.js";
 import {
   buildZoneTree, splitZoneHorizontal, splitZoneVertical, addEvenShelves,
@@ -190,7 +190,9 @@ export function patchModule(mod, patch) {
     patch = { ...patch, materials: restMaterials };
     if (!Object.keys(restMaterials).length) delete patch.materials;
   }
-  mergeInto(mod, patch);
+  // wymiary / konstrukcja zmieniają światło korpusu - wnętrze się do niego dopasowuje
+  if (isPlain(patch.dimensions) || isPlain(patch.construction)) refitInterior(mod, () => mergeInto(mod, patch));
+  else mergeInto(mod, patch);
   recalculateLayout(mod);
   return mod;
 }

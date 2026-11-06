@@ -1,6 +1,7 @@
 // src/ui/properties.js
-import { setModuleKorpusDecor } from "../core/korpusDecorChange.js";
+import { setModuleKorpusDecor, refitInterior } from "../core/korpusDecorChange.js";
 import { moduleBoardThickness, decorThickness } from "../core/boardThickness.js";
+import { TOP_TYPES } from "../core/topType.js";
 import { state, getActiveModule, frontBodyGap } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
@@ -321,8 +322,8 @@ export function initPropertiesPanel() {
       <div class="property-group"><label>Grubość płyty (mm):</label><input type="number" id="input-board-thick" value="${state.project.materials.boardThickness}" step="0.1" />${decorThickness(activeModule.materials?.korpusDecor) ? `<div class="hint">Ta szafka: ${decorThickness(activeModule.materials.korpusDecor)} mm z nazwy dekoru korpusu (pole niżej). Ta wartość dotyczy szafek bez grubości w dekorze.</div>` : ''}</div>
       <div class="property-group"><label>Dekor korpusu (puste = z projektu):</label><input type="text" id="input-korpus-decor" list="korpus-decor-catalog" value="${escapeHtml(activeModule.materials?.korpusDecor || '')}" placeholder="np. Egger U740 PM" title="Formatki z płyty korpusu tej szafki (i zaznaczonych) dostaną materiał „Korpus: dekor” - osobna pozycja w kosztorysie i osobne arkusze w rozkroju." /><datalist id="korpus-decor-catalog">${catalogLabels(state.project).map(l => `<option value="${escapeHtml(l)}"></option>`).join('')}</datalist></div>
       <div class="property-group"><label>Sposób łączenia:</label><select id="input-join-type"><option value="boki_przelotowe" ${cons.joinType === 'boki_przelotowe' ? 'selected' : ''}>Boki do ziemi (wieńce wpuszczane)</option><option value="wience_przelotowe" ${cons.joinType === 'wience_przelotowe' ? 'selected' : ''}>Wieńce pełne (boki wpuszczane)</option></select></div>
-      <div class="property-group"><label>Zamknięcie góry:</label><select id="input-top-type"><option value="pelny" ${cons.topType === 'pelny' ? 'selected' : ''}>Pełny wieniec</option><option value="trawersy_poziom" ${cons.topType === 'trawersy_poziom' ? 'selected' : ''}>Trawersy poziome</option><option value="trawersy_pion" ${cons.topType === 'trawersy_pion' ? 'selected' : ''}>Trawersy pionowe</option></select></div>
-      <div class="prop-box" id="traverse-options" style="display: ${cons.topType !== 'pelny' ? 'block' : 'none'};"><div class="property-group mb-0"><label class="fs-xs">Szerokość trawersu (mm):</label><input type="number" id="input-traverse-width" value="${cons.traverseWidth}" /></div></div>
+      <div class="property-group"><label>Zamknięcie góry:</label><select id="input-top-type">${TOP_TYPES.map(([v, label]) => `<option value="${v}" ${cons.topType === v ? 'selected' : ''}>${label}</option>`).join('')}</select></div>
+      <div class="prop-box" id="traverse-options" style="display: ${cons.topType.includes('trawersy') ? 'block' : 'none'};"><div class="property-group mb-0"><label class="fs-xs">Szerokość trawersu (mm):</label><input type="number" id="input-traverse-width" value="${cons.traverseWidth}" /></div></div>
       <div class="property-group"><label>Wieniec dolny cofnięty o (mm):</label><input type="number" id="input-bottom-setback" value="${cons.bottomSetback ?? 0}" min="0" step="1" title="Wieniec dolny płytszy i cofnięty od przodu - np. szufladki pod blatem biurka: front zachodzi niżej i daje chwyt od spodu. 0 = zwykły wieniec." /></div>
       <div class="property-group"><label>Maks. rozstaw łączników kołek + wkręt (mm):</label><input type="number" id="input-joint-spacing" value="${cons.jointSpacing ?? 250}" min="64" step="1" title="Wieńce, półki stałe i przegrody: skrajne zestawy 37 mm od przodu i tyłu, środkowe dokładane, gdy odstęp przekracza ten rozstaw (w rastrze 32 mm)" /></div>
       ${(() => {
@@ -331,7 +332,7 @@ export function initPropertiesPanel() {
       <div class="prop-box" title="Listwa z płyty korpusu na sztorc pod półką, przy tylnej krawędzi (profil L) - dla półek stałych i ruchomych dłuższych niż próg"><div class="property-group"><label class="fs-xs">Dla półek dłuższych niż (mm):</label><input type="number" id="input-stiffener-min" value="${st.minLength}" min="1" step="1" /></div><div class="property-group mb-0"><label class="fs-xs">Wysokość listwy (mm):</label><input type="number" id="input-stiffener-height" value="${st.height}" min="1" step="1" /></div></div>`;
       })()}
 
-      ${cons.topType !== 'pelny' ? (() => {
+      ${cons.topType.includes('trawersy') ? (() => {
           const trav = getTraverseConfig(cons);
           const travRaw = cons.traverses || {};
           return `
@@ -561,7 +562,8 @@ function setupEventListeners() {
   const topTypeInput = document.getElementById('input-top-type');
   const traverseOptions = document.getElementById('traverse-options');
   if (topTypeInput && traverseOptions) topTypeInput.addEventListener('change', (e) => {
-      getSelectedMods().forEach(mod => { mod.construction = mod.construction || {}; mod.construction.topType = e.target.value; });
+      // „bez wieńca górnego” zmienia światło korpusu - wnętrze się dopasowuje
+      getSelectedMods().forEach(mod => refitInterior(mod, () => { mod.construction = mod.construction || {}; mod.construction.topType = e.target.value; }));
       updateAll();
       initPropertiesPanel(); // odsłania/chowa sekcję "Trawersy — ustawienia ręczne", nie tylko #traverse-options
   });

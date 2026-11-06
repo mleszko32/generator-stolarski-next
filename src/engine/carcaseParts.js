@@ -6,6 +6,7 @@ import { getTraverseConfig } from "../core/layout.js";
 import { resolveBackPanel, corpusInnerDepth, sideDepthOf, isBoardOverlayBack } from "../core/backPanel.js";
 import { rcRearOverride, rcMidGrid } from "../core/rcSystem.js";
 import { moduleBoardThickness } from "../core/boardThickness.js";
+import { topInnerY } from "../core/topType.js";
 
 // Zestawy łączników korpusu (wkręt + kołek) na połączeniu o długości `depth` (wieniec / półka
 // stała / przegroda z bokiem): skrajne - wkręt 37 mm od przodu i od tyłu, kołek 32 mm dalej w
@@ -148,13 +149,9 @@ export function getPionMountHoles(mod, config) {
   const poziomy = (mod.elements || []).filter(el => el.typ === 'poziom');
   const EPS = 2;
 
-  // Ta sama formuła co core/zoneTree.js: getCabinetInnerRect (topY światła
-  // korpusu) - zduplikowana tu specjalnie, żeby nie wiązać silnika formatek
-  // z modułem edytora wnętrza (zoneTree.js) tylko dla jednej stałej.
+  // Górna granica światła korpusu - ta sama co core/zoneTree.js: getCabinetInnerRect.
   const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(config.construction || {}), ...(mod.construction || {}) };
-  const hasTraverses = cons.topType.includes('trawersy');
-  const isVerticalTraverse = cons.topType === 'trawersy_pion';
-  const topInnerY = hasTraverses && isVerticalTraverse ? height - (parseFloat(cons.traverseWidth) || 100) : height - th;
+  const topY = topInnerY(cons, height, th);
 
   const cons2 = { joinType: 'boki_przelotowe', ...(config.construction || {}), ...(mod.construction || {}) };
   const wieniecWidth = cons2.joinType === 'wience_przelotowe' ? width : width - th * 2;
@@ -186,8 +183,9 @@ export function getPionMountHoles(mod, config) {
       if (below) addHoles(`polka-${below.id}-gora`, 'Półka (spód przegrody)', below.w, below.x, centerX);
     }
 
-    if (Math.abs((p.y + p.h) - topInnerY) < EPS) {
-      addHoles('wieniec-gorny', 'Wieniec górny', wieniecWidth, wieniecOffsetX, centerX);
+    if (Math.abs((p.y + p.h) - topY) < EPS) {
+      // bez wieńca górnego przegrodę mocuje się do blatu - nie ma płyty do wiercenia
+      if (cons.topType !== 'brak') addHoles('wieniec-gorny', 'Wieniec górny', wieniecWidth, wieniecOffsetX, centerX);
     } else {
       const above = poziomy.find(s => Math.abs(s.y - (p.y + p.h)) < EPS);
       if (above) addHoles(`polka-${above.id}-dol`, 'Półka (wierzch przegrody)', above.w, above.x, centerX);

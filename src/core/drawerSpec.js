@@ -32,7 +32,12 @@ export function drawerSpec(mod, el, project) {
   // Wysokość wnęki: front minus wieniec, na który zachodzi (dolny / górny).
   let availableSpace = h;
   if (y < th) availableSpace -= th;
-  if (y + h > H - th) availableSpace -= th;
+  const topType = { ...(project.construction || {}), ...(mod.construction || {}) }.topType;
+  if (y + h > H - th) {
+    // bez wieńca górnego (pod blatem) skrzynka ma miejsce do górnej krawędzi boków, nad frontem też
+    if (topType === "brak") availableSpace = H - Math.max(y, th);
+    else availableSpace -= th;
+  }
   // Jedyny front we wnęce, zaczynający się nad jej dnem (np. szufladki pod blatem biurka z
   // chwytem od spodu): skrzynka ma całą wnękę między wieńcami, a nie tylko wysokość frontu.
   const zoneH = num(el.baseZone && el.baseZone.maxY) - num(el.baseZone && el.baseZone.minY);

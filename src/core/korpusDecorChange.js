@@ -10,6 +10,20 @@ import { moduleBoardThickness } from "./boardThickness.js";
 
 const near = (a, b) => Math.abs(a - b) < 0.01;
 
+// Zmiana, która przesuwa światło korpusu (wymiary, zamknięcie góry): `change()` modyfikuje szafkę,
+// a półki / przegrody / wolne wnęki frontów dopasowują się do nowego światła jak przy zmianie dekoru.
+export function refitInterior(mod, change) {
+  const refit = mod.type !== "corner_cabinet" && mod.type !== "slope_cabinet" && Array.isArray(mod.elements) && mod.elements.length > 0;
+  const oldRect = refit ? getCabinetInnerRect(mod) : null;
+  const tree = refit ? buildZoneTree(mod) : null;
+  change();
+  if (!refit) return;
+  const r = getCabinetInnerRect(mod);
+  if (near(r.minX, oldRect.minX) && near(r.maxX, oldRect.maxX) && near(r.minY, oldRect.minY) && near(r.maxY, oldRect.maxY)) return;
+  rescaleSubtree(tree, "x", oldRect.minX, oldRect.maxX, r.minX, r.maxX);
+  rescaleSubtree(tree, "y", oldRect.minY, oldRect.maxY, r.minY, r.maxY);
+}
+
 export function setModuleKorpusDecor(mod, decor, project) {
   const v = String(decor || "").trim();
   const oldTh = moduleBoardThickness(mod, project);
