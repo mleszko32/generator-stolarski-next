@@ -87,7 +87,7 @@ export function projectDecorLegend(project) {
   });
   (project.sidePanels || []).forEach((p) => {
     const d = String(p.decor || "").trim();
-    if (d) { add(p.kind === "poziomy" ? "Korpus" : "Front", d, decorColor(d)); return; }
+    if (d) { add(p.kind === "blenda" ? "Front" : "Korpus", d, decorColor(d)); return; }
     if (p.kind === "poziomy") { plainKorpus = true; return; }
     add("Front", frontMaterialName(p.materialId, project), frontMaterialColor(p.materialId, project));
   });
