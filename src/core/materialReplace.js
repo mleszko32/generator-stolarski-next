@@ -11,7 +11,7 @@
 import { partMaterial } from "./decorColors.js";
 import { setModuleKorpusDecor } from "./korpusDecorChange.js";
 import { assignFrontMaterialByName } from "./materialCatalog.js";
-import { decorThickness } from "./boardThickness.js";
+import { applyPanelDecorThickness } from "./boardThickness.js";
 
 export function replaceMaterial(project, key, newName) {
   const name = String(newName || "").trim();
@@ -56,11 +56,7 @@ export function replaceMaterial(project, key, newName) {
       panel.materialId = frontMaterialId();
     } else {
       panel.decor = name;
-      const t = decorThickness(name);
-      if (t && panel.dimensions) {
-        if (panel.kind === "poziomy") panel.dimensions.height = t;
-        else if (panel.kind !== "blenda") panel.dimensions.width = t;
-      }
+      applyPanelDecorThickness(panel, name); // płyty sklejone (36 mm) zostają sklejone
     }
     changed++;
   });

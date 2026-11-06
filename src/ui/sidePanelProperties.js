@@ -3,7 +3,7 @@
 // Prawy panel dla boku dokładanego i blendy (project.sidePanels) - wydzielony z
 // ui/properties.js, który woła renderSidePanelProperties() zamiast formularza szafki.
 import { lacquerSuggestions } from "../core/lacquerColors.js";
-import { decorThickness } from "../core/boardThickness.js";
+import { applyPanelDecorThickness } from "../core/boardThickness.js";
 import { catalogLabels } from "../core/materialCatalog.js";
 import { state } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
@@ -153,9 +153,8 @@ function bindSidePanelInputs(rightSidebar, panel) {
   bindText('input-side-decor', v => panel.decor = v);
   // dekor z bazy płyt z grubością w nazwie („19mm”) ustawia grubość boku / panelu poziomego
   document.getElementById('input-side-decor')?.addEventListener('change', (e) => {
-    const t = decorThickness(e.target.value);
-    if (!t || panel.kind === 'blenda') return;
-    if (panel.kind === 'poziomy') panel.dimensions.height = t; else panel.dimensions.width = t;
+    // zachowuje liczbę sklejonych płyt (36 mm = 2 × 18 mm)
+    if (!applyPanelDecorThickness(panel, e.target.value)) return;
     update3D(); updateSidebar(); initPropertiesPanel();
   });
   bindNumber('input-side-width', v => panel.dimensions.width = v);

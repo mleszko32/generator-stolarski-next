@@ -15,7 +15,7 @@ import { splitPlinthRun, maxPlinthLength } from "./plinthSplit.js";
 import { shelfStiffener } from "../core/shelfStiffener.js";
 import { KORPUS, korpusCategory, moduleKorpusDecor } from "../core/materialCatalog.js";
 import { plinthMaterial } from "../core/plinthMaterial.js";
-import { moduleBoardThickness } from "../core/boardThickness.js";
+import { moduleBoardThickness, sidePanelLayers } from "../core/boardThickness.js";
 
 export function calculateParts() {
   // Fronty muszą mieć aktualne el.x/y/w/h zanim policzymy z nich formatki.
@@ -461,6 +461,13 @@ function getBlendaParts(panel, config) {
 // z frontami, dając realną sumę m² tego dekoru do wyceny.
 function getSidePanelParts(panel, config) {
   if (panel.kind === 'blenda') return getBlendaParts(panel, config);
+  // Płyta grubsza niż jedna płyta (36 mm = 2 × 18 mm) to płyty sklejone: tyle formatek, ile warstw.
+  const layers = sidePanelLayers(panel, config);
+  const glued = layers > 1 ? ` [sklejane ×${layers}]` : '';
+  return getSinglePanelParts(panel).map(p => ({ ...p, name: p.name + glued, qty: p.qty * layers }));
+}
+
+function getSinglePanelParts(panel) {
   if (panel.kind === 'poziomy') {
     // Panel poziomy (core/state.js: addHorizontalPanel): płyta korpusu długość × głębokość,
     // okleina domyślnie tylko na jednej dłuższej krawędzi (przód).

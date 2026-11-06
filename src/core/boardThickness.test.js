@@ -36,6 +36,34 @@ describe("grubość płyty z dekoru", () => {
   });
 });
 
+describe("płyty sklejane (36 mm = 2 × 18 mm)", async () => {
+  const { sidePanelLayers, applyPanelDecorThickness } = await import("./boardThickness.js");
+  const project = { materials: { boardThickness: 18 } };
+  it("zmiana dekoru zachowuje liczbę sklejonych płyt", () => {
+    const shelf = { kind: "poziomy", dimensions: { width: 1200, height: 36, depth: 300 } };
+    expect(sidePanelLayers(shelf, project)).toBe(2);
+    applyPanelDecorThickness(shelf, "Egger U740 PM 18mm Taupe");
+    expect(shelf.dimensions.height).toBe(36);
+    applyPanelDecorThickness(shelf, "Egger W1000 PM/ST9 19mm");
+    expect(shelf.dimensions.height).toBe(38);
+    const leg = { kind: "bok", dimensions: { width: 36, height: 740, depth: 600 } };
+    applyPanelDecorThickness(leg, "Egger U740 PM 18mm");
+    expect(leg.dimensions.width).toBe(36);
+    const single = { kind: "poziomy", dimensions: { width: 800, height: 18, depth: 300 } };
+    applyPanelDecorThickness(single, "Egger W1000 PM/ST9 19mm");
+    expect(single.dimensions.height).toBe(19);
+  });
+
+  it("panel 36 mm daje dwie formatki", () => {
+    setProject(freshProject({ modules: [], sidePanels: [
+      { id: "p", kind: "poziomy", decor: "Egger U740 PM 18mm", dimensions: { width: 1200, height: 36, depth: 300 }, position: { x: 0, y: 0, z: 0 } },
+    ] }));
+    const part = calculateAllProjectParts().find((p) => p.name.startsWith("Panel poziomy"));
+    expect(part.qty).toBe(2);
+    expect(part.name).toContain("sklejane ×2");
+  });
+});
+
 describe("zmiana dekoru korpusu dopasowuje wnętrze do grubości płyty", async () => {
   const { setModuleKorpusDecor } = await import("./korpusDecorChange.js");
   const { state } = await import("./state.js");

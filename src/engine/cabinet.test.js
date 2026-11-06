@@ -64,7 +64,7 @@ describe("calculateAllProjectParts — cały projekt", () => {
     ] }));
     const parts = calculateAllProjectParts();
     expect(parts.find((p) => p.name.endsWith("noga"))).toMatchObject({ name: "Bok dokładany — noga", length: 720, width: 600 });
-    expect(parts.find((p) => p.name.endsWith("półka"))).toMatchObject({ name: "Płyta pozioma — półka", length: 1200, width: 250 });
+    expect(parts.find((p) => p.name.includes("półka"))).toMatchObject({ name: "Płyta pozioma — półka [sklejane ×2]", length: 1200, width: 250, qty: 2 });
   });
 
   it("scala cokół dwóch stykających się szafek w jeden odcinek", () => {
