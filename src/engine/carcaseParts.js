@@ -3,7 +3,7 @@
 // Formatki i wiercenia korpusu prostokątnej szafki (boki, wieńce, trawersy, plecy) -
 // wydzielone z engine/cabinet.js. Używane też przez engine/cornerParts.js.
 import { getTraverseConfig } from "../core/layout.js";
-import { resolveBackPanel, corpusInnerDepth, sideDepthOf } from "../core/backPanel.js";
+import { resolveBackPanel, corpusInnerDepth, sideDepthOf, isBoardOverlayBack } from "../core/backPanel.js";
 import { rcRearOverride, rcMidGrid } from "../core/rcSystem.js";
 
 // Zestawy łączników korpusu (wkręt + kołek) na połączeniu o długości `depth` (wieniec / półka
@@ -270,6 +270,9 @@ export function getBackPanelParts(mod, config) {
     // płytsze o plecy - corpusInnerDepth), więc na całą wysokość korpusu. Wcześniej H - 2 płyty
     // zostawiało szczeliny za wieńcami. Formatka kategorii Korpus (materiał i cena korpusu), nie HDF.
     return [{ name: `Plecy wpuszczane ${height}x${width}`, length: parseFloat(Number(height).toFixed(1)), width: parseFloat((width - board * 2).toFixed(1)), qty: 1, category: "Korpus" }];
+  } else if (isBoardOverlayBack(mod, config)) {
+    // Plecy nakładane z płyty (np. 18 mm): na pełny wymiar, zakrywają tył boków i wieńców.
+    return [{ name: `Plecy nakładane ${height}x${width}`, length: parseFloat(Number(height).toFixed(1)), width: parseFloat(Number(width).toFixed(1)), qty: 1, category: "Korpus" }];
   } else {
     hdfWidth = width - 4; hdfHeight = height - 4;
   }

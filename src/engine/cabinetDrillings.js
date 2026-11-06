@@ -16,7 +16,7 @@
 // - formatka pozioma (wieniec, półka, trawers poziomy): rzut z góry, x od lewej krawędzi
 //   formatki, z od przodu; otwory w czołach mają edge 'lewe' / 'prawe' / 'przednie' / 'tylne'.
 import { calculateModuleParts } from "./cabinet.js";
-import { resolveBackPanel, corpusInnerDepth, backThicknessOf, sideDepthOf } from "../core/backPanel.js";
+import { resolveBackPanel, corpusInnerDepth, backThicknessOf, sideDepthOf, isBoardOverlayBack } from "../core/backPanel.js";
 import { recalculateLayout, getTraverseConfig } from "../core/layout.js";
 import { jointSetsFor, bottomSetbackOf, sideFloorExt } from "./carcaseParts.js";
 import { num, round1 } from "../utils/math.js";
@@ -232,11 +232,13 @@ export function getCabinetPanels(mod, project) {
 
   // --- Plecy (bez otworów; sposób montażu w uwadze) ---
   const inset = backP.type === "wpuszczane";
-  const back = parts.find((p) => (inset ? String(p.name).startsWith("Plecy wpuszczane") : p.category === "Plecy"));
+  const boardOverlay = isBoardOverlayBack(mod, project);
+  const back = parts.find((p) => (inset ? String(p.name).startsWith("Plecy wpuszczane")
+    : boardOverlay ? String(p.name).startsWith("Plecy nakładane") : p.category === "Plecy"));
   const backNote = inset ? `wpuszczane między boki, za wieńcami, na całą wysokość, ${backP.insetOffset > 0 ? `cofnięte o ${backP.insetOffset} mm od tyłu boków` : "tył równo z tyłem boków"} (płyta ${backThick} mm) - przykręcić przez boki i wieńce`
     : backP.type === "nut" ? `w nucie (głęb. ${num(backP.grooveDepth, 6)} mm, ${num(backP.offset, 16)} mm od tyłu) - wsunąć przed zamknięciem korpusu`
     : "nakładane - przybić / przykręcić od tyłu po złożeniu korpusu";
-  if (back) panels.push({ id: "plecy", kind: "plecy", name: inset ? "Plecy wpuszczane" : "Plecy (HDF)", qty: 1, length: back.length, width: back.width, thickness: backThick, holes: [], note: backNote });
+  if (back) panels.push({ id: "plecy", kind: "plecy", name: inset ? "Plecy wpuszczane" : boardOverlay ? `Plecy nakładane (płyta ${backThick} mm)` : "Plecy (HDF)", qty: 1, length: back.length, width: back.width, thickness: backThick, holes: [], note: backNote });
 
   return panels;
 }

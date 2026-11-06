@@ -15,6 +15,7 @@ export const BACK_PANEL_DEFAULTS = Object.freeze({
   nutBuild: "all", // które płyty mają nut: all | sides | top_bottom
   thickness: 18,   // grubość pleców wpuszczanych (płyta korpusu między bokami i wieńcami)
   insetOffset: 0,  // cofnięcie pleców wpuszczanych od tyłu boków (np. szczelina do ściany)
+  overlayThickness: 0, // grubość pleców nakładanych tej szafki; 0 = z projektu (materials.backThickness)
 });
 
 const BACK_TYPES = ["nakladane", "nut", "wpuszczane"];
@@ -34,14 +35,27 @@ export function resolveBackPanel(mod, project) {
     nutBuild: ["all", "sides", "top_bottom"].includes(bp.nutBuild) ? bp.nutBuild : BACK_PANEL_DEFAULTS.nutBuild,
     thickness: num(bp.thickness, BACK_PANEL_DEFAULTS.thickness) || BACK_PANEL_DEFAULTS.thickness,
     insetOffset: Math.max(0, num(bp.insetOffset, 0)),
+    // Grubość pleców nakładanych tej szafki (np. 18 mm płyty zamiast HDF); 0 = z projektu.
+    overlayThickness: Math.max(0, num(bp.overlayThickness, 0)),
   };
 }
 
-// Grubość płyty pleców: wpuszczane - własna (płyta korpusu), pozostałe - HDF z ustawień projektu.
+// Od tej grubości plecy nakładane to płyta korpusu (pełny wymiar, kategoria Korpus), a nie HDF.
+export const BOARD_BACK_MIN = 8;
+
+// Grubość płyty pleców: wpuszczane - własna (płyta korpusu); nakładane - własna szafki, jeśli
+// podana (overlayThickness), inaczej jak w nucie - HDF z ustawień projektu.
 export function backThicknessOf(mod, project) {
   const bp = resolveBackPanel(mod, project);
   if (bp.type === "wpuszczane") return bp.thickness;
+  if (bp.type === "nakladane" && bp.overlayThickness > 0) return bp.overlayThickness;
   return num(project && project.materials && project.materials.backThickness, 3) || 3;
+}
+
+// Plecy nakładane z płyty (≥ BOARD_BACK_MIN): na pełny wymiar korpusu, zakrywają krawędzie boków i wieńców.
+export function isBoardOverlayBack(mod, project) {
+  const bp = resolveBackPanel(mod, project);
+  return bp.type === "nakladane" && bp.overlayThickness >= BOARD_BACK_MIN;
 }
 
 // Głębokość boku: plecy nakładane przykrywają tył boków (bok krótszy o plecy), w nucie i

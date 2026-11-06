@@ -1,6 +1,6 @@
 // src/render/viewer3d.js
 import * as THREE from 'three';
-import { resolveBackPanel } from '../core/backPanel.js';
+import { resolveBackPanel, backThicknessOf, isBoardOverlayBack } from '../core/backPanel.js';
 import { bottomSetbackOf, sideFloorExt } from '../engine/carcaseParts.js';
 import { computeDimensions } from '../core/dimensions3d.js';
 import { buildDimensionGroup } from './dimensions3d.js';
@@ -1224,7 +1224,8 @@ export function update3D() {
       const udBack = { moduleId: mod.id, type: 'corpus', part: 'back' }; 
 
       const backP = resolveBackPanel(mod, state.project);
-      const backThick = backP.type === 'wpuszczane' ? backP.thickness : 3;
+      const backThick = backThicknessOf(mod, state.project);
+      const boardOverlayBack = isBoardOverlayBack(mod, state.project);
 
       let sideD, tbD, backZ;
       if (backP.type === 'wpuszczane') {
@@ -1269,6 +1270,7 @@ export function update3D() {
 
       // Plecy wpuszczane: płyta korpusu między bokami, za wieńcami - na całą wysokość.
       if (backP.type === 'wpuszczane') addBox(W - 2*th, H, backThick, posX + th, posY, backZ, 'corpus', isActive, udBack, innerGroup);
+      else if (boardOverlayBack) addBox(W, H, backThick, posX, posY, backZ, 'corpus', isActive, udBack, innerGroup);
       else addBox(W - 4, H - 4, backThick, posX + 2, posY + 2, backZ, 'hdf', isActive, udBack, innerGroup);
 
       const hwAxis = isTopBottomFull ? 'y' : 'x';

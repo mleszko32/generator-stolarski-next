@@ -11,7 +11,22 @@ describe("resolveBackPanel", () => {
 
   it("uzupełnia brakujące pola i zamienia napisy na liczby", () => {
     const bp = resolveBackPanel({ backPanel: { type: "nut", offset: "20" } }, freshProject());
-    expect(bp).toEqual({ type: "nut", offset: 20, grooveDepth: 6, clearance: 2, nutBuild: "all", thickness: 18, insetOffset: 0 });
+    expect(bp).toEqual({ type: "nut", offset: 20, grooveDepth: 6, clearance: 2, nutBuild: "all", thickness: 18, insetOffset: 0, overlayThickness: 0 });
+  });
+
+  it("plecy nakładane z własną grubością szafki (18 mm płyty)", () => {
+    const project = freshProject();
+    const m = baseModule({ dimensions: { width: 600, height: 2500, depth: 600 }, backPanel: { type: "nakladane", overlayThickness: 18 } });
+    expect(sideDepthOf(m, project)).toBe(582);
+    expect(corpusInnerDepth(m, project)).toBe(582);
+    expect(getBackPanelParts(m, project)).toEqual([{ name: "Plecy nakładane 2500x600", length: 2500, width: 600, qty: 1, category: "Korpus" }]);
+    // bez własnej grubości - HDF z projektu, jak dotąd
+    const h = baseModule({ dimensions: { width: 600, height: 2500, depth: 600 }, backPanel: { type: "nakladane" } });
+    expect(sideDepthOf(h, project)).toBe(597);
+    expect(getBackPanelParts(h, project)[0]).toMatchObject({ length: 2496, width: 596, category: "Plecy" });
+    // grubość pleców nakładanych nie wpływa na plecy w nucie
+    const n = baseModule({ backPanel: { type: "nut", overlayThickness: 18 } });
+    expect(corpusInnerDepth(n, project)).toBe(corpusInnerDepth(baseModule({ backPanel: { type: "nut" } }), project));
   });
 
   it("szafka nadpisuje ustawienia projektu", () => {
