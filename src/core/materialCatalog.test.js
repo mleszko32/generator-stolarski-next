@@ -35,3 +35,18 @@ describe("katalog materiałów", () => {
     expect(partMaterialLabel({ category: "Front", materialId: "x" }, p)).toMatch(/^Front: Lakier biały mat \(Egger W908/);
   });
 });
+
+describe("materiał frontów zaznaczonych szafek po nazwie", async () => {
+  const { assignFrontMaterialByName } = await import("./materialCatalog.js");
+  it("istniejąca pozycja cennika po nazwie, inaczej nowa; wszystkie fronty szafek", () => {
+    const project = { pricing: { frontMaterials: [{ id: "a", name: "Lakier", pricePerM2: 300 }] } };
+    const mods = [{ elements: [{ typ: "front" }, { typ: "poziom" }] }, { elements: [{ typ: "front", materialId: "x" }] }];
+    expect(assignFrontMaterialByName(mods, " lakier ", project)).toBe("a");
+    expect(mods.flatMap((m) => m.elements).filter((e) => e.typ === "front").every((e) => e.materialId === "a")).toBe(true);
+    const id = assignFrontMaterialByName(mods, "Egger W1000 PM/ST9 19mm", project);
+    expect(project.pricing.frontMaterials).toHaveLength(2);
+    expect(project.pricing.frontMaterials[1]).toMatchObject({ id, name: "Egger W1000 PM/ST9 19mm", pricePerM2: 0 });
+    expect(mods[1].elements[0].materialId).toBe(id);
+    expect(assignFrontMaterialByName(mods, "  ", project)).toBeNull();
+  });
+});

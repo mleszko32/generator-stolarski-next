@@ -83,3 +83,23 @@ export function partMaterialLabel(part, project) {
   const decor = project && project.materials && project.materials.decors && project.materials.decors[category];
   return decor && String(decor).trim() ? `${category}: ${String(decor).trim()}` : category;
 }
+
+// Materiał frontów po nazwie (wpisanej albo wybranej z bazy dekorów) dla wszystkich frontów
+// podanych szafek: pozycja cennika frontów o tej nazwie (bez względu na wielkość liter) albo
+// nowa z ceną 0 do uzupełnienia w Kosztorysie. Zwraca id materiału albo null (pusta nazwa).
+export function assignFrontMaterialByName(mods, name, project) {
+  const n = String(name || "").trim();
+  if (!n || !project) return null;
+  if (!project.pricing) project.pricing = {};
+  if (!Array.isArray(project.pricing.frontMaterials)) project.pricing.frontMaterials = [];
+  const list = project.pricing.frontMaterials;
+  let mat = list.find((m) => String(m.name || "").trim().toLowerCase() === n.toLowerCase());
+  if (!mat) {
+    mat = { id: "mat-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name: n, pricePerM2: 0 };
+    list.push(mat);
+  }
+  (mods || []).forEach((mod) => (mod.elements || []).forEach((el) => {
+    if (el.typ === "front") el.materialId = mat.id;
+  }));
+  return mat.id;
+}

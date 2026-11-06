@@ -26,7 +26,7 @@ import { getStiffenerSettings } from "../core/shelfStiffener.js";
 import { findKitchenRunAround } from "../core/kitchenRun.js";
 import { openWallFillModal } from "./wallFillModal.js";
 import { BOARD_BACK_MIN } from "../core/backPanel.js";
-import { catalogLabels } from "../core/materialCatalog.js";
+import { catalogLabels, assignFrontMaterialByName } from "../core/materialCatalog.js";
 import { moduleFrontMaterialId, PLINTH_KORPUS } from "../core/plinthMaterial.js";
 
 // Wybór materiału cokołu (mod.legs.plinthMaterial, core/plinthMaterial.js).
@@ -259,6 +259,14 @@ export function initPropertiesPanel() {
       <div class="hint">Powyższe "Luz góra/dół" działają tylko na krawędzi, które dotykają prawdziwej góry/dołu korpusu. Front kończący się na wewnętrznym wieńcu/półce ma nakładanie liczone osobno (patrz niżej).</div>
 
       ${allFrontsList.length ? `
+        <h3>Materiał frontów szafki</h3>
+        <div class="property-group mb-8">
+          <label class="fs-xs">Wszystkie fronty ${getSelectedMods().length > 1 ? `zaznaczonych szafek (${getSelectedMods().length})` : 'tej szafki'} — wpisz albo wybierz z listy:</label>
+          <input type="text" id="input-fronts-material-all" list="fronts-material-catalog" placeholder="np. Lakier albo Egger W1000 PM/ST9 19mm" autocomplete="off" />
+          <datalist id="fronts-material-catalog">${[...new Set([...(state.project.pricing?.frontMaterials || []).map(m => m.name), ...catalogLabels(state.project)])].map(l => `<option value="${escapeHtml(l)}"></option>`).join('')}</datalist>
+          <div class="hint">Materiał z cennika frontów albo dekor z bazy płyt — nowy dopisze się do cennika (cenę ustawisz w Kosztorysie).</div>
+        </div>
+
         <h3>Materiał frontu (per front)</h3>
         <div class="hint" style="margin-bottom: 8px;">Ceny edytujesz w Kosztorysie (Produkcja i raporty) — pokazuje tam tylko materiały faktycznie użyte przez jakiś front. Bez wyboru liczy się pierwszy materiał z listy. "+ Nowy materiał…" dopisuje pozycję do listy i od razu ją przypisuje tu.</div>
         ${allFrontsList.map(({ front, label }) => `
@@ -710,6 +718,11 @@ function setupEventListeners() {
   };
   wireFrontNumberOverride('input-front-axisgap-top', 'gapFromAxisTop');
   wireFrontNumberOverride('input-front-axisgap-bottom', 'gapFromAxisBottom');
+  document.getElementById('input-fronts-material-all')?.addEventListener('change', (e) => {
+    if (!assignFrontMaterialByName(getSelectedMods(), e.target.value, state.project)) return;
+    updateAll();
+    initPropertiesPanel();
+  });
   document.querySelectorAll('.input-front-material').forEach(sel => {
     sel.addEventListener('change', async (e) => {
       const front = findFront(sel.dataset.frontId);
