@@ -13,13 +13,14 @@ import { getDrawerComponents, calculateNominalLength } from "./drawerMath.js";
 import { drawerSystems } from "./drawerSystems.js";
 import { corpusInnerDepth } from "./backPanel.js";
 import { num } from "../utils/math.js";
+import { moduleBoardThickness } from "./boardThickness.js";
 
 // Zapas za prowadnicą (jak w calculateNominalLength, core/drawerMath.js).
 const NL_SAFETY = 5;
 
 // mod: szafka, el: front szufladowy, project: state.project.
 export function drawerSpec(mod, el, project) {
-  const th = num(project.materials && project.materials.boardThickness, 18) || 18;
+  const th = moduleBoardThickness(mod, project);
   const W = num(mod.dimensions && mod.dimensions.width);
   const H = num(mod.dimensions && mod.dimensions.height);
   const front = { ...(project.front || {}), ...(mod.front || {}) };

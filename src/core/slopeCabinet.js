@@ -31,6 +31,7 @@ import { drawerSystems } from './drawerSystems.js';
 import { getDrawerComponents, getWoodenDrawerHeights, drawerComponentsToParts, drawerHardwareKey, calculateDrawerHoles } from './drawerMath.js';
 import { calculateHinges } from './hingeMath.js';
 import { LAMELLO, lamelloGrooveLen, lamelloPositions, LAMELLO_EDGE, lamelloDiscSetting } from './lamello.js';
+import { moduleBoardThickness } from "./boardThickness.js";
 
 const MIN_PIECE = 50;   // krótsze kawałki pomijamy (nie da się ich zrobić)
 const r1 = (v) => Math.round(v * 10) / 10;
@@ -331,7 +332,7 @@ export function getSlopeFrontSettings(mod, config) {
 // w układzie skosu: kształt po docięciu, typ ('szuflada' | 'drzwi' | 'blenda' |
 // 'brak') i - dla szuflad - skrzynka. auto - typ bez wymuszenia el.slopeBlenda.
 export function getSlopeFronts(mod, config) {
-  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const th = moduleBoardThickness(mod, config);
   const backThick = parseFloat(config.materials?.backThickness) || 3;
   const g = getSlopeGeometry(mod, th);
   const s = getSlopeSettings(mod);
@@ -434,7 +435,7 @@ function realOutline(g, pts) {
 // frontu), przesunięte tak, że lewy dolny róg obrysu jest w (0, 0). Te same nazwy
 // co na liście formatek; identyczne kształty zliczone razem.
 export function getSlopeShapes(mod, config) {
-  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const th = moduleBoardThickness(mod, config);
   const g = getSlopeGeometry(mod, th);
   const out = new Map();
   const add = (name, category, pts) => {
@@ -471,7 +472,7 @@ function drawerBNames(fr, g) {
 
 // Formatki frontów, blend i skrzynek szuflad szafki pod skos.
 export function getSlopeFrontParts(mod, config) {
-  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const th = moduleBoardThickness(mod, config);
   const g = getSlopeGeometry(mod, th);
   const parts = [];
   getSlopeFronts(mod, config).forEach((fr) => {
@@ -564,7 +565,7 @@ function frontSolids(mod, config) {
 // a i b na końcu to cięcie pod kątem: pochylenie piły = atan(różnica / grubość).
 // Kolejność wzdłuż płyty: od strony skosu / od dołu (start) do drugiego końca.
 export function getSlopeBoards(mod, config) {
-  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const th = moduleBoardThickness(mod, config);
   const backThick = parseFloat(config.materials?.backThickness) || 3;
   const g = getSlopeGeometry(mod, th);
   const width = g.D - backThick;
@@ -713,7 +714,7 @@ export function slopeBevelGroove(angleDeg, th, lam) {
 const edgeJointSets = (depth) => [{ screw: 37, dowel: 69 }, { screw: depth - 37, dowel: depth - 69 }];
 export function getSlopeDrillings(mod, config, opts = {}) {
   const jointSets = opts.jointSets || edgeJointSets;
-  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const th = moduleBoardThickness(mod, config);
   const backThick = parseFloat(config.materials?.backThickness) || 3;
   const g = getSlopeGeometry(mod, th);
   const depth = g.D - backThick;
@@ -882,7 +883,7 @@ export function getSlopeOverlay(mod, th = 18) {
 // solids - fronty i skrzynki szuflad (frontSolids). Dla lowSide === 'right'
 // punkty są odbite w poziomie.
 export function getSlopeCabinetPolygons(mod, config = { materials: { boardThickness: 18, backThickness: 3 } }) {
-  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const th = moduleBoardThickness(mod, config);
   const g = getSlopeGeometry(mod, th);
   const solids = frontSolids(mod, config);
   const polys = [];

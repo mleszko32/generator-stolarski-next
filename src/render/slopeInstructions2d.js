@@ -9,11 +9,12 @@ import { C, FONT } from "./drawingPalette.js";
 import { escapeHtml } from "../utils/dom.js";
 import { getSlopeCabinetPolygons, getSlopeDividers, getSlopeShelfPieces } from "../core/slopeCabinet.js";
 import { r1, text, line, proj, move, prism, solidsSvg } from "./workshopDrawing.js";
+import { moduleBoardThickness } from "../core/boardThickness.js";
 
 // Kolejność wielokątów z getSlopeCabinetPolygons: skos, bok wysoki, [bok niski, dno] albo dno,
 // przegrody (getSlopeDividers), półki (getSlopeShelfPieces) - przypisanie do id formatek.
 function slopeSolids(mod, panels, project, explode) {
-  const th = parseFloat(project.materials && project.materials.boardThickness) || 18;
+  const th = moduleBoardThickness(mod, project);
   const { polys, back, geometry: g } = getSlopeCabinetPolygons(mod, project);
   const byId = (id) => panels.find((p) => p.id === id);
   const no = (id) => panels.findIndex((p) => p.id === id) + 1;

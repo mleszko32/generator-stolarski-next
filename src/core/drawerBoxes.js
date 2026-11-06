@@ -9,6 +9,7 @@
 import { drawerSpec } from "./drawerSpec.js";
 import { num } from "../utils/math.js";
 import { getSlopeFronts, getSlopeGeometry } from "./slopeCabinet.js";
+import { moduleBoardThickness } from "./boardThickness.js";
 
 const SIDE_T = 16;   // grubość boku i dna szuflady
 
@@ -50,7 +51,7 @@ export function getDrawerBoxRect(mod, el, project) {
 // Szafka pod skos: skrzynka liczona pod skosem (core/slopeCabinet.js); front,
 // który stał się blendą (trójkąt albo szuflada się nie mieści), nie ma skrzynki.
 function slopeDrawerBoxRect(mod, el, project) {
-  const th = num(project.materials && project.materials.boardThickness, 18) || 18;
+  const th = moduleBoardThickness(mod, project);
   const fr = getSlopeFronts(mod, project).find((f) => f.el.id === el.id);
   if (!fr || fr.type !== "szuflada" || !fr.drawer) return null;
   const d = fr.drawer, c = d.comps;

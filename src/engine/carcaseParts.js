@@ -5,6 +5,7 @@
 import { getTraverseConfig } from "../core/layout.js";
 import { resolveBackPanel, corpusInnerDepth, sideDepthOf, isBoardOverlayBack } from "../core/backPanel.js";
 import { rcRearOverride, rcMidGrid } from "../core/rcSystem.js";
+import { moduleBoardThickness } from "../core/boardThickness.js";
 
 // Zestawy łączników korpusu (wkręt + kołek) na połączeniu o długości `depth` (wieniec / półka
 // stała / przegroda z bokiem): skrajne - wkręt 37 mm od przodu i od tyłu, kołek 32 mm dalej w
@@ -76,7 +77,7 @@ export const jointSpacingOf = (mod, config) => {
 
 export function getCorpusHoles(mod, config) {
   const { height } = mod.dimensions;
-  const th = config.materials.boardThickness || 18;
+  const th = moduleBoardThickness(mod, config);
   const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(config.construction || {}), ...(mod.construction || {}) };
   const trav = getTraverseConfig(cons);
 
@@ -138,7 +139,7 @@ export function getCorpusHoles(mod, config) {
 // X wzdłuż szerokości korpusu, Z wzdłuż głębokości).
 export function getPionMountHoles(mod, config) {
   const { width, height, depth } = mod.dimensions;
-  const th = config.materials.boardThickness || 18;
+  const th = moduleBoardThickness(mod, config);
   const topBottomDepth = corpusInnerDepth(mod, config, parseFloat(depth) || 0);
 
   const piony = (mod.elements || []).filter(el => el.typ === 'pion' && el.isStructural);
@@ -211,7 +212,7 @@ export function sideFloorExt(mod, config) {
 export function getCorpusParts(mod, config) {
   const parts = [];
   const { width, height, depth } = mod.dimensions;
-  const board = config.materials.boardThickness;
+  const board = moduleBoardThickness(mod, config);
   const construction = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(config.construction || {}), ...(mod.construction || {}) };
   const isTopBottomFullWidth = construction.joinType === 'wience_przelotowe';
 
@@ -253,7 +254,7 @@ export function getCorpusParts(mod, config) {
 
 export function getBackPanelParts(mod, config) {
   const { width, height } = mod.dimensions;
-  const board = config.materials.boardThickness;
+  const board = moduleBoardThickness(mod, config);
   const backP = resolveBackPanel(mod, config);
 
   let hdfWidth, hdfHeight;

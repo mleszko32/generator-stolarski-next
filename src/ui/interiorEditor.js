@@ -27,6 +27,7 @@
 // wrapperami wokół niej, więc zachowanie dla istniejących wywołań (main.js,
 // ui/properties.js, ui/sidebar.js, render/viewer3d.js) jest identyczne jak
 // przed wprowadzeniem fabryki.
+import { moduleBoardThickness } from "../core/boardThickness.js";
 import { fmtMm } from "../utils/math.js";
 import { escapeHtml } from "../utils/dom.js";
 import { state, getActiveModule } from "../core/state.js";
@@ -458,7 +459,7 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       // (core/slopeCabinet.js: getSlopeInnerRect) - skośną płytę i to, co nad nią,
       // przykrywamy, żeby było widać, jak skos przytnie półki, przegrody i fronty.
       if (!cornerArm && it.mod.type === "slope_cabinet") {
-        const th = parseFloat(state.project.materials?.boardThickness) || 18;
+        const th = moduleBoardThickness(it.mod, state.project);
         const ov = getSlopeOverlay(it.mod, th);
         const pts = (poly) => poly.map(([x, y]) => `${px.toPxX(x)},${px.toPxY(y)}`).join(" ");
         const svgNS = "http://www.w3.org/2000/svg";

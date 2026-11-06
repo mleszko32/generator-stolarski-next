@@ -50,3 +50,18 @@ describe("kolory dekorów w 3D", () => {
     expect(partColor("corpus", { sidePanelId: "p" }, project)).toBe(decorColor("U740 PM"));
   });
 });
+
+describe("kolor skrzynek szuflad i dekor korpusu projektu", () => {
+  const project = {
+    materials: { decors: { Szuflada: "Egger U702 ST9 18mm Kaszmir", Korpus: "Egger W1000 ST9" } },
+    modules: [{ id: "a", elements: [{ id: "d", typ: "front", subtype: "szuflada" }] }],
+  };
+  it("skrzynka w dekorze Szuflada, korpus bez własnego dekoru w dekorze projektu", () => {
+    expect(partColor("drawerBox", { moduleId: "a", elementId: "d" }, project)).toBe(decorColor("Egger U702 ST9 18mm Kaszmir"));
+    expect(partColor("corpus", { moduleId: "a" }, project)).toBe(decorColor("Egger W1000 ST9"));
+  });
+  it("legenda ma grupę Szuflady", () => {
+    const leg = projectDecorLegend(project);
+    expect(leg.find((l) => l.group === "Szuflada").label).toBe("Egger U702 ST9 18mm Kaszmir");
+  });
+});

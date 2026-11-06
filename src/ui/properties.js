@@ -1,4 +1,6 @@
 // src/ui/properties.js
+import { setModuleKorpusDecor } from "../core/korpusDecorChange.js";
+import { moduleBoardThickness, decorThickness } from "../core/boardThickness.js";
 import { state, getActiveModule, frontBodyGap } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
@@ -123,7 +125,7 @@ export function initPropertiesPanel() {
   const f = { ...(state.project.front || {}), ...(activeModule.front || {}) };
   const fc = { ...(state.project.front?.clearance || {}), ...(activeModule.front?.clearance || {}) };
   const fh = { topOffset: 100, bottomOffset: 100, margin: 40, forceCount: 0, ...(state.project.front?.hinges || {}), ...(activeModule.front?.hinges || {}) };
-  const th = parseFloat(state.project.materials.boardThickness) || 18;
+  const th = moduleBoardThickness(activeModule, state.project);
 
   let actualBottomText = "";
   let actualTopText = "";
@@ -308,7 +310,7 @@ export function initPropertiesPanel() {
 
     ${tabContent("konstrukcja", `
       <h3>Konstrukcja Korpusu</h3>
-      <div class="property-group"><label>Grubość płyty (mm):</label><input type="number" id="input-board-thick" value="${state.project.materials.boardThickness}" step="0.1" /></div>
+      <div class="property-group"><label>Grubość płyty (mm):</label><input type="number" id="input-board-thick" value="${state.project.materials.boardThickness}" step="0.1" />${decorThickness(activeModule.materials?.korpusDecor) ? `<div class="hint">Ta szafka: ${decorThickness(activeModule.materials.korpusDecor)} mm z nazwy dekoru korpusu (pole niżej). Ta wartość dotyczy szafek bez grubości w dekorze.</div>` : ''}</div>
       <div class="property-group"><label>Dekor korpusu (puste = z projektu):</label><input type="text" id="input-korpus-decor" list="korpus-decor-catalog" value="${escapeHtml(activeModule.materials?.korpusDecor || '')}" placeholder="np. Egger U740 PM" title="Formatki z płyty korpusu tej szafki (i zaznaczonych) dostaną materiał „Korpus: dekor” - osobna pozycja w kosztorysie i osobne arkusze w rozkroju." /><datalist id="korpus-decor-catalog">${catalogLabels(state.project).map(l => `<option value="${escapeHtml(l)}"></option>`).join('')}</datalist></div>
       <div class="property-group"><label>Sposób łączenia:</label><select id="input-join-type"><option value="boki_przelotowe" ${cons.joinType === 'boki_przelotowe' ? 'selected' : ''}>Boki do ziemi (wieńce wpuszczane)</option><option value="wience_przelotowe" ${cons.joinType === 'wience_przelotowe' ? 'selected' : ''}>Wieńce pełne (boki wpuszczane)</option></select></div>
       <div class="property-group"><label>Zamknięcie góry:</label><select id="input-top-type"><option value="pelny" ${cons.topType === 'pelny' ? 'selected' : ''}>Pełny wieniec</option><option value="trawersy_poziom" ${cons.topType === 'trawersy_poziom' ? 'selected' : ''}>Trawersy poziome</option><option value="trawersy_pion" ${cons.topType === 'trawersy_pion' ? 'selected' : ''}>Trawersy pionowe</option></select></div>
@@ -615,11 +617,9 @@ function setupEventListeners() {
   // Dekor korpusu per szafka (core/materialCatalog.js: moduleKorpusDecor) - dla wszystkich zaznaczonych.
   document.getElementById('input-korpus-decor')?.addEventListener('change', (e) => {
     const v = e.target.value.trim();
-    getSelectedMods().forEach(mod => {
-      if (v) { mod.materials = { ...(mod.materials || {}), korpusDecor: v }; }
-      else if (mod.materials) { delete mod.materials.korpusDecor; if (!Object.keys(mod.materials).length) delete mod.materials; }
-    });
+    getSelectedMods().forEach(mod => setModuleKorpusDecor(mod, v, state.project)); // grubość z dekoru dopasowuje wnętrze
     updateAll();
+    initPropertiesPanel(); // podpowiedź grubości płyty z dekoru
   });
 
   document.querySelectorAll('.input-leg-height-override').forEach(inp => {
@@ -778,7 +778,7 @@ function setupEventListeners() {
             if (id === 'width') {
               if (val < 50) return;
               const oldWidth = parseFloat(mod.dimensions.width) || 0;
-              const th = parseFloat(state.project.materials.boardThickness) || 18;
+              const th = moduleBoardThickness(mod, state.project);
               const innerOldX = oldWidth - 2 * th;
               const innerNewX = val - 2 * th;
               if (innerOldX > 0 && innerNewX > 0 && mod.elements) {
@@ -803,7 +803,7 @@ function setupEventListeners() {
             if (id === 'height') {
               if (val < 50) return;
               const oldHeight = parseFloat(mod.dimensions.height) || 0;
-              const th = parseFloat(state.project.materials.boardThickness) || 18;
+              const th = moduleBoardThickness(mod, state.project);
               const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(state.project.construction || {}), ...(mod.construction || {}) };
               let topZoneH = (cons.topType === 'trawersy_pion') ? (parseFloat(cons.traverseWidth) || 100) : th;
               const innerOldY = oldHeight - th - topZoneH;

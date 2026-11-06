@@ -15,6 +15,7 @@ import { state, DEFAULT_ROOM } from "./state.js";
 import { assignFront } from "./zoneTree.js";
 import { getSlopeInnerRect } from "./slopeCabinet.js";
 import { applyBlindCorner } from "./blindCorner.js";
+import { moduleBoardThickness } from "./boardThickness.js";
 
 // Przelicza layout wszystkich modułów projektu. Wołaj przed każdym liczeniem
 // formatek/okuć całego projektu — fronty z sąsiednich modułów też muszą mieć
@@ -238,7 +239,7 @@ export function elementsInBoundOrder(elements) {
 export function recalculateLayout(mod) {
   if (!mod || !mod.elements) return;
   const config = state.project;
-  const th = parseFloat(config.materials.boardThickness) || 18;
+  const th = moduleBoardThickness(mod, config);
   const width = parseFloat(mod.dimensions.width) || 600;
   const height = parseFloat(mod.dimensions.height) || 720;
 
@@ -474,7 +475,7 @@ function migrateCornerHingesToSide(mod) {
 
 function applyCornerFrontOverlap(mod) {
   const primaryArm = mod.cornerFrontOverlap?.primaryArm || 'A';
-  const th = parseFloat(state.project.materials?.boardThickness) || 18;
+  const th = moduleBoardThickness(mod, state.project);
   const gap = parseFloat(mod.front?.gap ?? state.project.front?.gap) || 3;
 
   // Prawa (zewnętrzna, przy boku korpusu) krawędź liczona NIEZALEŻNIE od
@@ -552,7 +553,7 @@ export function getCornerDepths(mod) {
 // z opts.cornerArm) - piony/poziomy/fronty zagnieżdżone w ramieniu mierzą się
 // względem tego samego prostokąta.
 export function getCornerArmRect(mod, arm) {
-  const th = parseFloat(state.project.materials?.boardThickness) || 18;
+  const th = moduleBoardThickness(mod, state.project);
   const legA = parseFloat(mod.dimensions.width) || 860;
   const legB = parseFloat(mod.dimensions.legB) || 860;
   const { depthA, depthB } = getCornerDepths(mod);

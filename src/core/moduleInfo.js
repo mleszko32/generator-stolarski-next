@@ -8,6 +8,7 @@ import { corpusInnerDepth } from "./backPanel.js";
 import { calculateHinges } from "./hingeMath.js";
 import { getDrawerBoxInfo } from "./drawerBoxes.js";
 import { num, round1 } from "../utils/math.js";
+import { moduleBoardThickness } from "./boardThickness.js";
 
 const TYPE_LABELS = {
   base_cabinet: "Szafka dolna",
@@ -20,7 +21,7 @@ const TYPE_LABELS = {
 // Zwraca { type, dims, inner, doors[], drawers[], shelves[], dividers } dla szafki zwykłej.
 export function getModuleSummary(mod, project) {
   recalculateLayout(mod);
-  const th = num(project.materials && project.materials.boardThickness, 18) || 18;
+  const th = moduleBoardThickness(mod, project);
   const W = num(mod.dimensions.width), H = num(mod.dimensions.height), D = num(mod.dimensions.depth);
   const els = mod.elements || [];
   // Głębokość wnętrza BEZ pleców (tak jak głębokość wieńców w liście formatek): przy plecach

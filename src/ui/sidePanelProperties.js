@@ -2,6 +2,8 @@
 //
 // Prawy panel dla boku dokładanego i blendy (project.sidePanels) - wydzielony z
 // ui/properties.js, który woła renderSidePanelProperties() zamiast formularza szafki.
+import { decorThickness } from "../core/boardThickness.js";
+import { catalogLabels } from "../core/materialCatalog.js";
 import { state } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
@@ -19,13 +21,18 @@ import { propHeaderHtml, sectionHtml, bindSections, positionRotationHtml } from 
 // sam, droższy dekor co fronty, więc korzysta z tego samego cennika zamiast
 // dublować go osobno dla "Front" w kosztorysie (engine/cabinet.js:
 // resolveFrontMaterial obsługuje panel.materialId tak samo jak front.materialId).
+// Podpowiedzi pełnych nazw płyt z bazy (z grubością) do pola Dekor.
+function decorDatalistHtml() {
+  return `<datalist id="side-decor-catalog">${catalogLabels(state.project).map(l => `<option value="${escapeHtml(l)}">`).join('')}</datalist>`;
+}
+
 function materialSectionHtml(panel) {
   const mats = state.project.pricing?.frontMaterials || [];
   return `
     <h3>Materiał i dekor</h3>
     <div class="property-group">
       <label>Dekor (opis do formatki):</label>
-      <input type="text" id="input-side-decor" value="${escapeHtml(panel.decor || '')}" placeholder="np. Front biały połysk" />
+      <input type="text" id="input-side-decor" list="side-decor-catalog" value="${escapeHtml(panel.decor || '')}" placeholder="np. Front biały połysk" />${decorDatalistHtml()}
     </div>
     <div class="property-group">
       <label>Materiał (cennik frontów):</label>
@@ -94,7 +101,7 @@ function renderHorizontalPanelProperties(rightSidebar, panel) {
       <h3>Materiał i dekor</h3>
       <div class="property-group">
         <label>Dekor (opis do formatki):</label>
-        <input type="text" id="input-side-decor" value="${escapeHtml(panel.decor || '')}" placeholder="pusty = dekor korpusu" />
+        <input type="text" id="input-side-decor" list="side-decor-catalog" value="${escapeHtml(panel.decor || '')}" placeholder="pusty = dekor korpusu" />${decorDatalistHtml()}
       </div>
     `)}
   `;
@@ -143,6 +150,13 @@ function bindSidePanelInputs(rightSidebar, panel) {
   bindSections(rightSidebar);
   bindText('input-side-name', v => panel.name = v);
   bindText('input-side-decor', v => panel.decor = v);
+  // dekor z bazy płyt z grubością w nazwie („19mm”) ustawia grubość boku / panelu poziomego
+  document.getElementById('input-side-decor')?.addEventListener('change', (e) => {
+    const t = decorThickness(e.target.value);
+    if (!t || panel.kind === 'blenda') return;
+    if (panel.kind === 'poziomy') panel.dimensions.height = t; else panel.dimensions.width = t;
+    update3D(); updateSidebar(); initPropertiesPanel();
+  });
   bindNumber('input-side-width', v => panel.dimensions.width = v);
   bindNumber('input-side-height', v => panel.dimensions.height = v);
   bindNumber('input-side-depth', v => panel.dimensions.depth = v);

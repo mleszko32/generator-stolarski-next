@@ -2,6 +2,7 @@
 // Sekcja "Narożnik" prawego panelu: szafka ślepa (zwykła szafka - ui/properties.js)
 // i okucie narożne szafki L (ui/cornerProperties.js). Obliczenia: core/blindCorner.js,
 // katalog okuć: core/cornerFittings.js.
+import { moduleBoardThickness } from "../core/boardThickness.js";
 import { state } from "../core/state.js";
 import { recalculateLayout } from "../core/layout.js";
 import { buildZoneTree, assignFront } from "../core/zoneTree.js";
@@ -123,7 +124,7 @@ export function bindBlindCornerSection(root, mod, { refresh, rerender }) {
 // Szafka narożna L: wybór karuzeli.
 export function cornerFittingSectionHtml(mod) {
   const id = getCornerFitting(mod.cornerFitting) ? mod.cornerFitting : "";
-  const th = num(state.project.materials && state.project.materials.boardThickness, 18) || 18;
+  const th = moduleBoardThickness(mod, state.project);
   const warnings = id ? checkCornerFitting(id, {
     width: [num(mod.dimensions.width), num(mod.dimensions.legB, num(mod.dimensions.width))],
     innerHeight: num(mod.dimensions.height) - 2 * th,

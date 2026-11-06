@@ -5,6 +5,7 @@
 // szafka (ui/propertiesShell.js). Wnętrze (przegrody, półki, fronty, szuflady)
 // ustawia się w zwykłym edytorze "Wnętrze 2D" - tak jak w każdej szafce.
 // Geometria i formatki: core/slopeCabinet.js.
+import { moduleBoardThickness } from "../core/boardThickness.js";
 import { state } from "../core/state.js";
 import { update3D } from "../render/viewer3d.js";
 import { updateSidebar } from "./sidebar.js";
@@ -23,7 +24,7 @@ const TYPE_LABELS = { szuflada: 'Szuflada', drzwi: 'Drzwi', blenda: 'Blenda', br
 const SUBTYPE_LABELS = { szuflada: 'Szuflada', 'szuflada-wewnetrzna': 'Szuflada wewn.', drzwi: 'Drzwi', 'drzwi-lp': 'Drzwi' };
 
 export function renderSlopeModuleProperties(rightSidebar, mod) {
-  const th = parseFloat(state.project.materials?.boardThickness) || 18;
+  const th = moduleBoardThickness(mod, state.project);
   const s = getSlopeSettings(mod);
   const join = getSlopeJoin(mod, state.project);
   const g = getSlopeGeometry(mod, th);

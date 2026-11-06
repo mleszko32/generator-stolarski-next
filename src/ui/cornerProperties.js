@@ -2,6 +2,7 @@
 //
 // Prawy panel szafki narożnej i wydruk wykroju formatki narożnej - wydzielone z
 // ui/properties.js (renderCornerModuleProperties zamiast zakładek zwykłego modułu).
+import { moduleBoardThickness } from "../core/boardThickness.js";
 import { state } from "../core/state.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
@@ -29,7 +30,7 @@ export function openCornerBlankPrintView(mod) {
   const legB = parseFloat(mod.dimensions.legB) || 860;
   const { depthA, depthB } = getCornerDepths(mod);
   const shelfCount = (mod.elements || []).filter(el => el.typ === 'poziom-narozny').length;
-  const th = parseFloat(state.project.materials?.boardThickness) || 18;
+  const th = moduleBoardThickness(mod, state.project);
 
   const svgContent = generateCornerBlankSVG(legA, legB, depthA, depthB, th, null, {
     title: 'RZUT SZAFKI Z GÓRY', plain: true,

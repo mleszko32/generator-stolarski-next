@@ -22,6 +22,7 @@ import { jointSetsFor, bottomSetbackOf, sideFloorExt } from "./carcaseParts.js";
 import { num, round1 } from "../utils/math.js";
 import { getBlindStile, blindGeometry, getBlindCorner, PARALLEL_PLATE_INSET } from "../core/blindCorner.js";
 import { SHELF_PIN_DROP, SHELF_PIN_OFFSETS } from "../core/hingeMath.js";
+import { moduleBoardThickness } from "../core/boardThickness.js";
 const EPS = 2;
 
 // Średnice i głębokości (jak legenda rysunku 2D: kołek Ø8 + wkręt, podpórki / prowadnice /
@@ -45,7 +46,7 @@ const HOLE_KIND = { screw: "wkret", dowel: "kolek" };
 export function getCabinetPanels(mod, project) {
   if (!mod || mod.type === "corner_cabinet" || mod.type === "slope_cabinet") return [];
   recalculateLayout(mod);
-  const th = num(project.materials && project.materials.boardThickness, 18) || 18;
+  const th = moduleBoardThickness(mod, project);
   const backThick = backThicknessOf(mod, project);
   const W = num(mod.dimensions.width), H = num(mod.dimensions.height), D = num(mod.dimensions.depth);
   const cons = { joinType: "boki_przelotowe", topType: "pelny", traverseWidth: 100, ...(project.construction || {}), ...(mod.construction || {}) };

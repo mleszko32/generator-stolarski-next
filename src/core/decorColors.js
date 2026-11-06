@@ -41,6 +41,16 @@ export function isLightColor(color) {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.85;
 }
 
+// Dekor kategorii ustawiony dla całego projektu (pasek materiałów w Produkcji: Korpus / Plecy / Szuflada).
+function projectDecor(project, category) {
+  const d = project && project.materials && project.materials.decors && project.materials.decors[category];
+  return String(d || "").trim();
+}
+// Dekor korpusu szafki: jej własny, a bez niego - ustawiony dla projektu.
+function korpusDecorOf(mod, project) {
+  return moduleKorpusDecor(mod) || projectDecor(project, KORPUS);
+}
+
 // Kolor materiału frontu z cennika (project.pricing.frontMaterials) - z nazwy materiału, tak
 // samo jak dekor wpisany przy blendzie / panelu, więc ta sama nazwa = ten sam kolor. Tylko
 // nietknięty domyślny „Standard” zostaje w kolorze domyślnym (null).
@@ -78,15 +88,23 @@ export function projectDecorLegend(project) {
   const entries = new Map(); // nazwa (wielkie litery) -> { group, label, color }
   let plainKorpus = false, plainFront = false;
   const add = (group, label, color) => {
-    if (color == null || !String(label || "").trim()) { if (group === "Front") plainFront = true; else plainKorpus = true; return; }
-    const k = String(label).trim().toUpperCase();
+    if (color == null || !String(label || "").trim()) {
+      if (group === "Front") plainFront = true; else if (group === "Korpus") plainKorpus = true;
+      return;
+    }
+    // szuflady osobno (ten sam dekor co korpus i tak ma być widać przy szufladach)
+    const k = (group === "Szuflada" ? "S:" : "") + String(label).trim().toUpperCase();
     const prev = entries.get(k);
     if (!prev || (prev.group === "Korpus" && group === "Front")) entries.set(k, { group, label: String(label).trim(), color });
   };
   const list = (project.pricing && project.pricing.frontMaterials) || [];
   (project.modules || []).forEach((mod) => {
-    const d = moduleKorpusDecor(mod);
+    const d = korpusDecorOf(mod, project);
     add("Korpus", d, decorColor(d));
+    if ((mod.elements || []).some((el) => el.typ === "front" && /szuflada/.test(el.subtype || ""))) {
+      const sd = projectDecor(project, "Szuflada");
+      add("Szuflada", sd, decorColor(sd));
+    }
     (mod.elements || []).forEach((el) => {
       if (el.typ === "front") add("Front", frontMaterialName(el.materialId, project), frontMaterialColor(el.materialId, project));
     });
@@ -108,11 +126,12 @@ export function projectDecorLegend(project) {
   };
   group("Korpus", plainKorpus, "bez dekoru (z projektu)");
   group("Front", plainFront, (list[0] && list[0].name) || "standard");
+  group("Szuflada", false, "");
   return out;
 }
 
 // Kolor bryły 3D z jej userData (moduleId / elementId / sidePanelId) i typu ('corpus',
-// 'shelf', 'front', 'plinth'); null = kolor domyślny materiału.
+// 'shelf', 'front', 'plinth', 'drawerBox'); null = kolor domyślny materiału.
 export function partColor(type, userData, project) {
   if (!userData || !project) return null;
   if (userData.sidePanelId) {
@@ -129,6 +148,7 @@ export function partColor(type, userData, project) {
     const el = userData.elementId && (mod.elements || []).find((e) => e.id === userData.elementId);
     return el ? frontMaterialColor(el.materialId, project) : null;
   }
-  if (type === "corpus" || type === "shelf") return decorColor(moduleKorpusDecor(mod));
+  if (type === "corpus" || type === "shelf") return decorColor(korpusDecorOf(mod, project));
+  if (type === "drawerBox") return decorColor(projectDecor(project, "Szuflada"));
   return null;
 }

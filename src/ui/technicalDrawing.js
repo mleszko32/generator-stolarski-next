@@ -1,6 +1,7 @@
 // src/ui/technicalDrawing.js
 // Rysunek techniczny aktywnej szafki (nawierty, System 32) w osobnym oknie, z
 // wydrukiem pojedynczej formatki na A4.
+import { moduleBoardThickness } from "../core/boardThickness.js";
 import { calculateParts } from "../engine/cabinet.js";
 import { generateSidePanelSVG } from "../render/viewer2d.js";
 import { state, getActiveModule } from "../core/state.js";
@@ -57,7 +58,7 @@ export function openTechnicalDrawing() {
         const buildPrintMeta = (m) => ({
             project: state.project.name || '',
             module: m.name || '',
-            th: parseFloat(state.project.materials?.boardThickness) || 18,
+            th: moduleBoardThickness(m, state.project),
             date: new Date().toLocaleDateString('pl-PL'),
         });
         window.__printMeta = buildPrintMeta(activeMod);

@@ -422,6 +422,12 @@ formatek „Korpus” tej szafki na „Korpus: <dekor>” (cokół — gdy cały
 z wypełnionym „Dekor” też), więc kosztorys (cena w `pricing.materials["Korpus: …"]`, bez wpisu = cena Korpus), rozkrój,
 CSV i FC2 rozdzielają dekory same. Reguły i kolejność po kategorii bazowej: `baseCategory` (`core/materialCatalog.js`).
 `calculateModuleParts` (rysunki, instrukcje) zostaje przy „Korpus”.
+**Grubość płyty per szafka**: `core/boardThickness.js` — `moduleBoardThickness(mod, project)` = grubość z nazwy dekoru
+korpusu („U702 ST9 18mm”, „W1000 PM/ST9 19mm”, `decorThickness`), inaczej `project.materials.boardThickness`. Wszystkie
+miejsca liczące szafkę (layout, zoneTree, formatki, wiercenia, instrukcje, 3D, skos, narożna) biorą grubość z niej — nie
+czytaj `project.materials.boardThickness` tam, gdzie jest szafka. Zmiana dekoru tylko przez `setModuleKorpusDecor`
+(`core/korpusDecorChange.js`; panel i pilot `set`), które dopasowuje wnętrze (rescaleSubtree, grubość półek/przegród).
+Bok dokładany / panel poziomy: dekor z grubością w nazwie ustawia ich grubość (pole Dekor z podpowiedziami z bazy).
 W 3D kolor płyty zależy od dekoru: `core/decorColors.js` (`partColor` z userData bryły — dekor szafki dla korpusu/półek,
 „Dekor” panelu, materiał frontu z cennika poza pierwszym; kod Egger W/H/F/U wybiera rodzinę barw), używane w
 `materialFor` w `meshBuilders.js` (jasne kolory w trybie przezroczystym pomijane). Legenda w lewym dolnym rogu widoku 3D

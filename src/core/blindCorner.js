@@ -11,6 +11,7 @@
 import { num } from "../utils/math.js";
 import { corpusInnerDepth } from "./backPanel.js";
 import { checkCornerFitting, getCornerFitting } from "./cornerFittings.js";
+import { moduleBoardThickness } from "./boardThickness.js";
 
 export const DEFAULT_BLIND_FRONT = 450;
 const MIN_FRONT = 100;
@@ -63,7 +64,7 @@ export function blindHingeSide(mod) {
 }
 
 function frontContext(mod, project) {
-  const th = num(project.materials && project.materials.boardThickness, 18) || 18;
+  const th = moduleBoardThickness(mod, project);
   const f = { ...(project.front || {}), ...(mod.front || {}) };
   const fc = { ...((project.front && project.front.clearance) || {}), ...((mod.front && mod.front.clearance) || {}) };
   return {
@@ -161,7 +162,7 @@ export function getBlindPanel(mod, project) {
 export function getBlindStile(mod, project) {
   const g = blindGeometry(mod, project);
   if (!g || g.mount !== "listwa" || g.stileX1 - g.stileX0 < 1) return null;
-  const th = num(project.materials && project.materials.boardThickness, 18) || 18;
+  const th = moduleBoardThickness(mod, project);
   const H = num(mod.dimensions && mod.dimensions.height, 720);
   const r = (v) => Math.round(v * 10) / 10;
   return { x: r(g.stileX0), w: r(g.stileX1 - g.stileX0), y: th, h: r(H - 2 * th), thickness: th };
@@ -169,7 +170,7 @@ export function getBlindStile(mod, project) {
 
 // Wymiary wnętrza do sprawdzenia okucia.
 export function innerDims(mod, project) {
-  const th = num(project.materials && project.materials.boardThickness, 18) || 18;
+  const th = moduleBoardThickness(mod, project);
   const D = num(mod.dimensions && mod.dimensions.depth, 513);
   const H = num(mod.dimensions && mod.dimensions.height, 720);
   return {

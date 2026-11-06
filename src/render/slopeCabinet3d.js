@@ -8,6 +8,7 @@ import { state } from '../core/state.js';
 import { getWorldFootprint } from '../core/layout.js';
 import { getSlopeCabinetPolygons } from '../core/slopeCabinet.js';
 import { addPrism, addLegsAndPlinth, isXrayMode } from './meshBuilders.js';
+import { moduleBoardThickness } from "../core/boardThickness.js";
 
 // frontsVisible - przełącznik "fronty" z podglądu 3D; skrzynki szuflad są
 // widoczne, gdy fronty są schowane albo w trybie przezroczystym.
@@ -51,7 +52,7 @@ export function renderSlopeCabinet(mod, isActive, th, parentGroup, frontsVisible
   const legsGroup = new THREE.Group();
   legsGroup.position.set(-W / 2, -H / 2 - baseOffsetY, -D / 2);
   modGroup.add(legsGroup);
-  addLegsAndPlinth(mod, W, D, parseFloat(state.project.materials?.boardThickness) || 18, isActive, legsGroup);
+  addLegsAndPlinth(mod, W, D, moduleBoardThickness(mod, state.project), isActive, legsGroup);
 
   parentGroup.add(modGroup);
 }

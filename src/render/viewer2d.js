@@ -16,6 +16,7 @@ export const formatVal = (val) => Number(Number(val).toFixed(1));
 // wysokością półki i wymiar przestrzeni między półkami zostaje dokładny (refaktor
 // rysunku z 3.09 to zgubił i otwory wypadły na samej wysokości półki).
 import { SHELF_PIN_DROP } from '../core/hingeMath.js';
+import { moduleBoardThickness } from "../core/boardThickness.js";
 
 // Opis wysokości otworu w stylu rysunku boku zwykłej szafki: bliższa krawędź
 // (DÓŁ/GÓRA) wyróżniona, druga w nawiasie.
@@ -677,7 +678,7 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
 
   const config = state.project;
   const cabWidth = parseFloat(mod.dimensions?.width) || 600;
-  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const th = moduleBoardThickness(mod, config);
 
   const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(config.construction || {}), ...(mod.construction || {}) };
   const isTopBottomFullWidth = cons.joinType === 'wience_przelotowe';

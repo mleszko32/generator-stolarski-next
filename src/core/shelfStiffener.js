@@ -1,3 +1,4 @@
+import { moduleBoardThickness } from "./boardThickness.js";
 // Listwa usztywniająca półki: długa półka (stała albo ruchoma) dostaje od spodu, przy tylnej
 // krawędzi, listwę z płyty korpusu ustawioną na sztorc - razem tworzą profil L, kilka razy
 // sztywniejszy od samej półki. Ustawienia w construction.shelfStiffener (scalane projekt + moduł):
@@ -26,6 +27,6 @@ export function shelfStiffener(mod, el, project) {
   const s = getStiffenerSettings(mod, project);
   const length = parseFloat(el.w) || 0;
   if (!s.active || length <= s.minLength) return null;
-  const thickness = parseFloat(project && project.materials && project.materials.boardThickness) || 18;
+  const thickness = moduleBoardThickness(mod, project);
   return { length: Math.round(length * 10) / 10, height: s.height, thickness };
 }

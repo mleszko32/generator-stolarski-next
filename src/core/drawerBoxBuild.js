@@ -37,6 +37,7 @@ import { recalculateLayout } from "./layout.js";
 import { drawerSystems } from "./drawerSystems.js";
 import { num, round1 } from "../utils/math.js";
 import { LAMELLO, lamelloGrooveLen, lamelloPositions } from "./lamello.js";
+import { moduleBoardThickness } from "./boardThickness.js";
 
 export { LAMELLO, lamelloGrooveLen, lamelloGrooveLength, lamelloPositions } from "./lamello.js";
 
@@ -308,7 +309,7 @@ export function cabinetFrontView(mod, project) {
   const W = num(mod.dimensions.width), H = num(mod.dimensions.height);
   const rect = (x, y, w, h) => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
   if (mod.type === "slope_cabinet") {
-    const th = num(project.materials && project.materials.boardThickness, 18) || 18;
+    const th = moduleBoardThickness(mod, project);
     const g = getSlopeGeometry(mod, th);
     const real = (pts) => (g.lowSide === "right" ? pts.map(([x, y]) => [round1(g.W - x), round1(y)]) : pts.map(([x, y]) => [round1(x), round1(y)]));
     const outline = real(g.isTriangle ? [[0, 0], [g.W, 0], [g.W, g.H]] : [[0, 0], [g.W, 0], [g.W, g.H], [0, g.L]]);

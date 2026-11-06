@@ -15,6 +15,7 @@ import { splitPlinthRun, maxPlinthLength } from "./plinthSplit.js";
 import { shelfStiffener } from "../core/shelfStiffener.js";
 import { KORPUS, korpusCategory, moduleKorpusDecor } from "../core/materialCatalog.js";
 import { plinthMaterial } from "../core/plinthMaterial.js";
+import { moduleBoardThickness } from "../core/boardThickness.js";
 
 export function calculateParts() {
   // Fronty muszą mieć aktualne el.x/y/w/h zanim policzymy z nich formatki.
@@ -83,7 +84,7 @@ export function calculateModuleParts(mod) {
 
 function getGlobalHingesForModule(targetMod, config) {
   const mountingData = [];
-  const th = config.materials.boardThickness || 18;
+  const th = moduleBoardThickness(targetMod, config);
   // Odcisk w pokoju z uwzględnieniem obrotu (getModuleBox) - wcześniej szerokość/głębokość
   // brane wprost z dimensions dawały przy obrocie 90/270 fantomowe nachodzenie sąsiednich
   // szafek w rzędzie na bocznej ścianie i cudze zawiasy na boku.
@@ -215,7 +216,7 @@ export function collectProjectParts() {
           // sąsiada, żeby w ogóle mogły się połączyć w jeden ciągły odcinek.
           // Bok do podłogi: cokół zaczyna się / kończy na boku (grubość płyty mniej z tej strony).
           const ext = sideFloorExt(mod, config);
-          const thB = parseFloat(config.materials && config.materials.boardThickness) || 18;
+          const thB = moduleBoardThickness(mod, config);
           const cutStart = ext.left ? thB : 0, cutEnd = ext.right ? thB : 0;
           const along = (alongZ ? z : x) + (alongZ ? 0 : cutStart);
           const runLen = (alongZ ? worldD : worldW) - (alongZ ? 0 : cutStart + cutEnd);
@@ -301,7 +302,7 @@ function getInteriorParts(mod, config) {
   if (!mod.elements || mod.elements.length === 0) return parts;
 
   const { depth, width } = mod.dimensions;
-  const board = config.materials.boardThickness;
+  const board = moduleBoardThickness(mod, config);
 
   const f = { ...(config.front || {}), ...(mod.front || {}) };
   const frontType = f.type || 'nakladane';
@@ -361,7 +362,7 @@ function getFrontsAndDrawers(mod, config) {
   if (fronts.length === 0) return { parts, mountingData };
   fronts.sort((a, b) => a.y - b.y);
 
-  const board = config.materials.boardThickness;
+  const board = moduleBoardThickness(mod, config);
   const fc = { ...(config.front?.clearance || {}), ...(mod.front?.clearance || {}) };
 
   fronts.forEach((front, index) => {

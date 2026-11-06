@@ -20,6 +20,7 @@
 // przegrody (każda z nich to osobny węzeł 'split' w tym samym poddrzewie).
 // Dodanie takiej półki NIE usuwa frontu - baseZone frontu się nie zmienia,
 // więc nadal pasuje do rect węzła 'split', który go teraz reprezentuje.
+import { moduleBoardThickness } from "./boardThickness.js";
 import { state } from "./state.js";
 import { autoDistributeShelves } from "./shelfMath.js";
 import { getCornerArmRect } from "./layout.js";
@@ -27,8 +28,8 @@ import { getSlopeInnerRect } from "./slopeCabinet.js";
 
 const EPS = 2; // mm tolerancji przy porównaniach geometrycznych (zaokrąglenia)
 
-function getBoardThickness() {
-  return parseFloat(state.project.materials?.boardThickness) || 18;
+function getBoardThickness(mod) {
+  return moduleBoardThickness(mod, state.project);
 }
 
 function getConsForModule(mod) {
@@ -44,7 +45,7 @@ function getConsForModule(mod) {
 // Wewnętrzny prostokąt korpusu (światło między bokami/wieńcami), w mm,
 // liczony od dołu modułu (0,0 = lewy dolny róg wnętrza korpusu).
 export function getCabinetInnerRect(mod) {
-  const th = getBoardThickness();
+  const th = getBoardThickness(mod);
   // Szafka pod skos: wnętrze do najwyższego miejsca pod skosem (core/slopeCabinet.js).
   if (mod.type === "slope_cabinet") return getSlopeInnerRect(mod, th);
   const W = parseFloat(mod.dimensions.width) || 600;
@@ -207,7 +208,7 @@ function collectFrontIds(node, into) {
 // wizualnie nadal obejmuje całość, a nowa półka jest już za nim.
 export function splitZoneHorizontal(mod, node, cornerArm) {
   if (node.type !== "leaf") return null;
-  const th = getBoardThickness();
+  const th = getBoardThickness(mod);
   const { minX, maxX, minY, maxY } = node.rect;
   const midY = (minY + maxY) / 2;
   const shelf = {
@@ -231,7 +232,7 @@ export function splitZoneHorizontal(mod, node, cornerArm) {
 // nawierty w rysunku technicznym, engine/carcaseParts.js: getPionMountHoles).
 export function splitZoneVertical(mod, node, cornerArm) {
   if (node.type !== "leaf") return null;
-  const th = getBoardThickness();
+  const th = getBoardThickness(mod);
   const { minX, maxX, minY, maxY } = node.rect;
   const midX = (minX + maxX) / 2;
   const divider = {
@@ -253,7 +254,7 @@ export function splitZoneVertical(mod, node, cornerArm) {
 // z tych samych powodów co przy splitZoneHorizontal.
 export function addEvenShelves(mod, node, count, cornerArm) {
   if (node.type !== "leaf" || count < 1) return [];
-  const th = getBoardThickness();
+  const th = getBoardThickness(mod);
   const { minX, maxX, minY, maxY } = node.rect;
   const offsets = autoDistributeShelves(maxY - minY, th, count);
   const ts = Date.now();
@@ -568,7 +569,7 @@ const MIN_GAP = 30; // najmniejszy dopuszczalny prześwit po obu stronach przesu
 // i proporcjonalnie przeskalowując wszystko zagnieżdżone po obu stronach.
 export function moveSplit(mod, node, newPos) {
   if (node.type !== "split") return;
-  const th = getBoardThickness();
+  const th = getBoardThickness(mod);
 
   if (node.axis === "h") {
     const min = node.rect.minY + MIN_GAP;

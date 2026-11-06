@@ -1,4 +1,5 @@
 // src/render/viewer3d.js
+import { moduleBoardThickness } from "../core/boardThickness.js";
 import * as THREE from 'three';
 import { resolveBackPanel, backThicknessOf, isBoardOverlayBack } from '../core/backPanel.js';
 import { bottomSetbackOf, sideFloorExt } from '../engine/carcaseParts.js';
@@ -1155,10 +1156,11 @@ function renderDecorLegend() {
   decorLegendEl.hidden = items.length === 0;
   if (!items.length) { decorLegendEl.innerHTML = ''; return; }
   const hex = (c) => '#' + c.toString(16).padStart(6, '0');
-  const defaults = { Korpus: mats.solid.corpus.color.getHex(), Front: mats.solid.front.color.getHex() };
+  const defaults = { Korpus: mats.solid.corpus.color.getHex(), Front: mats.solid.front.color.getHex(), Szuflada: mats.solid.drawerBox.color.getHex() };
+  const groupNames = { Korpus: 'Płyta korpusu', Front: 'Fronty', Szuflada: 'Szuflady' };
   let html = '', group = '';
   items.forEach((it) => {
-    if (it.group !== group) { group = it.group; html += `<div class="decor-legend-group">${group === 'Korpus' ? 'Płyta korpusu' : 'Fronty'}</div>`; }
+    if (it.group !== group) { group = it.group; html += `<div class="decor-legend-group">${groupNames[group] || group}</div>`; }
     html += `<div class="decor-legend-row"><span class="decor-legend-swatch" style="background:${hex(it.color ?? defaults[it.group])}"></span>${escapeHtml(it.label)}</div>`;
   });
   decorLegendEl.innerHTML = html;
@@ -1189,9 +1191,10 @@ export function update3D() {
   }
   requestRender();
 
-  const th = parseFloat(state.project.materials?.boardThickness) || 18;
+  // grubość płyty liczona per szafka (dekor korpusu z grubością w nazwie - core/boardThickness.js)
 
   state.project.modules.forEach(mod => {
+      const th = moduleBoardThickness(mod, state.project);
       recalculateLayout(mod);
 
       // Szafka narożna (mod.type === 'corner_cabinet', core/state.js:

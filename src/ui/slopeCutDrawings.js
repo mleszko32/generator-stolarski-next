@@ -6,6 +6,7 @@
 // W każdej zakładce spis do szybkiego skoku; druk bieżącej zakładki albo wszystkiego.
 // Ten sam wzorzec okna co wykrój narożnika (ui/cornerProperties.js:
 // openCornerBlankPrintView) - samodzielny HTML w nowej karcie.
+import { moduleBoardThickness } from "../core/boardThickness.js";
 import { state } from "../core/state.js";
 import { escapeHtml, openHtmlWindow } from "../utils/dom.js";
 import { round1 } from "../utils/math.js";
@@ -47,7 +48,7 @@ const index = (items) => items.length
 
 export function openSlopeCutDrawings(mod) {
   const config = state.project;
-  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const th = moduleBoardThickness(mod, config);
   const g = getSlopeGeometry(mod, th);
   recalculateLayout(mod);
   const boards = groupBoards(getSlopeBoards(mod, config));

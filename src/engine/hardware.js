@@ -16,6 +16,7 @@ import { getSlopePanels } from "./slopeDrillings.js";
 import { getBlindCorner, blindGeometry, BLIND_MOUNTS } from "../core/blindCorner.js";
 import { getCornerFitting } from "../core/cornerFittings.js";
 import { wardrobeRodLength } from "../core/slopeNiche.js";
+import { moduleBoardThickness } from "../core/boardThickness.js";
 
 export function calculateProjectHardware() {
   recalculateAllLayouts();
@@ -24,7 +25,7 @@ export function calculateProjectHardware() {
   const hardwareList = {};
 
   config.modules.forEach(mod => {
-    const board = config.materials.boardThickness || 18;
+    const board = moduleBoardThickness(mod, config);
 
     if (mod.legs && mod.legs.active) {
       const legH = parseFloat(mod.legs.height) || 100;

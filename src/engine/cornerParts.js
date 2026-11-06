@@ -8,6 +8,7 @@ import { calculateHinges } from "../core/hingeMath.js";
 import { fmtMm } from "../utils/math.js";
 import { recalculateLayout, getCornerDepths } from "../core/layout.js";
 import { jointSetsFor } from "./carcaseParts.js";
+import { moduleBoardThickness } from "../core/boardThickness.js";
 
 // Szafka narożna, kąt prosty (mod.type === 'corner_cabinet', core/
 // state.js: addCornerModule) - korpus i plecy dla modułu o dwóch
@@ -21,7 +22,7 @@ export function getCornerCorpusParts(mod, config) {
   const legB = parseFloat(mod.dimensions.legB) || 860;
   const { depthA, depthB } = getCornerDepths(mod);
   const height = parseFloat(mod.dimensions.height) || 720;
-  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const th = moduleBoardThickness(mod, config);
   const backThick = parseFloat(config.materials?.backThickness) || 3;
   const battenW = 100;
 
@@ -132,7 +133,7 @@ export function getCornerDoorHingeSide(mod, front) {
 // przykręcany do boku korpusu (atBok) tylko gdy leży na zewnętrznej krawędzi.
 export function getCornerDoorHinges(mod) {
   recalculateLayout(mod);
-  const board = parseFloat(state.project.materials?.boardThickness) || 18;
+  const board = moduleBoardThickness(mod, state.project);
   const els = mod.elements || [];
   const cornerShelves = els.filter(el => el.typ === 'poziom-narozny');
   return els
@@ -157,7 +158,7 @@ export function getCornerDoorHinges(mod) {
 // listwę narożną (stoi końcami na wieńcu). Półka nie ma żadnych - opiera się
 // na podpórkach i ma wycięcie na listwę.
 export function getCornerWieniecHoles(mod, config = state.project) {
-  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const th = moduleBoardThickness(mod, config);
   return [20, 80].map(x => ({ x, y: th / 2, type: 'dowel', side: 'batten' }));
 }
 
@@ -166,7 +167,7 @@ export function getCornerWieniecHoles(mod, config = state.project) {
 // wycięcie na listwę tylko w półce - te same liczby co w getCornerCorpusParts
 // i render/cornerCabinet3d.js: renderCornerCabinet.
 export function getCornerPartsGeometry(mod, config = state.project) {
-  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const th = moduleBoardThickness(mod, config);
   const backThick = parseFloat(config.materials?.backThickness) || 3;
   const legA = parseFloat(mod.dimensions.width) || 860;
   const legB = parseFloat(mod.dimensions.legB) || 860;
@@ -189,7 +190,7 @@ export function getCornerShelfHoles(mod, config = state.project) {
   const backThick = parseFloat(config.materials?.backThickness) || 3;
   const height = parseFloat(mod.dimensions.height) || 720;
   const { depthA, depthB } = getCornerDepths(mod);
-  const th = parseFloat(config.materials?.boardThickness) || 18;
+  const th = moduleBoardThickness(mod, config);
   const battenW = 100;
   const pinR = 2.5;
 

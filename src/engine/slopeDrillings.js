@@ -20,6 +20,7 @@ import { getSlopeGeometry, getSlopeDrillings, getSlopeBoards, getSlopeDividers, 
 import { jointSetsFor } from "./carcaseParts.js";
 import { cabinetHoleSpecs } from "./cabinetDrillings.js";
 import { num, round1 } from "../utils/math.js";
+import { moduleBoardThickness } from "../core/boardThickness.js";
 
 const KIND_OF = { drawer: "prowadnica", shelf: "podporka", screw: "wkret", dowel: "kolek", hinge: "zawias", lamello: "lamello", key: "klucz" };
 const TO = { prowadnica: "prowadnica szuflady", podporka: "półka ruchoma", wkret: "półka stała", kolek: "półka stała", zawias: "prowadnik zawiasu", lamello: "półka stała", klucz: "łącznik Clamex" };
@@ -40,7 +41,7 @@ function cutNote(b) {
 export function getSlopePanels(mod, project) {
   if (!mod || mod.type !== "slope_cabinet") return { panels: [], notes: [] };
   recalculateLayout(mod);
-  const th = num(project.materials && project.materials.boardThickness, 18) || 18;
+  const th = moduleBoardThickness(mod, project);
   const backThick = num(project.materials && project.materials.backThickness, 3) || 3;
   const g = getSlopeGeometry(mod, th);
   const depth = round1(g.D - backThick);
@@ -169,7 +170,7 @@ export function getSlopePanels(mod, project) {
 
 // Opis konstrukcji do nagłówka instrukcji i kolejności montażu.
 export function getSlopeConstruction(mod, project) {
-  const th = num(project.materials && project.materials.boardThickness, 18) || 18;
+  const th = moduleBoardThickness(mod, project);
   const g = getSlopeGeometry(mod, th);
   const fronts = getSlopeFronts(mod, project);
   const els = mod.elements || [];
