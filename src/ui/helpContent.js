@@ -40,6 +40,10 @@ export const HELP_SECTIONS = [
     body: `
       <p>Przycisk <b>Pomieszczenie</b> na górnym pasku otwiera okno z szerokością, głębokością
       i wysokością pokoju. Punkt (0, 0) to tylny lewy narożnik.</p>
+      <p><b>Pokój w kształcie L</b>: w polu <b>Wcięcie</b> wybierz narożnik i podaj, ile mm wcięcie
+      zabiera wzdłuż szerokości i głębokości (np. ściana za szafą wnękową). Szerokość i głębokość
+      pokoju to wtedy wymiary całego obrysu. W 3D pojawiają się dodatkowe ściany, a kontrola projektu
+      zgłasza szafkę, która wchodzi we wcięcie. Rzuty ścian dotyczą czterech ścian zewnętrznych.</p>
       <p>W tym samym oknie dodaje się <b>otwory</b>: okna, drzwi i inne przeszkody na ścianach
       (ściana, odległość od lewego końca ściany patrząc z wnętrza pokoju, szerokość, wysokość,
       parapet). Otwory są rysowane w 3D i na rzutach ścian, a kontrola projektu ostrzega, gdy

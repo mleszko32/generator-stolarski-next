@@ -21,6 +21,7 @@ import { checkBlindCorner, innerDims } from "./blindCorner.js";
 import { checkCornerFitting, getCornerFitting } from "./cornerFittings.js";
 import { cornerFrontIssues, footprintBoxes, passageIssues } from "./cornerChecks.js";
 import { computeWorktops, MIN_WORKTOP_OVERHANG } from "./worktops.js";
+import { boxInNotch } from "./roomShape.js";
 
 export const MAX_DOOR_WIDTH = 600;   // szersze drzwi się wichrują / zawiasy nie dają rady
 export const MAX_SHELF_SPAN = 800;   // dłuższa półka ugina się pod obciążeniem
@@ -192,6 +193,9 @@ export function validateProject(project = state.project) {
   function checkCollisions() {
     const boxes = footprintBoxes(project);
     const reported = new Set();
+    // Pokój w kształcie L (core/roomShape.js): szafka nie może wchodzić we wcięcie.
+    const inNotch = new Set(boxes.filter((b) => boxInNotch(b, room)).map((b) => b.mod));
+    inNotch.forEach((mod) => add("error", mod, "Wchodzi we wcięcie pomieszczenia (za ścianę pokoju w kształcie L)."));
     for (let i = 0; i < boxes.length; i++) {
       for (let j = i + 1; j < boxes.length; j++) {
         const a = boxes[i], b = boxes[j];

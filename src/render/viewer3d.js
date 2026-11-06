@@ -21,6 +21,7 @@ import { toggleInteriorEditor, renderInteriorEditorIfVisible } from '../ui/inter
 import { updateSidebar } from '../ui/sidebar.js';
 import { worktopBoxes } from '../core/worktops.js';
 import { getOpenings, openingBox } from '../core/openings.js';
+import { roomWalls } from '../core/roomShape.js';
 import { snapSidePanel } from '../core/sidePanelSnap.js';
 import { snapModulePosition, sweepSelection, boxesOverlap, getSidePanelBox } from '../core/moduleDrag.js';
 import { refreshModuleInfoCard } from '../ui/moduleInfoPanel.js';
@@ -163,12 +164,23 @@ function rebuildRoomGeometry() {
     color: 0xf7f5f1, roughness: 0.95, metalness: 0, transparent: true, opacity: 1, side: THREE.DoubleSide,
   });
 
-  const wallDefs = [
-    { geo: new THREE.BoxGeometry(W + WALL_THICKNESS, H, WALL_THICKNESS), pos: [W / 2, H / 2, -WALL_THICKNESS / 2], normal: new THREE.Vector3(0, 0, -1) }, // tylna, z=0
-    { geo: new THREE.BoxGeometry(W + WALL_THICKNESS, H, WALL_THICKNESS), pos: [W / 2, H / 2, D + WALL_THICKNESS / 2], normal: new THREE.Vector3(0, 0, 1) }, // przednia, z=D
-    { geo: new THREE.BoxGeometry(WALL_THICKNESS, H, D + WALL_THICKNESS), pos: [-WALL_THICKNESS / 2, H / 2, D / 2], normal: new THREE.Vector3(-1, 0, 0) }, // lewa, x=0
-    { geo: new THREE.BoxGeometry(WALL_THICKNESS, H, D + WALL_THICKNESS), pos: [W + WALL_THICKNESS / 2, H / 2, D / 2], normal: new THREE.Vector3(1, 0, 0) }, // prawa, x=W
-  ];
+  // Ściany z obrysu pokoju (core/roomShape.js) - 4 dla prostokąta, 6 dla pokoju w kształcie L.
+  // Bryła leży na zewnątrz linii ściany; na narożnikach wypukłych wydłużona o grubość.
+  const T = WALL_THICKNESS;
+  const wallDefs = roomWalls({ ...room, width: W, depth: D }).map((w) => {
+    const [dx, dz] = [(w.b[0] - w.a[0]) / w.length, (w.b[1] - w.a[1]) / w.length];
+    const eA = w.extA ? T : 0, eB = w.extB ? T : 0;
+    const len = w.length + eA + eB;
+    const mid = (eB - eA) / 2; // przesunięcie środka wzdłuż ściany
+    const cx = (w.a[0] + w.b[0]) / 2 + dx * mid + w.normal[0] * T / 2;
+    const cz = (w.a[1] + w.b[1]) / 2 + dz * mid + w.normal[1] * T / 2;
+    const alongX = Math.abs(dx) > 0.5;
+    return {
+      geo: new THREE.BoxGeometry(alongX ? len : T, H, alongX ? T : len),
+      pos: [cx, H / 2, cz],
+      normal: new THREE.Vector3(w.normal[0], 0, w.normal[1]),
+    };
+  });
 
   wallDefs.forEach(({ geo, pos, normal }) => {
     const mesh = new THREE.Mesh(geo, makeWallMat());

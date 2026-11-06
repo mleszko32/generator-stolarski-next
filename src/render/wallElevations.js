@@ -9,6 +9,7 @@ import { escapeHtml } from '../utils/dom.js';
 import { fmtMm } from '../utils/math.js';
 import { computeWallLayouts } from '../core/walls.js';
 import { computeWorktops } from '../core/worktops.js';
+import { roomPolygon } from '../core/roomShape.js';
 import { C, FONT_UI } from './drawingPalette.js';
 
 const NAVY = C.blue900;
@@ -34,7 +35,8 @@ const WALL_EDGE = { tyl: 'top', prawa: 'right', przednia: 'bottom', lewa: 'left'
 function planInset(wallId, room, plan, x0, y0, size, fs) {
   const k = size / Math.max(room.width, room.depth);
   const pw = room.width * k, ph = room.depth * k;
-  let s = `<rect x="${x0}" y="${y0}" width="${pw}" height="${ph}" fill="${C.slate50}" stroke="${C.slate400}" stroke-width="${fs * 0.1}" />`;
+  const outline = roomPolygon(room).map(([x, z]) => `${x0 + x * k},${y0 + z * k}`).join(' ');
+  let s = `<polygon points="${outline}" fill="${C.slate50}" stroke="${C.slate400}" stroke-width="${fs * 0.1}" />`;
   plan.forEach(p => {
     s += `<rect x="${x0 + p.x * k}" y="${y0 + p.z * k}" width="${p.w * k}" height="${p.d * k}" fill="${C.slate300}" stroke="${C.slate500}" stroke-width="${fs * 0.06}" />`;
   });

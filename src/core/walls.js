@@ -66,6 +66,7 @@ export function getRoom(project = state.project) {
     width: parseFloat(r.width) || DEFAULT_ROOM.width,
     depth: parseFloat(r.depth) || DEFAULT_ROOM.depth,
     height: parseFloat(r.height) || DEFAULT_ROOM.height,
+    ...(r.notch ? { notch: r.notch } : {}), // wcięcie pokoju L (core/roomShape.js)
   };
 }
 

@@ -304,6 +304,10 @@ sprawdzenia struktury — `modules` jest tablicą, każdy moduł ma `id`/`type`/
 dane są uszkodzone, zamiast psuć działającą aplikację w połowie zastosowanymi śmieciami.
 Wywołujący muszą sprawdzać zwracaną wartość.
 
+**Pokój w kształcie L**: `room.notch = { corner, width, depth }` (wcięcie w jednym narożniku, poza pokojem) —
+`core/roomShape.js` (czyste, z testami): `roomPolygon`, `roomWalls` (ściany 3D w `viewer3d.js`), `boxInNotch`
+(kontrola projektu), miniplan rzutów. Pola w oknie pokoju. Rzuty ścian i rozmieszczanie dalej znają 4 ściany zewnętrzne.
+
 **Otwory (okna/drzwi/przeszkody)**: `project.openings[]` (na najwyższym poziomie, NIE w `room`,
 bo okno pokoju podmienia `project.room` w całości) — `core/openings.js` (ściana + `u` od lewego
 końca ściany patrząc z wnętrza pokoju, szerokość, wysokość, parapet). Edytowane w oknie pokoju

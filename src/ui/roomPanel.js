@@ -6,6 +6,7 @@
 import { state, DEFAULT_ROOM } from "../core/state.js";
 import { getWorldFootprint } from "../core/layout.js";
 import { getOpenings, newOpening, OPENING_KINDS, OPENING_WALLS } from "../core/openings.js";
+import { NOTCH_CORNERS, boxInNotch } from "../core/roomShape.js";
 import { escapeHtml } from "../utils/dom.js";
 import { openModal, showAlert } from "../utils/modal.js";
 import { update3D, updateRoom } from "../render/viewer3d.js";
@@ -13,10 +14,11 @@ import { updateSidebar } from "./sidebar.js";
 
 export function openRoomSettingsModal() {
   const room = state.project.room || DEFAULT_ROOM;
+  const notch = room.notch || {};
 
   const dlg = openModal({
     title: "Pomieszczenie",
-    subtitle: "Prostokątny pokój - narożnik tylno-lewy to punkt (0, 0).",
+    subtitle: "Narożnik tylno-lewy to punkt (0, 0). Pokój w kształcie L = prostokąt z wcięciem w jednym narożniku.",
     width: 700,
     dismissable: false,
     body: `
@@ -24,6 +26,14 @@ export function openRoomSettingsModal() {
         <div class="field"><label>Szerokość (mm)</label><input type="number" id="input-room-width" value="${room.width}" min="500" step="10" /></div>
         <div class="field"><label>Głębokość (mm)</label><input type="number" id="input-room-depth" value="${room.depth}" min="500" step="10" /></div>
         <div class="field"><label>Wysokość ścian (mm)</label><input type="number" id="input-room-height" value="${room.height}" min="1500" step="10" /></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Wcięcie (pokój w kształcie L)</label><select class="input" id="input-notch-corner">
+          <option value="">Brak - prostokąt</option>
+          ${NOTCH_CORNERS.map((c) => `<option value="${c.id}" ${notch.corner === c.id ? "selected" : ""}>Narożnik: ${escapeHtml(c.label.toLowerCase())}</option>`).join("")}
+        </select></div>
+        <div class="field"><label>Wcięcie wzdłuż szerokości (mm)</label><input type="number" id="input-notch-width" value="${notch.width || 0}" min="0" step="10" /></div>
+        <div class="field"><label>Wcięcie wzdłuż głębokości (mm)</label><input type="number" id="input-notch-depth" value="${notch.depth || 0}" min="0" step="10" /></div>
       </div>
       <div id="room-overflow-warning" class="notice notice-danger" style="display:none; margin-bottom:12px;"></div>
 
@@ -42,17 +52,24 @@ export function openRoomSettingsModal() {
   const inpDepth = modal.querySelector("#input-room-depth");
   const inpHeight = modal.querySelector("#input-room-height");
   const warningEl = modal.querySelector("#room-overflow-warning");
+  const inpNotchCorner = modal.querySelector("#input-notch-corner");
+  const inpNotchW = modal.querySelector("#input-notch-width");
+  const inpNotchD = modal.querySelector("#input-notch-depth");
+  const readNotch = () => (inpNotchCorner.value
+    ? { corner: inpNotchCorner.value, width: parseFloat(inpNotchW.value) || 0, depth: parseFloat(inpNotchD.value) || 0 }
+    : null);
 
   // Ostrzeżenie na żywo, jeśli po zapisaniu nowych (mniejszych) wymiarów jakaś
-  // szafka wystawałaby poza pokój - NIE blokuje zapisu, tylko informuje.
+  // szafka wystawałaby poza pokój albo weszła we wcięcie - NIE blokuje zapisu, tylko informuje.
   function checkOverflow() {
     const w = parseFloat(inpWidth.value) || 0;
     const d = parseFloat(inpDepth.value) || 0;
+    const shape = { width: w, depth: d, notch: readNotch() };
     const overflowing = (state.project.modules || []).filter((mod) => {
       const { worldW, worldD } = getWorldFootprint(mod);
       const x = parseFloat(mod.position.x) || 0;
       const z = parseFloat(mod.position.z) || 0;
-      return x + worldW > w || z + worldD > d;
+      return x + worldW > w || z + worldD > d || boxInNotch({ x0: x, x1: x + worldW, z0: z, z1: z + worldD }, shape);
     });
     if (overflowing.length > 0) {
       warningEl.style.display = "block";
@@ -61,7 +78,8 @@ export function openRoomSettingsModal() {
       warningEl.style.display = "none";
     }
   }
-  [inpWidth, inpDepth].forEach((inp) => inp.addEventListener("input", checkOverflow));
+  [inpWidth, inpDepth, inpNotchW, inpNotchD].forEach((inp) => inp.addEventListener("input", checkOverflow));
+  inpNotchCorner.addEventListener("change", checkOverflow);
   checkOverflow();
 
   // Edytor przeszkód: pracujemy na kopii, do projektu trafia dopiero po "Zapisz".
@@ -105,7 +123,8 @@ export function openRoomSettingsModal() {
       showAlert("Wszystkie wymiary muszą być liczbami większymi od 0.");
       return;
     }
-    state.project.room = { width, depth, height };
+    const notchVal = readNotch();
+    state.project.room = { width, depth, height, ...(notchVal && notchVal.width > 0 && notchVal.depth > 0 ? { notch: notchVal } : {}) };
     state.project.openings = openings.filter((o) => o.width > 0 && o.height > 0).map((o) => ({ ...o }));
     close();
     updateRoom();
