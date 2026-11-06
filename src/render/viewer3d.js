@@ -33,7 +33,7 @@ import { showAlert } from "../utils/modal.js";
 import { shelfStiffener } from '../core/shelfStiffener.js';
 import { projectDecorLegend, materialPaletteMap } from '../core/decorColors.js';
 import { replaceMaterial } from '../core/materialReplace.js';
-import { catalogLabels } from '../core/materialCatalog.js';
+import { frontMaterialSuggestions } from '../core/materialCatalog.js';
 import { escapeHtml } from '../utils/dom.js';
 
 let alignMode = { active: false, sourceMod: null, sourceEl: null, banner: null };
@@ -1179,7 +1179,7 @@ function renderDecorLegend() {
       if (!name || !replaceMaterial(state.project, highlightKey, name)) return;
       // podświetlenie przechodzi na nowy materiał
       const low = name.toLowerCase();
-      const next = projectDecorLegend(state.project, { all: true }).find((it) => it.label.toLowerCase() === low || it.label.toLowerCase().startsWith(low + ' '));
+      const next = projectDecorLegend(state.project, { all: true }).find((it) => { const l = it.label.toLowerCase(); return l === low || l.startsWith(low + ' ') || low.startsWith(l + ' '); });
       setHighlightKey(next ? next.key : null);
       update3D();
       updateSidebar();
@@ -1208,7 +1208,7 @@ function renderDecorLegend() {
     html += `<div class="decor-legend-row${active}" data-key="${escapeHtml(it.key)}" role="button" tabindex="0"><span class="decor-legend-swatch" style="background:${hex(color)}"></span>${escapeHtml(it.label)}</div>`;
     if (active) html += `<div class="decor-legend-replace"><label class="fs-xs">Zamień w całym projekcie na:</label><input type="text" class="input decor-legend-replace-input" list="decor-legend-catalog" placeholder="wpisz albo wybierz z listy" autocomplete="off"></div>`;
   });
-  if (highlightKey) html += `<datalist id="decor-legend-catalog">${[...new Set([...(state.project.pricing?.frontMaterials || []).map(m => m.name), ...catalogLabels(state.project)])].map(l => `<option value="${escapeHtml(l)}"></option>`).join('')}</datalist>`;
+  if (highlightKey) html += `<datalist id="decor-legend-catalog">${frontMaterialSuggestions(state.project).map(l => `<option value="${escapeHtml(l)}"></option>`).join('')}</datalist>`;
   decorLegendEl.innerHTML = html;
 }
 

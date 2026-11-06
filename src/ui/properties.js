@@ -26,7 +26,7 @@ import { getStiffenerSettings } from "../core/shelfStiffener.js";
 import { findKitchenRunAround } from "../core/kitchenRun.js";
 import { openWallFillModal } from "./wallFillModal.js";
 import { BOARD_BACK_MIN } from "../core/backPanel.js";
-import { catalogLabels, assignFrontMaterialByName } from "../core/materialCatalog.js";
+import { catalogLabels, assignFrontMaterialByName, frontMaterialSuggestions } from "../core/materialCatalog.js";
 import { moduleFrontMaterialId, PLINTH_KORPUS } from "../core/plinthMaterial.js";
 
 // Wybór materiału cokołu (mod.legs.plinthMaterial, core/plinthMaterial.js).
@@ -262,9 +262,9 @@ export function initPropertiesPanel() {
         <h3>Materiał frontów szafki</h3>
         <div class="property-group mb-8">
           <label class="fs-xs">Wszystkie fronty ${getSelectedMods().length > 1 ? `zaznaczonych szafek (${getSelectedMods().length})` : 'tej szafki'} — wpisz albo wybierz z listy:</label>
-          <input type="text" id="input-fronts-material-all" list="fronts-material-catalog" placeholder="np. Lakier albo Egger W1000 PM/ST9 19mm" autocomplete="off" />
-          <datalist id="fronts-material-catalog">${[...new Set([...(state.project.pricing?.frontMaterials || []).map(m => m.name), ...catalogLabels(state.project)])].map(l => `<option value="${escapeHtml(l)}"></option>`).join('')}</datalist>
-          <div class="hint">Materiał z cennika frontów albo dekor z bazy płyt — nowy dopisze się do cennika (cenę ustawisz w Kosztorysie).</div>
+          <input type="text" id="input-fronts-material-all" list="fronts-material-catalog" placeholder="np. Lakier RAL 9016, NCS S 0502-Y albo Egger W1000" autocomplete="off" />
+          <datalist id="fronts-material-catalog">${frontMaterialSuggestions(state.project).map(l => `<option value="${escapeHtml(l)}"></option>`).join('')}</datalist>
+          <div class="hint">Materiał z cennika frontów, lakier w kolorze RAL / NCS albo dekor z bazy płyt — nowy dopisze się do cennika (cenę ustawisz w Kosztorysie; lakier bierze cenę istniejącego lakieru).</div>
         </div>
 
         <h3>Materiał frontu (per front)</h3>

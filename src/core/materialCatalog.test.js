@@ -50,3 +50,22 @@ describe("materiał frontów zaznaczonych szafek po nazwie", async () => {
     expect(assignFrontMaterialByName(mods, "  ", project)).toBeNull();
   });
 });
+
+describe("lakier RAL / NCS z listy materiałów frontów", async () => {
+  const { assignFrontMaterialByName, frontMaterialSuggestions } = await import("./materialCatalog.js");
+  it("podpowiedzi zawierają lakiery RAL i NCS oraz płyty", () => {
+    const s = frontMaterialSuggestions({ pricing: { frontMaterials: [{ id: "a", name: "Lakier" }] } });
+    expect(s).toContain("Lakier RAL 9016 Traffic white");
+    expect(s).toContain("Lakier NCS S 0502-Y");
+    expect(s.some((l) => /W1000/.test(l))).toBe(true);
+  });
+  it("wybór lakieru tworzy „Lakier” z kolorem i ceną istniejącego lakieru; ten sam kod - ta sama pozycja", () => {
+    const project = { pricing: { frontMaterials: [{ id: "l1", name: "Lakier", color: "NCS S 0500-N", pricePerM2: 350 }] } };
+    const mods = [{ elements: [{ typ: "front" }] }];
+    expect(assignFrontMaterialByName(mods, "Lakier NCS S 0500-N", project)).toBe("l1");
+    const id = assignFrontMaterialByName(mods, "Lakier RAL 9016 Traffic white", project);
+    const mat = project.pricing.frontMaterials.find((m) => m.id === id);
+    expect(mat).toMatchObject({ name: "Lakier", color: "RAL 9016 Traffic white", pricePerM2: 350 });
+    expect(assignFrontMaterialByName(mods, "RAL 9016", project)).toBe(id);
+  });
+});

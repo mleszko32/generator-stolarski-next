@@ -2,6 +2,7 @@
 //
 // Prawy panel dla boku dokładanego i blendy (project.sidePanels) - wydzielony z
 // ui/properties.js, który woła renderSidePanelProperties() zamiast formularza szafki.
+import { lacquerSuggestions } from "../core/lacquerColors.js";
 import { decorThickness } from "../core/boardThickness.js";
 import { catalogLabels } from "../core/materialCatalog.js";
 import { state } from "../core/state.js";
@@ -23,7 +24,7 @@ import { propHeaderHtml, sectionHtml, bindSections, positionRotationHtml } from 
 // resolveFrontMaterial obsługuje panel.materialId tak samo jak front.materialId).
 // Podpowiedzi pełnych nazw płyt z bazy (z grubością) do pola Dekor.
 function decorDatalistHtml() {
-  return `<datalist id="side-decor-catalog">${catalogLabels(state.project).map(l => `<option value="${escapeHtml(l)}">`).join('')}</datalist>`;
+  return `<datalist id="side-decor-catalog">${[...catalogLabels(state.project), ...lacquerSuggestions().map(l => `Lakier ${l}`)].map(l => `<option value="${escapeHtml(l)}">`).join('')}</datalist>`;
 }
 
 function materialSectionHtml(panel) {

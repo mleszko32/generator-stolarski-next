@@ -6,6 +6,7 @@
 // Własne pozycje katalogu: project.materialCatalog = [{ producer, code, name }].
 
 import { EGGER_SAS_DECORS } from "./data/eggerSasDecors.js";
+import { lacquerCode, lacquerSuggestions } from "./lacquerColors.js";
 
 // Wbudowany katalog: płyty Egger z cennika SAS + HDF; inne dekory dopisuje się jako własne pozycje.
 export const BUILTIN_DECORS = Object.freeze([
@@ -94,6 +95,18 @@ export function assignFrontMaterialByName(mods, name, project) {
   if (!Array.isArray(project.pricing.frontMaterials)) project.pricing.frontMaterials = [];
   const list = project.pricing.frontMaterials;
   let mat = list.find((m) => String(m.name || "").trim().toLowerCase() === n.toLowerCase());
+  // lakier w kolorze RAL / NCS („Lakier RAL 9016 …”, „NCS S 0502-Y”): materiał „Lakier” z tym kolorem
+  // (ten sam kod = ta sama pozycja cennika; nowa bierze cenę z istniejącego lakieru)
+  const code = !mat ? lacquerCode(n) : "";
+  if (code) {
+    const isLacquer = (m) => /lakier/i.test(String(m.name || ""));
+    mat = list.find((m) => isLacquer(m) && lacquerCode(m.color) === code);
+    if (!mat) {
+      const price = (list.find((m) => isLacquer(m) && Number(m.pricePerM2) > 0) || {}).pricePerM2 || 0;
+      mat = { id: "mat-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name: "Lakier", color: n.replace(/^lakier\s+/i, ""), pricePerM2: price };
+      list.push(mat);
+    }
+  }
   if (!mat) {
     mat = { id: "mat-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name: n, pricePerM2: 0 };
     list.push(mat);
@@ -102,4 +115,10 @@ export function assignFrontMaterialByName(mods, name, project) {
     if (el.typ === "front") el.materialId = mat.id;
   }));
   return mat.id;
+}
+
+// Podpowiedzi materiału frontów: cennik frontów, lakiery RAL / NCS („Lakier RAL 9016 …”), płyty z bazy.
+export function frontMaterialSuggestions(project) {
+  const own = ((project && project.pricing && project.pricing.frontMaterials) || []).map((m) => m.name);
+  return [...new Set([...own, ...lacquerSuggestions().map((l) => `Lakier ${l}`), ...catalogLabels(project)])];
 }
