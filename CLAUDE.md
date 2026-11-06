@@ -425,7 +425,15 @@ CSV i FC2 rozdzielają dekory same. Reguły i kolejność po kategorii bazowej: 
 W 3D kolor płyty zależy od dekoru: `core/decorColors.js` (`partColor` z userData bryły — dekor szafki dla korpusu/półek,
 „Dekor” panelu, materiał frontu z cennika poza pierwszym; kod Egger W/H/F/U wybiera rodzinę barw), używane w
 `materialFor` w `meshBuilders.js` (jasne kolory w trybie przezroczystym pomijane). Legenda w lewym dolnym rogu widoku 3D
-(`projectDecorLegend` → `renderDecorLegend` w `viewer3d.js`), ukryta, gdy nic nie ma własnego koloru.
+(`projectDecorLegend` → `renderDecorLegend` w `viewer3d.js`), ukryta, gdy nic nie ma własnego koloru. Kolor frontu
+liczy się z nazwy materiału (jak dekor blendy), więc ta sama nazwa = ten sam kolor; nietknięty „Standard” domyślny.
+
+**Materiał cokołu**: `mod.legs.plinthMaterial` — `core/plinthMaterial.js` (`plinthMaterial`, czyste, z testami): puste = jak
+fronty szafki (najczęstszy `materialId` jej frontów → formatka kategorii Front z `materialId`), `'korpus'`, `'front:<id>'`,
+`'decor:<dekor>'` („Korpus: <dekor>”). Bieg cokołu łączy tylko szafki o tym samym materiale. Pole „Materiał cokołu”
+w sekcji Nóżki i Cokół; w 3D cokół w kolorze materiału. Materiał frontu może mieć `board` (płyta formatek, pole
+„Płyta formatek” w Kosztorysie); lakier bez wpisu tnie się z MDF dwustronnego W908 z bazy SAS (`frontMaterialBoard`,
+`LACQUER_BOARD` w `core/materialCatalog.js`), widać to w kolumnie Materiał listy formatek.
 
 **Oferta dla klienta**: `core/offer.js` (czysta: ustawienia w `project.offer`, `buildOfferHtml`)
 + karta „Oferta dla klienta” w sekcji Kosztorys huba (`ui/productionHub.js`). Pokazuje tylko

@@ -59,12 +59,24 @@ export function moduleKorpusDecor(mod) {
 
 // Nazwa materiału formatki do listy: front - pozycja cennika frontów (brak/usunięta = pierwsza,
 // jak w kosztorysie), pozostałe - wybrany dekor kategorii; bez wyboru sama kategoria.
+// Płyta, z której tnie się formatki materiału frontu: pole board z cennika, a dla lakieru
+// bez wpisu - MDF dwustronnie laminowany 18 mm z bazy SAS (lakieruje się MDF).
+export const LACQUER_BOARD = "Egger W908/W908 SM/SM-MB Biały bazowy 18mm 2800x2070 Dwustronna E1E05 TSCA";
+export function frontMaterialBoard(mat) {
+  if (!mat) return "";
+  const own = String(mat.board || "").trim();
+  if (own) return own;
+  return /lakier/i.test(String(mat.name || "")) ? LACQUER_BOARD : "";
+}
+
 export function partMaterialLabel(part, project) {
   const category = (part && part.category) || "";
   if (category === "Front") {
     const list = (project && project.pricing && project.pricing.frontMaterials) || [];
     const m = list.find((x) => x.id === part.materialId) || list[0];
-    return m && m.name ? `Front: ${m.name}` : category;
+    if (!m || !m.name) return category;
+    const board = frontMaterialBoard(m);
+    return board ? `Front: ${m.name} (${board})` : `Front: ${m.name}`;
   }
   const decor = project && project.materials && project.materials.decors && project.materials.decors[category];
   return decor && String(decor).trim() ? `${category}: ${String(decor).trim()}` : category;

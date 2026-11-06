@@ -14,6 +14,7 @@ import { getBlindPanel, getBlindStile, blindGeometry, getBlindCorner } from "../
 import { splitPlinthRun, maxPlinthLength } from "./plinthSplit.js";
 import { shelfStiffener } from "../core/shelfStiffener.js";
 import { KORPUS, korpusCategory, moduleKorpusDecor } from "../core/materialCatalog.js";
+import { plinthMaterial } from "../core/plinthMaterial.js";
 
 export function calculateParts() {
   // Fronty muszą mieć aktualne el.x/y/w/h zanim policzymy z nich formatki.
@@ -224,18 +225,18 @@ export function collectProjectParts() {
           // Szukamy wśród WSZYSTKICH biegów (nie tylko ostatniego): szafka z innego rzędu o
           // tym samym obrocie (np. wyspa) wpadała w sortowaniu między szafki pod ścianą i
           // rozbijała ich wspólny cokół na kilka odcinków.
+          const mat = plinthMaterial(mod, config);
           let joined = false;
           const last = plinthRuns.find(r => r.rot === rot && Math.abs((r.along + r.runLen) - along) <= 1 &&
-              r.crossPos === crossPos && r.h === h && r.offset === offset && r.frontCoord === frontCoord);
+              r.crossPos === crossPos && r.h === h && r.offset === offset && r.frontCoord === frontCoord && r.mat.key === mat.key);
           if (last) {
               // styk = początek dołączanej szafki (względem początku biegu) - tu wolno ciąć
               last.joints.push(along - last.along);
-              last.decors.add(moduleKorpusDecor(mod));
               last.runLen += runLen + (along - (last.along + last.runLen));
               joined = true;
           }
           if (!joined) {
-              plinthRuns.push({ rot, along, runLen, crossPos, y, h, offset, frontCoord, joints: [], decors: new Set([moduleKorpusDecor(mod)]) });
+              plinthRuns.push({ rot, along, runLen, crossPos, y, h, offset, frontCoord, joints: [], mat });
           }
       });
   });
@@ -245,8 +246,6 @@ export function collectProjectParts() {
   const plinthMax = maxPlinthLength(config.cutPlan);
   plinthRuns.forEach((run, index) => {
     const pieces = splitPlinthRun(run.runLen, run.joints, plinthMax);
-    // Cokół biegnie pod kilkoma szafkami: dekor szafek tylko gdy wszystkie mają ten sam.
-    const plinthCat = run.decors.size === 1 ? korpusCategory([...run.decors][0]) : KORPUS;
     pieces.forEach((len, i) => {
       allParts.push({
         name: pieces.length > 1
@@ -255,7 +254,8 @@ export function collectProjectParts() {
         length: parseFloat(len.toFixed(1)),
         width: parseFloat(run.h.toFixed(1)),
         qty: 1,
-        category: plinthCat,
+        category: run.mat.category,
+        ...(run.mat.materialId ? { materialId: run.mat.materialId } : {}),
         moduleName: "Elementy zbiorcze"
       });
     });

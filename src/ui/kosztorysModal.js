@@ -10,7 +10,7 @@ import { updateSidebar } from "./sidebar.js";
 import { showCustomDialog } from "../core/storage.js";
 import { loadPriceDefaults, savePriceDefaults, applyPriceDefaults, exportPriceDefaultsJson, importPriceDefaultsJson } from "../core/priceLibrary.js";
 import { showAlert } from "../utils/modal.js";
-import { baseCategory } from "../core/materialCatalog.js";
+import { baseCategory, catalogLabels } from "../core/materialCatalog.js";
 
 // "Zastosuj do wszystkich dolnych/górnych" (zgłoszona potrzeba: w kuchni
 // fronty szafek dolnych i wiszących często mają inny materiał/kolor, ale
@@ -148,6 +148,13 @@ export function mountKosztorys(root) {
             const mat = pricing.frontMaterials.find(m => m.id === input.getAttribute('data-material-id'));
             if (mat) mat.name = input.value.trim() || 'Bez nazwy';
         });
+        // płyta, z której tnie się formatki tego materiału (np. Lakier -> MDF dwustronny z bazy SAS)
+        modal.querySelectorAll('.kosztorys-mat-board').forEach(input => {
+            const mat = pricing.frontMaterials.find(m => m.id === input.getAttribute('data-material-id'));
+            if (!mat) return;
+            const v = input.value.trim();
+            if (v) mat.board = v; else delete mat.board;
+        });
         modal.querySelectorAll('.kosztorys-hw-price').forEach(input => {
             const name = input.getAttribute('data-name');
             pricing.hardware[name] = parseFloat(input.value) || 0;
@@ -234,9 +241,10 @@ export function mountKosztorys(root) {
         const frontHtml = cost.materials.filter(m => m.category === 'Front').map(frontRowHtml).join('');
         const restHtml = cost.materials.filter(m => !isKorpus(m) && m.category !== 'Front').map(otherRowHtml).join('');
 
-        materialsTbody.innerHTML = (korpusHtml + frontHtml + restHtml) || `<tr><td colspan="5" class="empty-note">Projekt jest pusty</td></tr>`;
+        materialsTbody.innerHTML = ((korpusHtml + frontHtml + restHtml) || `<tr><td colspan="5" class="empty-note">Projekt jest pusty</td></tr>`)
+            + `<tr hidden><td><datalist id="kosztorys-board-catalog">${catalogLabels(state.project).map(l => `<option value="${escapeHtml(l)}">`).join('')}</datalist></td></tr>`;
 
-        materialsTbody.querySelectorAll('.kosztorys-mat-price, .kosztorys-front-mat-price, .kosztorys-mat-name').forEach(input => {
+        materialsTbody.querySelectorAll('.kosztorys-mat-price, .kosztorys-front-mat-price, .kosztorys-mat-name, .kosztorys-mat-board').forEach(input => {
             input.addEventListener('input', recalc);
         });
         // Nazwa materiału: odśwież listę per front (ui/properties.js) dopiero po
@@ -291,7 +299,7 @@ export function mountKosztorys(root) {
                 <td class="num kosztorys-front-mat-cost" data-material-id="${escapeHtml(m.materialId)}"><b>${formatPLN(m.cost)}</b></td>
                 <td>${canDelete ? `<button type="button" class="icon-btn kosztorys-mat-del" data-material-id="${escapeHtml(m.materialId)}" title="Usuń materiał"><i class="ti ti-trash" aria-hidden="true"></i></button>` : ''}</td>
             </tr>
-            <tr class="kosztorys-mat-bulk-row"><td colspan="5">Zastosuj do: ${bulkBtns}</td></tr>`;
+            <tr class="kosztorys-mat-bulk-row"><td colspan="5"><label class="kosztorys-mat-board-label">Płyta formatek: <input type="text" class="input kosztorys-mat-board" list="kosztorys-board-catalog" data-material-id="${escapeHtml(m.materialId)}" value="${escapeHtml((pricing.frontMaterials.find(x => x.id === m.materialId) || {}).board || '')}" placeholder="np. MDF dwustronny z bazy SAS"></label> · Zastosuj do: ${bulkBtns}</td></tr>`;
     }
 
     function renderHardwareRows() {

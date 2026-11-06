@@ -25,6 +25,21 @@ import { findKitchenRunAround } from "../core/kitchenRun.js";
 import { openWallFillModal } from "./wallFillModal.js";
 import { BOARD_BACK_MIN } from "../core/backPanel.js";
 import { catalogLabels } from "../core/materialCatalog.js";
+import { moduleFrontMaterialId, PLINTH_KORPUS } from "../core/plinthMaterial.js";
+
+// Wybór materiału cokołu (mod.legs.plinthMaterial, core/plinthMaterial.js).
+function plinthMaterialHtml(mod) {
+  const list = state.project.pricing?.frontMaterials || [];
+  const cur = String(mod.legs?.plinthMaterial || '');
+  const isDecor = cur.startsWith('decor:');
+  const frontName = (list.find(m => m.id === moduleFrontMaterialId(mod, state.project)) || {}).name || 'fronty';
+  const opts = [['', `Jak fronty (${frontName})`], [PLINTH_KORPUS, 'Jak korpus'],
+    ...list.map(m => [`front:${m.id}`, `Front: ${m.name}`]), ['decor', 'Dekor płyty…']];
+  const sel = isDecor ? 'decor' : cur;
+  return `
+        <div class="property-group mb-8"><label style="font-size: 11px;">Materiał cokołu:</label><select id="input-plinth-material">${opts.map(([v, l]) => `<option value="${escapeHtml(v)}" ${v === sel ? 'selected' : ''}>${escapeHtml(l)}</option>`).join('')}</select></div>
+        <div class="property-group mb-8" style="display: ${isDecor ? '' : 'none'};"><label style="font-size: 11px;">Dekor cokołu:</label><input type="text" id="input-plinth-decor" list="plinth-decor-catalog" value="${escapeHtml(isDecor ? cur.slice(6) : '')}" placeholder="np. Egger W1000 ST9"><datalist id="plinth-decor-catalog">${catalogLabels(state.project).map(l => `<option value="${escapeHtml(l)}">`).join('')}</datalist></div>`;
+}
 
 function getSelectedMods() {
     if (state.selectedModules && state.selectedModules.size > 0) {
@@ -360,6 +375,7 @@ export function initPropertiesPanel() {
       <div class="prop-box" id="legs-options" style="display: ${activeModule.legs.active ? 'block' : 'none'};">
         <div class="property-group mb-8"><label style="font-size: 11px;">Wysokość nóżek (mm):</label><input type="number" id="input-legs-height" value="${activeModule.legs.height}" /></div>
         <div class="property-group" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;"><input type="checkbox" id="input-plinth-active" ${activeModule.legs.plinth ? 'checked' : ''} style="width: 14px; height: 14px;" /><label style="font-size: 12px;">Generuj cokół przedni</label></div>
+        ${plinthMaterialHtml(activeModule)}
         <div class="property-group mb-8"><label style="font-size: 11px;">Cofnięcie cokołu (mm):</label><input type="number" id="input-plinth-offset" value="${activeModule.legs.plinthOffset}" /></div>
         <div class="property-group mb-0"><label style="font-size: 11px;">Boki do podłogi:</label><select id="input-sides-to-floor">${[['none', 'Nie (boki na nóżkach)'], ['left', 'Lewy bok'], ['right', 'Prawy bok'], ['both', 'Oba boki']].map(([v, l]) => `<option value="${v}" ${(activeModule.legs.sidesToFloor || 'none') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
       </div>
@@ -499,6 +515,26 @@ function setupEventListeners() {
       updateAll();
     });
   }
+
+  // Materiał cokołu (core/plinthMaterial.js): select + pole dekoru dla „Dekor płyty”.
+  const plinthMatSel = document.getElementById('input-plinth-material');
+  const plinthDecorInput = document.getElementById('input-plinth-decor');
+  const savePlinthMaterial = () => {
+    let v = plinthMatSel.value;
+    plinthDecorInput.parentElement.style.display = v === 'decor' ? '' : 'none';
+    if (v === 'decor') {
+      const d = plinthDecorInput.value.trim();
+      if (!d) return; // czeka na wpisanie dekoru
+      v = 'decor:' + d;
+    }
+    getSelectedMods().forEach(mod => {
+      if (!mod.legs) return;
+      if (v) mod.legs.plinthMaterial = v; else delete mod.legs.plinthMaterial;
+    });
+    updateAll();
+  };
+  if (plinthMatSel) plinthMatSel.addEventListener('change', savePlinthMaterial);
+  if (plinthDecorInput) plinthDecorInput.addEventListener('change', savePlinthMaterial);
 
   const sidesToFloorInput = document.getElementById('input-sides-to-floor');
   if (sidesToFloorInput) {

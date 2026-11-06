@@ -32,6 +32,6 @@ describe("katalog materiałów", () => {
     expect(partMaterialLabel({ category: "Plecy" }, p)).toBe("Plecy");
     expect(partMaterialLabel({ category: "Front", materialId: "b" }, p)).toBe("Front: Egger H1145 ST10");
     // brak / usunięty materiał frontu = pierwsza pozycja cennika
-    expect(partMaterialLabel({ category: "Front", materialId: "x" }, p)).toBe("Front: Lakier biały mat");
+    expect(partMaterialLabel({ category: "Front", materialId: "x" }, p)).toMatch(/^Front: Lakier biały mat \(Egger W908/);
   });
 });

@@ -160,7 +160,7 @@ const tintCache = new Map();
 function materialFor(type, userData) {
   const matObj = isXrayMode ? mats.xray : mats.solid;
   const base = matObj[type] || matObj.corpus;
-  if (type !== 'corpus' && type !== 'shelf' && type !== 'front') return base;
+  if (type !== 'corpus' && type !== 'shelf' && type !== 'front' && type !== 'plinth') return base;
   const color = partColor(type, userData, state.project);
   if (color == null || (isXrayMode && isLightColor(color))) return base;
   const key = `${isXrayMode ? 'x' : 's'}|${type}|${color}`;

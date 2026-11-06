@@ -164,7 +164,7 @@ describe('kosztorys - materiały frontów (per front, pricing.frontMaterials)', 
         baseModule({ id: 'b', elements: [fullZoneFront({ id: 'fb', materialId: 'fornir' })], position: { x: 700, y: 0, z: 0 } }),
       ],
     }));
-    const parts = calculateAllProjectParts().filter(p => p.category === 'Front');
+    const parts = calculateAllProjectParts().filter(p => p.category === 'Front' && !p.name.startsWith('Cokół'));
     expect(parts).toHaveLength(2);
     expect(parts.every(p => p.qty === 1)).toBe(true);
   });

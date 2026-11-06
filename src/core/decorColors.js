@@ -5,7 +5,8 @@
 // dekoru: kod Egger podpowiada rodzinę (W = biele, H = drewno, F = kamień/beton, U = kolory
 // jednolite), a w rodzinie odcień wybiera skrót z nazwy, więc różne dekory różnią się kolorem,
 // a ten sam dekor ma zawsze ten sam kolor. Czyste funkcje (bez Three.js).
-import { moduleKorpusDecor } from "./materialCatalog.js";
+import { moduleKorpusDecor, baseCategory, KORPUS } from "./materialCatalog.js";
+import { plinthMaterial } from "./plinthMaterial.js";
 
 const FAMILIES = {
   W: [0xfaf9f6, 0xf3efe6, 0xeceae4, 0xf6f1e7],
@@ -37,60 +38,74 @@ export function isLightColor(color) {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.85;
 }
 
-// Kolor materiału frontu z cennika (project.pricing.frontMaterials). Pojedynczy materiał
-// bez kodu dekoru zostaje w kolorze domyślnym (null), tak samo pierwsza pozycja cennika -
-// to „zwykłe” fronty; pozostałe dostają własny kolor.
+// Kolor materiału frontu z cennika (project.pricing.frontMaterials) - z nazwy materiału, tak
+// samo jak dekor wpisany przy blendzie / panelu, więc ta sama nazwa = ten sam kolor. Tylko
+// nietknięty domyślny „Standard” zostaje w kolorze domyślnym (null).
 export function frontMaterialColor(materialId, project) {
   const list = (project && project.pricing && project.pricing.frontMaterials) || [];
-  if (!list.length) return null;
-  const idx = Math.max(0, list.findIndex((m) => m.id === materialId));
-  const mat = list[idx];
-  const byCode = /(?:^|[\s:(])[WUHF]\s?\d{3,4}\b/i.test(mat.name || "");
-  if (byCode) return decorColor(mat.name);
-  return idx === 0 ? null : decorColor(`${mat.name}#${mat.id}`);
+  const mat = list.find((m) => m.id === materialId) || list[0];
+  if (!mat) return null;
+  if (mat.id === "default" && mat.name === "Standard") return null;
+  return decorColor(mat.name);
+}
+
+function frontMaterialName(materialId, project) {
+  const list = (project && project.pricing && project.pricing.frontMaterials) || [];
+  const mat = list.find((m) => m.id === materialId) || list[0];
+  return mat ? mat.name : "";
+}
+
+// Materiał cokołu szafki jako nazwa + grupa legendy (null = cokół domyślny).
+function plinthLegendEntry(mod, project) {
+  const pm = plinthMaterial(mod, project);
+  if (pm.category === "Front") return { group: "Front", label: frontMaterialName(pm.materialId, project), color: frontMaterialColor(pm.materialId, project) };
+  const decor = baseCategory(pm.category) === KORPUS && pm.category !== KORPUS ? pm.category.slice(KORPUS.length + 2) : "";
+  return { group: "Korpus", label: decor, color: decorColor(decor) };
 }
 
 // Legenda kolorów dekorów użytych w projekcie: [{ group: 'Korpus'|'Front', label, color }]
 // (color null = kolor domyślny). Pusta, gdy nic nie ma własnego koloru - wtedy legenda niepotrzebna.
+// Ta sama nazwa (np. materiał frontów i dekor blendy) to jedna pozycja - w grupie Front.
 export function projectDecorLegend(project) {
   if (!project) return [];
-  const korpus = new Map(), front = new Map();
+  const entries = new Map(); // nazwa (wielkie litery) -> { group, label, color }
   let plainKorpus = false, plainFront = false;
+  const add = (group, label, color) => {
+    if (color == null || !String(label || "").trim()) { if (group === "Front") plainFront = true; else plainKorpus = true; return; }
+    const k = String(label).trim().toUpperCase();
+    const prev = entries.get(k);
+    if (!prev || (prev.group === "Korpus" && group === "Front")) entries.set(k, { group, label: String(label).trim(), color });
+  };
+  const list = (project.pricing && project.pricing.frontMaterials) || [];
   (project.modules || []).forEach((mod) => {
     const d = moduleKorpusDecor(mod);
-    if (d) korpus.set(d.toUpperCase(), d); else plainKorpus = true;
+    add("Korpus", d, decorColor(d));
     (mod.elements || []).forEach((el) => {
-      if (el.typ !== "front") return;
-      const c = frontMaterialColor(el.materialId, project);
-      const list = project.pricing?.frontMaterials || [];
-      const mat = list.find((m) => m.id === el.materialId) || list[0];
-      if (c != null && mat) front.set(`m:${mat.id}`, { label: mat.name, color: c });
-      else plainFront = true;
+      if (el.typ === "front") add("Front", frontMaterialName(el.materialId, project), frontMaterialColor(el.materialId, project));
     });
+    if (mod.legs && mod.legs.active && mod.legs.plinth) { const e = plinthLegendEntry(mod, project); add(e.group, e.label, e.color); }
   });
   (project.sidePanels || []).forEach((p) => {
     const d = String(p.decor || "").trim();
-    if (d) { korpus.set(d.toUpperCase(), d); return; }
+    if (d) { add(p.kind === "poziomy" ? "Korpus" : "Front", d, decorColor(d)); return; }
     if (p.kind === "poziomy") { plainKorpus = true; return; }
-    const c = frontMaterialColor(p.materialId, project);
-    const mat = (project.pricing?.frontMaterials || []).find((m) => m.id === p.materialId);
-    if (c != null && mat) front.set(`m:${mat.id}`, { label: mat.name, color: c });
-    else plainFront = true;
+    add("Front", frontMaterialName(p.materialId, project), frontMaterialColor(p.materialId, project));
   });
+  if (!entries.size) return [];
   const out = [];
-  const push = (group, map, plain, plainLabel) => {
-    const items = [...map.values()].map((v) => (typeof v === "string" ? { label: v, color: decorColor(v) } : v));
-    if (!items.length) return;
-    if (plain) out.push({ group, label: plainLabel, color: null });
-    items.sort((a, b) => a.label.localeCompare(b.label, "pl")).forEach((v) => out.push({ group, ...v }));
+  const group = (g, plain, plainLabel) => {
+    const items = [...entries.values()].filter((e) => e.group === g).sort((a, b) => a.label.localeCompare(b.label, "pl"));
+    if (!items.length && !plain) return;
+    if (plain) out.push({ group: g, label: plainLabel, color: null });
+    items.forEach((e) => out.push(e));
   };
-  push("Korpus", korpus, plainKorpus, "bez dekoru (z projektu)");
-  push("Front", front, plainFront, (project.pricing?.frontMaterials || [])[0]?.name || "standard");
+  group("Korpus", plainKorpus, "bez dekoru (z projektu)");
+  group("Front", plainFront, (list[0] && list[0].name) || "standard");
   return out;
 }
 
 // Kolor bryły 3D z jej userData (moduleId / elementId / sidePanelId) i typu ('corpus',
-// 'shelf', 'front'); null = kolor domyślny materiału.
+// 'shelf', 'front', 'plinth'); null = kolor domyślny materiału.
 export function partColor(type, userData, project) {
   if (!userData || !project) return null;
   if (userData.sidePanelId) {
@@ -102,6 +117,7 @@ export function partColor(type, userData, project) {
   }
   const mod = userData.moduleId && (project.modules || []).find((m) => m.id === userData.moduleId);
   if (!mod) return null;
+  if (userData.type === "plinth") return type === "plinth" ? plinthLegendEntry(mod, project).color : null; // nóżki bez koloru
   if (type === "front") {
     const el = userData.elementId && (mod.elements || []).find((e) => e.id === userData.elementId);
     return el ? frontMaterialColor(el.materialId, project) : null;

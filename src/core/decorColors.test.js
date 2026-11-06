@@ -13,24 +13,33 @@ describe("kolory dekorów w 3D", () => {
   });
 
   const project = {
-    pricing: { frontMaterials: [{ id: "m1", name: "Standard" }, { id: "m2", name: "Lakier mat" }] },
-    modules: [{ id: "a", materials: { korpusDecor: "H3303 ST10" }, elements: [{ id: "f1", typ: "front", materialId: "m2" }, { id: "f2", typ: "front" }] },
-      { id: "b", elements: [] }],
-    sidePanels: [{ id: "p", kind: "poziomy", decor: "U740 PM" }, { id: "s", materialId: "m2" }],
+    pricing: { frontMaterials: [{ id: "default", name: "Standard" }, { id: "m2", name: "Lakier mat" }] },
+    modules: [
+      { id: "a", materials: { korpusDecor: "H3303 ST10" }, legs: { active: true, plinth: true },
+        elements: [{ id: "f1", typ: "front", materialId: "m2" }, { id: "f2", typ: "front", materialId: "m2" }] },
+      { id: "b", legs: { active: true, plinth: true, plinthMaterial: "decor:W1000 ST9" }, elements: [] },
+    ],
+    sidePanels: [{ id: "p", kind: "poziomy", decor: "U740 PM" }, { id: "s", kind: "blenda", decor: "lakier MAT" }],
   };
 
-  it("front: pierwszy materiał domyślny, kolejne własny kolor", () => {
+  it("front: nietknięty Standard domyślny, inne wg nazwy - jak dekor blendy o tej nazwie", () => {
     expect(frontMaterialColor(undefined, project)).toBeNull();
-    expect(frontMaterialColor("m2", project)).not.toBeNull();
-    expect(partColor("front", { moduleId: "a", elementId: "f2" }, project)).toBeNull();
+    expect(frontMaterialColor("m2", project)).toBe(decorColor("Lakier mat"));
     expect(partColor("front", { moduleId: "a", elementId: "f1" }, project)).toBe(frontMaterialColor("m2", project));
+    expect(partColor("front", { sidePanelId: "s" }, project)).toBe(frontMaterialColor("m2", project));
   });
 
-  it("legenda: dekory korpusu i paneli, materiały frontów, pozycje domyślne", () => {
+  it("cokół w kolorze swojego materiału, nóżki bez koloru", () => {
+    // szafka a: cokół jak fronty (Lakier mat), szafka b: dekor W1000
+    expect(partColor("plinth", { moduleId: "a", type: "plinth" }, project)).toBe(decorColor("Lakier mat"));
+    expect(partColor("plinth", { moduleId: "b", type: "plinth" }, project)).toBe(decorColor("W1000 ST9"));
+    expect(partColor("corpus", { moduleId: "a", type: "plinth" }, project)).toBeNull();
+  });
+
+  it("legenda: dekory i materiały, ta sama nazwa raz (w grupie Front)", () => {
     const leg = projectDecorLegend(project);
-    expect(leg.filter((l) => l.group === "Korpus").map((l) => l.label)).toEqual(["bez dekoru (z projektu)", "H3303 ST10", "U740 PM"]);
-    expect(leg.filter((l) => l.group === "Front").map((l) => l.label)).toEqual(["Standard", "Lakier mat"]);
-    expect(leg.find((l) => l.label === "U740 PM").color).toBe(decorColor("U740 PM"));
+    expect(leg.filter((l) => l.group === "Korpus").map((l) => l.label)).toEqual(["bez dekoru (z projektu)", "H3303 ST10", "U740 PM", "W1000 ST9"]);
+    expect(leg.filter((l) => l.group === "Front").map((l) => l.label)).toEqual(["Lakier mat"]);
     expect(projectDecorLegend({ modules: [{ id: "x", elements: [] }] })).toEqual([]);
   });
 
@@ -39,6 +48,5 @@ describe("kolory dekorów w 3D", () => {
     expect(partColor("shelf", { moduleId: "a", elementId: "x" }, project)).toBe(decorColor("H3303 ST10"));
     expect(partColor("corpus", { moduleId: "b" }, project)).toBeNull();
     expect(partColor("corpus", { sidePanelId: "p" }, project)).toBe(decorColor("U740 PM"));
-    expect(partColor("front", { sidePanelId: "s" }, project)).toBe(frontMaterialColor("m2", project));
   });
 });
