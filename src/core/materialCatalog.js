@@ -76,7 +76,9 @@ export function partMaterialLabel(part, project) {
     const m = list.find((x) => x.id === part.materialId) || list[0];
     if (!m || !m.name) return category;
     const board = frontMaterialBoard(m);
-    return board ? `Front: ${m.name} (${board})` : `Front: ${m.name}`;
+    const color = String(m.color || "").trim();
+    const name = color ? `${m.name} ${color}` : m.name;
+    return board ? `Front: ${name} (${board})` : `Front: ${name}`;
   }
   const decor = project && project.materials && project.materials.decors && project.materials.decors[category];
   return decor && String(decor).trim() ? `${category}: ${String(decor).trim()}` : category;

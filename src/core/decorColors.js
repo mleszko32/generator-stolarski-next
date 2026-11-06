@@ -7,6 +7,7 @@
 // a ten sam dekor ma zawsze ten sam kolor. Czyste funkcje (bez Three.js).
 import { moduleKorpusDecor, baseCategory, KORPUS } from "./materialCatalog.js";
 import { plinthMaterial } from "./plinthMaterial.js";
+import { lacquerColor, lacquerCode } from "./lacquerColors.js";
 
 const FAMILIES = {
   W: [0xfaf9f6, 0xf3efe6, 0xeceae4, 0xf6f1e7],
@@ -27,6 +28,8 @@ function hash(str) {
 export function decorColor(name) {
   const s = String(name || "").trim();
   if (!s) return null;
+  const lac = lacquerColor(s); // „Lakier RAL 9016” / „NCS S 0502-Y” - odcień z palety
+  if (lac != null) return lac;
   const m = s.match(/(?:^|[\s:(])([WUHF])\s?\d{3,4}\b/i);
   const pal = m ? FAMILIES[m[1].toUpperCase()] : OTHER;
   return pal[hash(s.toUpperCase()) % pal.length];
@@ -45,6 +48,8 @@ export function frontMaterialColor(materialId, project) {
   const list = (project && project.pricing && project.pricing.frontMaterials) || [];
   const mat = list.find((m) => m.id === materialId) || list[0];
   if (!mat) return null;
+  const lac = lacquerColor(mat.color); // kolor lakieru RAL / NCS z cennika - prawdziwy odcień
+  if (lac != null) return lac;
   if (mat.id === "default" && mat.name === "Standard") return null;
   return decorColor(mat.name);
 }
@@ -52,7 +57,9 @@ export function frontMaterialColor(materialId, project) {
 function frontMaterialName(materialId, project) {
   const list = (project && project.pricing && project.pricing.frontMaterials) || [];
   const mat = list.find((m) => m.id === materialId) || list[0];
-  return mat ? mat.name : "";
+  if (!mat) return "";
+  const code = lacquerCode(mat.color);
+  return code ? `${mat.name} ${code}` : mat.name;
 }
 
 // Materiał cokołu szafki jako nazwa + grupa legendy (null = cokół domyślny).
@@ -95,7 +102,7 @@ export function projectDecorLegend(project) {
   const out = [];
   const group = (g, plain, plainLabel) => {
     const items = [...entries.values()].filter((e) => e.group === g).sort((a, b) => a.label.localeCompare(b.label, "pl"));
-    if (!items.length && !plain) return;
+    if (!items.length) return;
     if (plain) out.push({ group: g, label: plainLabel, color: null });
     items.forEach((e) => out.push(e));
   };

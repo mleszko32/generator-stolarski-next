@@ -11,6 +11,7 @@ import { showCustomDialog } from "../core/storage.js";
 import { loadPriceDefaults, savePriceDefaults, applyPriceDefaults, exportPriceDefaultsJson, importPriceDefaultsJson } from "../core/priceLibrary.js";
 import { showAlert } from "../utils/modal.js";
 import { baseCategory, catalogLabels } from "../core/materialCatalog.js";
+import { lacquerColor, lacquerSuggestions } from "../core/lacquerColors.js";
 
 // "Zastosuj do wszystkich dolnych/górnych" (zgłoszona potrzeba: w kuchni
 // fronty szafek dolnych i wiszących często mają inny materiał/kolor, ale
@@ -155,6 +156,16 @@ export function mountKosztorys(root) {
             const v = input.value.trim();
             if (v) mat.board = v; else delete mat.board;
         });
+        // kolor lakieru (RAL / NCS) - opis formatek i kolor frontów w 3D
+        modal.querySelectorAll('.kosztorys-mat-color').forEach(input => {
+            const mat = pricing.frontMaterials.find(m => m.id === input.getAttribute('data-material-id'));
+            if (!mat) return;
+            const v = input.value.trim();
+            if (v) mat.color = v; else delete mat.color;
+            const sw = input.parentElement.querySelector('.kosztorys-mat-swatch');
+            const c = lacquerColor(v);
+            if (sw) { sw.hidden = c == null; if (c != null) sw.style.background = '#' + c.toString(16).padStart(6, '0'); }
+        });
         modal.querySelectorAll('.kosztorys-hw-price').forEach(input => {
             const name = input.getAttribute('data-name');
             pricing.hardware[name] = parseFloat(input.value) || 0;
@@ -242,16 +253,19 @@ export function mountKosztorys(root) {
         const restHtml = cost.materials.filter(m => !isKorpus(m) && m.category !== 'Front').map(otherRowHtml).join('');
 
         materialsTbody.innerHTML = ((korpusHtml + frontHtml + restHtml) || `<tr><td colspan="5" class="empty-note">Projekt jest pusty</td></tr>`)
-            + `<tr hidden><td><datalist id="kosztorys-board-catalog">${catalogLabels(state.project).map(l => `<option value="${escapeHtml(l)}">`).join('')}</datalist></td></tr>`;
+            + `<tr hidden><td><datalist id="kosztorys-color-catalog">${lacquerSuggestions().map(l => `<option value="${escapeHtml(l)}">`).join('')}</datalist><datalist id="kosztorys-board-catalog">${catalogLabels(state.project).map(l => `<option value="${escapeHtml(l)}">`).join('')}</datalist></td></tr>`;
 
-        materialsTbody.querySelectorAll('.kosztorys-mat-price, .kosztorys-front-mat-price, .kosztorys-mat-name, .kosztorys-mat-board').forEach(input => {
+        materialsTbody.querySelectorAll('.kosztorys-mat-price, .kosztorys-front-mat-price, .kosztorys-mat-name, .kosztorys-mat-board, .kosztorys-mat-color').forEach(input => {
             input.addEventListener('input', recalc);
         });
         // Nazwa materiału: odśwież listę per front (ui/properties.js) dopiero po
         // skończeniu wpisywania (change, nie input) - żeby nie przerywać pisania
         // pełnym przebudowaniem panelu na każdą literę.
         materialsTbody.querySelectorAll('.kosztorys-mat-name').forEach(input => {
-            input.addEventListener('change', initPropertiesPanel);
+            input.addEventListener('change', () => { initPropertiesPanel(); update3D(); }); // nazwa i kolor lakieru = kolor frontów w 3D
+        });
+        materialsTbody.querySelectorAll('.kosztorys-mat-color').forEach(input => {
+            input.addEventListener('change', () => update3D());
         });
         materialsTbody.querySelectorAll('.kosztorys-mat-del').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -286,6 +300,14 @@ export function mountKosztorys(root) {
             </tr>`;
     }
 
+    // Pole koloru lakieru z podpowiedziami RAL / NCS i próbką koloru.
+    function colorFieldHtml(materialId) {
+        const v = (pricing.frontMaterials.find(x => x.id === materialId) || {}).color || '';
+        const c = lacquerColor(v);
+        const bg = c == null ? '' : '#' + c.toString(16).padStart(6, '0');
+        return `<label class="kosztorys-mat-color-label">Kolor (RAL / NCS): <span class="decor-legend-swatch kosztorys-mat-swatch" ${c == null ? 'hidden' : ''} style="background:${bg}"></span> <input type="text" class="input kosztorys-mat-color" list="kosztorys-color-catalog" data-material-id="${escapeHtml(materialId)}" value="${escapeHtml(v)}" placeholder="np. RAL 9016 albo S 0502-Y"></label>`;
+    }
+
     function frontRowHtml(m) {
         const canDelete = pricing.frontMaterials.length > 1;
         const bulkBtns = BULK_ZONES.map(z =>
@@ -299,7 +321,7 @@ export function mountKosztorys(root) {
                 <td class="num kosztorys-front-mat-cost" data-material-id="${escapeHtml(m.materialId)}"><b>${formatPLN(m.cost)}</b></td>
                 <td>${canDelete ? `<button type="button" class="icon-btn kosztorys-mat-del" data-material-id="${escapeHtml(m.materialId)}" title="Usuń materiał"><i class="ti ti-trash" aria-hidden="true"></i></button>` : ''}</td>
             </tr>
-            <tr class="kosztorys-mat-bulk-row"><td colspan="5"><label class="kosztorys-mat-board-label">Płyta formatek: <input type="text" class="input kosztorys-mat-board" list="kosztorys-board-catalog" data-material-id="${escapeHtml(m.materialId)}" value="${escapeHtml((pricing.frontMaterials.find(x => x.id === m.materialId) || {}).board || '')}" placeholder="np. MDF dwustronny z bazy SAS"></label> · Zastosuj do: ${bulkBtns}</td></tr>`;
+            <tr class="kosztorys-mat-bulk-row"><td colspan="5">${colorFieldHtml(m.materialId)} · <label class="kosztorys-mat-board-label">Płyta formatek: <input type="text" class="input kosztorys-mat-board" list="kosztorys-board-catalog" data-material-id="${escapeHtml(m.materialId)}" value="${escapeHtml((pricing.frontMaterials.find(x => x.id === m.materialId) || {}).board || '')}" placeholder="np. MDF dwustronny z bazy SAS"></label> · Zastosuj do: ${bulkBtns}</td></tr>`;
     }
 
     function renderHardwareRows() {

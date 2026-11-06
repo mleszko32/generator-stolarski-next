@@ -746,3 +746,5 @@ button, input, select, textarea { font-family: inherit; }
 .decor-legend-group:first-child { margin-top: 0; }
 .decor-legend-row { display: flex; align-items: center; gap: 6px; line-height: 1.5; }
 .decor-legend-swatch { flex: none; width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border); }
+.kosztorys-mat-swatch { display: inline-block; vertical-align: middle; }
+.kosztorys-mat-swatch[hidden] { display: none; }
