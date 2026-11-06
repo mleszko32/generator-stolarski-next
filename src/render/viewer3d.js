@@ -32,6 +32,8 @@ import { initMeasureTool, isMeasureActive, setMeasureButton, toggleMeasureMode, 
 import { showAlert } from "../utils/modal.js";
 import { shelfStiffener } from '../core/shelfStiffener.js';
 import { projectDecorLegend, materialPaletteMap } from '../core/decorColors.js';
+import { replaceMaterial } from '../core/materialReplace.js';
+import { catalogLabels } from '../core/materialCatalog.js';
 import { escapeHtml } from '../utils/dom.js';
 
 let alignMode = { active: false, sourceMod: null, sourceEl: null, banner: null };
@@ -1171,6 +1173,18 @@ function renderDecorLegend() {
       setHighlightKey(highlightKey === key ? null : key);
       update3D();
     });
+    decorLegendEl.addEventListener('change', (e) => {
+      if (!e.target.classList.contains('decor-legend-replace-input') || !highlightKey) return;
+      const name = e.target.value.trim();
+      if (!name || !replaceMaterial(state.project, highlightKey, name)) return;
+      // podświetlenie przechodzi na nowy materiał
+      const low = name.toLowerCase();
+      const next = projectDecorLegend(state.project, { all: true }).find((it) => it.label.toLowerCase() === low || it.label.toLowerCase().startsWith(low + ' '));
+      setHighlightKey(next ? next.key : null);
+      update3D();
+      updateSidebar();
+      initPropertiesPanel();
+    });
     decorLegendEl.addEventListener('keydown', (e) => {
       if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('.decor-legend-row')) { e.preventDefault(); e.target.click(); }
     });
@@ -1192,7 +1206,9 @@ function renderDecorLegend() {
     const color = all ? palette.get(it.key) : (it.color ?? defaults[it.group]);
     const active = highlightKey === it.key ? ' is-active' : '';
     html += `<div class="decor-legend-row${active}" data-key="${escapeHtml(it.key)}" role="button" tabindex="0"><span class="decor-legend-swatch" style="background:${hex(color)}"></span>${escapeHtml(it.label)}</div>`;
+    if (active) html += `<div class="decor-legend-replace"><label class="fs-xs">Zamień w całym projekcie na:</label><input type="text" class="input decor-legend-replace-input" list="decor-legend-catalog" placeholder="wpisz albo wybierz z listy" autocomplete="off"></div>`;
   });
+  if (highlightKey) html += `<datalist id="decor-legend-catalog">${[...new Set([...(state.project.pricing?.frontMaterials || []).map(m => m.name), ...catalogLabels(state.project)])].map(l => `<option value="${escapeHtml(l)}"></option>`).join('')}</datalist>`;
   decorLegendEl.innerHTML = html;
 }
 

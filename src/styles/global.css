@@ -752,3 +752,5 @@ button, input, select, textarea { font-family: inherit; }
 .decor-legend-row { cursor: pointer; border-radius: 3px; padding: 0 4px; margin: 0 -4px; }
 .decor-legend-row:hover { background: var(--surface-subtle); }
 .decor-legend-row.is-active { font-weight: 600; background: var(--surface-subtle); }
+.decor-legend-replace { margin: 2px 0 6px 20px; display: flex; flex-direction: column; gap: 2px; }
+.decor-legend-replace .input { font-size: var(--fs-sm); padding: 3px 6px; }

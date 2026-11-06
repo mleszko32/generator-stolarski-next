@@ -435,7 +435,9 @@ W 3D kolor płyty zależy od dekoru: `core/decorColors.js` (`partColor` z userDa
 liczy się z nazwy materiału (jak dekor blendy), więc ta sama nazwa = ten sam kolor; nietknięty „Standard” domyślny.
 `partMaterial` daje bryle pozycję legendy z kluczem (`key`); przycisk „Kolory: rzeczywiste / materiały” (`colorMode` w
 `meshBuilders.js`, localStorage) maluje bryły kontrastową paletą po kolejności legendy (`materialPaletteMap`), a kliknięcie
-pozycji legendy ustawia `highlightKey` — bryły innych materiałów półprzezroczyste.
+pozycji legendy ustawia `highlightKey` — bryły innych materiałów półprzezroczyste; pod podświetloną pozycją pole
+„Zamień w całym projekcie na” → `replaceMaterial` (`core/materialReplace.js`, czyste, z testami): korpusy (przez
+`setModuleKorpusDecor`), boki/panele (grubość z dekoru), cokół, fronty i czoła blend (cennik po nazwie), dekor szuflad.
 
 **Materiał cokołu**: `mod.legs.plinthMaterial` — `core/plinthMaterial.js` (`plinthMaterial`, czyste, z testami): puste = jak
 fronty szafki (najczęstszy `materialId` jej frontów → formatka kategorii Front z `materialId`), `'korpus'`, `'front:<id>'`,
