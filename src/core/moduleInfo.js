@@ -6,6 +6,7 @@
 import { recalculateLayout } from "./layout.js";
 import { corpusInnerDepth } from "./backPanel.js";
 import { calculateHinges } from "./hingeMath.js";
+import { isFlap, flapHinges } from "./liftFlap.js";
 import { getDrawerBoxInfo } from "./drawerBoxes.js";
 import { num, round1 } from "../utils/math.js";
 import { moduleBoardThickness } from "./boardThickness.js";
@@ -36,6 +37,7 @@ export function getModuleSummary(mod, project) {
   const doors = fronts
     .filter((f) => (f.subtype || "").includes("drzwi"))
     .map((f, i) => {
+      if (isFlap(f)) return { label: `Klapa ${i + 1} (do góry, HK-XS)`, w: round1(num(f.w)), h: round1(num(f.h)), side: "top", hinges: flapHinges(f).length };
       const side = f.subtype === "drzwi-lp" ? (String(f.id).includes("-L-") ? "left" : "right") : (f.openingSide === "right" ? "right" : "left");
       let hinges;
       try { hinges = (calculateHinges(f, th, obstacles, side) || []).length; } catch (e) { hinges = 0; }

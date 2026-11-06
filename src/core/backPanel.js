@@ -6,6 +6,8 @@
 // formularz pokazywał domyślne 6 mm. Wartości domyślne = to, co pokazuje formularz
 // (ui/properties.js, sekcja Plecy).
 import { num } from "../utils/math.js";
+import { decorThickness, projectBoardThickness } from "./boardThickness.js";
+import { moduleKorpusDecor } from "./materialCatalog.js";
 
 export const BACK_PANEL_DEFAULTS = Object.freeze({
   type: "nakladane",
@@ -33,7 +35,12 @@ export function resolveBackPanel(mod, project) {
     grooveDepth: num(bp.grooveDepth, BACK_PANEL_DEFAULTS.grooveDepth),
     clearance: num(bp.clearance, BACK_PANEL_DEFAULTS.clearance),
     nutBuild: ["all", "sides", "top_bottom"].includes(bp.nutBuild) ? bp.nutBuild : BACK_PANEL_DEFAULTS.nutBuild,
-    thickness: num(bp.thickness, BACK_PANEL_DEFAULTS.thickness) || BACK_PANEL_DEFAULTS.thickness,
+    // Plecy wpuszczane to płyta korpusu: bez własnej grubości szafki - grubość jej dekoru
+    // (U740 PM 19 mm → 19), dopiero potem ustawienie projektu / grubość płyty projektu.
+    thickness: num(mod && mod.backPanel && mod.backPanel.thickness, 0) > 0
+      ? num(mod.backPanel.thickness, 0)
+      : (decorThickness(moduleKorpusDecor(mod)) || num(project && project.backPanel && project.backPanel.thickness, 0)
+        || projectBoardThickness(project) || BACK_PANEL_DEFAULTS.thickness),
     insetOffset: Math.max(0, num(bp.insetOffset, 0)),
     // Grubość pleców nakładanych tej szafki (np. 18 mm płyty zamiast HDF); 0 = z projektu.
     overlayThickness: Math.max(0, num(bp.overlayThickness, 0)),

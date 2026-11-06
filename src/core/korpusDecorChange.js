@@ -38,6 +38,8 @@ export function setModuleKorpusDecor(mod, decor, project) {
   }
 
   const newTh = moduleBoardThickness(mod, project);
+  // plecy wpuszczane z płyty korpusu: wpis równy staremu korpusowi idzie za nowym dekorem
+  if (!near(oldTh, newTh) && mod.backPanel && near(parseFloat(mod.backPanel.thickness), oldTh)) delete mod.backPanel.thickness;
   if (!refit || near(oldTh, newTh)) return;
   const r = getCabinetInnerRect(mod);
   rescaleSubtree(tree, "x", oldRect.minX, oldRect.maxX, r.minX, r.maxX);

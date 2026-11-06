@@ -528,10 +528,10 @@ function drawOuterFronts(ctx) {
       svg += `<rect x="${fSvgX}" y="${elSvgY}" width="${fWidth}" height="${front.h}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5" ${strokeDash} />`;
 
       const hingeSide = isDoor ? doorHingeSide(front) : null;
-      let labelText = isDrawer ? `Szuflada` : `Drzwi ${hingeSide === 'right' ? 'prawe' : 'lewe'}`;
+      let labelText = isDrawer ? `Szuflada` : hingeSide === 'top' ? 'Klapa do góry' : `Drzwi ${hingeSide === 'right' ? 'prawe' : 'lewe'}`;
       if (isForeign) labelText += ` (z: ${escapeHtml(front.sourceModName)})`;
       svg += `<text x="${fSvgX + fWidth/2}" y="${elSvgY + front.h/2}" font-size="12" fill="${isForeign ? C.slate400 : C.slate800}" font-weight="bold" text-anchor="middle">${labelText}</text>`;
-      if (isDoor) svg += `<text class="front-sub" x="${fSvgX + fWidth/2}" y="${elSvgY + front.h/2 + 16}" font-size="10" fill="${isForeign ? C.slate400 : C.green700}" text-anchor="middle">zawiasy z ${hingeSide === 'right' ? 'prawej' : 'lewej'}</text>`;
+      if (isDoor) svg += `<text class="front-sub" x="${fSvgX + fWidth/2}" y="${elSvgY + front.h/2 + 16}" font-size="10" fill="${isForeign ? C.slate400 : C.green700}" text-anchor="middle">${hingeSide === 'top' ? 'zawiasy pod wieńcem górnym, AVENTOS HK-XS' : `zawiasy z ${hingeSide === 'right' ? 'prawej' : 'lewej'}`}</text>`;
 
       if (isDoor && mountingData) {
         svg += `<g class="layer-holes-hinge">`;

@@ -25,7 +25,7 @@ export function moduleInfoHtml(mod) {
 
   if (s.doors.length) {
     rows.push(`<div class="info-sub">Drzwi</div>`);
-    s.doors.forEach((d) => rows.push(row(escapeHtml(d.label), `${d.w} × ${d.h} mm · zawiasy z ${d.side === "left" ? "lewej" : "prawej"} (${d.hinges} szt.)`)));
+    s.doors.forEach((d) => rows.push(row(escapeHtml(d.label), `${d.w} × ${d.h} mm · zawiasy ${d.side === "top" ? "u góry" : d.side === "left" ? "z lewej" : "z prawej"} (${d.hinges} szt.)`)));
   }
 
   if (s.drawers.length) {

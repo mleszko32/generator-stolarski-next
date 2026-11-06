@@ -129,6 +129,9 @@ export const HELP_SECTIONS = [
         <li><b>Podziel poziomo</b> (półka) / <b>Podziel pionowo</b> (przegroda).</li>
         <li><b>Drzwi - zawias z lewej / z prawej</b>, <b>Drzwi L/P</b> (para drzwi),
         <b>Szuflady zewn.</b>, <b>Szuflady wewn.</b> - obsadzenie wnęki frontem.</li>
+        <li><b>Klapa do góry</b> - front uchylny z zawiasami u góry (bez sprężyny) i podnośnikiem Blum AVENTOS HK-XS
+        TIP-ON; siłownik dobierany ze współczynnika mocy (wysokość frontu × masa). Istniejące drzwi zmienia przycisk
+        <b>Zamień na klapę</b>.</li>
         <li><b>Półki równo</b> - rozmieszcza podaną liczbę półek ruchomych.</li>
         <li><b>Usuń front</b> - wnęka zostaje pusta.</li>
       </ul>

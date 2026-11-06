@@ -48,6 +48,7 @@ import { update3D, enterAlignMode, areFrontsVisible } from "../render/viewer3d.j
 import { updateSidebar } from "./sidebar.js";
 import { initPropertiesPanel } from "./properties.js";
 import { calculateHinges } from "../core/hingeMath.js";
+import { isFlap, flapHinges } from "../core/liftFlap.js";
 import { getCornerDoorHingeSide } from "../engine/cornerParts.js";
 import { findInteriorCollisions } from "../core/validate.js";
 import { getDrawerBoxRect } from "../core/drawerBoxes.js";
@@ -62,7 +63,7 @@ const FRONT_LABELS = {
 // Strona zawiasów drzwi ('left' = zawiasy z lewej). Para L/P ma ją w id.
 function hingeSideOf(front) {
   if (front.subtype === "drzwi-lp") return front.id.includes("-L-") ? "left" : "right";
-  if (front.subtype === "drzwi") return front.openingSide === "right" ? "right" : "left";
+  if (front.subtype === "drzwi") return front.openingSide === "top" ? "top" : front.openingSide === "right" ? "right" : "left";
   return null;
 }
 
@@ -72,6 +73,7 @@ function frontLabelText(front) {
   const base = FRONT_LABELS[front.subtype] || front.subtype;
   const side = hingeSideOf(front);
   if (!side) return base;
+  if (side === "top") return "Klapa do góry · AVENTOS HK-XS";
   if (front.subtype === "drzwi-lp") return `Drzwi ${side === "left" ? "lewe" : "prawe"}`;
   return `Drzwi ${side === "left" ? "lewe" : "prawe"} · zawiasy ${side === "left" ? "z lewej" : "z prawej"}`;
 }
@@ -959,13 +961,20 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
     const obstacles = els.filter((o) =>
       (o.typ === "poziom" || o.subtype === "szuflada-wewnetrzna") && (!front.cornerArm || o.cornerArm === front.cornerArm));
     const side = front.cornerArm ? getCornerDoorHingeSide(mod, front) : hingeSideOf(front);
-    let hinges;
-    try { hinges = calculateHinges(front, th, obstacles, side) || []; } catch (e) { hinges = []; }
     const fx = parseFloat(front.x), fw = parseFloat(front.w);
     if (!Number.isFinite(fx) || !Number.isFinite(fw)) return [];
-    const cupX = side === "left" ? fx + 22.5 : fx + fw - 22.5;
     const d = Math.max(px.toPxLen(35), 8);
-    return hinges.map((h) => {
+    // Klapa: puszki przy górnej krawędzi (core/liftFlap.js).
+    const cups = isFlap(front)
+      ? flapHinges(front).map((h) => ({ x: fx + h.x, y: parseFloat(front.y) + parseFloat(front.h) - h.yFromTop }))
+      : (() => {
+        let hinges;
+        try { hinges = calculateHinges(front, th, obstacles, side) || []; } catch (e) { hinges = []; }
+        const cupX = side === "left" ? fx + 22.5 : fx + fw - 22.5;
+        return hinges.map((h) => ({ x: cupX, y: h.y }));
+      })();
+    return cups.map((h) => {
+      const cupX = h.x;
       const cup = document.createElement("div");
       cup.title = "Puszka zawiasu Ø35";
       Object.assign(cup.style, {
@@ -1291,6 +1300,10 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
         assignFront(mod, selectedNode, "drzwi-lp", { cornerArm });
         refreshAfterEdit();
       });
+      if (!cornerArm) addBtn("⏶ Klapa do góry", "Klapa uchylna do góry: zawiasy u góry, podnośnik Blum AVENTOS HK-XS", () => {
+        assignFront(mod, selectedNode, "drzwi", { openingSide: "top" });
+        refreshAfterEdit();
+      });
       appendDrawerPicker(toolbar, mod, "szuflada", "📦 Szuflady zewn.");
       appendDrawerPicker(toolbar, mod, "szuflada-wewnetrzna", "📥 Szuflady wewn.");
       if (!cornerArm) appendAutoShelvesPicker(toolbar, mod, selectedNode);
@@ -1307,10 +1320,15 @@ export function createZoneEditor({ getContainer, getMod, cornerArm }) {
       if (subtype === "drzwi") {
         const door = selectedNode.fronts[0];
         const isLeft = door.openingSide === "left" || !door.openingSide;
-        addBtn(isLeft ? "🔄 Zawias z prawej" : "🔄 Zawias z lewej", "Zmienia kierunek otwierania drzwi", () => {
-          door.openingSide = isLeft ? "right" : "left";
-          refreshAfterEdit();
-        });
+        if (door.openingSide === "top") {
+          addBtn("▭ Zamień na drzwi", "Zwykłe drzwi z zawiasami z lewej", () => { door.openingSide = "left"; refreshAfterEdit(); });
+        } else {
+          addBtn(isLeft ? "🔄 Zawias z prawej" : "🔄 Zawias z lewej", "Zmienia kierunek otwierania drzwi", () => {
+            door.openingSide = isLeft ? "right" : "left";
+            refreshAfterEdit();
+          });
+          if (!door.cornerArm) addBtn("⏶ Zamień na klapę", "Klapa do góry z podnośnikiem AVENTOS HK-XS", () => { door.openingSide = "top"; refreshAfterEdit(); });
+        }
       }
       // Podziel/półki równo można dodać TYLKO wtedy, gdy ta wnęka jeszcze nie ma
       // żadnego wewnętrznego podziału (node.type === 'leaf') - front przetrwa

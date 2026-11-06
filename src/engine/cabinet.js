@@ -11,6 +11,7 @@ import { getCorpusHoles, getPionMountHoles, getCorpusParts, getBackPanelParts, s
 import { getCornerCorpusParts } from "./cornerParts.js";
 import { getSlopeCabinetParts, getSlopeFrontParts } from "../core/slopeCabinet.js";
 import { getBlindPanel, getBlindStile, blindGeometry, getBlindCorner } from "../core/blindCorner.js";
+import { isFlap } from "../core/liftFlap.js";
 import { splitPlinthRun, maxPlinthLength } from "./plinthSplit.js";
 import { shelfStiffener } from "../core/shelfStiffener.js";
 import { KORPUS, korpusCategory, moduleKorpusDecor } from "../core/materialCatalog.js";
@@ -112,7 +113,7 @@ function getGlobalHingesForModule(targetMod, config) {
               // Drzwi szafki ślepej wiszące od strony narożnika (listwa / zaślepka) mają
               // prowadniki na listwie albo zaślepce, nie na boku - flaga parallelMount.
               const blindG = blindGeometry(sourceMod, config);
-              const fronts = sourceMod.elements.filter(el => el.typ === 'front' && el.subtype.includes('drzwi') && !(blindG && !(el.w >= 1)));
+              const fronts = sourceMod.elements.filter(el => el.typ === 'front' && el.subtype.includes('drzwi') && !(blindG && !(el.w >= 1)) && !isFlap(el));
               const obstacles = stackedHingeObstacles(sourceMod, config.modules, th);
               fronts.forEach(front => {
                   const side = front.subtype === 'drzwi-lp' ? (front.id.includes('-L-') ? 'left' : 'right') : (front.openingSide || 'left');

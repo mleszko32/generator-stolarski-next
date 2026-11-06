@@ -80,6 +80,21 @@ describe("plecy wpuszczane", () => {
     expect(getBackPanelParts(m, project)[0]).toMatchObject({ length: 2050, width: 384 });
   });
 
+  it("bez własnej grubości plecy mają grubość dekoru korpusu (19 mm), wieńce krótsze o 19", () => {
+    const m = baseModule({ dimensions: { width: 550, height: 694, depth: 500 }, backPanel: { type: "wpuszczane" },
+      materials: { korpusDecor: "U740 PM/ST9 19mm" } });
+    expect(corpusInnerDepth(m, freshProject())).toBe(481);
+    expect(getBackPanelParts(m, freshProject())[0]).toMatchObject({ width: 512 });
+  });
+
+  it("zmiana dekoru: wpis grubości równy staremu korpusowi idzie za nowym dekorem", async () => {
+    const { setModuleKorpusDecor } = await import("./korpusDecorChange.js");
+    const m = mod();
+    setModuleKorpusDecor(m, "U740 PM/ST9 19mm", freshProject());
+    expect(m.backPanel.thickness).toBeUndefined();
+    expect(resolveBackPanel(m, freshProject()).thickness).toBe(19);
+  });
+
   it("nakładane bez zmian: bok krótszy o HDF", () => {
     expect(sideDepthOf(baseModule({ dimensions: { width: 600, height: 720, depth: 513 } }), freshProject())).toBe(510);
   });

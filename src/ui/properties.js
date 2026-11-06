@@ -26,7 +26,7 @@ import { findRowAround } from "../core/wallFill.js";
 import { getStiffenerSettings } from "../core/shelfStiffener.js";
 import { findKitchenRunAround } from "../core/kitchenRun.js";
 import { openWallFillModal } from "./wallFillModal.js";
-import { BOARD_BACK_MIN } from "../core/backPanel.js";
+import { BOARD_BACK_MIN, resolveBackPanel } from "../core/backPanel.js";
 import { catalogLabels, assignFrontMaterialByName, frontMaterialSuggestions } from "../core/materialCatalog.js";
 import { moduleFrontMaterialId, PLINTH_KORPUS } from "../core/plinthMaterial.js";
 
@@ -151,7 +151,7 @@ export function initPropertiesPanel() {
   // żyje na elemencie frontu, więc działa wszędzie tam, gdzie ten sam front jest
   // odczytywany (3D, lista nawiertów, okucia) — nie tylko tutaj.
   const doorHingeGroups = (activeModule.elements || [])
-      .filter(el => el.typ === 'front' && el.subtype && el.subtype.includes('drzwi'))
+      .filter(el => el.typ === 'front' && el.subtype && el.subtype.includes('drzwi') && el.openingSide !== 'top')
       .map(front => {
           const obstacles = (activeModule.elements || []).filter(el => el.typ === 'poziom' || el.subtype === 'szuflada-wewnetrzna');
           const side = front.subtype === 'drzwi-lp' ? (front.id.includes('-L-') ? 'left' : 'right') : (front.openingSide || 'left');
@@ -363,7 +363,7 @@ export function initPropertiesPanel() {
 
       <div class="property-group"><label>Plecy (Tylko dla szafki):</label><select id="input-back-type"><option value="nut" ${backP.type === 'nut' ? 'selected' : ''}>W nucie</option><option value="nakladane" ${backP.type === 'nakladane' ? 'selected' : ''}>Nakładane</option><option value="wpuszczane" ${backP.type === 'wpuszczane' ? 'selected' : ''}>Wpuszczane (płyta między bokami)</option></select></div>
       <div class="prop-box" id="inset-back-options" style="display: ${backP.type === 'wpuszczane' ? 'block' : 'none'};">
-        <div class="property-group mb-0"><label class="fs-xs">Grubość pleców (mm):</label><input type="number" id="input-back-thickness" value="${backP.thickness !== undefined ? backP.thickness : 18}" /></div>
+        <div class="property-group mb-0"><label class="fs-xs">Grubość pleców (mm):</label><input type="number" id="input-back-thickness" value="${resolveBackPanel(activeModule, state.project).thickness}" /></div>
         <div class="property-group mb-0"><label class="fs-xs">Cofnięcie od tyłu boków (mm):</label><input type="number" id="input-back-inset-offset" value="${backP.insetOffset || 0}" /></div>
       </div>
       <div class="prop-box" id="overlay-back-options" style="display: ${backP.type === 'nakladane' ? 'block' : 'none'};">
@@ -857,7 +857,11 @@ function setupEventListeners() {
             }
             if (id === 'back-offset') mod.backPanel.offset = val;
             if (id === 'back-groove') mod.backPanel.grooveDepth = val;
-            if (id === 'back-thickness' && val > 0) mod.backPanel.thickness = val;
+            if (id === 'back-thickness' && val > 0) {
+              // grubość taka jak płyta korpusu = bez własnego wpisu (zmiana dekoru ją zmieni)
+              delete mod.backPanel.thickness;
+              if (resolveBackPanel(mod, state.project).thickness !== val) mod.backPanel.thickness = val;
+            }
             if (id === 'back-inset-offset') mod.backPanel.insetOffset = Math.max(0, val || 0);
         });
         debouncedUpdateAll();

@@ -17,6 +17,7 @@ import { getBlindCorner, blindGeometry, BLIND_MOUNTS } from "../core/blindCorner
 import { getCornerFitting } from "../core/cornerFittings.js";
 import { wardrobeRodLength } from "../core/slopeNiche.js";
 import { moduleBoardThickness } from "../core/boardThickness.js";
+import { isFlap, flapHardware, frontThickness } from "../core/liftFlap.js";
 
 export function calculateProjectHardware() {
   recalculateAllLayouts();
@@ -148,6 +149,14 @@ export function calculateProjectHardware() {
         else if (front.subtype.includes('drzwi')) {
           // Skrzydło szafki ślepej przycięte do zera nie istnieje - bez zawiasów.
           if (blind && !(front.w >= 1)) return;
+          // Klapa do góry: podnośnik AVENTOS HK-XS + zawiasy bez sprężyny (core/liftFlap.js).
+          if (isFlap(front)) {
+            flapHardware(front, frontThickness(front, config, board)).forEach(it => {
+              if (!hardwareList[it.name]) hardwareList[it.name] = { name: it.name, qty: 0, unit: it.unit };
+              hardwareList[it.name].qty += it.qty;
+            });
+            return;
+          }
           const side = front.subtype === 'drzwi-lp' ? (front.id.includes('-L-') ? 'left' : 'right') : (front.openingSide || 'left');
           const hinges = calculateHinges(front, board, obstacles, side);
           const hingeCount = hinges.length;

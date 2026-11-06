@@ -179,7 +179,7 @@ export function validateProject(project = state.project) {
           if (el.w !== undefined && el.h !== undefined && (fw < MIN_FRONT_SIZE || fh < MIN_FRONT_SIZE)) {
             add("error", mod, `Front ma tylko ${Math.round(fw)} × ${Math.round(fh)} mm - zbyt mały (sprawdź podziały i szczeliny).`);
           }
-          if ((el.subtype === "drzwi" || el.subtype === "drzwi-lp") && fw > MAX_DOOR_WIDTH) {
+          if ((el.subtype === "drzwi" || el.subtype === "drzwi-lp") && el.openingSide !== "top" && fw > MAX_DOOR_WIDTH) {
             add("warn", mod, `Drzwi szerokie na ${Math.round(fw)} mm (więcej niż ${MAX_DOOR_WIDTH} mm) - podziel na dwa skrzydła.`);
           }
         }

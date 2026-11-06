@@ -12,6 +12,7 @@ import { state, DEFAULT_ROOM, frontBodyGap } from '../core/state.js';
 import { calculateDrawerHoles } from '../core/drawerMath.js';
 import { drawerSpec } from '../core/drawerSpec.js';
 import { calculateHinges, stackedHingeObstacles, SHELF_PIN_DROP, SHELF_PIN_OFFSETS } from '../core/hingeMath.js';
+import { isFlap, flapHinges } from '../core/liftFlap.js';
 import { recalculateLayout, getTraverseConfig, getWorldFootprint, clampModuleToRoom, getModuleBox } from '../core/layout.js';
 import { buildZoneTree, moveSplit } from '../core/zoneTree.js';
 import { scheduleCheckpoint } from '../core/history.js';
@@ -1601,7 +1602,12 @@ export function update3D() {
                           const obstacles = stackedHingeObstacles(mod, state.project.modules, th);
 
                           const side = el.subtype === 'drzwi-lp' ? (el.id.includes('-L-') ? 'left' : 'right') : (el.openingSide || 'left');
-                          const hinges = calculateHinges(el, th, obstacles, side);
+                          // Klapa do góry: puszki przy górnej krawędzi (core/liftFlap.js).
+                          if (isFlap(el)) {
+                              const topY = isTopBottomFull ? el.y + el.h - th : el.y + el.h;
+                              flapHinges(el).forEach(h => addHole(17.5, 13, posX + el.x + h.x, posY + topY - h.yFromTop, zForFront + 6.5, 'z', innerGroup));
+                          }
+                          const hinges = isFlap(el) ? [] : calculateHinges(el, th, obstacles, side);
                           
                           hinges.forEach(h => {
                               let calcY = isTopBottomFull ? el.y + h.relY - th : el.y + h.relY;
