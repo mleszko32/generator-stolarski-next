@@ -734,3 +734,15 @@ button, input, select, textarea { font-family: inherit; }
   .help { grid-template-columns: 1fr; }
   .help-nav { position: static; }
 }
+
+/* Legenda kolorów dekorów w widoku 3D (render/viewer3d.js: renderDecorLegend) */
+.decor-legend {
+  position: absolute; left: 12px; bottom: 12px; z-index: 50; max-width: 280px; max-height: 45%; overflow: auto;
+  padding: 8px 10px; background: var(--surface-panel); border: 1px solid var(--border); border-radius: var(--radius);
+  font-family: var(--font); font-size: var(--fs-sm); color: var(--text-muted-strong);
+}
+.decor-legend[hidden] { display: none; }
+.decor-legend-group { font-weight: 600; margin: 4px 0 2px; }
+.decor-legend-group:first-child { margin-top: 0; }
+.decor-legend-row { display: flex; align-items: center; gap: 6px; line-height: 1.5; }
+.decor-legend-swatch { flex: none; width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border); }

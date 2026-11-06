@@ -417,6 +417,16 @@ samych wymiarach w różnych materiałach nigdy nie zleją się w jeden wiersz l
 `initPropertiesPanel()` po zmianach struktury cennika, żeby wybór materiału przy froncie był
 aktualny.
 
+**Dekor korpusu per szafka**: `mod.materials.korpusDecor` (pole w Konstrukcji). `collectProjectParts` zmienia kategorię
+formatek „Korpus” tej szafki na „Korpus: <dekor>” (cokół — gdy cały bieg ma jeden dekor; panel poziomy i bok dokładany
+z wypełnionym „Dekor” też), więc kosztorys (cena w `pricing.materials["Korpus: …"]`, bez wpisu = cena Korpus), rozkrój,
+CSV i FC2 rozdzielają dekory same. Reguły i kolejność po kategorii bazowej: `baseCategory` (`core/materialCatalog.js`).
+`calculateModuleParts` (rysunki, instrukcje) zostaje przy „Korpus”.
+W 3D kolor płyty zależy od dekoru: `core/decorColors.js` (`partColor` z userData bryły — dekor szafki dla korpusu/półek,
+„Dekor” panelu, materiał frontu z cennika poza pierwszym; kod Egger W/H/F/U wybiera rodzinę barw), używane w
+`materialFor` w `meshBuilders.js` (jasne kolory w trybie przezroczystym pomijane). Legenda w lewym dolnym rogu widoku 3D
+(`projectDecorLegend` → `renderDecorLegend` w `viewer3d.js`), ukryta, gdy nic nie ma własnego koloru.
+
 **Oferta dla klienta**: `core/offer.js` (czysta: ustawienia w `project.offer`, `buildOfferHtml`)
 + karta „Oferta dla klienta” w sekcji Kosztorys huba (`ui/productionHub.js`). Pokazuje tylko
 zakres + brutto/netto/VAT (bez kosztów/marży); obraz 3D pochodzi z `captureViewerSnapshot()`

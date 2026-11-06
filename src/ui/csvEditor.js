@@ -7,6 +7,7 @@ import { openModal, showAlert } from "../utils/modal.js";
 import { getPartEdges, describeEdges } from "../engine/edgeBanding.js";
 import { buildFc2Csv, fc2SymbolSlots, getFc2Settings } from "../engine/fc2Export.js";
 import { scheduleCheckpoint } from "../core/history.js";
+import { baseCategory } from "../core/materialCatalog.js";
 
 const DISPLAY_FILTERS = [
     { value: 'all', label: 'Wszystko' },
@@ -34,7 +35,9 @@ function rowHtml(cat, name, length, width, qty, source, edges, meta = {}) {
 
 function openCsvEditorModal(partsList) {
     let displayFilter = 'all';
-    partsList.sort((a, b) => (CAT_ORDER[a.category] || 99) - (CAT_ORDER[b.category] || 99));
+    // „Korpus: <dekor>” obok „Korpus”, każdy dekor zgrupowany razem
+    partsList.sort((a, b) => (CAT_ORDER[baseCategory(a.category)] || 99) - (CAT_ORDER[baseCategory(b.category)] || 99)
+        || String(a.category).localeCompare(String(b.category), 'pl'));
     const rules = state.project.edgeBanding;
 
     const rows = partsList.map(p => rowHtml(
@@ -91,7 +94,7 @@ function openCsvEditorModal(partsList) {
         root.querySelectorAll('#csv-editor-tbody tr').forEach(tr => {
             const cat = getRowCategory(tr);
             tr.setAttribute('data-category', cat);
-            const show = displayFilter === 'all' || cat === displayFilter;
+            const show = displayFilter === 'all' || baseCategory(cat) === displayFilter;
             tr.style.display = show ? '' : 'none';
             if (show) visible++;
         });
@@ -177,7 +180,7 @@ function openCsvEditorModal(partsList) {
         root.querySelectorAll('#csv-editor-tbody tr').forEach(tr => {
             const inputs = tr.querySelectorAll('input');
             const category = inputs[0].value.trim();
-            if (displayFilter !== 'all' && category !== displayFilter) return;
+            if (displayFilter !== 'all' && baseCategory(category) !== displayFilter) return;
             const edgeText = inputs[6].value.trim();
             let edges;
             try { edges = JSON.parse(tr.getAttribute('data-edges')); } catch (e) { edges = [true, true, true, true]; }

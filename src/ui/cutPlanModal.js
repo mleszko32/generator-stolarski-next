@@ -13,6 +13,7 @@ import { collectProjectParts } from "../engine/cabinet.js";
 import { nestParts } from "../engine/nesting.js";
 import { isEdgeBanded, getPartEdges, describeEdges, totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "../engine/edgeBanding.js";
 import { edgeIconSvg } from "./edgeBandingUi.js";
+import { baseCategory } from "../core/materialCatalog.js";
 
 const DEFAULTS = { sheetW: 2800, sheetH: 2070, kerf: 3, trim: 10, rotateFronts: false };
 const CATEGORY_ORDER = ['Korpus', 'Front', 'Szuflada', 'Plecy'];
@@ -26,7 +27,7 @@ function getSettings() {
 // jest na schemacie rozkroju i na etykiecie.
 function buildPieces() {
   const raw = collectProjectParts().filter(p => p.category !== 'Blat').slice().sort((a, b) => {
-    const ca = CATEGORY_ORDER.indexOf(a.category), cb = CATEGORY_ORDER.indexOf(b.category);
+    const ca = CATEGORY_ORDER.indexOf(baseCategory(a.category)), cb = CATEGORY_ORDER.indexOf(baseCategory(b.category));
     return (ca === -1 ? 99 : ca) - (cb === -1 ? 99 : cb)
       || String(a.moduleName).localeCompare(String(b.moduleName), 'pl')
       || String(a.name).localeCompare(String(b.name), 'pl');
@@ -67,8 +68,9 @@ function computePlan() {
   });
   const groups = [...byCategory.entries()]
     .sort((a, b) => {
-      const ia = CATEGORY_ORDER.indexOf(a[0]), ib = CATEGORY_ORDER.indexOf(b[0]);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      // „Korpus: <dekor>” to osobna grupa (osobne arkusze), ułożona przy „Korpus”
+      const ia = CATEGORY_ORDER.indexOf(baseCategory(a[0])), ib = CATEGORY_ORDER.indexOf(baseCategory(b[0]));
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a[0].localeCompare(b[0], 'pl');
     })
     .map(([category, list]) => ({
       category,

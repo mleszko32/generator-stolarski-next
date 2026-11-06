@@ -30,6 +30,8 @@ import { getBlindPanel, getBlindStile, blindGeometry, PARALLEL_PLATE_INSET } fro
 import { initMeasureTool, isMeasureActive, setMeasureButton, toggleMeasureMode, updateMeasureHover, handleMeasureClick, measureHoverMouse } from './measureTool.js';
 import { showAlert } from "../utils/modal.js";
 import { shelfStiffener } from '../core/shelfStiffener.js';
+import { projectDecorLegend } from '../core/decorColors.js';
+import { escapeHtml } from '../utils/dom.js';
 
 let alignMode = { active: false, sourceMod: null, sourceEl: null, banner: null };
 let isFrontsVisible = true;
@@ -1139,6 +1141,29 @@ function handle3DClick(event) {
   }
 }
 
+// Legenda kolorów dekorów (lewy dolny róg widoku 3D): który kolor płyty to który dekor /
+// materiał frontu w tym projekcie. Ukryta, gdy w projekcie nic nie ma własnego koloru.
+let decorLegendEl = null;
+function renderDecorLegend() {
+  if (!container) return;
+  if (!decorLegendEl) {
+    decorLegendEl = document.createElement('div');
+    decorLegendEl.className = 'decor-legend';
+    container.appendChild(decorLegendEl);
+  }
+  const items = projectDecorLegend(state.project);
+  decorLegendEl.hidden = items.length === 0;
+  if (!items.length) { decorLegendEl.innerHTML = ''; return; }
+  const hex = (c) => '#' + c.toString(16).padStart(6, '0');
+  const defaults = { Korpus: mats.solid.corpus.color.getHex(), Front: mats.solid.front.color.getHex() };
+  let html = '', group = '';
+  items.forEach((it) => {
+    if (it.group !== group) { group = it.group; html += `<div class="decor-legend-group">${group === 'Korpus' ? 'Płyta korpusu' : 'Fronty'}</div>`; }
+    html += `<div class="decor-legend-row"><span class="decor-legend-swatch" style="background:${hex(it.color ?? defaults[it.group])}"></span>${escapeHtml(it.label)}</div>`;
+  });
+  decorLegendEl.innerHTML = html;
+}
+
 export function update3D() {
   scheduleCheckpoint(); // patrz core/history.js — debounce'owany checkpoint historii cofnij/wprzód
   renderInteriorEditorIfVisible(); // patrz ui/interiorEditor.js — odświeża się tylko, gdy jest widoczny
@@ -1148,6 +1173,7 @@ export function update3D() {
   // zrobi to ResizeObserver, gdy kontener znowu będzie widoczny (syncSize w init3DViewer).
   if (container && container.clientWidth === 0) { sceneDirty = true; return; }
   sceneDirty = false;
+  renderDecorLegend();
 
   while (cabinetGroup.children.length > 0) {
       const old = cabinetGroup.children[0];

@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { state } from '../core/state.js';
 import { sideFloorExt } from '../engine/carcaseParts.js';
+import { partColor, isLightColor } from '../core/decorColors.js';
 
 export let isXrayMode = true;
 export function setXrayMode(value) {
@@ -153,16 +154,31 @@ function buildLabelMaterial(text) {
 }
 
 
+// Materiał bryły: domyślny dla typu, a dla korpusu/półek/frontów z ustawionym dekorem lub
+// materiałem frontu - kopia w kolorze dekoru (core/decorColors.js), z cache po kolorze.
+const tintCache = new Map();
+function materialFor(type, userData) {
+  const matObj = isXrayMode ? mats.xray : mats.solid;
+  const base = matObj[type] || matObj.corpus;
+  if (type !== 'corpus' && type !== 'shelf' && type !== 'front') return base;
+  const color = partColor(type, userData, state.project);
+  if (color == null || (isXrayMode && isLightColor(color))) return base;
+  const key = `${isXrayMode ? 'x' : 's'}|${type}|${color}`;
+  let m = tintCache.get(key);
+  if (!m) {
+    m = base.clone();
+    m.color.setHex(color);
+    if (isXrayMode) m.opacity = Math.max(base.opacity, 0.35);
+    m.userData.shared = true;
+    tintCache.set(key, m);
+  }
+  return m;
+}
+
 export function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, parentGroup, rotationY = 0) {
   const dimKey = `${w}|${h}|${d}`;
   const geo = cachedGeometry('box|' + dimKey, () => new THREE.BoxGeometry(w, h, d));
-  let matObj = isXrayMode ? mats.xray : mats.solid;
-  let mat = matObj.corpus;
-  if (type === 'front') mat = matObj.front;
-  if (type === 'shelf') mat = matObj.shelf;
-  if (type === 'drawerBox') mat = matObj.drawerBox;
-  if (type === 'hdf') mat = matObj.hdf;
-  if (type === 'plinth') mat = matObj.plinth;
+  const mat = materialFor(type, userData);
 
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(x + w/2, y + h/2, z + d/2);
@@ -227,8 +243,7 @@ export function addHardware(type, x, y, z, axis, parentGroup) {
 export function addPrism(points, z0, depth, type, isActiveModule, userData, parentGroup) {
   const shape = new THREE.Shape(points.map(([x, y]) => new THREE.Vector2(x, y)));
   const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
-  const matObj = isXrayMode ? mats.xray : mats.solid;
-  const mesh = new THREE.Mesh(geo, matObj[type] || matObj.corpus);
+  const mesh = new THREE.Mesh(geo, materialFor(type, userData));
   mesh.position.set(0, 0, z0);
   if (userData) mesh.userData = userData;
   mesh.castShadow = !isXrayMode; mesh.receiveShadow = !isXrayMode;
@@ -253,8 +268,7 @@ export function addCornerPanel(shape, thickness, y, isActiveModule, userData, pa
   const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
   geo.rotateX(-Math.PI / 2);
 
-  const matObj = isXrayMode ? mats.xray : mats.solid;
-  const mesh = new THREE.Mesh(geo, matObj.corpus);
+  const mesh = new THREE.Mesh(geo, materialFor('corpus', userData));
   mesh.position.set(0, y, 0);
   if (userData) mesh.userData = userData;
   mesh.castShadow = !isXrayMode; mesh.receiveShadow = !isXrayMode;

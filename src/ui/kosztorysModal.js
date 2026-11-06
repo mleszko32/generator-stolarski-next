@@ -10,6 +10,7 @@ import { updateSidebar } from "./sidebar.js";
 import { showCustomDialog } from "../core/storage.js";
 import { loadPriceDefaults, savePriceDefaults, applyPriceDefaults, exportPriceDefaultsJson, importPriceDefaultsJson } from "../core/priceLibrary.js";
 import { showAlert } from "../utils/modal.js";
+import { baseCategory } from "../core/materialCatalog.js";
 
 // "Zastosuj do wszystkich dolnych/górnych" (zgłoszona potrzeba: w kuchni
 // fronty szafek dolnych i wiszących często mają inny materiał/kolor, ale
@@ -227,9 +228,11 @@ export function mountKosztorys(root) {
     // dopiero gdy jest przypisany, ma tu sens pokazać mu wiersz do wyceny.
     function renderMaterialRows() {
         const cost = calculateProjectCost();
-        const korpusHtml = cost.materials.filter(m => m.category === 'Korpus').map(otherRowHtml).join('');
+        // „Korpus” i „Korpus: <dekor>” (dekor korpusu szafki) - każdy dekor osobny wiersz z własną ceną.
+        const isKorpus = (m) => baseCategory(m.category) === 'Korpus';
+        const korpusHtml = cost.materials.filter(isKorpus).map(otherRowHtml).join('');
         const frontHtml = cost.materials.filter(m => m.category === 'Front').map(frontRowHtml).join('');
-        const restHtml = cost.materials.filter(m => m.category !== 'Korpus' && m.category !== 'Front').map(otherRowHtml).join('');
+        const restHtml = cost.materials.filter(m => !isKorpus(m) && m.category !== 'Front').map(otherRowHtml).join('');
 
         materialsTbody.innerHTML = (korpusHtml + frontHtml + restHtml) || `<tr><td colspan="5" class="empty-note">Projekt jest pusty</td></tr>`;
 

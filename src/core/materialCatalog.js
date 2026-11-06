@@ -35,6 +35,28 @@ export function addCatalogDecor(project, decor) {
   return true;
 }
 
+// --- Dekor korpusu per szafka ---
+// Szafka z mod.materials.korpusDecor (a panel poziomy / bok dokładany z wypełnionym „Dekor”)
+// daje formatki kategorii „Korpus: <dekor>” zamiast „Korpus” - w zbiorczej liście projektu
+// (engine/cabinet.js: collectProjectParts), więc kosztorys, rozkrój i CSV rozdzielają je
+// same. Pusty dekor = zwykły „Korpus” projektu.
+export const KORPUS = "Korpus";
+
+export function korpusCategory(decor) {
+  const d = String(decor || "").trim();
+  return d ? `${KORPUS}: ${d}` : KORPUS;
+}
+
+// Kategoria bazowa do kolejności i reguł („Korpus: U740 PM” -> „Korpus”).
+export function baseCategory(category) {
+  const c = String(category || "");
+  return c.startsWith(`${KORPUS}: `) ? KORPUS : c;
+}
+
+export function moduleKorpusDecor(mod) {
+  return String((mod && mod.materials && mod.materials.korpusDecor) || "").trim();
+}
+
 // Nazwa materiału formatki do listy: front - pozycja cennika frontów (brak/usunięta = pierwsza,
 // jak w kosztorysie), pozostałe - wybrany dekor kategorii; bez wyboru sama kategoria.
 export function partMaterialLabel(part, project) {

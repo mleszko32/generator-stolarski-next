@@ -5,6 +5,7 @@
 import { state, migratePricingExtras } from "../core/state.js";
 import { calculateAllProjectParts } from "./cabinet.js";
 import { calculateProjectHardware } from "./hardware.js";
+import { baseCategory } from "../core/materialCatalog.js";
 
 // Szacunkowy kosztorys materiałowy - liczy powierzchnię formatek Z OSOBNA dla
 // każdej kategorii (Korpus/Front/Szuflada/Plecy, patrz PRICING_MATERIAL_
@@ -51,14 +52,14 @@ export function calculateProjectCost() {
 
   const frontOrderIndex = (id) => { const i = frontCatalog.findIndex(m => m.id === id); return i === -1 ? 99 : i; };
   const keys = Object.keys(areaMm2ByKey).sort((a, b) => {
-    const catA = a.startsWith('Front::') ? 'Front' : a;
-    const catB = b.startsWith('Front::') ? 'Front' : b;
+    const catA = a.startsWith('Front::') ? 'Front' : baseCategory(a);
+    const catB = b.startsWith('Front::') ? 'Front' : baseCategory(b);
     const ia = MATERIAL_CATEGORY_ORDER.indexOf(catA);
     const ib = MATERIAL_CATEGORY_ORDER.indexOf(catB);
     const byCat = (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
     if (byCat !== 0) return byCat;
     if (catA === 'Front') return frontOrderIndex(a.slice(7)) - frontOrderIndex(b.slice(7));
-    return 0;
+    return a === b ? 0 : (a === catA ? -1 : b === catB ? 1 : a.localeCompare(b)); // „Korpus”, potem dekory alfabetycznie
   });
 
   const materials = keys.map(key => {
@@ -68,7 +69,9 @@ export function calculateProjectCost() {
       const pricePerM2 = parseFloat(mat.pricePerM2) || 0;
       return { category: 'Front', materialId: mat.id, materialName: mat.name, areaM2, pricePerM2, cost: areaM2 * pricePerM2 };
     }
-    const pricePerM2 = parseFloat((pricing.materials || {})[key]) || 0;
+    // „Korpus: <dekor>” ma własną cenę w pricing.materials; dopóki jej nie wpisano - cena „Korpus”.
+    const own = (pricing.materials || {})[key];
+    const pricePerM2 = parseFloat(own !== undefined ? own : (pricing.materials || {})[baseCategory(key)]) || 0;
     return { category: key, areaM2, pricePerM2, cost: areaM2 * pricePerM2 };
   });
 
@@ -80,7 +83,7 @@ export function calculateProjectCost() {
   const materialsSubtotal = materials.reduce((sum, m) => sum + m.cost, 0);
   const hardwareSubtotal = hardwareLines.reduce((sum, l) => sum + l.cost, 0);
   const cutPartsCount = parts
-    .filter(p => CUT_CATEGORIES.includes(p.category))
+    .filter(p => CUT_CATEGORIES.includes(baseCategory(p.category)))
     .reduce((sum, p) => sum + (parseFloat(p.qty) || 0), 0);
   const cuttingCost = cutPartsCount * pricing.cuttingPerPart;
   const laborCost = pricing.labor.hours * pricing.labor.rate;

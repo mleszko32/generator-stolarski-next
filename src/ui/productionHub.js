@@ -13,7 +13,7 @@ import { calculateProjectCost } from "../engine/cost.js";
 import { totalEdgeBandingMeters, EDGE_BANDING_RESERVE, getPartEdges, withEdges, describeEdges } from "../engine/edgeBanding.js";
 import { edgeIconSvg } from "./edgeBandingUi.js";
 import { scheduleCheckpoint } from "../core/history.js";
-import { catalogLabels, addCatalogDecor, partMaterialLabel, DECOR_CATEGORIES } from "../core/materialCatalog.js";
+import { catalogLabels, addCatalogDecor, partMaterialLabel, DECOR_CATEGORIES, baseCategory } from "../core/materialCatalog.js";
 import { getCornerDepths, getWorldFootprint } from "../core/layout.js";
 import { update3D, captureViewerSnapshot, captureModuleSnapshot } from "../render/viewer3d.js";
 import { buildOfferHtml, getOfferSettings } from "../core/offer.js";
@@ -156,8 +156,8 @@ function renderFormatki(el) {
       byCat.get(k).push(p);
     });
     [...byCat.entries()].sort((a, b) => {
-      const ia = CATEGORY_ORDER.indexOf(a[0]), ib = CATEGORY_ORDER.indexOf(b[0]);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      const ia = CATEGORY_ORDER.indexOf(baseCategory(a[0])), ib = CATEGORY_ORDER.indexOf(baseCategory(b[0]));
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a[0].localeCompare(b[0], 'pl');
     }).forEach(([name, list]) => {
       const count = list.reduce((s, p) => s + (parseInt(p.qty, 10) || 1), 0);
       const head = name === 'Front' ? name : partMaterialLabel({ category: name }, state.project);

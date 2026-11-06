@@ -24,6 +24,7 @@ import { getStiffenerSettings } from "../core/shelfStiffener.js";
 import { findKitchenRunAround } from "../core/kitchenRun.js";
 import { openWallFillModal } from "./wallFillModal.js";
 import { BOARD_BACK_MIN } from "../core/backPanel.js";
+import { catalogLabels } from "../core/materialCatalog.js";
 
 function getSelectedMods() {
     if (state.selectedModules && state.selectedModules.size > 0) {
@@ -293,6 +294,7 @@ export function initPropertiesPanel() {
     ${tabContent("konstrukcja", `
       <h3>Konstrukcja Korpusu</h3>
       <div class="property-group"><label>Grubość płyty (mm):</label><input type="number" id="input-board-thick" value="${state.project.materials.boardThickness}" step="0.1" /></div>
+      <div class="property-group"><label>Dekor korpusu (puste = z projektu):</label><input type="text" id="input-korpus-decor" list="korpus-decor-catalog" value="${escapeHtml(activeModule.materials?.korpusDecor || '')}" placeholder="np. Egger U740 PM" title="Formatki z płyty korpusu tej szafki (i zaznaczonych) dostaną materiał „Korpus: dekor” - osobna pozycja w kosztorysie i osobne arkusze w rozkroju." /><datalist id="korpus-decor-catalog">${catalogLabels(state.project).map(l => `<option value="${escapeHtml(l)}"></option>`).join('')}</datalist></div>
       <div class="property-group"><label>Sposób łączenia:</label><select id="input-join-type"><option value="boki_przelotowe" ${cons.joinType === 'boki_przelotowe' ? 'selected' : ''}>Boki do ziemi (wieńce wpuszczane)</option><option value="wience_przelotowe" ${cons.joinType === 'wience_przelotowe' ? 'selected' : ''}>Wieńce pełne (boki wpuszczane)</option></select></div>
       <div class="property-group"><label>Zamknięcie góry:</label><select id="input-top-type"><option value="pelny" ${cons.topType === 'pelny' ? 'selected' : ''}>Pełny wieniec</option><option value="trawersy_poziom" ${cons.topType === 'trawersy_poziom' ? 'selected' : ''}>Trawersy poziome</option><option value="trawersy_pion" ${cons.topType === 'trawersy_pion' ? 'selected' : ''}>Trawersy pionowe</option></select></div>
       <div class="prop-box" id="traverse-options" style="display: ${cons.topType !== 'pelny' ? 'block' : 'none'};"><div class="property-group mb-0"><label class="fs-xs">Szerokość trawersu (mm):</label><input type="number" id="input-traverse-width" value="${cons.traverseWidth}" /></div></div>
@@ -572,6 +574,16 @@ function setupEventListeners() {
       updateAll();
       initPropertiesPanel();
     });
+  });
+
+  // Dekor korpusu per szafka (core/materialCatalog.js: moduleKorpusDecor) - dla wszystkich zaznaczonych.
+  document.getElementById('input-korpus-decor')?.addEventListener('change', (e) => {
+    const v = e.target.value.trim();
+    getSelectedMods().forEach(mod => {
+      if (v) { mod.materials = { ...(mod.materials || {}), korpusDecor: v }; }
+      else if (mod.materials) { delete mod.materials.korpusDecor; if (!Object.keys(mod.materials).length) delete mod.materials; }
+    });
+    updateAll();
   });
 
   document.querySelectorAll('.input-leg-height-override').forEach(inp => {

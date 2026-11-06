@@ -13,6 +13,7 @@ import { getSlopeCabinetParts, getSlopeFrontParts } from "../core/slopeCabinet.j
 import { getBlindPanel, getBlindStile, blindGeometry, getBlindCorner } from "../core/blindCorner.js";
 import { splitPlinthRun, maxPlinthLength } from "./plinthSplit.js";
 import { shelfStiffener } from "../core/shelfStiffener.js";
+import { KORPUS, korpusCategory, moduleKorpusDecor } from "../core/materialCatalog.js";
 
 export function calculateParts() {
   // Fronty muszą mieć aktualne el.x/y/w/h zanim policzymy z nich formatki.
@@ -159,7 +160,9 @@ export function collectProjectParts() {
       modParts.push(...getFrontsAndDrawers(mod, config).parts);
     }
 
-    allParts.push(...modParts.map(p => ({ ...p, moduleName: mod.name })));
+    // Dekor korpusu tej szafki: formatki z płyty korpusu -> „Korpus: <dekor>” (fronty, szuflady, HDF bez zmian).
+    const korpusCat = korpusCategory(moduleKorpusDecor(mod));
+    allParts.push(...modParts.map(p => ({ ...p, category: p.category === KORPUS ? korpusCat : p.category, moduleName: mod.name })));
   });
 
   // Boki dokładane (core/state.js: addSidePanel) NIE należą do żadnego
@@ -227,11 +230,12 @@ export function collectProjectParts() {
           if (last) {
               // styk = początek dołączanej szafki (względem początku biegu) - tu wolno ciąć
               last.joints.push(along - last.along);
+              last.decors.add(moduleKorpusDecor(mod));
               last.runLen += runLen + (along - (last.along + last.runLen));
               joined = true;
           }
           if (!joined) {
-              plinthRuns.push({ rot, along, runLen, crossPos, y, h, offset, frontCoord, joints: [] });
+              plinthRuns.push({ rot, along, runLen, crossPos, y, h, offset, frontCoord, joints: [], decors: new Set([moduleKorpusDecor(mod)]) });
           }
       });
   });
@@ -241,6 +245,8 @@ export function collectProjectParts() {
   const plinthMax = maxPlinthLength(config.cutPlan);
   plinthRuns.forEach((run, index) => {
     const pieces = splitPlinthRun(run.runLen, run.joints, plinthMax);
+    // Cokół biegnie pod kilkoma szafkami: dekor szafek tylko gdy wszystkie mają ten sam.
+    const plinthCat = run.decors.size === 1 ? korpusCategory([...run.decors][0]) : KORPUS;
     pieces.forEach((len, i) => {
       allParts.push({
         name: pieces.length > 1
@@ -249,7 +255,7 @@ export function collectProjectParts() {
         length: parseFloat(len.toFixed(1)),
         width: parseFloat(run.h.toFixed(1)),
         qty: 1,
-        category: "Korpus",
+        category: plinthCat,
         moduleName: "Elementy zbiorcze"
       });
     });
@@ -463,10 +469,13 @@ function getSidePanelParts(panel, config) {
       length: parseFloat(panel.dimensions?.width) || 0,
       width: parseFloat(panel.dimensions?.depth) || 0,
       qty: 1,
-      category: "Korpus",
+      category: korpusCategory(panel.decor), // wypełniony dekor = „Korpus: <dekor>”, razem z szafkami w tym dekorze
       defaultEdges: [true, false, false, false],
     }];
   }
+  // Bok dokładany z wypełnionym dekorem to płyta korpusu w tym dekorze („Korpus: <dekor>”),
+  // liczona razem z szafkami w tym samym dekorze; bez dekoru - jak dotąd front z cennika frontów.
+  const decor = String(panel.decor || '').trim();
   // Płyta leżąca (szersza niż wysoka - blat biurka, półka ścienna): formatka szerokość × głębokość.
   const w = parseFloat(panel.dimensions?.width) || 0, h = parseFloat(panel.dimensions?.height) || 0;
   const flat = w > h;
@@ -478,7 +487,6 @@ function getSidePanelParts(panel, config) {
     length: flat ? w : h,
     width: parseFloat(panel.dimensions?.depth) || 0,
     qty: 1,
-    category: "Front",
-    materialId: panel.materialId
+    ...(decor ? { category: korpusCategory(decor) } : { category: "Front", materialId: panel.materialId }),
   }];
 }
