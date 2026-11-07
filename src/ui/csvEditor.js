@@ -67,13 +67,14 @@ function openCsvEditorModal(partsList) {
             <details class="fc2-settings" style="margin-top:12px">
               <summary><b>Eksport FC2 / SAS</b> - symbole materiałów i okleiny (zapamiętywane w projekcie)</summary>
               <div class="fc2-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:8px">
-                ${fc2Slots.map(sl => `<label class="field"><span>${escapeHtml(sl.label)}</span><input type="text" class="input fc2-symbol" data-key="${escapeHtml(sl.key)}" value="${escapeHtml(fc2.symbols[sl.key] || '')}" placeholder="${escapeHtml(sl.auto || sl.label)}" title="Puste = ${escapeHtml(sl.auto || sl.label)} (z projektu)"></label>`).join('')}
-                <label class="field"><span>Symbol okleiny</span><input type="text" class="input" id="fc2-edge" value="${escapeHtml(fc2.edgeSymbol)}"></label>
+                ${fc2Slots.map(sl => `<label class="field"><span>${escapeHtml(sl.label)}</span><input type="text" class="input fc2-symbol" data-key="${escapeHtml(sl.key)}" value="${escapeHtml(fc2.symbols[sl.key] || '')}" placeholder="${escapeHtml(sl.auto || sl.label)}" title="Puste = ${escapeHtml(sl.auto || sl.label)} (z projektu)">
+                  <input type="text" class="input fc2-edge-slot" data-key="${escapeHtml(sl.key)}" value="${escapeHtml(fc2.edges[sl.key] || '')}" placeholder="okleina: jak wspólna" title="Okleina tej płyty (puste = wspólna)"></label>`).join('')}
+                <label class="field"><span>Okleina wspólna</span><input type="text" class="input" id="fc2-edge" value="${escapeHtml(fc2.edgeSymbol)}"></label>
                 <label class="field" style="align-self:end"><span><input type="checkbox" id="fc2-bolding" ${fc2.bolding ? 'checked' : ''}> Pogrubienie</span></label>
                 <label class="field" style="align-self:end"><span><input type="checkbox" id="fc2-grain" ${fc2.grain ? 'checked' : ''}> Struktura (tylko SAS)</span></label>
               </div>
               <div class="hint">Okleina: dłuższe krawędzie = góra/dół, krótsze = lewa/prawa. Puste pole symbolu = indeks SAS płyty z projektu (dekor korpusu, płyta frontu z cennika), a gdy płyty nie ma w bazie SAS - jej nazwa; wpisz symbol tylko, żeby to zmienić. Opis bez polskich liter, maks. 50 znaków.
-                SAS: „Kopiuj do SAS” → w eSAS w zamówieniu „Import danych” → „Wklej ze schowka” → „Importuj”. Symbol okleiny musi być taki jak w SAS.</div>
+                SAS: „Kopiuj do SAS” → w eSAS w zamówieniu „Import danych” → „Wklej ze schowka” → „Importuj”. Okleina dla SAS w pełnym zapisie eSAS „symbol/indeks”, np. 76873_23/2_GL_BIALE/963017-009 (podejrzysz go po ręcznym wybraniu okleiny w zamówieniu eSAS).</div>
             </details>`,
         footer: [
             { label: 'Dodaj pusty wiersz', icon: 'plus', onClick: () => addRow() },
@@ -199,6 +200,11 @@ function openCsvEditorModal(partsList) {
         root.querySelectorAll('.fc2-symbol').forEach(inp => { if (inp.value.trim()) symbols[inp.getAttribute('data-key')] = inp.value.trim(); });
         const settings = { symbols: { ...getFc2Settings(state.project).symbols, ...symbols }, edgeSymbol: root.querySelector('#fc2-edge').value.trim(), bolding: root.querySelector('#fc2-bolding').checked, grain: root.querySelector('#fc2-grain').checked };
         root.querySelectorAll('.fc2-symbol').forEach(inp => { if (!inp.value.trim()) delete settings.symbols[inp.getAttribute('data-key')]; });
+        settings.edges = { ...getFc2Settings(state.project).edges };
+        root.querySelectorAll('.fc2-edge-slot').forEach(inp => {
+            const k = inp.getAttribute('data-key');
+            if (inp.value.trim()) settings.edges[k] = inp.value.trim(); else delete settings.edges[k];
+        });
         state.project.fc2Export = settings;
         scheduleCheckpoint();
 

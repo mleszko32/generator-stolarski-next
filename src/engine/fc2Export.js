@@ -71,22 +71,36 @@ export function partBoardName(part, project) {
   return String(decors[category] || "").trim();
 }
 
-// Indeks SAS płyty z bazy dekorów (nazwa z katalogu, z „Egger ” albo bez); brak w bazie = "".
-const SAS_INDEX = new Map(EGGER_SAS_DECORS.map((d) => [d.name.toLowerCase(), d.sas]));
-export function sasIndex(boardName) {
-  return SAS_INDEX.get(String(boardName || "").trim().replace(/^Egger\s+/i, "").toLowerCase()) || "";
+// Płyty HDF z bazy (core/materialCatalog.js) -> symbol w eSAS (z katalogu materiałów eSAS, 11.2026).
+const HDF_ESAS = {
+  "hdf biały 3 mm": "HDF110PE-BIALA_JEDNOSTRONN_GR_3/HDF000-001",
+  "hdf 110 d-pe biały korpusowy 3mm": "HDF110PE-BIALA_JEDNOSTRONN_GR_3/HDF000-001",
+  "hdf kronospan 112 pe jasny szary 3mm": "HDF112PE_SZARY_GR3/HDF000-002",
+  "hdf kronospan 164 pe antracyt 3mm": "PLYTA_HDF_KRONOSPAN_164_PE_ANTRACYT_2/HDF164-000",
+  "hdf kronospan 190 pe czarny 3mm": "HDF190PE_CZARNA_GR3/HDF000-003",
+  "hdf woodeco hd3000 dąb sonoma 3mm": "PLYTA_HDF_WOODECO_HD3000_DAB_SONOMA_2/346586-930",
+  "hdf woodeco hd3016 dąb artisan ii 3mm": "PLYTA_HDF_WOODECO_HD3016_DAB_ARTISAN/348634-340",
+  "hdf woodeco hu1506 kaszmirowy beż 3mm": "PLYTA_HDF_WOODECO_HU1506_KASZMIROWY_B/348647-270",
+};
+
+// Symbol płyty w eSAS („symbol/indeks”) dla nazwy z bazy dekorów (z „Egger ” albo bez); brak = "".
+const ESAS = new Map(EGGER_SAS_DECORS.filter((d) => d.esas).map((d) => [d.name.toLowerCase(), d.esas]));
+export function esasSymbol(boardName) {
+  const key = String(boardName || "").trim().replace(/^Egger\s+/i, "").toLowerCase();
+  return ESAS.get(key) || HDF_ESAS[key] || "";
 }
 
-// Symbol płyty bez ręcznego wpisu: indeks SAS z bazy, inaczej nazwa płyty z projektu.
+// Symbol płyty bez ręcznego wpisu: symbol eSAS z bazy, inaczej nazwa płyty z projektu.
 export function autoSymbol(part, project) {
   const board = partBoardName(part, project);
-  return sasIndex(board) || board;
+  return esasSymbol(board) || board;
 }
 
 export function getFc2Settings(project) {
   const s = (project && project.fc2Export) || {};
   return {
     symbols: { ...(s.symbols || {}) },
+    edges: { ...(s.edges || {}) },
     edgeSymbol: s.edgeSymbol ?? FC2_DEFAULTS.edgeSymbol,
     bolding: !!s.bolding,
     grain: !!s.grain,
@@ -99,12 +113,13 @@ export function getFc2Settings(project) {
 // format "sas" = import formatek w eSAS (sassc.erozkroje.pl, „Import danych” → wklej ze schowka).
 export function buildFc2Csv(rows, project, settings = getFc2Settings(project), format = "fc2") {
   const slots = new Map(fc2SymbolSlots(rows, project).map((s) => [s.key, s.label]));  // zapas, gdy brak płyty
-  const edge = fc2Text(settings.edgeSymbol);
   const lines = rows
     .filter((r) => (parseFloat(r.length) || 0) > 0 && (parseFloat(r.width) || 0) > 0 && (parseInt(r.qty, 10) || 0) > 0)
     .map((r) => {
       const key = fc2SymbolKey(r, project);
       const symbol = fc2Text(settings.symbols[key] || autoSymbol(r, project) || slots.get(key) || key);
+      // okleina: osobna dla płyty (settings.edges[klucz]), inaczej wspólna
+      const edge = fc2Text((settings.edges && settings.edges[key]) || settings.edgeSymbol);
       const [l1, l2, w1, w2] = r.edges || [false, false, false, false];
       const e = (on) => (on ? edge : "");
       const head = [

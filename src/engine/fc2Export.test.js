@@ -54,17 +54,21 @@ describe("buildFc2Csv", () => {
     const csv = buildFc2Csv([{ category: "Korpus", name: "Bok", length: 720, width: 560, qty: 2, edges: [true, false, false, false] }],
       p, getFc2Settings(p), "sas");
     expect(csv).toBe("U702 ST9 18;720;560;2;Bok;;;PCV_2;;1;;;1\r\n");
+    const p2 = project({ symbols: { Korpus: "U702" }, edges: { Korpus: "76873_23/2_GL_BIALE/963017-009" } });
+    expect(buildFc2Csv([{ category: "Korpus", name: "Bok", length: 720, width: 560, qty: 1, edges: [true, false, false, false] }], p2, getFc2Settings(p2), "sas"))
+      .toBe("U702;720;560;1;Bok;;;76873_23/2_GL_BIALE/963017-009;;0;;;0\r\n");
   });
-  it("bez wpisu symbol = indeks SAS płyty z projektu (dekor korpusu, lakier -> MDF), inaczej nazwa płyty", () => {
-    const p = { pricing: { frontMaterials: [{ id: "l", name: "Lakier" }] }, materials: { decors: { Plecy: "HDF biały 3 mm" } } };
-    expect(autoSymbol({ category: "Korpus: Egger W908/W908 SM/SM-MB Biały bazowy 19mm 2800x2070 Dwustronna E1E05 TSCA" }, p)).toBe("145909-300");
-    expect(autoSymbol({ category: "Front", materialId: "l" }, p)).toBe("145909-200");
-    expect(autoSymbol({ category: "Plecy" }, p)).toBe("HDF biały 3 mm");
-    expect(autoSymbol({ category: "Szuflada" }, p)).toBe("");
+  it("bez wpisu symbol = symbol eSAS płyty z projektu (dekor korpusu, lakier -> MDF, HDF), inaczej nazwa płyty", () => {
+    const p = { pricing: { frontMaterials: [{ id: "l", name: "Lakier" }] }, materials: { decors: { Plecy: "HDF biały 3 mm", Szuflada: "Coś spoza bazy" } } };
+    expect(autoSymbol({ category: "Korpus: Egger W908/W908 SM/SM-MB Biały bazowy 19mm 2800x2070 Dwustronna E1E05 TSCA" }, p)).toBe("MDF_W908_SM/W908_SM-MB_DO_GL._FREZGR/145909-300");
+    expect(autoSymbol({ category: "Front", materialId: "l" }, p)).toBe("MDF_W908_SM/W908_SM-MB_DO_GL._FREZ._G/145909-200");
+    expect(autoSymbol({ category: "Plecy" }, p)).toBe("HDF110PE-BIALA_JEDNOSTRONN_GR_3/HDF000-001");
+    expect(autoSymbol({ category: "Szuflada" }, p)).toBe("Coś spoza bazy");
+    expect(autoSymbol({ category: "Inne" }, p)).toBe("");
     const csv = buildFc2Csv([{ category: "Front", materialId: "l", name: "Drzwi", length: 700, width: 500, qty: 1, edges: all }], p, getFc2Settings(p), "sas");
-    expect(csv.startsWith("145909-200;700;500;1;Drzwi;")).toBe(true);
+    expect(csv.startsWith("MDF_W908_SM/W908_SM-MB_DO_GL._FREZ._G/145909-200;700;500;1;Drzwi;")).toBe(true);
   });
   it("domyślne ustawienia", () => {
-    expect(getFc2Settings({})).toEqual({ symbols: {}, edgeSymbol: "PCV_2", bolding: false, grain: false });
+    expect(getFc2Settings({})).toEqual({ symbols: {}, edgeSymbol: "PCV_2", bolding: false, grain: false, edges: {} });
   });
 });
