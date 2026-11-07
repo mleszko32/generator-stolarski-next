@@ -213,10 +213,10 @@ export const HELP_SECTIONS = [
         <li><b>Formatki</b> - zbiorcza lista formatek z okleiną (kliknij krawędź ikonki, żeby ją
         przełączyć; środek ikonki = dookoła / brak) i eksport CSV; w tym samym oknie „Zapisz plik FC2” - plik importu FC2 (symbole materiałów i okleiny wpisujesz raz, zapamiętują się w projekcie), a „Kopiuj do SAS” - te same formatki
         w układzie eSAS do schowka: w zamówieniu SAS „Import danych” → „Wklej ze schowka” → „Importuj” (symbole płyt eSAS biorą się z dekorów projektu,
-        formatki idą bez oklejania; „Struktura” zaznacz dla płyt z usłojeniem). Na górze okna lista mebli - odznaczone meble nie idą
-        do tabeli ani do eksportu (wybór zapamiętuje się w projekcie). Mebel wstawiony z pliku to jedna pozycja, opis formatki w FC2/SAS
+        formatki idą bez oklejania; „Struktura” zaznacz dla płyt z usłojeniem). Na górze okna lista grup (grupy, „Bez grupy” - szafki i boki niepołączone, „Elementy zbiorcze” - cokół, blaty) - odznaczone nie idą
+        do tabeli ani do eksportu (wybór zapamiętuje się w projekcie). Mebel wstawiony z pliku to jedna grupa, opis formatki w FC2/SAS
         zaczyna się od nazwy mebla (np. „S.6.2 Bok”), a jednakowe formatki sumują się tylko w obrębie mebla.</li>
-        <li><b>Rozkrój i etykiety</b> - plan rozkroju na arkusze, etykiety do druku.</li>
+        <li><b>Rozkrój i etykiety</b> - plan rozkroju na arkusze, etykiety do druku. Nad wynikiem ten sam wybór grup co w eksporcie formatek.</li>
         <li><b>Rysunki 2D</b> - rysunki formatek z wierceniami (przycisk „Drukuj… (A4)” otwiera listę formatek - boki, przegrody, wieńce, fronty z nawiertami zawiasów i szuflad - zaznaczone drukują się razem, każda na swoich kartkach).</li>
         <li><b>Skrzynki szuflad</b> - rysunki skrzynek drewnianych (MOVENTO) z otworami łączników.</li>
         <li><b>Instrukcje montażu</b> - kolejność składania i rysunki każdej szafki. Po zaznaczeniu

@@ -117,8 +117,6 @@ export function getFc2Settings(project) {
     edgeSymbol: s.edgeSymbol ?? FC2_DEFAULTS.edgeSymbol,
     bolding: !!s.bolding,
     grain: !!s.grain,
-    // meble odznaczone w Menedżerze formatek (klucze z core/furnitureGroups.js)
-    excludedFurniture: Array.isArray(s.excludedFurniture) ? [...s.excludedFurniture] : [],
   };
 }
 

@@ -1,7 +1,8 @@
 // src/ui/csvEditor.js
 // Edytor i eksport CSV listy formatek (przycisk "Eksport CSV" w oknie Produkcja).
 import { collectProjectParts } from "../engine/cabinet.js";
-import { aggregateByFurniture, furnitureChoices } from "../core/furnitureGroups.js";
+import { aggregateByFurniture } from "../core/furnitureGroups.js";
+import { furnitureFilterHtml, bindFurnitureFilter, currentExcluded } from "./furnitureFilter.js";
 import { state } from "../core/state.js";
 import { escapeHtml, downloadFile } from "../utils/dom.js";
 import { openModal, showAlert } from "../utils/modal.js";
@@ -43,8 +44,7 @@ function openCsvEditorModal(rawParts) {
     let displayFilter = 'all';
     const rules = state.project.edgeBanding;
     const fc2 = getFc2Settings(state.project);
-    const choices = furnitureChoices(state.project, rawParts);
-    let excluded = fc2.excludedFurniture.filter(k => choices.some(c => c.key === k));
+    let excluded = currentExcluded(rawParts);
     const fc2Slots = fc2SymbolSlots(aggregateByFurniture(rawParts, state.project), state.project);
 
     function rowsHtml() {
@@ -58,13 +58,7 @@ function openCsvEditorModal(rawParts) {
             describeEdges(getPartEdges(p, rules)), { materialId: p.materialId, edges: getPartEdges(p, rules), furniture: p.furnitureLabel }
         )).join('');
     }
-    const furnitureHtml = choices.length > 1 ? `
-            <div class="field"><span>Meble w zestawieniu (odznaczone nie idą do tabeli ani do CSV / FC2 / SAS):</span></div>
-            <div class="csv-furniture">
-              ${choices.map(c => `<label><input type="checkbox" class="csv-furn-check" data-key="${escapeHtml(c.key)}" ${excluded.includes(c.key) ? '' : 'checked'}> ${escapeHtml(c.label)}</label>`).join('')}
-              <button type="button" class="btn btn-sm" id="csv-furn-all">Wszystkie</button>
-              <button type="button" class="btn btn-sm" id="csv-furn-none">Żaden</button>
-            </div>` : '';
+    const furnitureHtml = furnitureFilterHtml(rawParts);
 
     const dlg = openModal({
         title: 'Menedżer formatek (Pre-flight)',
@@ -218,7 +212,7 @@ function openCsvEditorModal(rawParts) {
     function collectFc2() {
         const symbols = {};
         root.querySelectorAll('.fc2-symbol').forEach(inp => { if (inp.value.trim()) symbols[inp.getAttribute('data-key')] = inp.value.trim(); });
-        const settings = { excludedFurniture: excluded, symbols: { ...getFc2Settings(state.project).symbols, ...symbols }, edgeSymbol: root.querySelector('#fc2-edge').value.trim(), bolding: root.querySelector('#fc2-bolding').checked, grain: root.querySelector('#fc2-grain').checked };
+        const settings = { symbols: { ...getFc2Settings(state.project).symbols, ...symbols }, edgeSymbol: root.querySelector('#fc2-edge').value.trim(), bolding: root.querySelector('#fc2-bolding').checked, grain: root.querySelector('#fc2-grain').checked };
         root.querySelectorAll('.fc2-symbol').forEach(inp => { if (!inp.value.trim()) delete settings.symbols[inp.getAttribute('data-key')]; });
         settings.edges = { ...getFc2Settings(state.project).edges };
         root.querySelectorAll('.fc2-edge-slot').forEach(inp => {
@@ -243,25 +237,14 @@ function openCsvEditorModal(rawParts) {
         return { rows, settings };
     }
 
-    // Zmiana wyboru mebli przelicza tabelę od nowa (ręczne poprawki w wierszach przepadają)
-    // i zapamiętuje wybór w projekcie.
-    function setExcluded(next) {
+    // Zmiana wyboru grup przelicza tabelę od nowa (ręczne poprawki w wierszach przepadają);
+    // wybór zapisuje się w projekcie - ten sam w planie rozkroju.
+    bindFurnitureFilter(root, rawParts, (next) => {
         excluded = next;
-        state.project.fc2Export = { ...(state.project.fc2Export || {}), excludedFurniture: excluded };
-        scheduleCheckpoint();
-        root.querySelectorAll('.csv-furn-check').forEach(cb => { cb.checked = !excluded.includes(cb.getAttribute('data-key')); });
         root.querySelector('#csv-editor-tbody').innerHTML = rowsHtml();
         attachRowEvents();
         applyDisplayFilter();
-    }
-    root.querySelectorAll('.csv-furn-check').forEach(cb => {
-        cb.addEventListener('change', () => {
-            const key = cb.getAttribute('data-key');
-            setExcluded(cb.checked ? excluded.filter(k => k !== key) : [...excluded, key]);
-        });
     });
-    root.querySelector('#csv-furn-all')?.addEventListener('click', () => setExcluded([]));
-    root.querySelector('#csv-furn-none')?.addEventListener('click', () => setExcluded(choices.map(c => c.key)));
 
     renderFilterButtons();
     attachRowEvents();

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { commonNamePrefix, furnitureGroups, sharedFurnitureKey, aggregateByFurniture, furnitureChoices, COLLECTIVE_KEY } from "./furnitureGroups.js";
+import { commonNamePrefix, furnitureGroups, sharedFurnitureKey, aggregateByFurniture, furnitureChoices, filterByChoice, getExcludedChoices, COLLECTIVE_KEY, UNGROUPED_KEY } from "./furnitureGroups.js";
 
 const project = {
   modules: [
@@ -75,5 +75,22 @@ describe("grupa z samych paneli", () => {
     const { groups, panelKey } = furnitureGroups(p);
     expect(groups.map((g) => g.label)).toEqual(["Szafka 1", "Panel ścienny"]);
     expect(panelKey.get("b")).toBe("w");
+  });
+});
+
+describe("wybór po grupach", () => {
+  const parts = [
+    { category: "Korpus", name: "Bok", length: 700, width: 560, qty: 2, moduleName: "Szafka 7", furnitureKey: "c1" },
+    { category: "Korpus", name: "Bok", length: 700, width: 560, qty: 2, moduleName: "S.6.2 Nadstawka 1", furnitureKey: "g1" },
+    { category: "Front", name: "Bok dokładany", length: 2600, width: 600, qty: 1, moduleName: "Bok", furnitureKey: "p3" },
+  ];
+  it("szafki i boki bez grupy to jedna pozycja „Bez grupy”, ale opis zostaje z nazwą szafki", () => {
+    expect(furnitureChoices(project, parts).map((c) => c.key)).toEqual(["g1", UNGROUPED_KEY]);
+    expect(filterByChoice(parts, project, [UNGROUPED_KEY]).map((p) => p.furnitureKey)).toEqual(["g1"]);
+    expect(aggregateByFurniture(parts, project)[0].furnitureLabel).toBe("Szafka 7");
+  });
+  it("odznaczenia z projektu, ze starym polem jako zapasem", () => {
+    expect(getExcludedChoices({ fc2Export: { excludedFurniture: ["x"] } })).toEqual(["x"]);
+    expect(getExcludedChoices({ partsSelection: { excluded: ["y"] }, fc2Export: { excludedFurniture: ["x"] } })).toEqual(["y"]);
   });
 });

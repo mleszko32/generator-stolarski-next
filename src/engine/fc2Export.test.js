@@ -76,7 +76,7 @@ describe("buildFc2Csv", () => {
     expect(csv.startsWith("MDF_W908_SM/W908_SM-MB_DO_GL._FREZ._G/145909-200;700;500;1;Drzwi;")).toBe(true);
   });
   it("domyślne ustawienia", () => {
-    expect(getFc2Settings({})).toEqual({ symbols: {}, edgeSymbol: "PCV_2", bolding: false, grain: false, edges: {}, excludedFurniture: [] });
+    expect(getFc2Settings({})).toEqual({ symbols: {}, edgeSymbol: "PCV_2", bolding: false, grain: false, edges: {} });
   });
 });
 

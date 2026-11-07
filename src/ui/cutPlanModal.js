@@ -10,6 +10,8 @@ import { escapeHtml, openHtmlWindow } from "../utils/dom.js";
 import { state } from "../core/state.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { collectProjectParts } from "../engine/cabinet.js";
+import { filterByChoice } from "../core/furnitureGroups.js";
+import { furnitureFilterHtml, bindFurnitureFilter, currentExcluded } from "./furnitureFilter.js";
 import { nestParts } from "../engine/nesting.js";
 import { isEdgeBanded, getPartEdges, describeEdges, totalEdgeBandingMeters, EDGE_BANDING_RESERVE } from "../engine/edgeBanding.js";
 import { edgeIconSvg } from "./edgeBandingUi.js";
@@ -26,7 +28,9 @@ function getSettings() {
 // Rozwija formatki na pojedyncze sztuki z numerem (P001...) - ten sam numer
 // jest na schemacie rozkroju i na etykiecie.
 function buildPieces() {
-  const raw = collectProjectParts().filter(p => p.category !== 'Blat').slice().sort((a, b) => {
+  // tylko zaznaczone grupy (ui/furnitureFilter.js - ten sam wybór co w Menedżerze formatek)
+  const all = collectProjectParts().filter(p => p.category !== 'Blat');
+  const raw = filterByChoice(all, state.project, currentExcluded(all)).slice().sort((a, b) => {
     const ca = CATEGORY_ORDER.indexOf(baseCategory(a.category)), cb = CATEGORY_ORDER.indexOf(baseCategory(b.category));
     return (ca === -1 ? 99 : ca) - (cb === -1 ? 99 : cb)
       || String(a.moduleName).localeCompare(String(b.moduleName), 'pl')
@@ -211,6 +215,8 @@ function printLabels(plan) {
 // Produkcja (ui/productionHub.js). onClose != null dodaje przycisk Zamknij.
 export function mountCutPlan(modal, onClose = null) {
   const s = getSettings();
+  const filterParts = collectProjectParts().filter(p => p.category !== 'Blat');
+  const filterHtml = furnitureFilterHtml(filterParts);
   modal.innerHTML = `
     <div class="hub-bar">
       <div><h3>Rozkrój i etykiety</h3><div class="hub-sub">Układ formatek na arkuszach (cięcia na wylot, do wykonania na pilarce), zużycie okleiny wg wyboru krawędzi i etykiety z kodem QR.</div></div>
@@ -228,6 +234,7 @@ export function mountCutPlan(modal, onClose = null) {
         <div class="field mb-0"><label>Obrzeże arkusza (mm)</label><input type="number" id="cp-trim" value="${s.trim}" /></div>
       </div>
       <label class="hub-sub row-center" style="margin-top:8px"><input type="checkbox" id="cp-rotate-fronts" ${s.rotateFronts ? 'checked' : ''} /> Pozwól obracać fronty (bez pilnowania słojów)</label>
+      ${filterHtml ? `<div style="margin-top:10px">${filterHtml}</div>` : ''}
     </div>
     <div id="cp-results"></div>
   `;
@@ -270,6 +277,7 @@ export function mountCutPlan(modal, onClose = null) {
   bind('#cp-kerf', 'kerf', num(0));
   bind('#cp-trim', 'trim', num(0));
   bind('#cp-rotate-fronts', 'rotateFronts', el => !!el.checked);
+  bindFurnitureFilter(modal, filterParts, () => render());
 
   modal.querySelector('#cp-print-plan').addEventListener('click', () => plan && plan.pieces.length && printCutPlan(plan));
   modal.querySelector('#cp-print-labels').addEventListener('click', () => plan && plan.pieces.length && printLabels(plan));

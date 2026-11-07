@@ -31,8 +31,8 @@ export function furnitureGroups(project) {
   const byKey = new Map();
   const moduleKey = new Map();
   const panelKey = new Map();
-  const add = (key, label) => {
-    if (!byKey.has(key)) { const g = { key, label }; byKey.set(key, g); groups.push(g); }
+  const add = (key, label, grouped = false) => {
+    if (!byKey.has(key)) { const g = { key, label, grouped }; byKey.set(key, g); groups.push(g); }
     return key;
   };
 
@@ -49,7 +49,7 @@ export function furnitureGroups(project) {
       const mods = grouped.get(m.groupId);
       if (!byKey.has(m.groupId)) {
         const prefix = mods.length > 1 ? commonNamePrefix(mods.map((x) => x.name)) : "";
-        add(m.groupId, prefix || mods[0].name || "Mebel");
+        add(m.groupId, prefix || mods[0].name || "Mebel", true);
         if (prefix) prefixes.push({ prefix, key: m.groupId });
       }
       moduleKey.set(m.id, m.groupId);
@@ -65,7 +65,7 @@ export function furnitureGroups(project) {
     if (p.groupId && !byKey.has(p.groupId)) {
       const members = panels.filter((x) => x.groupId === p.groupId);
       const prefix = members.length > 1 ? commonNamePrefix(members.map((x) => x.name)) : "";
-      add(p.groupId, prefix || String(p.name || "").trim() || "Grupa paneli");
+      add(p.groupId, prefix || String(p.name || "").trim() || "Grupa paneli", true);
     }
     if (p.groupId) { panelKey.set(p.id, p.groupId); return; }
     const name = String(p.name || "").trim();
@@ -83,24 +83,56 @@ export function sharedFurnitureKey(keys) {
   return set.size === 1 ? [...set][0] : COLLECTIVE_KEY;
 }
 
-// Lista mebli do wyboru: meble projektu + „Elementy zbiorcze”, jeśli jakaś formatka do nich trafiła.
+export const UNGROUPED_KEY = "bez-grupy";
+const UNGROUPED_LABEL = "Bez grupy";
+
+// Pozycja na liście wyboru, do której należy mebel: grupa (szafki/panele ze wspólnym groupId),
+// „Bez grupy” (pojedyncze szafki i boki) albo „Elementy zbiorcze”.
+function choiceKeyMap(project) {
+  const { groups } = furnitureGroups(project);
+  const map = new Map(groups.map((g) => [g.key, g.grouped ? g.key : UNGROUPED_KEY]));
+  return (fk) => (fk === COLLECTIVE_KEY ? COLLECTIVE_KEY : map.get(fk) || UNGROUPED_KEY);
+}
+
+// Lista wyboru do zestawień (lista formatek, SAS/FC2, plan rozkroju): grupy + „Bez grupy” +
+// „Elementy zbiorcze” - tylko te, do których trafiła jakaś formatka.
 export function furnitureChoices(project, parts) {
   const { groups } = furnitureGroups(project);
-  const used = new Set(parts.map((p) => p.furnitureKey || COLLECTIVE_KEY));
-  const list = groups.filter((g) => used.has(g.key));
+  const choiceOf = choiceKeyMap(project);
+  const used = new Set(parts.map((p) => choiceOf(p.furnitureKey || COLLECTIVE_KEY)));
+  const list = groups.filter((g) => g.grouped && used.has(g.key)).map(({ key, label }) => ({ key, label }));
+  if (used.has(UNGROUPED_KEY)) list.push({ key: UNGROUPED_KEY, label: UNGROUPED_LABEL });
   if (used.has(COLLECTIVE_KEY)) list.push({ key: COLLECTIVE_KEY, label: COLLECTIVE_LABEL });
   return list;
 }
 
-// Sumowanie formatek w obrębie mebla (klucz jak w calculateAllProjectParts + mebel), tylko
-// z mebli nie wykluczonych. Wiersz dostaje furnitureLabel (do opisu w FC2/SAS) i modules.
-export function aggregateByFurniture(parts, project, excluded = []) {
+// Formatki tylko z zaznaczonych pozycji listy wyboru (excluded = klucze odznaczonych).
+export function filterByChoice(parts, project, excluded = []) {
+  if (!excluded.length) return parts;
   const skip = new Set(excluded);
-  const labels = new Map(furnitureChoices(project, parts).map((g) => [g.key, g.label]));
+  const choiceOf = choiceKeyMap(project);
+  return parts.filter((p) => !skip.has(choiceOf(p.furnitureKey || COLLECTIVE_KEY)));
+}
+
+// Odznaczone pozycje zapamiętane w projekcie - wspólne dla listy formatek i planu rozkroju
+// (wcześniej fc2Export.excludedFurniture).
+export function getExcludedChoices(project) {
+  const s = (project && project.partsSelection) || {};
+  const legacy = project && project.fc2Export && project.fc2Export.excludedFurniture;
+  const list = Array.isArray(s.excluded) ? s.excluded : Array.isArray(legacy) ? legacy : [];
+  return [...list];
+}
+export function setExcludedChoices(project, excluded) {
+  project.partsSelection = { ...(project.partsSelection || {}), excluded: [...excluded] };
+}
+
+// Sumowanie formatek w obrębie mebla (klucz jak w calculateAllProjectParts + mebel), tylko
+// z zaznaczonych pozycji wyboru. Wiersz dostaje furnitureLabel (do opisu w FC2/SAS) i modules.
+export function aggregateByFurniture(parts, project, excluded = []) {
+  const labels = new Map(furnitureGroups(project).groups.map((g) => [g.key, g.label]));
   const out = new Map();
-  parts.forEach((p) => {
+  filterByChoice(parts, project, excluded).forEach((p) => {
     const fk = p.furnitureKey || COLLECTIVE_KEY;
-    if (skip.has(fk)) return;
     const key = `${fk}_${p.category}_${p.name}_${p.length}_${p.width}_${p.materialId || ""}`;
     const row = out.get(key);
     if (row) {
