@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildFc2Csv, fc2Text, fc2SymbolKey, fc2SymbolSlots, getFc2Settings } from "./fc2Export.js";
+import { buildFc2Csv, fc2Text, fc2SymbolKey, fc2SymbolSlots, getFc2Settings, autoSymbol } from "./fc2Export.js";
 
 const project = (fc2Export) => ({
   pricing: { frontMaterials: [{ id: "default", name: "Standard" }, { id: "lakier", name: "Lakier" }] },
@@ -22,7 +22,7 @@ describe("symbole materiałów", () => {
   });
   it("pozycje do wpisania w kolejności kategorii", () => {
     const slots = fc2SymbolSlots([{ category: "Plecy" }, { category: "Front", materialId: "lakier" }, { category: "Korpus" }], project());
-    expect(slots).toEqual([
+    expect(slots.map(({ key, label }) => ({ key, label }))).toEqual([
       { key: "Korpus", label: "Korpus" },
       { key: "Front:lakier", label: "Front - Lakier" },
       { key: "Plecy", label: "Plecy" },
@@ -49,7 +49,22 @@ describe("buildFc2Csv", () => {
       { category: "Korpus", name: "W550", length: 514, width: 480, qty: 12, edges: all }], project({ bolding: true }));
     expect(csv).toBe("Korpus;514;480;12;W550;PCV_2;PCV_2;PCV_2;PCV_2;;;1\r\n");
   });
+  it("format SAS: 13 kolumn - struktura (10) i pogrubianie (13)", () => {
+    const p = project({ symbols: { Korpus: "U702 ST9 18" }, grain: true, bolding: true });
+    const csv = buildFc2Csv([{ category: "Korpus", name: "Bok", length: 720, width: 560, qty: 2, edges: [true, false, false, false] }],
+      p, getFc2Settings(p), "sas");
+    expect(csv).toBe("U702 ST9 18;720;560;2;Bok;;;PCV_2;;1;;;1\r\n");
+  });
+  it("bez wpisu symbol = indeks SAS płyty z projektu (dekor korpusu, lakier -> MDF), inaczej nazwa płyty", () => {
+    const p = { pricing: { frontMaterials: [{ id: "l", name: "Lakier" }] }, materials: { decors: { Plecy: "HDF biały 3 mm" } } };
+    expect(autoSymbol({ category: "Korpus: Egger W908/W908 SM/SM-MB Biały bazowy 19mm 2800x2070 Dwustronna E1E05 TSCA" }, p)).toBe("145909-300");
+    expect(autoSymbol({ category: "Front", materialId: "l" }, p)).toBe("145909-200");
+    expect(autoSymbol({ category: "Plecy" }, p)).toBe("HDF biały 3 mm");
+    expect(autoSymbol({ category: "Szuflada" }, p)).toBe("");
+    const csv = buildFc2Csv([{ category: "Front", materialId: "l", name: "Drzwi", length: 700, width: 500, qty: 1, edges: all }], p, getFc2Settings(p), "sas");
+    expect(csv.startsWith("145909-200;700;500;1;Drzwi;")).toBe(true);
+  });
   it("domyślne ustawienia", () => {
-    expect(getFc2Settings({})).toEqual({ symbols: {}, edgeSymbol: "PCV_2", bolding: false });
+    expect(getFc2Settings({})).toEqual({ symbols: {}, edgeSymbol: "PCV_2", bolding: false, grain: false });
   });
 });

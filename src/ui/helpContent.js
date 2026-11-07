@@ -207,7 +207,9 @@ export const HELP_SECTIONS = [
       <p>Tryb <b>Produkcja</b> (albo przycisk <b>Produkcja i raporty</b>) otwiera hub z sekcjami:</p>
       <ul>
         <li><b>Formatki</b> - zbiorcza lista formatek z okleiną (kliknij krawędź ikonki, żeby ją
-        przełączyć; środek ikonki = dookoła / brak) i eksport CSV; w tym samym oknie „Zapisz plik FC2” - plik importu FC2 (symbole materiałów i okleiny wpisujesz raz, zapamiętują się w projekcie).</li>
+        przełączyć; środek ikonki = dookoła / brak) i eksport CSV; w tym samym oknie „Zapisz plik FC2” - plik importu FC2 (symbole materiałów i okleiny wpisujesz raz, zapamiętują się w projekcie), a „Kopiuj do SAS” - te same formatki
+        w układzie eSAS do schowka: w zamówieniu SAS „Import danych” → „Wklej ze schowka” → „Importuj” (symbole płyt i okleiny jak w SAS,
+        „Struktura” zaznacz dla płyt z usłojeniem).</li>
         <li><b>Rozkrój i etykiety</b> - plan rozkroju na arkusze, etykiety do druku.</li>
         <li><b>Rysunki 2D</b> - rysunki formatek z wierceniami (przycisk „Drukuj… (A4)” otwiera listę formatek - boki, przegrody, wieńce, fronty z nawiertami zawiasów i szuflad - zaznaczone drukują się razem, każda na swoich kartkach).</li>
         <li><b>Skrzynki szuflad</b> - rysunki skrzynek drewnianych (MOVENTO) z otworami łączników.</li>
