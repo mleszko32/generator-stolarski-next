@@ -6,6 +6,7 @@ import { lacquerSuggestions } from "../core/lacquerColors.js";
 import { applyPanelDecorThickness } from "../core/boardThickness.js";
 import { catalogLabels } from "../core/materialCatalog.js";
 import { state } from "../core/state.js";
+import { furnitureGroups } from "../core/furnitureGroups.js";
 import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
 import { escapeHtml } from "../utils/dom.js";
@@ -71,6 +72,7 @@ function renderBlendaProperties(rightSidebar, panel) {
     `)}
 
     ${sectionHtml('material', materialSectionHtml(panel))}
+    ${groupSectionHtml(panel)}
   `;
   bindSidePanelInputs(rightSidebar, panel);
   const flangeSel = document.getElementById('input-blenda-flange');
@@ -105,8 +107,32 @@ function renderHorizontalPanelProperties(rightSidebar, panel) {
         <input type="text" id="input-side-decor" list="side-decor-catalog" value="${escapeHtml(panel.decor || '')}" placeholder="pusty = dekor korpusu" />${decorDatalistHtml()}
       </div>
     `)}
+    ${groupSectionHtml(panel)}
   `;
   bindSidePanelInputs(rightSidebar, panel);
+}
+
+// Grupa (mebel), do której należy bok / blenda / panel: przesuwa się razem z jej szafkami i trafia
+// do tego samego mebla na liście formatek. Grupy tworzy się z szafek („Połącz zaznaczone w grupę”).
+function groupSectionHtml(panel) {
+  const moduleGroups = new Set(state.project.modules.map(m => m.groupId).filter(Boolean));
+  const fg = furnitureGroups(state.project);
+  const groups = fg.groups.filter(g => moduleGroups.has(g.key));
+  // bez groupId, ale z nazwą mebla na początku - na liście formatek i tak jest pod tym meblem
+  const byName = !panel.groupId && groups.find(g => g.key === fg.panelKey.get(panel.id));
+  return sectionHtml('grupa', `
+    <h3>Grupa (mebel)</h3>
+    <div class="property-group">
+      <label>Należy do grupy szafek:</label>
+      <select id="input-side-group" ${groups.length ? '' : 'disabled'}>
+        <option value="">${byName ? `— bez grupy (formatki: ${escapeHtml(byName.label)} po nazwie) —` : '— bez grupy —'}</option>
+        ${groups.map(g => `<option value="${escapeHtml(g.key)}" ${panel.groupId === g.key ? 'selected' : ''}>${escapeHtml(g.label)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="hint">${groups.length
+      ? 'Element przesuwa się razem z szafkami grupy, a na liście formatek i w SAS idzie pod tym meblem.'
+      : 'Najpierw połącz szafki w grupę (Shift + klik, „Połącz zaznaczone w grupę”), potem przypisz tu blendę albo bok.'}</div>
+  `);
 }
 
 export function renderSidePanelProperties(rightSidebar, panel) {
@@ -132,6 +158,7 @@ export function renderSidePanelProperties(rightSidebar, panel) {
     `)}
 
     ${sectionHtml('material', materialSectionHtml(panel))}
+    ${groupSectionHtml(panel)}
   `;
 
   bindSidePanelInputs(rightSidebar, panel);
@@ -150,6 +177,10 @@ function bindSidePanelInputs(rightSidebar, panel) {
 
   bindSections(rightSidebar);
   bindText('input-side-name', v => panel.name = v);
+  document.getElementById('input-side-group')?.addEventListener('change', (e) => {
+    if (e.target.value) panel.groupId = e.target.value; else delete panel.groupId;
+    update3D(); updateSidebar();
+  });
   bindText('input-side-decor', v => panel.decor = v);
   // dekor z bazy płyt z grubością w nazwie („19mm”) ustawia grubość boku / panelu poziomego
   document.getElementById('input-side-decor')?.addEventListener('change', (e) => {

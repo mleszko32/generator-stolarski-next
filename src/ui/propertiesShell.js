@@ -20,6 +20,7 @@ export const SECTIONS = {
   zawiasy: { label: "Zawiasy", icon: "ti-settings" },
   material: { label: "Materiał", icon: "ti-palette" },
   naroznik: { label: "Narożnik", icon: "ti-corner-down-right" },
+  grupa: { label: "Grupa", icon: "ti-link" },
 };
 
 // Stan otwarcia sekcji pamiętany w localStorage, żeby panel nie "zapominał" układu

@@ -928,10 +928,13 @@ function setupEventListeners() {
   if (btnGroupCombine) {
     btnGroupCombine.addEventListener('click', () => {
       const newGroupId = 'group-' + Date.now();
+      const oldGroups = new Set();
       state.selectedModules.forEach(id => {
         const m = state.project.modules.find(md => md.id === id);
-        if (m) m.groupId = newGroupId;
+        if (m) { if (m.groupId) oldGroups.add(m.groupId); m.groupId = newGroupId; }
       });
+      // blendy / boki przypisane do łączonych grup idą do nowej
+      (state.project.sidePanels || []).forEach(p => { if (p.groupId && oldGroups.has(p.groupId)) p.groupId = newGroupId; });
       updateAll();
       initPropertiesPanel();
     });
@@ -942,7 +945,7 @@ function setupEventListeners() {
       const mod = getActiveModule();
       if (!mod || !mod.groupId) return;
       const gId = mod.groupId;
-      state.project.modules.forEach(m => {
+      [...state.project.modules, ...(state.project.sidePanels || [])].forEach(m => {
         if (m.groupId === gId) delete m.groupId;
       });
       state.selectedModules = new Set([mod.id]);

@@ -99,7 +99,9 @@ export const HELP_SECTIONS = [
       <h4>Grupy</h4>
       <p>Kilka zaznaczonych szafek (Shift + klik) można połączyć przyciskiem <b>Połącz zaznaczone w grupę</b>
       w prawym panelu - wtedy zaznaczają się i przesuwają razem (np. słupek z nadstawką).
-      <b>Rozbij grupę</b> je rozdziela.</p>`,
+      <b>Rozbij grupę</b> je rozdziela. Blendę, bok dokładany albo panel poziomy dołączasz do grupy w jego panelu,
+      w sekcji <b>Grupa</b> („Należy do grupy szafek”) - przesuwa się wtedy razem z szafkami grupy, a na liście
+      formatek i w SAS idzie pod tym samym meblem.</p>`,
   },
   {
     id: "wlasciwosci",

@@ -84,6 +84,9 @@ const sidePanelNdcShift = new THREE.Vector2(); // przesunięcie kursora względe
 const SNAP_DIST = 40;
 let dragSelectionOrigins = new Map();
 let dragStartOverlaps = new Set(); // szafki, na które zaznaczenie nachodziło już przed przeciąganiem
+// Boki / blendy przypisane do grupy przeciąganych szafek (sidePanel.groupId) - jadą razem z nimi.
+// id → { pos: pozycja w projekcie, obj: pozycja bryły w scenie } z początku przeciągania.
+let dragGroupPanels = new Map();
 let wasSelectedOnDown = false;
 // Przeciąganie boku dokładanego (core/state.js: addSidePanel) - osobny,
 // prostszy tor niż moduły (bez grup, bez blend, bez trybu pionowego Alt),
@@ -121,7 +124,7 @@ function getDragObstacles() {
   const sel = state.selectedModules || new Set();
   return [
     ...state.project.modules.filter(m => !sel.has(m.id)).map(m => ({ id: m.id, box: getModuleBox(m) })),
-    ...(state.project.sidePanels || []).map(p => ({ id: p.id, box: getSidePanelBox(p) })),
+    ...(state.project.sidePanels || []).filter(p => !dragGroupPanels.has(p.id)).map(p => ({ id: p.id, box: getSidePanelBox(p) })),
   ];
 }
 
@@ -432,6 +435,16 @@ export function init3DViewer() {
                   const m = state.project.modules.find(mod => mod.id === id);
                   if (m) dragSelectionOrigins.set(id, { x: m.position.x || 0, y: m.position.y || 0, z: m.position.z || 0 });
               });
+              dragGroupPanels = new Map();
+              const dragGroupIds = new Set(state.project.modules.filter(m => state.selectedModules.has(m.id) && m.groupId).map(m => m.groupId));
+              (state.project.sidePanels || []).forEach(p => {
+                  if (!p.groupId || !dragGroupIds.has(p.groupId)) return;
+                  const obj = cabinetGroup.children.find(g => g.userData && g.userData.sidePanelId === p.id);
+                  dragGroupPanels.set(p.id, {
+                      pos: { x: parseFloat(p.position.x) || 0, y: parseFloat(p.position.y) || 0, z: parseFloat(p.position.z) || 0 },
+                      obj: obj ? obj.position.clone() : null,
+                  });
+              });
               dragStartOverlaps = new Set();
               const selBoxes = state.project.modules.filter(m => state.selectedModules.has(m.id)).map(getModuleBox);
               getDragObstacles().forEach(o => {
@@ -621,9 +634,10 @@ export function init3DViewer() {
                   y: (parseFloat(dragModule.position.y) || 0) - orig.y,
                   z: (parseFloat(dragModule.position.z) || 0) - orig.z,
               };
-              const selectedBoxes = state.project.modules
-                  .filter(m => state.selectedModules.has(m.id))
-                  .map(getModuleBox);
+              const selectedBoxes = [
+                  ...state.project.modules.filter(m => state.selectedModules.has(m.id)).map(getModuleBox),
+                  ...(state.project.sidePanels || []).filter(p => dragGroupPanels.has(p.id)).map(getSidePanelBox),
+              ];
               const otherBoxes = getDragObstacles()
                   .filter(o => !dragStartOverlaps.has(o.id))
                   .map(o => o.box);
@@ -654,6 +668,15 @@ export function init3DViewer() {
                       }
                   }
               });
+              dragGroupPanels.forEach((o, id) => {
+                  const p = state.project.sidePanels.find(sp => sp.id === id);
+                  if (!p) return;
+                  p.position.x = Math.round((o.pos.x + deltaX) * 100) / 100;
+                  p.position.y = Math.round((o.pos.y + deltaY) * 100) / 100;
+                  p.position.z = Math.round((o.pos.z + deltaZ) * 100) / 100;
+                  const obj = o.obj && cabinetGroup.children.find(g => g.userData && g.userData.sidePanelId === id);
+                  if (obj) obj.position.set(o.obj.x + deltaX, o.obj.y + deltaY, o.obj.z + deltaZ);
+              });
           }
 
           const inpX = document.getElementById('input-pos-x');
@@ -671,6 +694,7 @@ export function init3DViewer() {
   const endPointerDrag = () => {
       const moved = dragMoved;
       dragMoved = false;
+      dragGroupPanels = new Map();
       if (isDragging && !moved) {
           isDragging = false;
           dragTarget = null;
