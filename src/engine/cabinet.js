@@ -455,7 +455,7 @@ function getBlendaParts(panel, config) {
   const flange = panel.flange || 'prawa';
   if (flange !== 'brak' && d - th > 0) {
     const along = (flange === 'lewa' || flange === 'prawa') ? h : w;
-    parts.push({ name: `${base} (Mocowanie wewn.)`, length: along, width: d - th, qty: 1, category: "Korpus" });
+    parts.push({ name: "Listwa mocująca", length: along, width: d - th, qty: 1, category: "Korpus" });
   }
   return parts;
 }

@@ -85,9 +85,9 @@ describe("blenda jako osobny element", () => {
   it("daje dwie formatki: czoło (Front) i mocowanie (Korpus, głębokość - grubość płyty)", () => {
     const b = addBlenda();
     b.dimensions = { width: 50, height: 720, depth: 80 };
-    const parts = calculateAllProjectParts().filter((p) => p.name.startsWith("Blenda"));
+    const parts = calculateAllProjectParts().filter((p) => p.name.startsWith("Blenda") || p.name === "Listwa mocująca");
     const czolo = parts.find((p) => p.name.includes("Czoło"));
-    const mocowanie = parts.find((p) => p.name.includes("Mocowanie"));
+    const mocowanie = parts.find((p) => p.name === "Listwa mocująca");
     expect(czolo).toMatchObject({ length: 720, width: 50, category: "Front" });
     expect(mocowanie).toMatchObject({ length: 720, width: 62, category: "Korpus" });
   });
@@ -96,10 +96,10 @@ describe("blenda jako osobny element", () => {
     const b = addBlenda();
     b.dimensions = { width: 650, height: 50, depth: 80 };
     b.flange = "dol";
-    let parts = calculateAllProjectParts().filter((p) => p.name.includes("Mocowanie"));
+    let parts = calculateAllProjectParts().filter((p) => p.name === "Listwa mocująca");
     expect(parts[0]).toMatchObject({ length: 650, width: 62 });
     b.flange = "brak";
-    parts = calculateAllProjectParts().filter((p) => p.name.includes("Mocowanie"));
+    parts = calculateAllProjectParts().filter((p) => p.name === "Listwa mocująca");
     expect(parts).toHaveLength(0);
   });
 });
