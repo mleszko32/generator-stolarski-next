@@ -220,7 +220,7 @@ export function getCabinetPanels(mod, project) {
       holes.push(...pionHolesFor(`polka-${s.id}-gora`), ...pionHolesFor(`polka-${s.id}-dol`));
     }
     panels.push({ id: `polka-${i + 1}`, kind: "polka", name: s.isStructural ? `Półka stała ${i + 1}` : `Półka ruchoma ${i + 1}`, qty: 1,
-      length: round1(s.w), width: round1(s.isStructural ? tbDepth : tbDepth - 5), thickness: th, structural: !!s.isStructural, y: round1(s.y), x: round1(s.x), holes });
+      length: round1(s.w), width: round1(s.isStructural ? tbDepth : tbDepth - 5), thickness: th, structural: !!s.isStructural, y: round1(s.y), x: round1(s.x), elId: s.id, holes });
   });
 
   // --- Listwa szafki ślepej: łączniki w czołach (do wieńców) + prowadniki zawiasów

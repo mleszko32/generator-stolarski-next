@@ -2,7 +2,8 @@
 // Rysunek techniczny aktywnej szafki (nawierty, System 32) w osobnym oknie, z
 // wydrukiem pojedynczej formatki na A4.
 import { moduleBoardThickness } from "../core/boardThickness.js";
-import { calculateParts } from "../engine/cabinet.js";
+import { calculateParts, collectProjectParts } from "../engine/cabinet.js";
+import { furnitureCodes, furnitureGroups } from "../core/furnitureGroups.js";
 import { generateSidePanelSVG } from "../render/viewer2d.js";
 import { state, getActiveModule } from "../core/state.js";
 import { update3D } from "../render/viewer3d.js";
@@ -37,7 +38,10 @@ export function openTechnicalDrawing() {
         let drawHeight = sidePanel ? sidePanel.length : (parseFloat(activeMod.dimensions.height) || 720);
         let drawDepth = sidePanel ? sidePanel.width : (parseFloat(activeMod.dimensions.depth) || 510);
 
-        const svgContent = generateSidePanelSVG(drawHeight, drawDepth, mountingData || []);
+        // „Cała grupa” - zapamiętane w przeglądarce (okno rysunku ma ten sam origin co aplikacja).
+        let wholeGroup = false;
+        try { wholeGroup = localStorage.getItem('gsn-drawing-whole-group') === '1'; } catch (e) { /* domyślnie wyłączone */ }
+        const svgContent = generateSidePanelSVG(drawHeight, drawDepth, mountingData || [], { wholeGroup });
 
         // Szafa złożona z kilku zgrupowanych modułów (patrz ui/properties.js:
         // "Połącz zaznaczone w grupę") - widok KORPUS już pokazuje całą grupę
@@ -55,15 +59,27 @@ export function openTechnicalDrawing() {
         // Metadane nagłówka wydruku formatki (A4) - okno wydruku czyta je z
         // window.opener.__printMeta (świeże po przełączeniu modułu grupy), a gdy
         // aplikacja jest niedostępna, z kopii wstrzykniętej do skryptu okna.
+        // Numer mebla jak w opisie formatek w SAS / FC2 (M1, M2… - core/furnitureGroups.js), żeby
+        // kartka z rysunkiem pasowała do formatki z hurtowni („M1 Bok”).
+        const allParts = collectProjectParts();
+        const codes = furnitureCodes(state.project, allParts);
+        const furn = furnitureGroups(state.project);
+        const labels = new Map(furn.groups.map(g => [g.key, g.label]));
         const buildPrintMeta = (m) => ({
             project: state.project.name || '',
             module: m.name || '',
+            code: codes.get(furn.moduleKey.get(m.id)) || '',
+            furniture: labels.get(furn.moduleKey.get(m.id)) || '',
             th: moduleBoardThickness(m, state.project),
             date: new Date().toLocaleDateString('pl-PL'),
         });
         window.__printMeta = buildPrintMeta(activeMod);
 
-        window.__printSelectModule = (moduleId) => {
+        window.__printSelectModule = (moduleId, whole) => {
+            if (typeof whole === 'boolean') {
+                wholeGroup = whole;
+                try { localStorage.setItem('gsn-drawing-whole-group', whole ? '1' : '0'); } catch (e) { /* bez zapamiętania */ }
+            }
             state.activeModuleId = moduleId;
             update3D();
             updateSidebar();
@@ -75,7 +91,7 @@ export function openTechnicalDrawing() {
             const mSidePanel = mParts.find(p => p.name.toLowerCase().includes('bok'));
             const mDrawHeight = mSidePanel ? mSidePanel.length : (parseFloat(m.dimensions.height) || 720);
             const mDrawDepth = mSidePanel ? mSidePanel.width : (parseFloat(m.dimensions.depth) || 510);
-            return generateSidePanelSVG(mDrawHeight, mDrawDepth, mMountingData || []);
+            return generateSidePanelSVG(mDrawHeight, mDrawDepth, mMountingData || [], { wholeGroup });
         };
 
         const tabsHtml = groupModules.length > 1 ? `
@@ -153,7 +169,7 @@ export function openTechnicalDrawing() {
               <div class="header">
                   <div class="header-top">
                       <div class="header-text">
-                          <h1>Interaktywny Rysunek Techniczny</h1>
+                          <h1>Interaktywny Rysunek Techniczny <span id="furn-code" style="color:#2563eb">${escapeHtml(window.__printMeta.code ? window.__printMeta.code + " · " + window.__printMeta.furniture : "")}</span></h1>
                           <p><b>Kliknij element na korpusie</b> by zobaczyć jego nawierty. Przeciągaj LKM (przesunięcie) | Kółko myszy (Zoom).</p>
                       </div>
                       <div class="controls">
@@ -163,6 +179,7 @@ export function openTechnicalDrawing() {
                           <label style="color:#0284c7;"><input type="checkbox" checked onchange="toggleLayer('layer-holes-drawer', this)"> Szuflady</label>
                           <div style="width: 2px; height: 20px; background: #cbd5e1; margin: 0 5px;"></div>
                           <button class="btn-front" onclick="toggleFront('detail-front', this)">🚪 Fronty Zewn.</button>
+                          ${groupModules.length > 1 ? `<label title="Pokaż wszystkie szafki grupy (inaczej tylko stojące nad / pod tą szafką)"><input type="checkbox" ${wholeGroup ? 'checked' : ''} onchange="toggleWholeGroup(this)"> Cała grupa</label>` : ''}
                           <button class="btn-front" onclick="fitToContent()" title="Wyśrodkuj i przybliż rysunek (także dwuklik na rysunku)">Dopasuj widok</button>
                             <button class="btn-front" onclick="toggleFront('detail-front-inner', this)">📥 Fronty Wewn.</button>
                           <div style="width: 2px; height: 20px; background: #cbd5e1; margin: 0 5px;"></div>
@@ -249,9 +266,14 @@ export function openTechnicalDrawing() {
                   // kliknięto ten moduł na liście po lewej w aplikacji) i oddaje świeży
                   // SVG - dzięki temu nie trzeba zamykać okna wydruku, żeby zobaczyć
                   // nawierty innego modułu z tej samej grupy.
-                  function switchModule(moduleId, btn) {
+                  var currentModuleId = ${JSON.stringify(activeMod.id).replace(/</g, '\\u003c')};
+                  function toggleWholeGroup(cb) {
+                      switchModule(currentModuleId, document.querySelector('.module-tab.active'), cb.checked);
+                  }
+                  function switchModule(moduleId, btn, whole) {
                       if (!window.opener || window.opener.closed || !window.opener.__printSelectModule) return;
-                      const svg = window.opener.__printSelectModule(moduleId);
+                      const svg = window.opener.__printSelectModule(moduleId, whole);
+                      currentModuleId = moduleId;
                       if (!svg) return;
                       document.getElementById('svg-viewport').innerHTML = svg;
                       bindSvgPanZoom();
@@ -539,8 +561,8 @@ export function openTechnicalDrawing() {
                               var vy = ny === 1 ? by - (th - bh) / 2 : by + r * stepy;
                               var sheetNo = total > 1 ? (' · arkusz ' + n + '/' + total + ' (kol. ' + (c + 1) + ', wiersz ' + (r + 1) + ')') : '';
                               html += '<div class="sheet sheet-' + o.name + '">'
-                                  + '<div class="sh-head"><div class="sh-title">' + escH(title) + (dims ? ' — ' + escH(dims) : '') + '</div>'
-                                  + '<div class="sh-sub">' + escH(meta.project) + ' · ' + escH(meta.module) + ' · gr. płyty ' + fmtN(meta.th) + ' mm · skala ' + scaleTxt + sheetNo + ' · ' + escH(meta.date) + '</div></div>'
+                                  + '<div class="sh-head"><div class="sh-title">' + escH((meta.code ? meta.code + ' ' : '') + title) + (dims ? ' — ' + escH(dims) : '') + '</div>'
+                                  + '<div class="sh-sub">' + escH(meta.project) + (meta.code ? ' · ' + escH(meta.code + ' = ' + meta.furniture) : '') + ' · ' + escH(meta.module) + ' · gr. płyty ' + fmtN(meta.th) + ' mm · skala ' + scaleTxt + sheetNo + ' · ' + escH(meta.date) + '</div></div>'
                                   + '<svg xmlns="http://www.w3.org/2000/svg" width="' + o.aw + 'mm" height="' + o.ah + 'mm" viewBox="' + vx + ' ' + vy + ' ' + tw + ' ' + th + '" style="font-family: Segoe UI, Tahoma, Arial, sans-serif;">' + inner + '</svg>'
                                   + '<div class="sh-foot">' + legend
                                   + '<span class="scale">drukuj w skali 100% (bez dopasowania do strony) · 100 mm =<span class="scalebar" style="width:' + barMm + 'mm"></span></span></div>'

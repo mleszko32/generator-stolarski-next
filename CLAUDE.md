@@ -160,7 +160,9 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
     testami): najbliższy kandydat (w tym fronty równo), a przeciągana szafka zatrzymuje się
     na sąsiadach — sąsiedzi nigdy nie są odpychani. Shift w trakcie ruchu blokuje jedną oś.
 - `src/render/viewer2d.js` — `generateSidePanelSVG(height, depth, mountingData)` buduje
-  rysunek techniczny SVG boku z wierceniami. Rysunki szafki narożnej (formatki w kształcie
+  rysunek techniczny SVG boku z wierceniami (`opts.wholeGroup` = cała grupa, inaczej tylko szafki nad/pod; wieńce i półki
+  stałe klikalne - rzut z góry z otworów `getCabinetPanels`, jak instrukcja montażu; okno `ui/technicalDrawing.js` z numerem
+  mebla M1… na nagłówku i kartkach). Rysunki szafki narożnej (formatki w kształcie
   L, boki, fronty, wykrój) są w `cornerDrawing2d.js`. Kolory i fonty rysunków 2D (też
   `wallElevations.js`) biorą się z `drawingPalette.js` (`C.slate600`, `FONT`) — SVG są
   samodzielne (osobne okno, druk), więc nie używają tokenów CSS, ale nie wpisuj w nich hexów.

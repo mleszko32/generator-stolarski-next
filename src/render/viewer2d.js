@@ -17,6 +17,7 @@ export const formatVal = (val) => Number(Number(val).toFixed(1));
 // rysunku z 3.09 to zgubił i otwory wypadły na samej wysokości półki).
 import { SHELF_PIN_DROP } from '../core/hingeMath.js';
 import { moduleBoardThickness } from "../core/boardThickness.js";
+import { getCabinetPanels } from "../engine/cabinetDrillings.js";
 
 // Opis wysokości otworu w stylu rysunku boku zwykłej szafki: bliższa krawędź
 // (DÓŁ/GÓRA) wyróżniona, druga w nawiasie.
@@ -616,63 +617,74 @@ function drawInnerFronts(ctx) {
 
 // Rzuty z góry wieńców/półek z nawiertami od przegród (detail-<panelKey>). Część generateSidePanelSVG - wspólne wartości przychodzą w ctx.
 function drawPionMountViews(ctx) {
-  const { detailStartX, mountingData, sideH, svgTopY } = ctx;
+  const { detailStartX, pionMountByKey, sideH, svgTopY } = ctx;
   let svg = '';
 
-  // Rzuty z góry wieńca/półki z nawiertami kołek+wkręt od przegrody pionowej
-  // (isStructural, patrz core/zoneTree.js: toggleStructural) - jeden osobny,
-  // klikalny widok PER PANEL (engine/carcaseParts.js: getPionMountHoles), otwierany
-  // z mapy korpusu wyżej (panelRect). Kolor/rozmiar otworów - taki sam jak
-  // istniejące nawierty kołek+wkręt półki konstrukcyjnej w bok (patrz
-  // drawShelfHoles wyżej), bo to dokładnie to samo połączenie. Rysowane w tym
-  // samym miejscu co boki/przegrody (detailStartX) - tylko jeden widok jest
-  // naraz widoczny (showDetail), więc nie potrzeba dla nich osobnej kolumny
-  // z boku rysunku.
-  const wieniecPanels = mountingData.filter(d => d.type === 'wieniec-mount');
-  const wieniecX = detailStartX;
-  wieniecPanels.forEach(panel => {
-    const w = panel.panelWidth;
-    const d = panel.panelDepth;
+  // Rzuty z góry formatek poziomych (wieniec dolny/górny, trawersy, półki stałe) z otworami z
+  // engine/cabinetDrillings.js (te same co w instrukcji montażu): łączniki do boków w czołach
+  // (boki przelotowe) albo w licu (wieńce przelotowe) i nawierty od przegród. Jeden widok na
+  // płytę, otwierany z mapy korpusu (panelRect); rysowany w miejscu boków/przegród
+  // (detailStartX) - naraz widoczny jest tylko jeden (showDetail). Przód u góry, z = od przodu.
+  // Dolna krawędź płyty na sideH - tam, gdzie domyślnie patrzy widok.
+  const COLORS = { wkret: C.purple600, kolek: C.purple600, zawias: C.green600 };
+  const x0 = detailStartX;
+  Object.values(pionMountByKey || {}).forEach(panel => {
+    const w = panel.length;
+    const d = panel.width;
     const detailId = `detail-${panel.panelKey}`;
-    const color = C.purple600;
-    // Dolna krawędź płyty wyrównana do sideH - dokładnie tam, gdzie domyślny
-    // viewBox (wyliczony z boków/frontów, patrz vBoxY/vBoxH wyżej) jest
-    // wycentrowany - inaczej ten widok, rysowany w lokalnym układzie 0..d
-    // niepowiązanym z wysokością szafki, wypadał poza domyślnie widocznym
-    // oknem i po kliknięciu "nic się nie działo" (trzeba było ręcznie
-    // odnaleźć go, przeciągając daleko w górę).
     const topY = sideH - d;
 
     svg += `<g id="${detailId}" class="detail-view" style="display:none;">`;
-    svg += `<text x="${wieniecX + w/2}" y="${svgTopY - 25}" font-size="16" fill="${C.blue900}" font-weight="bold" text-anchor="middle">${escapeHtml(panel.panelLabel.toUpperCase())} (WIDOK Z GÓRY)</text>`;
-    svg += `<rect x="${wieniecX}" y="${topY}" width="${w}" height="${d}" fill="${C.white}" stroke="${C.slate600}" stroke-width="1.5" />`;
-    svg += `<text x="${wieniecX + w/2}" y="${topY - 10}" font-size="11" fill="${C.slate400}" font-weight="bold" text-anchor="middle" letter-spacing="1">PRZÓD</text>`;
-    svg += `<text x="${wieniecX + w/2}" y="${topY + d + 20}" font-size="11" fill="${C.slate400}" font-weight="bold" text-anchor="middle" letter-spacing="1">TYŁ</text>`;
+    svg += `<text x="${x0 + w/2}" y="${svgTopY - 25}" font-size="16" fill="${C.blue900}" font-weight="bold" text-anchor="middle">${escapeHtml(panel.panelLabel.toUpperCase())} (WIDOK Z GÓRY)</text>`;
+    svg += `<rect x="${x0}" y="${topY}" width="${w}" height="${d}" fill="${C.white}" stroke="${C.slate600}" stroke-width="1.5" />`;
+    svg += `<text x="${x0 + w/2}" y="${topY - 10}" font-size="11" fill="${C.slate400}" font-weight="bold" text-anchor="middle" letter-spacing="1">PRZÓD</text>`;
+    svg += `<text x="${x0 + w/2}" y="${topY + d + 20}" font-size="11" fill="${C.slate400}" font-weight="bold" text-anchor="middle" letter-spacing="1">TYŁ</text>`;
 
-    const xPositions = new Set();
+    const lico = [];
+    const zs = new Set();
     panel.holes.forEach(h => {
-      const r = h.holeType === 'dowel' ? 4.0 : 1.5;
-      svg += `<circle cx="${wieniecX + h.x}" cy="${topY + h.zFromFront}" r="${r}" fill="${color}" />`;
-      if (h.holeType === 'screw') xPositions.add(round1(h.x));
+      const color = COLORS[h.kind] || C.purple600;
+      const cy = topY + h.z;
+      zs.add(round1(h.z));
+      if (h.edge === 'lewe' || h.edge === 'prawe') {
+        // otwór w czole: zaznaczony w głąb płyty na swoją głębokość
+        const depthIn = Math.max(6, parseFloat(h.depth) || 12);
+        const dia = h.kind === 'kolek' ? 8 : 3;
+        const x = h.edge === 'lewe' ? x0 : x0 + w - depthIn;
+        svg += `<rect x="${x}" y="${cy - dia / 2}" width="${depthIn}" height="${dia}" fill="${color}" opacity="0.85" />`;
+      } else {
+        svg += `<circle cx="${x0 + h.x}" cy="${cy}" r="${h.kind === 'kolek' ? 4 : 1.5}" fill="${color}" />`;
+        lico.push(h);
+      }
     });
 
-    // Wymiar X (od lewej krawędzi płyty do środka przegrody) - Z (odległość
-    // od przodu) widać wprost z rysunku w skali, tak jak przy innych widokach.
-    Array.from(xPositions).sort((a, b) => a - b).forEach(x => {
-      const lineX = wieniecX + x;
-      svg += `<line x1="${lineX}" y1="${topY + d}" x2="${lineX}" y2="${topY + d + 32}" stroke="${color}" stroke-width="0.75" stroke-dasharray="2,2" />`;
-      svg += `<line x1="${wieniecX}" y1="${topY + d + 32}" x2="${lineX}" y2="${topY + d + 32}" stroke="${color}" stroke-width="0.5" />`;
-      svg += `<circle cx="${wieniecX}" cy="${topY + d + 32}" r="2" fill="${color}" />`;
-      svg += `<text x="${lineX + 4}" y="${topY + d + 46}" font-size="10" fill="${color}" font-weight="bold">${fmtMm(x)} mm od lewej</text>`;
+    // Otwory w licu: „… mm od lewej” pod płytą (jak w instrukcji montażu).
+    [...new Set(lico.map(h => round1(h.x)))].sort((a, b) => a - b).forEach((x, i) => {
+      const color = C.purple600;
+      const lineX = x0 + x;
+      const yL = topY + d + 32 + i * 16;
+      svg += `<line x1="${lineX}" y1="${topY + d}" x2="${lineX}" y2="${yL}" stroke="${color}" stroke-width="0.75" stroke-dasharray="2,2" />`;
+      svg += `<line x1="${x0}" y1="${yL}" x2="${lineX}" y2="${yL}" stroke="${color}" stroke-width="0.5" />`;
+      svg += `<circle cx="${x0}" cy="${yL}" r="2" fill="${color}" />`;
+      svg += `<text x="${lineX + 4}" y="${yL + 12}" font-size="10" fill="${color}" font-weight="bold">${fmtMm(x)} mm od lewej</text>`;
     });
-
+    // Odległości otworów od przodu - kolumna po prawej.
+    svg += `<text x="${x0 + w + 36}" y="${topY - 10}" font-size="9" fill="${C.slate400}">od przodu</text>`;
+    [...zs].sort((a, b) => a - b).forEach(z => {
+      svg += `<line x1="${x0 + w}" y1="${topY + z}" x2="${x0 + w + 32}" y2="${topY + z}" stroke="${C.slate300}" stroke-width="0.5" stroke-dasharray="2,2" />`;
+      svg += `<text x="${x0 + w + 36}" y="${topY + z + 4}" font-size="10" fill="${C.slate600}">${fmtMm(z)}</text>`;
+    });
+    svg += `<text x="${x0 + w/2}" y="${topY + d + 40 + Math.max(0, lico.length ? 16 * new Set(lico.map(h => round1(h.x))).size : 0)}" font-size="11" fill="${C.slate600}" text-anchor="middle">${fmtMm(w)} × ${fmtMm(d)} mm</text>`;
     svg += `</g>`;
   });
 
   return svg;
 }
 
-export function generateSidePanelSVG(height, depth, mountingData = []) {
+// opts.wholeGroup - pokaż całą grupę szafki (przełącznik „Cała grupa” w oknie rysunku);
+// bez niego tylko szafki stojące nad / pod aktywną, żeby mała szafka w dużej grupie
+// (np. nadstawka nad szafą) nie była maleńka na rysunku całej ściany.
+export function generateSidePanelSVG(height, depth, mountingData = [], opts = {}) {
   const mod = state.project.modules.find(m => m.id === state.activeModuleId) || state.project.modules[0];
   if (!mod) return '<svg></svg>';
 
@@ -689,8 +701,17 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   // słownik po panelKey, żeby dało się szybko sprawdzić "czy TEN wieniec/
   // półka ma nawierty" przy rysowaniu mapy korpusu i dorysować jej osobny,
   // klikalny rzut z góry (analogicznie do detail-left/right dla boków).
+  // Formatki poziome z otworami (wieńce, trawersy, półki stałe) z engine/cabinetDrillings.js -
+  // te same dane co instrukcja montażu: łączniki do boków w czołach + nawierty od przegród.
+  // Każda jest klikalna na mapie korpusu (rzut z góry w drawPionMountViews), także w szafce
+  // bez przegród (wcześniej klikalne były tylko płyty z nawiertami od przegrody).
   const pionMountByKey = {};
-  mountingData.filter(d => d.type === 'wieniec-mount').forEach(m => { pionMountByKey[m.panelKey] = m; });
+  getCabinetPanels(mod, config)
+    .filter(p => (p.kind === 'poziom' || (p.kind === 'polka' && p.structural)) && p.holes.length)
+    .forEach(p => {
+      const key = p.kind === 'polka' ? `polka-${p.elId}` : p.id;
+      pionMountByKey[key] = { ...p, panelKey: key, panelLabel: p.name };
+    });
 
   const activeModAbsX = parseFloat(mod.position.x) || 0;
   const activeModAbsZ = parseFloat(mod.position.z) || 0;
@@ -734,7 +755,7 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
   // pokazywać ją w komplecie, z zaznaczonymi półkami/przegrodami każdego
   // członka, nawet gdy klika akurat tylko jeden z nich.
   const stackModules = state.project.modules.filter(m => {
-      if (mod.groupId && m.groupId === mod.groupId) return true;
+      if (opts.wholeGroup && mod.groupId && m.groupId === mod.groupId) return true;
       const mX = parseFloat(m.position.x) || 0;
       const mW = parseFloat(m.dimensions.width) || 600;
       const mZ = parseFloat(m.position.z) || 0;
@@ -957,7 +978,7 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
           svg += `<rect id="map-detail-part-${pIndex}" x="${elSvgX}" y="${elSvgY}" width="${el.w}" height="${el.h}" fill="${bgFill}" stroke="${C.slate600}" stroke-width="1.5" class="clickable-rect" onclick="showDetail('detail-part-${pIndex}')" />`;
       } else {
           let fillColor = (el.typ === 'poziom' && el.isStructural) ? C.emerald200 : C.slate300;
-          const polkaMountKey = pionMountByKey[`polka-${el.id}-gora`] ? `polka-${el.id}-gora` : (pionMountByKey[`polka-${el.id}-dol`] ? `polka-${el.id}-dol` : null);
+          const polkaMountKey = pionMountByKey[`polka-${el.id}`] ? `polka-${el.id}` : null;
           if (polkaMountKey) {
             svg += panelRect(elSvgX, elSvgY, el.w, el.h, polkaMountKey, `detail-${polkaMountKey}`, fillColor);
           } else {
@@ -967,7 +988,7 @@ export function generateSidePanelSVG(height, depth, mountingData = []) {
     });
   }
 
-  const ctx = { cabWidth, cabX, config, depth, detailStartX, frontX, getDy, getLocalRelX, innerFrontX, isTopBottomFullWidth, mod, mountingData, panels, partitions, sideH, stackModules, svgTopY, th };
+  const ctx = { cabWidth, cabX, config, depth, detailStartX, frontX, getDy, getLocalRelX, innerFrontX, isTopBottomFullWidth, mod, mountingData, panels, partitions, pionMountByKey, sideH, stackModules, svgTopY, th };
   svg += drawSpaceDimensions(ctx);
   svg += drawSideDetails(ctx);
   svg += drawOuterFronts(ctx);
