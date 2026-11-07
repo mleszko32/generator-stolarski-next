@@ -94,3 +94,10 @@ describe("wybór po grupach", () => {
     expect(getExcludedChoices({ partsSelection: { excluded: ["y"] }, fc2Export: { excludedFurniture: ["x"] } })).toEqual(["y"]);
   });
 });
+
+describe("nazwa grupy", () => {
+  it("nazwa nadana przez użytkownika wygrywa z przedrostkiem", () => {
+    const p = { ...project, groups: [{ id: "g1", name: "Szafa przy łóżku" }] };
+    expect(furnitureGroups(p).groups[0].label).toBe("Szafa przy łóżku");
+  });
+});

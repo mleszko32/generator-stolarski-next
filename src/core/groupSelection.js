@@ -66,10 +66,26 @@ export function combineIntoGroup(project, selection, newGroupId) {
   return newGroupId;
 }
 
-// Rozbija grupę - szafki i boki/blendy.
+// Rozbija grupę - szafki i boki/blendy (i zapomina jej nazwę).
 export function splitGroup(project, groupId) {
   if (!groupId) return;
   [...modulesOf(project), ...panelsOf(project)].forEach((o) => {
     if (o.groupId === groupId) delete o.groupId;
   });
+  setGroupName(project, groupId, "");
+}
+
+// Nazwy grup nadane przez użytkownika: project.groups = [{ id, name }] (pole „name” jest wolnym
+// tekstem dla projectSanitize). Bez nazwy grupa nazywa się wspólnym początkiem nazw elementów
+// (core/furnitureGroups.js).
+export function groupName(project, groupId) {
+  const g = ((project && project.groups) || []).find((x) => x.id === groupId);
+  return (g && String(g.name || "").trim()) || "";
+}
+export function setGroupName(project, groupId, name) {
+  if (!groupId) return;
+  const list = ((project.groups || [])).filter((x) => x.id !== groupId);
+  const n = String(name || "").trim();
+  if (n) list.push({ id: groupId, name: n });
+  project.groups = list;
 }

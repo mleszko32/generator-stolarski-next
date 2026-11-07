@@ -54,3 +54,16 @@ describe("grupa z samych paneli", () => {
     expect(groupMembers(p, "panel", "a")).toEqual({ moduleIds: [], panelIds: ["a", "b"] });
   });
 });
+
+describe("nazwy grup", () => {
+  it("zapis, zmiana i usunięcie przy rozbiciu", async () => {
+    const { groupName, setGroupName } = await import("./groupSelection.js");
+    const p = make();
+    setGroupName(p, "g", "Regał");
+    setGroupName(p, "g", "Regał nad biurkiem");
+    expect(groupName(p, "g")).toBe("Regał nad biurkiem");
+    expect(p.groups).toHaveLength(1);
+    splitGroup(p, "g");
+    expect(groupName(p, "g")).toBe("");
+  });
+});

@@ -7,6 +7,8 @@
 // Nazwa mebla z grupy = wspólny przedrostek nazw jego szafek (całe słowa), np. „S.6.2”.
 // Czyste - bez state, z testami.
 
+import { groupName } from "./groupSelection.js";
+
 export const COLLECTIVE_KEY = "zbiorcze";
 const COLLECTIVE_LABEL = "Elementy zbiorcze";
 
@@ -49,7 +51,7 @@ export function furnitureGroups(project) {
       const mods = grouped.get(m.groupId);
       if (!byKey.has(m.groupId)) {
         const prefix = mods.length > 1 ? commonNamePrefix(mods.map((x) => x.name)) : "";
-        add(m.groupId, prefix || mods[0].name || "Mebel", true);
+        add(m.groupId, groupName(project, m.groupId) || prefix || mods[0].name || "Mebel", true);
         if (prefix) prefixes.push({ prefix, key: m.groupId });
       }
       moduleKey.set(m.id, m.groupId);
@@ -65,7 +67,7 @@ export function furnitureGroups(project) {
     if (p.groupId && !byKey.has(p.groupId)) {
       const members = panels.filter((x) => x.groupId === p.groupId);
       const prefix = members.length > 1 ? commonNamePrefix(members.map((x) => x.name)) : "";
-      add(p.groupId, prefix || String(p.name || "").trim() || "Grupa paneli", true);
+      add(p.groupId, groupName(project, p.groupId) || prefix || String(p.name || "").trim() || "Grupa paneli", true);
     }
     if (p.groupId) { panelKey.set(p.id, p.groupId); return; }
     const name = String(p.name || "").trim();
