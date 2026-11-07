@@ -1,6 +1,7 @@
 // src/ui/csvEditor.js
 // Edytor i eksport CSV listy formatek (przycisk "Eksport CSV" w oknie Produkcja).
-import { calculateAllProjectParts } from "../engine/cabinet.js";
+import { collectProjectParts } from "../engine/cabinet.js";
+import { aggregateByFurniture, furnitureChoices } from "../core/furnitureGroups.js";
 import { state } from "../core/state.js";
 import { escapeHtml, downloadFile } from "../utils/dom.js";
 import { openModal, showAlert } from "../utils/modal.js";
@@ -18,12 +19,15 @@ const DISPLAY_FILTERS = [
 ];
 const CAT_ORDER = { 'Korpus': 1, 'Front': 2, 'Szuflada': 3, 'Plecy': 4, 'Inne': 5 };
 
-// meta: { materialId, edges } - nie edytowane w tabeli, potrzebne do eksportu FC2.
+// meta: { materialId, edges, furniture } - materiał i krawędzie nie edytowane w tabeli, potrzebne
+// do eksportu FC2; furniture = nazwa mebla (przedrostek opisu w FC2/SAS, kolumna „Mebel”).
+// Kolejność pól input w wierszu jest ważna (indeksy w saveCsv / collectFc2).
 function rowHtml(cat, name, length, width, qty, source, edges, meta = {}) {
     return `
       <tr data-category="${escapeHtml(cat)}" data-mat="${escapeHtml(meta.materialId || '')}" data-edges="${escapeHtml(JSON.stringify(meta.edges || [true, true, true, true]))}">
         <td><input type="text" class="input csv-cat-input" data-cat="${escapeHtml(cat)}" value="${escapeHtml(cat)}"></td>
         <td><input type="text" class="input" value="${escapeHtml(name)}"></td>
+        <td><input type="text" class="input csv-furn-input" value="${escapeHtml(meta.furniture || '')}" title="Mebel - przedrostek opisu formatki w FC2 / SAS"></td>
         <td><input type="number" class="input" value="${length}"></td>
         <td><input type="number" class="input" value="${width}"></td>
         <td><input type="number" class="input" value="${qty}"></td>
@@ -33,35 +37,50 @@ function rowHtml(cat, name, length, width, qty, source, edges, meta = {}) {
       </tr>`;
 }
 
-function openCsvEditorModal(partsList) {
+// rawParts = formatki z collectProjectParts (każda z furnitureKey); tabela sumuje je w obrębie
+// mebla tylko z zaznaczonych mebli.
+function openCsvEditorModal(rawParts) {
     let displayFilter = 'all';
-    // „Korpus: <dekor>” obok „Korpus”, każdy dekor zgrupowany razem
-    partsList.sort((a, b) => (CAT_ORDER[baseCategory(a.category)] || 99) - (CAT_ORDER[baseCategory(b.category)] || 99)
-        || String(a.category).localeCompare(String(b.category), 'pl'));
     const rules = state.project.edgeBanding;
-
-    const rows = partsList.map(p => rowHtml(
-        p.category || 'Inne', p.name, p.length, p.width, p.qty, (p.modules || []).join(' + '),
-        describeEdges(getPartEdges(p, rules)), { materialId: p.materialId, edges: getPartEdges(p, rules) }
-    )).join('');
     const fc2 = getFc2Settings(state.project);
-    const fc2Slots = fc2SymbolSlots(partsList, state.project);
+    const choices = furnitureChoices(state.project, rawParts);
+    let excluded = fc2.excludedFurniture.filter(k => choices.some(c => c.key === k));
+    const fc2Slots = fc2SymbolSlots(aggregateByFurniture(rawParts, state.project), state.project);
+
+    function rowsHtml() {
+        const partsList = aggregateByFurniture(rawParts, state.project, excluded);
+        // „Korpus: <dekor>” obok „Korpus”, każdy dekor zgrupowany razem; w kategorii po meblu
+        partsList.sort((a, b) => (CAT_ORDER[baseCategory(a.category)] || 99) - (CAT_ORDER[baseCategory(b.category)] || 99)
+            || String(a.category).localeCompare(String(b.category), 'pl')
+            || String(a.furnitureLabel).localeCompare(String(b.furnitureLabel), 'pl', { numeric: true }));
+        return partsList.map(p => rowHtml(
+            p.category || 'Inne', p.name, p.length, p.width, p.qty, (p.modules || []).join(' + '),
+            describeEdges(getPartEdges(p, rules)), { materialId: p.materialId, edges: getPartEdges(p, rules), furniture: p.furnitureLabel }
+        )).join('');
+    }
+    const furnitureHtml = choices.length > 1 ? `
+            <div class="field"><span>Meble w zestawieniu (odznaczone nie idą do tabeli ani do CSV / FC2 / SAS):</span></div>
+            <div class="csv-furniture">
+              ${choices.map(c => `<label><input type="checkbox" class="csv-furn-check" data-key="${escapeHtml(c.key)}" ${excluded.includes(c.key) ? '' : 'checked'}> ${escapeHtml(c.label)}</label>`).join('')}
+              <button type="button" class="btn btn-sm" id="csv-furn-all">Wszystkie</button>
+              <button type="button" class="btn btn-sm" id="csv-furn-none">Żaden</button>
+            </div>` : '';
 
     const dlg = openModal({
         title: 'Menedżer formatek (Pre-flight)',
         subtitle: 'Przed eksportem możesz poprawić, dodać lub usunąć formatki. Zmiany dotyczą tylko pliku CSV.',
         width: 980,
         dismissable: false,
-        body: `
+        body: `${furnitureHtml}
             <div id="csv-display-filters" class="csv-filters"></div>
             <div id="csv-filter-count" class="modal-sub" style="margin:8px 0"></div>
             <div class="csv-table-wrap">
               <table class="cost-table csv-table">
                 <thead><tr>
-                  <th>Kategoria</th><th>Nazwa elementu</th><th style="width:90px">Dł. (mm)</th><th style="width:90px">Szer. (mm)</th>
+                  <th>Kategoria</th><th>Nazwa elementu</th><th style="width:110px">Mebel</th><th style="width:90px">Dł. (mm)</th><th style="width:90px">Szer. (mm)</th>
                   <th style="width:70px">Ilość</th><th>Źródło / Szafki</th><th style="width:110px">Okleina</th><th style="width:50px"></th>
                 </tr></thead>
-                <tbody id="csv-editor-tbody">${rows}</tbody>
+                <tbody id="csv-editor-tbody">${rowsHtml()}</tbody>
               </table>
             </div>
             <details class="fc2-settings" style="margin-top:12px">
@@ -73,7 +92,7 @@ function openCsvEditorModal(partsList) {
                 <label class="field" style="align-self:end"><span><input type="checkbox" id="fc2-bolding" ${fc2.bolding ? 'checked' : ''}> Pogrubienie</span></label>
                 <label class="field" style="align-self:end"><span><input type="checkbox" id="fc2-grain" ${fc2.grain ? 'checked' : ''}> Struktura (tylko SAS)</span></label>
               </div>
-              <div class="hint">Okleina: dłuższe krawędzie = góra/dół, krótsze = lewa/prawa. Puste pole symbolu = indeks SAS płyty z projektu (dekor korpusu, płyta frontu z cennika), a gdy płyty nie ma w bazie SAS - jej nazwa; wpisz symbol tylko, żeby to zmienić. Opis bez polskich liter, maks. 50 znaków.
+              <div class="hint">Okleina: dłuższe krawędzie = góra/dół, krótsze = lewa/prawa. Puste pole symbolu = indeks SAS płyty z projektu (dekor korpusu, płyta frontu z cennika), a gdy płyty nie ma w bazie SAS - jej nazwa; wpisz symbol tylko, żeby to zmienić. Opis = mebel + nazwa formatki (np. „S.6.2 Bok”), bez polskich liter, maks. 50 znaków.
                 SAS: „Kopiuj do SAS” → w eSAS w zamówieniu „Import danych” → „Wklej ze schowka” → „Importuj”. Do SAS formatki idą bez oklejania (okleina tylko w pliku FC2).</div>
             </details>`,
         footer: [
@@ -147,7 +166,7 @@ function openCsvEditorModal(partsList) {
 
     function saveCsv(close) {
         const filterMode = displayFilter;
-        let csvContent = "﻿Kategoria;Nazwa;Dlugosc(mm);Szerokosc(mm);Ilosc;Zrodlo;Okleina\n";
+        let csvContent = "﻿Kategoria;Mebel;Nazwa;Dlugosc(mm);Szerokosc(mm);Ilosc;Zrodlo;Okleina\n";
 
         root.querySelectorAll('#csv-editor-tbody tr').forEach(tr => {
             const inputs = tr.querySelectorAll('input');
@@ -155,13 +174,14 @@ function openCsvEditorModal(partsList) {
             if (filterMode !== 'all' && cat !== filterMode) return;
 
             const name = inputs[1].value.replace(/"/g, '""');
-            const len = inputs[2].value;
-            const wid = inputs[3].value;
-            const qty = inputs[4].value;
-            const src = inputs[5].value.replace(/"/g, '""');
-            const edge = inputs[6].value.replace(/"/g, '""');
+            const furn = inputs[2].value.replace(/"/g, '""');
+            const len = inputs[3].value;
+            const wid = inputs[4].value;
+            const qty = inputs[5].value;
+            const src = inputs[6].value.replace(/"/g, '""');
+            const edge = inputs[7].value.replace(/"/g, '""');
 
-            csvContent += `"${cat}";"${name}";${len};${wid};${qty};"${src}";"${edge}"\n`;
+            csvContent += `"${cat}";"${furn}";"${name}";${len};${wid};${qty};"${src}";"${edge}"\n`;
         });
 
         const projName = state.project.name.replace(/\s+/g, '_');
@@ -198,7 +218,7 @@ function openCsvEditorModal(partsList) {
     function collectFc2() {
         const symbols = {};
         root.querySelectorAll('.fc2-symbol').forEach(inp => { if (inp.value.trim()) symbols[inp.getAttribute('data-key')] = inp.value.trim(); });
-        const settings = { symbols: { ...getFc2Settings(state.project).symbols, ...symbols }, edgeSymbol: root.querySelector('#fc2-edge').value.trim(), bolding: root.querySelector('#fc2-bolding').checked, grain: root.querySelector('#fc2-grain').checked };
+        const settings = { excludedFurniture: excluded, symbols: { ...getFc2Settings(state.project).symbols, ...symbols }, edgeSymbol: root.querySelector('#fc2-edge').value.trim(), bolding: root.querySelector('#fc2-bolding').checked, grain: root.querySelector('#fc2-grain').checked };
         root.querySelectorAll('.fc2-symbol').forEach(inp => { if (!inp.value.trim()) delete settings.symbols[inp.getAttribute('data-key')]; });
         settings.edges = { ...getFc2Settings(state.project).edges };
         root.querySelectorAll('.fc2-edge-slot').forEach(inp => {
@@ -213,15 +233,35 @@ function openCsvEditorModal(partsList) {
             const inputs = tr.querySelectorAll('input');
             const category = inputs[0].value.trim();
             if (displayFilter !== 'all' && baseCategory(category) !== displayFilter) return;
-            const edgeText = inputs[6].value.trim();
+            const edgeText = inputs[7].value.trim();
             let edges;
             try { edges = JSON.parse(tr.getAttribute('data-edges')); } catch (e) { edges = [true, true, true, true]; }
             if (edgeText === 'dookoła') edges = [true, true, true, true];
             if (edgeText === 'brak') edges = [false, false, false, false];
-            rows.push({ category, name: inputs[1].value, length: inputs[2].value, width: inputs[3].value, qty: inputs[4].value, materialId: tr.getAttribute('data-mat') || undefined, edges });
+            rows.push({ category, name: inputs[1].value, furnitureLabel: inputs[2].value, length: inputs[3].value, width: inputs[4].value, qty: inputs[5].value, materialId: tr.getAttribute('data-mat') || undefined, edges });
         });
         return { rows, settings };
     }
+
+    // Zmiana wyboru mebli przelicza tabelę od nowa (ręczne poprawki w wierszach przepadają)
+    // i zapamiętuje wybór w projekcie.
+    function setExcluded(next) {
+        excluded = next;
+        state.project.fc2Export = { ...(state.project.fc2Export || {}), excludedFurniture: excluded };
+        scheduleCheckpoint();
+        root.querySelectorAll('.csv-furn-check').forEach(cb => { cb.checked = !excluded.includes(cb.getAttribute('data-key')); });
+        root.querySelector('#csv-editor-tbody').innerHTML = rowsHtml();
+        attachRowEvents();
+        applyDisplayFilter();
+    }
+    root.querySelectorAll('.csv-furn-check').forEach(cb => {
+        cb.addEventListener('change', () => {
+            const key = cb.getAttribute('data-key');
+            setExcluded(cb.checked ? excluded.filter(k => k !== key) : [...excluded, key]);
+        });
+    });
+    root.querySelector('#csv-furn-all')?.addEventListener('click', () => setExcluded([]));
+    root.querySelector('#csv-furn-none')?.addEventListener('click', () => setExcluded(choices.map(c => c.key)));
 
     renderFilterButtons();
     attachRowEvents();
@@ -231,7 +271,7 @@ function openCsvEditorModal(partsList) {
 // Akcja wołana z okna Produkcja (ui/productionHub.js): liczy formatki w chwili
 // wywołania, nie polega na zmiennych z renderu panelu.
 export function openCsvExport() {
-  const allParts = calculateAllProjectParts();
+  const allParts = collectProjectParts();
   if (allParts.length === 0) {
     showAlert("Twój projekt jest pusty. Dodaj szafkę, aby wygenerować formatki.");
     return;

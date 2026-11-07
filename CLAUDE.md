@@ -279,7 +279,9 @@ wylot (sprawdza kilka orientacji, wybiera najmniej arkuszy), wyświetlane przez
 **Eksport FC2**: `engine/fc2Export.js` (czysta, z testami) — plik importu FC2 (bez nagłówka, `;`, 12 kolumn: symbol
 materiału, dł., szer., ilość, opis ≤ 50 znaków bez polskich liter, okleina L/P/G/D, 2× CNC, pogrubienie). Dłuższe krawędzie =
 góra/dół. Symbole w `project.fc2Export` (kategoria, fronty po `Front:<materialId>`); przycisk „Zapisz plik FC2” w
-`ui/csvEditor.js`.
+`ui/csvEditor.js`. Okno listy formatek sumuje formatki w obrębie mebla (`core/furnitureGroups.js`: mebel = szafki ze
+wspólnym `groupId` + boki o tym samym przedrostku nazwy, nazwa = wspólny przedrostek nazw, np. „S.6.2”; `furnitureKey`
+nadaje `collectProjectParts`), opis w FC2/SAS = `fc2Description(mebel, nazwa)`, odznaczone meble w `fc2Export.excludedFurniture`.
 
 **DXF frontów na CNC**: `engine/frontsDxf.js` (czysta, z testami) — formatki kategorii „Front” ułożone przez
 `nestPartsFree` (MaxRects), osobno dla każdego materiału frontu, zapis DXF R12; karta `ui/frontsDxfPanel.js`.

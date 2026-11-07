@@ -16,6 +16,7 @@ import { splitPlinthRun, maxPlinthLength } from "./plinthSplit.js";
 import { shelfStiffener } from "../core/shelfStiffener.js";
 import { KORPUS, korpusCategory, moduleKorpusDecor, PLECY, plecyCategory, moduleBackDecor } from "../core/materialCatalog.js";
 import { plinthMaterial } from "../core/plinthMaterial.js";
+import { furnitureGroups, sharedFurnitureKey, COLLECTIVE_KEY } from "../core/furnitureGroups.js";
 import { moduleBoardThickness, sidePanelLayers } from "../core/boardThickness.js";
 
 export function calculateParts() {
@@ -146,6 +147,8 @@ export function collectProjectParts() {
 
   const config = state.project;
   let allParts = [];
+  // mebel każdej formatki (furnitureKey) - do wyboru mebli i opisu w rozkroju (core/furnitureGroups.js)
+  const furn = furnitureGroups(config);
 
   config.modules.forEach(mod => {
     const modParts = [];
@@ -167,7 +170,7 @@ export function collectProjectParts() {
     const korpusCat = korpusCategory(moduleKorpusDecor(mod));
     // Plecy HDF w kolorze wybranym przy szafce (mod.backPanel.decor) -> „Plecy: <dekor>”.
     const plecyCat = plecyCategory(moduleBackDecor(mod));
-    allParts.push(...modParts.map(p => ({ ...p, category: p.category === KORPUS ? korpusCat : p.category === PLECY ? plecyCat : p.category, moduleName: mod.name })));
+    allParts.push(...modParts.map(p => ({ ...p, category: p.category === KORPUS ? korpusCat : p.category === PLECY ? plecyCat : p.category, moduleName: mod.name, furnitureKey: furn.moduleKey.get(mod.id) })));
   });
 
   // Boki dokładane (core/state.js: addSidePanel) NIE należą do żadnego
@@ -175,7 +178,7 @@ export function collectProjectParts() {
   // więc trafiają do wspólnej listy formatek projektu, ale nie do
   // calculateParts() (lista formatek AKTYWNEGO modułu).
   (config.sidePanels || []).forEach(panel => {
-    allParts.push(...getSidePanelParts(panel, config).map(p => ({ ...p, moduleName: panel.name || (panel.kind === 'blenda' ? 'Blenda' : panel.kind === 'poziomy' ? 'Panel poziomy' : 'Bok dokładany') })));
+    allParts.push(...getSidePanelParts(panel, config).map(p => ({ ...p, moduleName: panel.name || (panel.kind === 'blenda' ? 'Blenda' : panel.kind === 'poziomy' ? 'Panel poziomy' : 'Bok dokładany'), furnitureKey: furn.panelKey.get(panel.id) })));
   });
 
   // Szafka narożna (mod.type === 'corner_cabinet') wyłączona z tego wspólnego
@@ -236,11 +239,12 @@ export function collectProjectParts() {
           if (last) {
               // styk = początek dołączanej szafki (względem początku biegu) - tu wolno ciąć
               last.joints.push(along - last.along);
+              last.mods.push(mod);
               last.runLen += runLen + (along - (last.along + last.runLen));
               joined = true;
           }
           if (!joined) {
-              plinthRuns.push({ rot, along, runLen, crossPos, y, h, offset, frontCoord, joints: [], mat });
+              plinthRuns.push({ rot, along, runLen, crossPos, y, h, offset, frontCoord, joints: [], mat, mods: [mod] });
           }
       });
   });
@@ -260,14 +264,15 @@ export function collectProjectParts() {
         qty: 1,
         category: run.mat.category,
         ...(run.mat.materialId ? { materialId: run.mat.materialId } : {}),
-        moduleName: "Elementy zbiorcze"
+        moduleName: "Elementy zbiorcze",
+        furnitureKey: sharedFurnitureKey(run.mods.map(m => furn.moduleKey.get(m.id)))
       });
     });
   });
 
   // Blaty (core/worktops.js) - kategoria "Blat": w liście formatek i kosztorysie,
   // ale poza rozkrojem płyt i okleiną (cięte osobno z płyt 4100/2050).
-  allParts.push(...getWorktopParts(config));
+  allParts.push(...getWorktopParts(config).map(p => ({ ...p, furnitureKey: COLLECTIVE_KEY })));
 
   return allParts;
 }

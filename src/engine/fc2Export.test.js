@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildFc2Csv, fc2Text, fc2SymbolKey, fc2SymbolSlots, getFc2Settings, autoSymbol } from "./fc2Export.js";
+import { buildFc2Csv, fc2Text, fc2SymbolKey, fc2SymbolSlots, getFc2Settings, autoSymbol, fc2Description } from "./fc2Export.js";
 
 const project = (fc2Export) => ({
   pricing: { frontMaterials: [{ id: "default", name: "Standard" }, { id: "lakier", name: "Lakier" }] },
@@ -76,6 +76,18 @@ describe("buildFc2Csv", () => {
     expect(csv.startsWith("MDF_W908_SM/W908_SM-MB_DO_GL._FREZ._G/145909-200;700;500;1;Drzwi;")).toBe(true);
   });
   it("domyślne ustawienia", () => {
-    expect(getFc2Settings({})).toEqual({ symbols: {}, edgeSymbol: "PCV_2", bolding: false, grain: false, edges: {} });
+    expect(getFc2Settings({})).toEqual({ symbols: {}, edgeSymbol: "PCV_2", bolding: false, grain: false, edges: {}, excludedFurniture: [] });
+  });
+});
+
+describe("fc2Description", () => {
+  it("mebel przed nazwą formatki, bez polskich liter", () => {
+    expect(fc2Description("S.6.2", "Półka")).toBe("S.6.2 Polka");
+    expect(fc2Description("", "Bok")).toBe("Bok");
+  });
+  it("za długi opis skraca nazwę mebla, nie formatki", () => {
+    const d = fc2Description("Bardzo długa nazwa mebla z rysunku klienta", "Wieniec dolny W600 szafki");
+    expect(d.length).toBeLessThanOrEqual(50);
+    expect(d.endsWith("Wieniec dolny W600 szafki")).toBe(true);
   });
 });

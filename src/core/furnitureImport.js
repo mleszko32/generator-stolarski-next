@@ -51,6 +51,7 @@ export function insertFurniture(project, furniture) {
     const panel = sanitizeProjectData(JSON.parse(JSON.stringify(src)));
     panel.id = (panel.kind === "blenda" ? "blenda-" : "side-") + Date.now() + "-" + i + Math.random().toString(36).slice(2, 6);
     shift(panel);
+    panel.groupId = groupId;  // ten sam mebel na liście formatek (core/furnitureGroups.js)
     project.sidePanels.push(panel);
   });
   ensureSidePanelsDefaults(project);
