@@ -21,6 +21,7 @@ export const KIND = {
   podporka: { color: C.amber600, label: "podpórka półki" },
   prowadnica: { color: C.sky600, label: "prowadnica szuflady" },
   zawias: { color: C.teal700, label: "prowadnik zawiasu" },
+  puszka: { color: C.teal700, label: "puszka zawiasu Ø35" },
 };
 
 // Jednostka opisu (U): przy dużych formatkach (słupek) czcionki, odstępy opisów i znaczniki

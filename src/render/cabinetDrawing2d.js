@@ -53,9 +53,10 @@ export function verticalPanelSVG(panel, startNo = 1, scale = null, side = null) 
   const rev = !!panel.frontOnRight;
   const X = (x) => (rev ? L - x : x);
   const Y = (y) => H - y;
-  const isTrav = panel.kind === "trawers-pion" || panel.kind === "listwa";
+  const isTrav = panel.kind === "trawers-pion" || panel.kind === "listwa" || panel.kind === "front";
   const label = side ? `${panel.name} — strona ${side}` : panel.kind === "bok" ? `${panel.name} — widok od wewnątrz`
-    : panel.kind === "listwa" ? `${panel.name} — od wnętrza, naroże z lewej` : panel.name;
+    : panel.kind === "listwa" ? `${panel.name} — od wnętrza, naroże z lewej`
+    : panel.kind === "front" ? `${panel.name} — widok od przodu, zawiasy z ${panel.hingeSide === "lewa" ? "lewej" : "prawej"} (puszki od wewnątrz)` : panel.name;
   let b = title(L / 2, -58 * u, label, `${fmt(L)} × ${fmt(H)} × ${fmt(panel.thickness)} mm · ${panel.qty} szt.${scaleNote(scale)}`);
   b += `<rect x="0" y="0" width="${r1(L)}" height="${r1(H)}" fill="${C.white}" stroke="${C.slate600}" stroke-width="${r1(1.5 * u)}"/>`;
   if (!isTrav) {
@@ -101,6 +102,9 @@ export function verticalPanelSVG(panel, startNo = 1, scale = null, side = null) 
   }
   const runners = face.filter((h) => h.kind === "prowadnica");
   if (runners.length) writeCol(uniq(runners.map((h) => h.y)), KIND.prowadnica.color, false);
+  // Puszki zawiasów frontu: wysokość osi od dołu / góry frontu.
+  const cups = face.filter((h) => h.kind === "puszka");
+  if (cups.length) writeCol(uniq(cups.map((h) => h.y)), KIND.puszka.color, false);
   const joints = face.filter((h) => h.kind === "wkret");
   if (joints.length) writeCol(uniq(joints.map((h) => h.y)), KIND.wkret.color, true);
   // Zawiasy: opis przy otworach (środek pary prowadnika).

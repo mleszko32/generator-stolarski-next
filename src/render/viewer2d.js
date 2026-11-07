@@ -18,6 +18,7 @@ export const formatVal = (val) => Number(Number(val).toFixed(1));
 import { SHELF_PIN_DROP } from '../core/hingeMath.js';
 import { moduleBoardThickness } from "../core/boardThickness.js";
 import { getCabinetPanels } from "../engine/cabinetDrillings.js";
+import { moduleDrillPanels } from "../engine/drillSheets.js";
 
 // Opis wysokości otworu w stylu rysunku boku zwykłej szafki: bliższa krawędź
 // (DÓŁ/GÓRA) wyróżniona, druga w nawiasie.
@@ -198,6 +199,12 @@ function drawSpaceDimensions(ctx) {
 }
 
 // Rzuty boków i przegród z nawiertami (detail-left/right/part-N). Część generateSidePanelSVG - wspólne wartości przychodzą w ctx.
+// Nazwa formatki jak na liście formatek i w SAS („M1 Bok (L/P) · 2450 × 583”) nad tytułem widoku.
+function partNameText(names, detailId, x, y) {
+  const n = names && names[detailId];
+  return n ? `<text class="part-name" x="${x}" y="${y}" font-size="14" fill="${C.slate800}" font-weight="bold" text-anchor="middle">${escapeHtml(n)}</text>` : '';
+}
+
 function drawSideDetails(ctx) {
   const { cabWidth, depth, isTopBottomFullWidth, mod, mountingData, panels, partitions, sideH, svgTopY, th } = ctx;
   let svg = '';
@@ -270,6 +277,7 @@ function drawSideDetails(ctx) {
           const panelDrawY = sideH - panelCalcY - panelH;
 
           svg += `<text x="${panel.svgX + depth/2}" y="${svgTopY - 25}" font-size="16" fill="${C.blue900}" font-weight="bold" text-anchor="middle">${panel.title}</text>`;
+          svg += partNameText(ctx.partNames, groupId, panel.svgX + depth/2, svgTopY - 50);
           svg += `<rect x="${panel.svgX}" y="${panelDrawY}" width="${depth}" height="${panelH}" fill="${C.white}" stroke="${C.slate600}" stroke-width="1.5" />`;
 
           const isReversed = panel.isReversedView; 
@@ -635,6 +643,7 @@ function drawPionMountViews(ctx) {
     const topY = sideH - d;
 
     svg += `<g id="${detailId}" class="detail-view" style="display:none;">`;
+    svg += partNameText(ctx.partNames, detailId, x0 + w/2, svgTopY - 50);
     svg += `<text x="${x0 + w/2}" y="${svgTopY - 25}" font-size="16" fill="${C.blue900}" font-weight="bold" text-anchor="middle">${escapeHtml(panel.panelLabel.toUpperCase())} (WIDOK Z GÓRY)</text>`;
     svg += `<rect x="${x0}" y="${topY}" width="${w}" height="${d}" fill="${C.white}" stroke="${C.slate600}" stroke-width="1.5" />`;
     svg += `<text x="${x0 + w/2}" y="${topY - 10}" font-size="11" fill="${C.slate400}" font-weight="bold" text-anchor="middle" letter-spacing="1">PRZÓD</text>`;
@@ -988,7 +997,16 @@ export function generateSidePanelSVG(height, depth, mountingData = [], opts = {}
     });
   }
 
-  const ctx = { cabWidth, cabX, config, depth, detailStartX, frontX, getDy, getLocalRelX, innerFrontX, isTopBottomFullWidth, mod, mountingData, panels, partitions, pionMountByKey, sideH, stackModules, svgTopY, th };
+  // Nazwy formatek z listy formatek (jak w SAS, z numerem mebla opts.code) dla widoków szczegółów.
+  const partNames = {};
+  const detailOf = (p) => (p.kind === 'bok' ? (p.id === 'bok-lewy' ? 'detail-left' : 'detail-right')
+    : p.kind === 'przegroda' ? `detail-part-${parseInt(String(p.id).replace('przegroda-', ''), 10) - 1}`
+    : p.kind === 'polka' ? `detail-polka-${p.elId}` : `detail-${p.id}`);
+  (moduleDrillPanels(mod, config) || []).filter(p => p.kind !== 'front').forEach(p => {
+    partNames[detailOf(p)] = `${opts.code ? opts.code + ' ' : ''}${p.listName} · ${fmtMm(Math.max(p.length, p.width))} × ${fmtMm(Math.min(p.length, p.width))}`;
+  });
+
+  const ctx = { cabWidth, cabX, config, depth, detailStartX, frontX, getDy, getLocalRelX, innerFrontX, isTopBottomFullWidth, mod, mountingData, panels, partitions, partNames, pionMountByKey, sideH, stackModules, svgTopY, th };
   svg += drawSpaceDimensions(ctx);
   svg += drawSideDetails(ctx);
   svg += drawOuterFronts(ctx);

@@ -41,7 +41,6 @@ export function openTechnicalDrawing() {
         // „Cała grupa” - zapamiętane w przeglądarce (okno rysunku ma ten sam origin co aplikacja).
         let wholeGroup = false;
         try { wholeGroup = localStorage.getItem('gsn-drawing-whole-group') === '1'; } catch (e) { /* domyślnie wyłączone */ }
-        const svgContent = generateSidePanelSVG(drawHeight, drawDepth, mountingData || [], { wholeGroup });
 
         // Szafa złożona z kilku zgrupowanych modułów (patrz ui/properties.js:
         // "Połącz zaznaczone w grupę") - widok KORPUS już pokazuje całą grupę
@@ -74,6 +73,7 @@ export function openTechnicalDrawing() {
             date: new Date().toLocaleDateString('pl-PL'),
         });
         window.__printMeta = buildPrintMeta(activeMod);
+        const svgContent = generateSidePanelSVG(drawHeight, drawDepth, mountingData || [], { wholeGroup, code: window.__printMeta.code });
 
         window.__printSelectModule = (moduleId, whole) => {
             if (typeof whole === 'boolean') {
@@ -91,7 +91,7 @@ export function openTechnicalDrawing() {
             const mSidePanel = mParts.find(p => p.name.toLowerCase().includes('bok'));
             const mDrawHeight = mSidePanel ? mSidePanel.length : (parseFloat(m.dimensions.height) || 720);
             const mDrawDepth = mSidePanel ? mSidePanel.width : (parseFloat(m.dimensions.depth) || 510);
-            return generateSidePanelSVG(mDrawHeight, mDrawDepth, mMountingData || [], { wholeGroup });
+            return generateSidePanelSVG(mDrawHeight, mDrawDepth, mMountingData || [], { wholeGroup, code: window.__printMeta.code });
         };
 
         const tabsHtml = groupModules.length > 1 ? `
@@ -343,6 +343,8 @@ export function openTechnicalDrawing() {
                   }
 
                   function isFrontGroup(id) { return id.indexOf('detail-front') === 0; }
+                  // Nazwa formatki z listy formatek (jak w SAS) - podpis .part-name w widoku.
+                  function partNameOf(g) { var t = g.querySelector('.part-name'); return t ? t.textContent : ''; }
 
                   // Nazwa formatki z tytułu jej widoku. Przegroda ma dwa widoki (lewa i
                   // prawa strona) w jednej grupie - wtedy jedna nazwa „… (obie strony)”.
@@ -490,7 +492,7 @@ export function openTechnicalDrawing() {
                       // (po powiększeniu nachodził na nazwę frontu; stronę widać po puszkach).
                       function hideForPrint() {
                           titleEls.forEach(function (t) { setAttrTracked(t, 'display', 'none'); });
-                          g.querySelectorAll('.foreign-front, .front-sub').forEach(function (e) { setAttrTracked(e, 'display', 'none'); });
+                          g.querySelectorAll('.foreign-front, .front-sub, .part-name').forEach(function (e) { setAttrTracked(e, 'display', 'none'); });
                       }
                       function applyBoost(k, sc) {
                           hideForPrint();
@@ -561,7 +563,7 @@ export function openTechnicalDrawing() {
                               var vy = ny === 1 ? by - (th - bh) / 2 : by + r * stepy;
                               var sheetNo = total > 1 ? (' · arkusz ' + n + '/' + total + ' (kol. ' + (c + 1) + ', wiersz ' + (r + 1) + ')') : '';
                               html += '<div class="sheet sheet-' + o.name + '">'
-                                  + '<div class="sh-head"><div class="sh-title">' + escH((meta.code ? meta.code + ' ' : '') + title) + (dims ? ' — ' + escH(dims) : '') + '</div>'
+                                  + '<div class="sh-head"><div class="sh-title">' + escH(partNameOf(g) ? partNameOf(g).split(' · ')[0] + ' — ' + title : (meta.code ? meta.code + ' ' : '') + title) + (dims ? ' — ' + escH(dims) : '') + '</div>'
                                   + '<div class="sh-sub">' + escH(meta.project) + (meta.code ? ' · ' + escH(meta.code + ' = ' + meta.furniture) : '') + ' · ' + escH(meta.module) + ' · gr. płyty ' + fmtN(meta.th) + ' mm · skala ' + scaleTxt + sheetNo + ' · ' + escH(meta.date) + '</div></div>'
                                   + '<svg xmlns="http://www.w3.org/2000/svg" width="' + o.aw + 'mm" height="' + o.ah + 'mm" viewBox="' + vx + ' ' + vy + ' ' + tw + ' ' + th + '" style="font-family: Segoe UI, Tahoma, Arial, sans-serif;">' + inner + '</svg>'
                                   + '<div class="sh-foot">' + legend

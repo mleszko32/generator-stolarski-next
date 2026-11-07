@@ -28,6 +28,7 @@ import { updateSidebar } from "./sidebar.js";
 import { openCsvExport } from "./csvEditor.js";
 import { printHardwareList } from "./hardwareList.js";
 import { openTechnicalDrawing } from "./technicalDrawing.js";
+import { openDrillSheetsDialog } from "./drillSheetsPrint.js";
 import { mountKosztorys } from "./kosztorysModal.js";
 import { collectDrawerBoxes, getDrawerBoxSettings, JOIN_METHODS, LAMELLO } from "../core/drawerBoxBuild.js";
 import { openDrawerBoxDrawings } from "./drawerBoxDrawings.js";
@@ -369,7 +370,7 @@ function renderRysunki(el) {
   const mods = state.project.modules || [];
   const activeId = state.activeModuleId;
   el.innerHTML = `
-    <div class="hub-bar"><div><h3>Rysunki 2D</h3><div class="hub-sub">Rysunek wykonawczy z nawiertami (System 32, wkręty i kołki, zawiasy, podpórki). Wybierz szafkę, dla której chcesz otworzyć rysunek. W otwartym rysunku kliknij formatkę (bok, przegrodę, wieniec) i użyj „Drukuj formatkę (A4)” - arkusz z odwiertami w czytelnej skali, w razie potrzeby na kilku kartkach.</div></div></div>
+    <div class="hub-bar"><div><h3>Rysunki 2D</h3><div class="hub-sub">Rysunek wykonawczy z nawiertami (System 32, wkręty i kołki, zawiasy, podpórki). Wybierz szafkę, dla której chcesz otworzyć rysunek. W otwartym rysunku kliknij formatkę (bok, przegrodę, wieniec) i użyj „Drukuj formatkę (A4)” - arkusz z odwiertami w czytelnej skali, w razie potrzeby na kilku kartkach.</div></div><button type="button" class="btn btn-primary btn-sm" id="hub-drill-sheets" title="Wszystkie formatki z otworami z wybranych grup - każda na kartce A4, jednakowe razem z liczbą sztuk"><i class="ti ti-printer" aria-hidden="true"></i> Arkusze nawierceń mebli</button></div>
     ${mods.length === 0 ? '<p class="hub-empty">Projekt nie ma jeszcze szafek.</p>' : `
     <table class="hub-table">
       <thead><tr><th>Szafka</th><th>Wymiary</th><th></th></tr></thead>
@@ -382,6 +383,7 @@ function renderRysunki(el) {
         </tr>`;
       }).join('')}</tbody>
     </table>`}`;
+  el.querySelector('#hub-drill-sheets')?.addEventListener('click', openDrillSheetsDialog);
   el.querySelectorAll('.hub-draw').forEach(btn => btn.addEventListener('click', () => {
     // Rysunek liczy się dla aktywnej szafki - przełączamy ją tak samo jak kliknięcie
     // na liście (panel boczny i 3D idą za wyborem).
