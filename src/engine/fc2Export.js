@@ -81,7 +81,8 @@ const HDF_ESAS = {
   "hdf kronospan 190 pe czarny 3mm": "HDF190PE_CZARNA_GR3/HDF000-003",
   "hdf woodeco hd3000 dąb sonoma 3mm": "PLYTA_HDF_WOODECO_HD3000_DAB_SONOMA_2/346586-930",
   "hdf woodeco hd3016 dąb artisan ii 3mm": "PLYTA_HDF_WOODECO_HD3016_DAB_ARTISAN/348634-340",
-  "hdf woodeco hu1506 kaszmirowy beż 3mm": "PLYTA_HDF_WOODECO_HU1506_KASZMIROWY_B/348647-270",
+  // ten sam indeks ma w katalogu dwa symbole - „PLYTA_HDF_WOODECO_HU1506…” eSAS odrzuca
+  "hdf woodeco hu1506 kaszmirowy beż 3mm": "HDF_HU1506_2850*2070_GR_3MM-KASZMIROW/348647-270",
 };
 
 // Symbol płyty w eSAS („symbol/indeks”) dla nazwy z bazy dekorów (z „Egger ” albo bez); brak = "".
@@ -114,11 +115,20 @@ export function getFc2Settings(project) {
 // format "sas" = import formatek w eSAS (sassc.erozkroje.pl, „Import danych” → wklej ze schowka).
 export function buildFc2Csv(rows, project, settings = getFc2Settings(project), format = "fc2") {
   const slots = new Map(fc2SymbolSlots(rows, project).map((s) => [s.key, s.label]));  // zapas, gdy brak płyty
+  // „Korpus” bez dekoru (np. listwy montażowe blend) - płyta korpusu najczęstsza w tym zestawieniu
+  const korpusCount = new Map();
+  rows.forEach((r) => {
+    if (!String(r.category || "").startsWith("Korpus: ")) return;
+    const s = autoSymbol(r, project);
+    if (s) korpusCount.set(s, (korpusCount.get(s) || 0) + (parseInt(r.qty, 10) || 0));
+  });
+  const mainKorpus = [...korpusCount.entries()].sort((a, b) => b[1] - a[1])[0];
   const lines = rows
     .filter((r) => (parseFloat(r.length) || 0) > 0 && (parseFloat(r.width) || 0) > 0 && (parseInt(r.qty, 10) || 0) > 0)
     .map((r) => {
       const key = fc2SymbolKey(r, project);
-      const symbol = fc2Text(settings.symbols[key] || autoSymbol(r, project) || slots.get(key) || key);
+      const fallback = r.category === "Korpus" && mainKorpus ? mainKorpus[0] : "";
+      const symbol = fc2Text(settings.symbols[key] || autoSymbol(r, project) || fallback || slots.get(key) || key);
       // okleina: osobna dla płyty (settings.edges[klucz]), inaczej wspólna
       const edge = fc2Text((settings.edges && settings.edges[key]) || settings.edgeSymbol);
       const [l1, l2, w1, w2] = r.edges || [false, false, false, false];

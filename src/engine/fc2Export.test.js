@@ -66,6 +66,12 @@ describe("buildFc2Csv", () => {
     expect(autoSymbol({ category: "Szuflada" }, p)).toBe("Coś spoza bazy");
     expect(autoSymbol({ category: "Inne" }, p)).toBe("");
     expect(autoSymbol({ category: "Korpus: Lakier NCS S 2005-Y40R" }, p)).toBe("MDF_W908_SM/W908_SM-MB_DO_GL._FREZ._G/145909-200");
+    // „Korpus” bez dekoru -> najczęstsza płyta korpusu z zestawienia
+    const k = buildFc2Csv([
+      { category: "Korpus: Egger W908/W908 SM/SM-MB Biały bazowy 19mm 2800x2070 Dwustronna E1E05 TSCA", name: "Bok", length: 700, width: 500, qty: 4, edges: all },
+      { category: "Korpus", name: "Listwa blendy", length: 2500, width: 62, qty: 1, edges: all },
+    ], p, getFc2Settings(p), "sas").split("\r\n");
+    expect(k[1].startsWith("MDF_W908_SM/W908_SM-MB_DO_GL._FREZGR/145909-300;2500;62;")).toBe(true);
     const csv = buildFc2Csv([{ category: "Front", materialId: "l", name: "Drzwi", length: 700, width: 500, qty: 1, edges: all }], p, getFc2Settings(p), "sas");
     expect(csv.startsWith("MDF_W908_SM/W908_SM-MB_DO_GL._FREZ._G/145909-200;700;500;1;Drzwi;")).toBe(true);
   });
