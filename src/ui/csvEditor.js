@@ -74,7 +74,7 @@ function openCsvEditorModal(partsList) {
                 <label class="field" style="align-self:end"><span><input type="checkbox" id="fc2-grain" ${fc2.grain ? 'checked' : ''}> Struktura (tylko SAS)</span></label>
               </div>
               <div class="hint">Okleina: dłuższe krawędzie = góra/dół, krótsze = lewa/prawa. Puste pole symbolu = indeks SAS płyty z projektu (dekor korpusu, płyta frontu z cennika), a gdy płyty nie ma w bazie SAS - jej nazwa; wpisz symbol tylko, żeby to zmienić. Opis bez polskich liter, maks. 50 znaków.
-                SAS: „Kopiuj do SAS” → w eSAS w zamówieniu „Import danych” → „Wklej ze schowka” → „Importuj”. Okleina dla SAS w pełnym zapisie eSAS „symbol/indeks”, np. 76873_23/2_GL_BIALE/963017-009 (podejrzysz go po ręcznym wybraniu okleiny w zamówieniu eSAS).</div>
+                SAS: „Kopiuj do SAS” → w eSAS w zamówieniu „Import danych” → „Wklej ze schowka” → „Importuj”. Do SAS formatki idą bez oklejania (okleina tylko w pliku FC2).</div>
             </details>`,
         footer: [
             { label: 'Dodaj pusty wiersz', icon: 'plus', onClick: () => addRow() },

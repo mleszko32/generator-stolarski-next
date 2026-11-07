@@ -13,7 +13,7 @@
 // formatek, a fronty osobno dla każdego materiału z cennika frontów.
 
 import { EGGER_SAS_DECORS } from "../core/data/eggerSasDecors.js";
-import { frontMaterialBoard } from "../core/materialCatalog.js";
+import { frontMaterialBoard, LACQUER_BOARD } from "../core/materialCatalog.js";
 
 export const FC2_DEFAULTS = Object.freeze({ edgeSymbol: "PCV_2", bolding: false });
 
@@ -66,9 +66,10 @@ export function partBoardName(part, project) {
     return m ? (frontMaterialBoard(m) || String(m.name || "").trim()) : "";
   }
   const own = category.match(/^[^:]+:\s*(.+)$/);
-  if (own) return own[1].trim();
   const decors = (project && project.materials && project.materials.decors) || {};
-  return String(decors[category] || "").trim();
+  const name = own ? own[1].trim() : String(decors[category] || "").trim();
+  // lakier (np. bok dokładany „Lakier NCS …”) tnie się z MDF - jak fronty
+  return /lakier/i.test(name) ? LACQUER_BOARD : name;
 }
 
 // Płyty HDF z bazy (core/materialCatalog.js) -> symbol w eSAS (z katalogu materiałów eSAS, 11.2026).
@@ -121,7 +122,8 @@ export function buildFc2Csv(rows, project, settings = getFc2Settings(project), f
       // okleina: osobna dla płyty (settings.edges[klucz]), inaczej wspólna
       const edge = fc2Text((settings.edges && settings.edges[key]) || settings.edgeSymbol);
       const [l1, l2, w1, w2] = r.edges || [false, false, false, false];
-      const e = (on) => (on ? edge : "");
+      // SAS: bez oklejania (oklejamy u siebie) - kolumny okleiny puste
+      const e = (on) => (on && format !== "sas" ? edge : "");
       const head = [
         symbol, Math.round(parseFloat(r.length) * 10) / 10, Math.round(parseFloat(r.width) * 10) / 10, parseInt(r.qty, 10),
         fc2Text(r.name), e(w1), e(w2), e(l1), e(l2),
