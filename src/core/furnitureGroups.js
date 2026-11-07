@@ -128,10 +128,31 @@ export function setExcludedChoices(project, excluded) {
   project.partsSelection = { ...(project.partsSelection || {}), excluded: [...excluded] };
 }
 
+// Krótkie numery mebli do opisu w FC2/SAS (pełna nazwa się tam nie mieści): „M1”, „M2”…
+// w kolejności mebli w projekcie, tylko meble z formatkami (bez elementów zbiorczych).
+// Liczone ze wszystkich formatek, więc odznaczenie grupy nie przenumerowuje pozostałych.
+// Zwraca Map(furnitureKey → kod).
+export function furnitureCodes(project, parts) {
+  const used = new Set(parts.map((p) => p.furnitureKey || COLLECTIVE_KEY));
+  const codes = new Map();
+  furnitureGroups(project).groups.forEach((g) => {
+    if (used.has(g.key) && g.key !== COLLECTIVE_KEY) codes.set(g.key, `M${codes.size + 1}`);
+  });
+  return codes;
+}
+
+// Legenda numerów: [{ code, label }] dla mebli z formatkami.
+export function furnitureLegend(project, parts) {
+  const labels = new Map(furnitureGroups(project).groups.map((g) => [g.key, g.label]));
+  return [...furnitureCodes(project, parts)].map(([key, code]) => ({ code, label: labels.get(key) || "" }));
+}
+
 // Sumowanie formatek w obrębie mebla (klucz jak w calculateAllProjectParts + mebel), tylko
-// z zaznaczonych pozycji wyboru. Wiersz dostaje furnitureLabel (do opisu w FC2/SAS) i modules.
+// z zaznaczonych pozycji wyboru. Wiersz dostaje furnitureLabel (pełna nazwa mebla),
+// furnitureCode (numer do opisu w FC2/SAS) i modules.
 export function aggregateByFurniture(parts, project, excluded = []) {
   const labels = new Map(furnitureGroups(project).groups.map((g) => [g.key, g.label]));
+  const codes = furnitureCodes(project, parts);
   const out = new Map();
   filterByChoice(parts, project, excluded).forEach((p) => {
     const fk = p.furnitureKey || COLLECTIVE_KEY;
@@ -146,6 +167,7 @@ export function aggregateByFurniture(parts, project, excluded = []) {
         materialId: p.materialId, defaultEdges: p.defaultEdges, modules: [p.moduleName],
         // cokół z kilku mebli / blaty - bez przedrostka mebla w opisie
         furnitureKey: fk, furnitureLabel: fk === COLLECTIVE_KEY ? "" : labels.get(fk) || "",
+        furnitureCode: codes.get(fk) || "",
       });
     }
   });

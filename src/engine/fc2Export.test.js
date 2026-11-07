@@ -85,6 +85,11 @@ describe("fc2Description", () => {
     expect(fc2Description("S.6.2", "Półka")).toBe("S.6.2 Polka");
     expect(fc2Description("", "Bok")).toBe("Bok");
   });
+  it("numer mebla zamiast nazwy, pełna nazwa mebla wycięta z nazwy formatki", () => {
+    expect(fc2Description("M1", "Bok", "Szafa przy łóżku")).toBe("M1 Bok");
+    expect(fc2Description("M2", "Blenda — S.6.2 Blenda lewa (Czoło)", "S.6.2")).toBe("M2 Blenda - Blenda lewa (Czolo)");
+    expect(fc2Description("M3", "Blenda — Blenda 1 (Czoło)", "Blenda 1")).toBe("M3 Blenda (Czolo)");
+  });
   it("za długi opis skraca nazwę mebla, nie formatki", () => {
     const d = fc2Description("Bardzo długa nazwa mebla z rysunku klienta", "Wieniec dolny W600 szafki");
     expect(d.length).toBeLessThanOrEqual(50);

@@ -281,7 +281,7 @@ materiału, dł., szer., ilość, opis ≤ 50 znaków bez polskich liter, oklein
 góra/dół. Symbole w `project.fc2Export` (kategoria, fronty po `Front:<materialId>`); przycisk „Zapisz plik FC2” w
 `ui/csvEditor.js`. Okno listy formatek sumuje formatki w obrębie mebla (`core/furnitureGroups.js`: mebel = szafki ze
 wspólnym `groupId` + boki o tym samym przedrostku nazwy, nazwa = wspólny przedrostek nazw, np. „S.6.2”; `furnitureKey`
-nadaje `collectProjectParts`; grupy z blendami/bokami: zaznaczenie Shift/Ctrl `state.selectedModules` + `state.selectedSidePanels`, logika `core/groupSelection.js`, przyciski `ui/groupButtons.js`, nazwy grup w `project.groups` [{id, name}]), opis w FC2/SAS = `fc2Description(mebel, nazwa)`, wybór grup do zestawienia (grupy + „Bez grupy” + „Elementy zbiorcze”, `filterByChoice`, odznaczone w `project.partsSelection.excluded`) wspólny dla Menedżera formatek i planu rozkroju — `ui/furnitureFilter.js`.
+nadaje `collectProjectParts`; grupy z blendami/bokami: zaznaczenie Shift/Ctrl `state.selectedModules` + `state.selectedSidePanels`, logika `core/groupSelection.js`, przyciski `ui/groupButtons.js`, nazwy grup w `project.groups` [{id, name}]), opis w FC2/SAS = `fc2Description(numer, nazwa, nazwaMebla)` — numer „M1…” z `furnitureCodes`, legenda `furnitureLegend` nad tabelą Menedżera formatek, wybór grup do zestawienia (grupy + „Bez grupy” + „Elementy zbiorcze”, `filterByChoice`, odznaczone w `project.partsSelection.excluded`) wspólny dla Menedżera formatek i planu rozkroju — `ui/furnitureFilter.js`.
 
 **DXF frontów na CNC**: `engine/frontsDxf.js` (czysta, z testami) — formatki kategorii „Front” ułożone przez
 `nestPartsFree` (MaxRects), osobno dla każdego materiału frontu, zapis DXF R12; karta `ui/frontsDxfPanel.js`.

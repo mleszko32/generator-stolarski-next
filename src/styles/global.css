@@ -562,6 +562,8 @@ button, input, select, textarea { font-family: inherit; }
 .csv-table .csv-cat-input[data-cat="Plecy"] { color: #059669; }
 .csv-furniture { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-bottom: 8px; }
 .csv-furniture label { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-sm); cursor: pointer; }
+.csv-legend { margin-bottom: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius, 6px); }
+.csv-legend-list { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 4px; font-size: var(--fs-sm); }
 .csv-del { text-align: center; }
 
 /* =========================================

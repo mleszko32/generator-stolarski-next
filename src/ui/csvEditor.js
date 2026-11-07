@@ -1,7 +1,7 @@
 // src/ui/csvEditor.js
 // Edytor i eksport CSV listy formatek (przycisk "Eksport CSV" w oknie Produkcja).
 import { collectProjectParts } from "../engine/cabinet.js";
-import { aggregateByFurniture } from "../core/furnitureGroups.js";
+import { aggregateByFurniture, furnitureLegend } from "../core/furnitureGroups.js";
 import { furnitureFilterHtml, bindFurnitureFilter, currentExcluded } from "./furnitureFilter.js";
 import { state } from "../core/state.js";
 import { escapeHtml, downloadFile } from "../utils/dom.js";
@@ -10,6 +10,7 @@ import { getPartEdges, describeEdges } from "../engine/edgeBanding.js";
 import { buildFc2Csv, fc2SymbolSlots, getFc2Settings } from "../engine/fc2Export.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { baseCategory } from "../core/materialCatalog.js";
+import { C, FONT } from "../render/drawingPalette.js";
 
 const DISPLAY_FILTERS = [
     { value: 'all', label: 'Wszystko' },
@@ -20,15 +21,16 @@ const DISPLAY_FILTERS = [
 ];
 const CAT_ORDER = { 'Korpus': 1, 'Front': 2, 'Szuflada': 3, 'Plecy': 4, 'Inne': 5 };
 
-// meta: { materialId, edges, furniture } - materiał i krawędzie nie edytowane w tabeli, potrzebne
-// do eksportu FC2; furniture = nazwa mebla (przedrostek opisu w FC2/SAS, kolumna „Mebel”).
+// meta: { materialId, edges, furniture, label } - materiał i krawędzie nie edytowane w tabeli, potrzebne
+// do eksportu FC2; furniture = numer mebla z legendy (przedrostek opisu w FC2/SAS, kolumna „Mebel”),
+// label = pełna nazwa mebla (do legendy w CSV i wycięcia z nazwy formatki w opisie).
 // Kolejność pól input w wierszu jest ważna (indeksy w saveCsv / collectFc2).
 function rowHtml(cat, name, length, width, qty, source, edges, meta = {}) {
     return `
-      <tr data-category="${escapeHtml(cat)}" data-mat="${escapeHtml(meta.materialId || '')}" data-edges="${escapeHtml(JSON.stringify(meta.edges || [true, true, true, true]))}">
+      <tr data-category="${escapeHtml(cat)}" data-label="${escapeHtml(meta.label || '')}" data-mat="${escapeHtml(meta.materialId || '')}" data-edges="${escapeHtml(JSON.stringify(meta.edges || [true, true, true, true]))}">
         <td><input type="text" class="input csv-cat-input" data-cat="${escapeHtml(cat)}" value="${escapeHtml(cat)}"></td>
         <td><input type="text" class="input" value="${escapeHtml(name)}"></td>
-        <td><input type="text" class="input csv-furn-input" value="${escapeHtml(meta.furniture || '')}" title="Mebel - przedrostek opisu formatki w FC2 / SAS"></td>
+        <td><input type="text" class="input csv-furn-input" value="${escapeHtml(meta.furniture || '')}" title="Numer mebla z legendy - przedrostek opisu formatki w FC2 / SAS"></td>
         <td><input type="number" class="input" value="${length}"></td>
         <td><input type="number" class="input" value="${width}"></td>
         <td><input type="number" class="input" value="${qty}"></td>
@@ -52,20 +54,32 @@ function openCsvEditorModal(rawParts) {
         // „Korpus: <dekor>” obok „Korpus”, każdy dekor zgrupowany razem; w kategorii po meblu
         partsList.sort((a, b) => (CAT_ORDER[baseCategory(a.category)] || 99) - (CAT_ORDER[baseCategory(b.category)] || 99)
             || String(a.category).localeCompare(String(b.category), 'pl')
-            || String(a.furnitureLabel).localeCompare(String(b.furnitureLabel), 'pl', { numeric: true }));
+            || String(a.furnitureCode).localeCompare(String(b.furnitureCode), 'pl', { numeric: true }));
         return partsList.map(p => rowHtml(
             p.category || 'Inne', p.name, p.length, p.width, p.qty, (p.modules || []).join(' + '),
-            describeEdges(getPartEdges(p, rules)), { materialId: p.materialId, edges: getPartEdges(p, rules), furniture: p.furnitureLabel }
+            describeEdges(getPartEdges(p, rules)), { materialId: p.materialId, edges: getPartEdges(p, rules), furniture: p.furnitureCode, label: p.furnitureLabel }
         )).join('');
     }
     const furnitureHtml = furnitureFilterHtml(rawParts);
+    // Legenda numerów mebli (M1 = Szafa przy łóżku) - w opisie SAS/FC2 idzie tylko numer.
+    const legend = furnitureLegend(state.project, rawParts);
+    const legendText = () => legend.map(l => `${l.code} = ${l.label}`).join('\n');
+    const legendHtml = legend.length ? `
+            <div class="csv-legend">
+              <b>Legenda mebli</b> <span class="hint">(w opisie formatki w SAS / FC2 jest tylko numer)</span>
+              <div class="csv-legend-list">${legend.map(l => `<span><b>${escapeHtml(l.code)}</b> ${escapeHtml(l.label)}</span>`).join('')}</div>
+              <div style="display:flex;gap:6px;margin-top:6px">
+                <button type="button" class="btn btn-sm" id="csv-legend-copy"><i class="ti ti-clipboard" aria-hidden="true"></i> Kopiuj legendę</button>
+                <button type="button" class="btn btn-sm" id="csv-legend-print"><i class="ti ti-printer" aria-hidden="true"></i> Drukuj legendę</button>
+              </div>
+            </div>` : '';
 
     const dlg = openModal({
         title: 'Menedżer formatek (Pre-flight)',
         subtitle: 'Przed eksportem możesz poprawić, dodać lub usunąć formatki. Zmiany dotyczą tylko pliku CSV.',
         width: 980,
         dismissable: false,
-        body: `${furnitureHtml}
+        body: `${furnitureHtml}${legendHtml}
             <div id="csv-display-filters" class="csv-filters"></div>
             <div id="csv-filter-count" class="modal-sub" style="margin:8px 0"></div>
             <div class="csv-table-wrap">
@@ -86,7 +100,7 @@ function openCsvEditorModal(rawParts) {
                 <label class="field" style="align-self:end"><span><input type="checkbox" id="fc2-bolding" ${fc2.bolding ? 'checked' : ''}> Pogrubienie</span></label>
                 <label class="field" style="align-self:end"><span><input type="checkbox" id="fc2-grain" ${fc2.grain ? 'checked' : ''}> Struktura (tylko SAS)</span></label>
               </div>
-              <div class="hint">Okleina: dłuższe krawędzie = góra/dół, krótsze = lewa/prawa. Puste pole symbolu = indeks SAS płyty z projektu (dekor korpusu, płyta frontu z cennika), a gdy płyty nie ma w bazie SAS - jej nazwa; wpisz symbol tylko, żeby to zmienić. Opis = mebel + nazwa formatki (np. „S.6.2 Bok”), bez polskich liter, maks. 50 znaków.
+              <div class="hint">Okleina: dłuższe krawędzie = góra/dół, krótsze = lewa/prawa. Puste pole symbolu = indeks SAS płyty z projektu (dekor korpusu, płyta frontu z cennika), a gdy płyty nie ma w bazie SAS - jej nazwa; wpisz symbol tylko, żeby to zmienić. Opis = numer mebla z legendy + nazwa formatki (np. „M1 Bok”), bez polskich liter, maks. 50 znaków.
                 SAS: „Kopiuj do SAS” → w eSAS w zamówieniu „Import danych” → „Wklej ze schowka” → „Importuj”. Do SAS formatki idą bez oklejania (okleina tylko w pliku FC2).</div>
             </details>`,
         footer: [
@@ -160,7 +174,7 @@ function openCsvEditorModal(rawParts) {
 
     function saveCsv(close) {
         const filterMode = displayFilter;
-        let csvContent = "﻿Kategoria;Mebel;Nazwa;Dlugosc(mm);Szerokosc(mm);Ilosc;Zrodlo;Okleina\n";
+        let csvContent = "﻿Kategoria;Mebel;Nazwa mebla;Nazwa;Dlugosc(mm);Szerokosc(mm);Ilosc;Zrodlo;Okleina\n";
 
         root.querySelectorAll('#csv-editor-tbody tr').forEach(tr => {
             const inputs = tr.querySelectorAll('input');
@@ -175,7 +189,8 @@ function openCsvEditorModal(rawParts) {
             const src = inputs[6].value.replace(/"/g, '""');
             const edge = inputs[7].value.replace(/"/g, '""');
 
-            csvContent += `"${cat}";"${furn}";"${name}";${len};${wid};${qty};"${src}";"${edge}"\n`;
+            const furnLabel = (tr.getAttribute('data-label') || '').replace(/"/g, '""');
+            csvContent += `"${cat}";"${furn}";"${furnLabel}";"${name}";${len};${wid};${qty};"${src}";"${edge}"\n`;
         });
 
         const projName = state.project.name.replace(/\s+/g, '_');
@@ -232,7 +247,7 @@ function openCsvEditorModal(rawParts) {
             try { edges = JSON.parse(tr.getAttribute('data-edges')); } catch (e) { edges = [true, true, true, true]; }
             if (edgeText === 'dookoła') edges = [true, true, true, true];
             if (edgeText === 'brak') edges = [false, false, false, false];
-            rows.push({ category, name: inputs[1].value, furnitureLabel: inputs[2].value, length: inputs[3].value, width: inputs[4].value, qty: inputs[5].value, materialId: tr.getAttribute('data-mat') || undefined, edges });
+            rows.push({ category, name: inputs[1].value, furnitureCode: inputs[2].value, furnitureLabel: tr.getAttribute('data-label') || '', length: inputs[3].value, width: inputs[4].value, qty: inputs[5].value, materialId: tr.getAttribute('data-mat') || undefined, edges });
         });
         return { rows, settings };
     }
@@ -244,6 +259,21 @@ function openCsvEditorModal(rawParts) {
         root.querySelector('#csv-editor-tbody').innerHTML = rowsHtml();
         attachRowEvents();
         applyDisplayFilter();
+    });
+
+    root.querySelector('#csv-legend-copy')?.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(legendText()); showAlert('Skopiowano legendę mebli.'); }
+        catch (e) { downloadFile(`Legenda_${state.project.name.replace(/\s+/g, '_')}.txt`, legendText(), 'text/plain;charset=utf-8;'); }
+    });
+    root.querySelector('#csv-legend-print')?.addEventListener('click', () => {
+        const w = window.open('', '_blank');
+        if (!w) return;
+        w.document.write(`<!doctype html><meta charset="utf-8"><title>Legenda mebli</title>
+          <style>body{font-family:${FONT};padding:20px}td{padding:4px 12px;font-size:14pt;border-bottom:1px solid ${C.slate300}}</style>
+          <h2>${escapeHtml(state.project.name || 'Projekt')} - legenda mebli</h2>
+          <table>${legend.map(l => `<tr><td><b>${escapeHtml(l.code)}</b></td><td>${escapeHtml(l.label)}</td></tr>`).join('')}</table>`);
+        w.document.close();
+        w.print();
     });
 
     renderFilterButtons();

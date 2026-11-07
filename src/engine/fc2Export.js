@@ -32,10 +32,17 @@ export function fc2Text(s) {
     .slice(0, MAX_TEXT);
 }
 
-// Opis formatki: „<mebel> <formatka>” (np. „S.6.2 Bok”). Gdy się nie mieści w 50 znakach,
-// skracana jest nazwa mebla, nie formatki.
-export function fc2Description(furniture, name) {
-  const n = fc2Text(name);
+// Opis formatki: „<mebel> <formatka>” (np. „M1 Bok” - numer mebla z legendy,
+// core/furnitureGroups.js: furnitureCodes). label = pełna nazwa mebla: wycinana z nazwy
+// formatki (blendy / boki mają ją w nazwie), bo numer już mówi, z którego mebla jest.
+// Gdy się nie mieści w 50 znakach, skracana jest nazwa mebla, nie formatki.
+export function fc2Description(furniture, name, label = "") {
+  let raw = String(name ?? "");
+  const full = String(label || "").trim();
+  if (full && full !== String(furniture || "").trim()) {
+    raw = raw.split(full).join(" ").replace(/\s*[—–-]\s*(?=\(|$)/g, " ").replace(/\(\s*\)/g, "");
+  }
+  const n = fc2Text(raw);
   const f = fc2Text(furniture);
   if (!f || n.includes(f)) return n;  // blendy / boki mają już mebel w nazwie
   const room = MAX_TEXT - n.length - 1;
@@ -120,7 +127,7 @@ export function getFc2Settings(project) {
   };
 }
 
-// rows: [{ category, name, length, width, qty, materialId?, furnitureLabel?, edges: [dł.1, dł.2, szer.1, szer.2] }]
+// rows: [{ category, name, length, width, qty, materialId?, furnitureLabel?, furnitureCode?, edges: [dł.1, dł.2, szer.1, szer.2] }]
 // Symbol bez wpisu = indeks SAS płyty z projektu, potem nazwa płyty, na końcu nazwa pozycji
 // (np. „Korpus”), żeby żadna formatka nie zginęła.
 // format "sas" = import formatek w eSAS (sassc.erozkroje.pl, „Import danych” → wklej ze schowka).
@@ -147,7 +154,7 @@ export function buildFc2Csv(rows, project, settings = getFc2Settings(project), f
       const e = (on) => (on && format !== "sas" ? edge : "");
       const head = [
         symbol, Math.round(parseFloat(r.length) * 10) / 10, Math.round(parseFloat(r.width) * 10) / 10, parseInt(r.qty, 10),
-        fc2Description(r.furnitureLabel, r.name), e(w1), e(w2), e(l1), e(l2),
+        fc2Description(r.furnitureCode ?? r.furnitureLabel, r.name, r.furnitureLabel), e(w1), e(w2), e(l1), e(l2),
       ];
       const bold = settings.bolding ? 1 : 0;
       // SAS (eSAS, import FastCut): 10 struktura (0/1), 11-12 kody kreskowe, 13 pogrubianie.

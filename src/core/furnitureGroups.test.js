@@ -63,6 +63,13 @@ describe("aggregateByFurniture", () => {
     expect(rows.map((r) => r.furnitureLabel)).toEqual(["S.6.4"]);
   });
 
+  it("numery mebli M1, M2… z legendą, bez przenumerowania po odznaczeniu", async () => {
+    const { furnitureLegend } = await import("./furnitureGroups.js");
+    expect(furnitureLegend(project, parts)).toEqual([{ code: "M1", label: "S.6.2" }, { code: "M2", label: "S.6.4" }]);
+    expect(aggregateByFurniture(parts, project).map((r) => r.furnitureCode)).toEqual(["M1", "M2", ""]);
+    expect(aggregateByFurniture(parts, project, ["g1"]).map((r) => r.furnitureCode)).toEqual(["M2", ""]);
+  });
+
   it("lista wyboru tylko z meblami, które mają formatki", () => {
     expect(furnitureChoices(project, parts).map((g) => g.key)).toEqual(["g1", "g2", COLLECTIVE_KEY]);
   });
