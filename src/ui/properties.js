@@ -29,6 +29,7 @@ import { openWallFillModal } from "./wallFillModal.js";
 import { BOARD_BACK_MIN, resolveBackPanel } from "../core/backPanel.js";
 import { catalogLabels, assignFrontMaterialByName, frontMaterialSuggestions, addCatalogDecor } from "../core/materialCatalog.js";
 import { moduleFrontMaterialId, PLINTH_KORPUS } from "../core/plinthMaterial.js";
+import { groupButtonsHtml, bindGroupButtons } from "./groupButtons.js";
 
 // Wybór materiału cokołu (mod.legs.plinthMaterial, core/plinthMaterial.js).
 function plinthMaterialHtml(mod) {
@@ -183,16 +184,7 @@ export function initPropertiesPanel() {
   // (render/viewer3d.js), teraz też tutaj (patrz plan przeniesienia okienek 3D
   // do panelu bocznego). "Można połączyć w grupę" tylko gdy zaznaczenie ma
   // >1 element i NIE są już wszystkie w tej samej grupie.
-  const selectedIdsForGroup = state.selectedModules && state.selectedModules.size > 1
-      ? Array.from(state.selectedModules)
-      : [];
-  const canCombineIntoGroup = selectedIdsForGroup.length > 1 && !(() => {
-      const first = state.project.modules.find(m => m.id === selectedIdsForGroup[0]);
-      return first && first.groupId && selectedIdsForGroup.every(id => {
-          const m = state.project.modules.find(md => md.id === id);
-          return m && m.groupId === first.groupId;
-      });
-  })();
+  // (blok przycisków wspólny z panelem blendy/boku - ui/groupButtons.js)
 
   // Sekcje, w których TA szafka ma własne ustawienia nadpisujące domyślne
   // projektu (mod.front / mod.construction są scalane nad ustawieniami projektu).
@@ -237,13 +229,7 @@ export function initPropertiesPanel() {
         </div>
       ` : ''}
 
-      ${(canCombineIntoGroup || activeModule.groupId) ? `
-        <h3>Grupowanie</h3>
-        <div class="property-group" style="display: flex; flex-direction: column; gap: 6px;">
-          ${canCombineIntoGroup ? `<button type="button" id="btn-group-combine" class="btn btn-sm"><i class="ti ti-link" aria-hidden="true"></i> Połącz zaznaczone w grupę</button>` : ''}
-          ${activeModule.groupId ? `<button type="button" id="btn-group-split" class="btn btn-sm btn-danger"><i class="ti ti-scissors" aria-hidden="true"></i> Rozbij grupę</button>` : ''}
-        </div>
-      ` : ''}
+      ${groupButtonsHtml(activeModule.groupId)}
     `)}
 
     ${tabContent("front", `
@@ -924,33 +910,5 @@ function setupEventListeners() {
     if (mod) openWallFillModal(() => { initPropertiesPanel(); updateAll(); }, { editKitchenId: mod.id });
   });
 
-  const btnGroupCombine = document.getElementById('btn-group-combine');
-  if (btnGroupCombine) {
-    btnGroupCombine.addEventListener('click', () => {
-      const newGroupId = 'group-' + Date.now();
-      const oldGroups = new Set();
-      state.selectedModules.forEach(id => {
-        const m = state.project.modules.find(md => md.id === id);
-        if (m) { if (m.groupId) oldGroups.add(m.groupId); m.groupId = newGroupId; }
-      });
-      // blendy / boki przypisane do łączonych grup idą do nowej
-      (state.project.sidePanels || []).forEach(p => { if (p.groupId && oldGroups.has(p.groupId)) p.groupId = newGroupId; });
-      updateAll();
-      initPropertiesPanel();
-    });
-  }
-  const btnGroupSplit = document.getElementById('btn-group-split');
-  if (btnGroupSplit) {
-    btnGroupSplit.addEventListener('click', () => {
-      const mod = getActiveModule();
-      if (!mod || !mod.groupId) return;
-      const gId = mod.groupId;
-      [...state.project.modules, ...(state.project.sidePanels || [])].forEach(m => {
-        if (m.groupId === gId) delete m.groupId;
-      });
-      state.selectedModules = new Set([mod.id]);
-      updateAll();
-      initPropertiesPanel();
-    });
-  }
+  bindGroupButtons(getActiveModule()?.groupId, () => { updateAll(); initPropertiesPanel(); });
 }

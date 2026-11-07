@@ -214,6 +214,9 @@ export function migrateLegacyFillers(project) {
 export const state = {
   activeModuleId: null,
   activeSidePanelId: null,
+  // boki dokładane / blendy zaznaczone razem z szafkami (Shift/Ctrl) - do łączenia w grupę i
+  // wspólnego przesuwania (core/groupSelection.js); szafki są w state.selectedModules
+  selectedSidePanels: new Set(),
   loadedProjectId: null,
   project: {
     name: "Zabudowa Wielomodułowa",

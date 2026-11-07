@@ -61,7 +61,13 @@ export function furnitureGroups(project) {
   prefixes.sort((a, b) => b.prefix.length - a.prefix.length);
 
   panels.forEach((p) => {
-    if (p.groupId && byKey.has(p.groupId)) { panelKey.set(p.id, p.groupId); return; }
+    // grupa z samych paneli (np. panele na ścianę) - nazwa ze wspólnego początku ich nazw
+    if (p.groupId && !byKey.has(p.groupId)) {
+      const members = panels.filter((x) => x.groupId === p.groupId);
+      const prefix = members.length > 1 ? commonNamePrefix(members.map((x) => x.name)) : "";
+      add(p.groupId, prefix || String(p.name || "").trim() || "Grupa paneli");
+    }
+    if (p.groupId) { panelKey.set(p.id, p.groupId); return; }
     const name = String(p.name || "").trim();
     const hit = prefixes.find(({ prefix }) => name === prefix || name.startsWith(prefix + " "));
     if (hit) { panelKey.set(p.id, hit.key); return; }

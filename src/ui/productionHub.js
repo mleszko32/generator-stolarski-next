@@ -190,6 +190,7 @@ function renderFormatki(el) {
       const id = img.getAttribute('data-module-id');
       state.activeModuleId = id;
       state.selectedModules = new Set([id]);
+      state.selectedSidePanels = new Set();
       state.activeSidePanelId = null;
       initPropertiesPanel();
       update3D();

@@ -67,3 +67,13 @@ describe("aggregateByFurniture", () => {
     expect(furnitureChoices(project, parts).map((g) => g.key)).toEqual(["g1", "g2", COLLECTIVE_KEY]);
   });
 });
+
+describe("grupa z samych paneli", () => {
+  it("panele na ścianę to jeden mebel z nazwą ze wspólnego początku", () => {
+    const p = { modules: [{ id: "m", name: "Szafka 1" }], sidePanels: [
+      { id: "a", groupId: "w", name: "Panel ścienny 1" }, { id: "b", groupId: "w", name: "Panel ścienny 2" }] };
+    const { groups, panelKey } = furnitureGroups(p);
+    expect(groups.map((g) => g.label)).toEqual(["Szafka 1", "Panel ścienny"]);
+    expect(panelKey.get("b")).toBe("w");
+  });
+});

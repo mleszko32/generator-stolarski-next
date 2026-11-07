@@ -24,6 +24,7 @@ import { getOpenings, openingBox } from '../core/openings.js';
 import { roomWalls } from '../core/roomShape.js';
 import { snapSidePanel } from '../core/sidePanelSnap.js';
 import { snapModulePosition, sweepSelection, boxesOverlap, getSidePanelBox } from '../core/moduleDrag.js';
+import { clickSelection, groupMembers } from '../core/groupSelection.js';
 import { refreshModuleInfoCard } from '../ui/moduleInfoPanel.js';
 import { initPropertiesPanel } from '../ui/properties.js';
 import { mats, worktopMat, disposeObject, createLabelSprite, addBox, addHole, addHardware, addLegsAndPlinth, isXrayMode, setXrayMode, colorMode, setColorMode, setMaterialPalette, highlightKey, setHighlightKey } from './meshBuilders.js';
@@ -87,6 +88,10 @@ let dragStartOverlaps = new Set(); // szafki, na które zaznaczenie nachodziło 
 // Boki / blendy przypisane do grupy przeciąganych szafek (sidePanel.groupId) - jadą razem z nimi.
 // id → { pos: pozycja w projekcie, obj: pozycja bryły w scenie } z początku przeciągania.
 let dragGroupPanels = new Map();
+// Przeciąganie boku/blendy: reszta jego grupy / zaznaczenia ('m:id' / 'p:id' → { kind, item, pos, obj })
+// i pozycja przeciąganego boku z początku ruchu.
+let dragFollowers = new Map();
+let dragPanelOrigin = { x: 0, z: 0 };
 let wasSelectedOnDown = false;
 // Przeciąganie boku dokładanego (core/state.js: addSidePanel) - osobny,
 // prostszy tor niż moduły (bez grup, bez blend, bez trybu pionowego Alt),
@@ -411,18 +416,15 @@ export function init3DViewer() {
               dragPlane.setFromNormalAndCoplanarPoint(normal, intersects[0].point);
               dragOffset.copy(dragTarget.position).sub(intersects[0].point);
               
-              const gId = dragModule.groupId;
-              const idsToSelect = gId ? state.project.modules.filter(m => m.groupId === gId).map(m => m.id) : [dragModule.id];
-
               if (!state.selectedModules) state.selectedModules = new Set();
               wasSelectedOnDown = state.selectedModules.has(dragModule.id);
 
               if (!wasSelectedOnDown) {
-                  if (e.shiftKey) {
-                      idsToSelect.forEach(id => state.selectedModules.add(id));
-                  } else {
-                      state.selectedModules = new Set(idsToSelect);
-                  }
+                  // cała grupa (szafki + jej blendy/boki); Shift/Ctrl dokłada do zaznaczenia
+                  const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels },
+                      'module', dragModule.id, e.shiftKey || e.ctrlKey || e.metaKey);
+                  state.selectedModules = sel.moduleIds;
+                  state.selectedSidePanels = sel.panelIds;
                   state.activeModuleId = dragModule.id;
                   state.activeSidePanelId = null;
                   updateSidebar();
@@ -437,8 +439,9 @@ export function init3DViewer() {
               });
               dragGroupPanels = new Map();
               const dragGroupIds = new Set(state.project.modules.filter(m => state.selectedModules.has(m.id) && m.groupId).map(m => m.groupId));
+              const selPanels = state.selectedSidePanels || new Set();
               (state.project.sidePanels || []).forEach(p => {
-                  if (!p.groupId || !dragGroupIds.has(p.groupId)) return;
+                  if (!selPanels.has(p.id) && !(p.groupId && dragGroupIds.has(p.groupId))) return;
                   const obj = cabinetGroup.children.find(g => g.userData && g.userData.sidePanelId === p.id);
                   dragGroupPanels.set(p.id, {
                       pos: { x: parseFloat(p.position.x) || 0, y: parseFloat(p.position.y) || 0, z: parseFloat(p.position.z) || 0 },
@@ -467,9 +470,13 @@ export function init3DViewer() {
 
                   const wasActive = state.activeSidePanelId === dragSidePanel.id;
                   if (!wasActive) {
+                      // jak w lewym panelu: klik = grupa boku, Shift/Ctrl dokłada go do zaznaczenia szafek
+                      const sel = clickSelection(state.project, { moduleIds: state.selectedModules || new Set(), panelIds: state.selectedSidePanels },
+                          'panel', dragSidePanel.id, e.shiftKey || e.ctrlKey || e.metaKey);
+                      state.selectedModules = sel.moduleIds;
+                      state.selectedSidePanels = sel.panelIds;
                       state.activeSidePanelId = dragSidePanel.id;
                       state.activeModuleId = null;
-                      if (state.selectedModules) state.selectedModules.clear();
                       updateSidebar();
                       initPropertiesPanel();
                       update3D();
@@ -483,6 +490,19 @@ export function init3DViewer() {
                   // podstawy, i przy przeciąganiu tnie promień przez podstawę leżącą na podłodze.
                   // Dzięki temu podstawa boku jedzie 1:1 za kursorem, a płaszczyzna nie jest
                   // prawie równoległa do promienia (bok złapany za górę skakał o metry).
+                  // Grupa / zaznaczenie (Shift/Ctrl) jedzie razem z przeciąganym bokiem.
+                  dragPanelOrigin = { x: parseFloat(dragSidePanel.position.x) || 0, z: parseFloat(dragSidePanel.position.z) || 0 };
+                  dragFollowers = new Map();
+                  const addFollower = (kind, item) => {
+                      const obj = cabinetGroup.children.find(g => g.userData && (kind === 'm' ? g.userData.moduleId === item.id : g.userData.sidePanelId === item.id));
+                      dragFollowers.set(kind + ':' + item.id, {
+                          kind, item, obj: obj ? obj.position.clone() : null,
+                          pos: { x: parseFloat(item.position.x) || 0, z: parseFloat(item.position.z) || 0 },
+                      });
+                  };
+                  state.project.modules.forEach(m => { if (state.selectedModules && state.selectedModules.has(m.id)) addFollower('m', m); });
+                  state.project.sidePanels.forEach(p => { if (p.id !== dragSidePanel.id && state.selectedSidePanels && state.selectedSidePanels.has(p.id)) addFollower('p', p); });
+
                   const basePoint = new THREE.Vector3(dragSidePanelTarget.position.x, parseFloat(dragSidePanel.position.y) || 0, dragSidePanelTarget.position.z);
                   const baseNdc = basePoint.clone().project(camera);
                   sidePanelNdcShift.set(baseNdc.x - mouse.x, baseNdc.y - mouse.y);
@@ -511,8 +531,14 @@ export function init3DViewer() {
           const { worldW, worldD } = getWorldFootprint(dragSidePanel);
 
           // Przyciąganie do szafek (z blendami), innych boków i ścian oraz wypchnięcie
-          // z korpusu - patrz core/sidePanelSnap.js.
-          const snapped = snapSidePanel(dragSidePanel, newGroupPos.x - worldW / 2, newGroupPos.z - worldD / 2, state.project, SNAP_DIST);
+          // z korpusu - patrz core/sidePanelSnap.js. Elementy jadące razem z nim (grupa) nie
+          // są celem przyciągania.
+          const snapProject = dragFollowers.size
+              ? { ...state.project,
+                  modules: state.project.modules.filter(m => !dragFollowers.has('m:' + m.id)),
+                  sidePanels: state.project.sidePanels.filter(p => !dragFollowers.has('p:' + p.id)) }
+              : state.project;
+          const snapped = snapSidePanel(dragSidePanel, newGroupPos.x - worldW / 2, newGroupPos.z - worldD / 2, snapProject, SNAP_DIST);
           const snapX = snapped.x;
           const snapZ = snapped.z;
 
@@ -522,6 +548,16 @@ export function init3DViewer() {
           const H = parseFloat(dragSidePanel.dimensions.height) || 0;
           const y = parseFloat(dragSidePanel.position.y) || 0;
           dragSidePanelTarget.position.set(snapX + worldW / 2, y + H / 2, snapZ + worldD / 2);
+
+          // reszta grupy / zaznaczenia - o to samo przesunięcie
+          const dx = dragSidePanel.position.x - dragPanelOrigin.x;
+          const dz = dragSidePanel.position.z - dragPanelOrigin.z;
+          dragFollowers.forEach((f) => {
+              f.item.position.x = Math.round((f.pos.x + dx) * 100) / 100;
+              f.item.position.z = Math.round((f.pos.z + dz) * 100) / 100;
+              const obj = f.obj && cabinetGroup.children.find(g => g.userData && (f.kind === 'm' ? g.userData.moduleId === f.item.id : g.userData.sidePanelId === f.item.id));
+              if (obj) obj.position.set(f.obj.x + dx, f.obj.y, f.obj.z + dz);
+          });
           return;
       }
 
@@ -695,6 +731,7 @@ export function init3DViewer() {
       const moved = dragMoved;
       dragMoved = false;
       dragGroupPanels = new Map();
+      dragFollowers = new Map();
       if (isDragging && !moved) {
           isDragging = false;
           dragTarget = null;
@@ -1106,6 +1143,7 @@ function handle3DClick(event) {
           state.activeModuleId = null;
           state.activeSidePanelId = null;
           if (state.selectedModules) state.selectedModules.clear();
+          state.selectedSidePanels = new Set();
           updateSidebar();
           initPropertiesPanel();
           update3D();
@@ -1117,9 +1155,9 @@ function handle3DClick(event) {
   // (edycja pozycji/wymiarów wyłącznie liczbowo w panelu bocznym), bez trybu
   // przeciągania czy menu kontekstowego, jak przy module.
   if (data.sidePanelId && !data.moduleId) {
+      // zaznaczenie (z grupą / Shift) ustawił już pointerdown
       state.activeSidePanelId = data.sidePanelId;
       state.activeModuleId = null;
-      if (state.selectedModules) state.selectedModules.clear();
       updateSidebar();
       initPropertiesPanel();
       update3D();
@@ -1171,19 +1209,21 @@ function handle3DClick(event) {
   }
 
   if (validHit && data) {
-      const clickedMod = state.project.modules.find(m => m.id === data.moduleId);
-      const gId = clickedMod && clickedMod.groupId;
-      const idsToSelect = gId ? state.project.modules.filter(m => m.groupId === gId).map(m => m.id) : [data.moduleId];
+      const group = groupMembers(state.project, 'module', data.moduleId);
+      const additive = event.shiftKey || event.ctrlKey || event.metaKey;
 
       if (wasSelectedOnDown) {
-          if (event.shiftKey) {
-              idsToSelect.forEach(id => state.selectedModules.delete(id));
+          if (additive) {
+              const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels }, 'module', data.moduleId, true);
+              state.selectedModules = sel.moduleIds;
+              state.selectedSidePanels = sel.panelIds;
               if (state.activeModuleId === data.moduleId) state.activeModuleId = Array.from(state.selectedModules).pop() || null;
               updateSidebar();
               initPropertiesPanel();
               update3D();
-          } else if (state.selectedModules.size > idsToSelect.length) {
-              state.selectedModules = new Set(idsToSelect);
+          } else if (state.selectedModules.size + (state.selectedSidePanels?.size || 0) > group.moduleIds.length + group.panelIds.length) {
+              state.selectedModules = new Set(group.moduleIds);
+              state.selectedSidePanels = new Set(group.panelIds);
               state.activeModuleId = data.moduleId;
               state.activeSidePanelId = null;
               updateSidebar();
@@ -1732,7 +1772,7 @@ export function update3D() {
       });
       (state.project.sidePanels || []).forEach(panel => {
           if (panel.kind === 'blenda' ? !isBlendsVisible : !isSidePanelsVisible) return;
-          const isActiveSide = panel.id === state.activeSidePanelId;
+          const isActiveSide = panel.id === state.activeSidePanelId || !!(state.selectedSidePanels && state.selectedSidePanels.has(panel.id));
           const { worldW, worldD } = getWorldFootprint(panel);
           const x = parseFloat(panel.position?.x) || 0;
           const y = parseFloat(panel.position?.y) || 0;

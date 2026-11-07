@@ -14,6 +14,7 @@ import { sanitizeAiModules, buildModulesFromAi } from "../core/aiSketchImport.js
 import { getIdToken } from "../core/storage.js";
 import { clampModuleToRoom } from "../core/layout.js";
 import { parseFurnitureJson, insertFurniture } from "../core/furnitureImport.js";
+import { clickSelection } from "../core/groupSelection.js";
 
 // Okno oczekiwania na wynik AI (wspólne openModal, bez zamykania w trakcie).
 let aiLoader = null;
@@ -77,7 +78,7 @@ export function updateSidebar() {
     <section class="panel-section">
       <div class="panel-head">
         <h2>Szafki</h2>
-        <span class="panel-hint">Shift = zaznacz wiele</span>
+        <span class="panel-hint">Shift / Ctrl = zaznacz wiele</span>
       </div>`;
 
   if (modules.length === 0) {
@@ -126,10 +127,12 @@ export function updateSidebar() {
   // obiekty projektu, obie listy z jednej tablicy project.sidePanels (pole kind).
   const sideItem = (p, icon, fallbackName, delTitle, meta) => {
     const isActive = p.id === state.activeSidePanelId;
+    const isSelected = state.selectedSidePanels && state.selectedSidePanels.has(p.id);
+    const group = p.groupId ? `<i class="ti ti-link li-group" title="W grupie z szafkami" aria-hidden="true"></i>` : '';
     return `
-        <div class="list-item side-panel-item${isActive ? ' is-active' : ''}" data-id="${escapeHtml(p.id)}">
+        <div class="list-item side-panel-item${isActive ? ' is-active' : (isSelected ? ' is-selected' : '')}" data-id="${escapeHtml(p.id)}">
           <i class="ti ${icon} li-icon" aria-hidden="true"></i>
-          <div class="li-main"><span class="li-name">${escapeHtml(p.name || fallbackName)}</span><span class="li-meta">${escapeHtml(meta)}</span></div>
+          <div class="li-main"><span class="li-name">${escapeHtml(p.name || fallbackName)}</span>${group}<span class="li-meta">${escapeHtml(meta)}</span></div>
           <div class="li-actions"><button class="icon-btn btn-side-panel-del" data-id="${escapeHtml(p.id)}" title="${delTitle}"><i class="ti ti-trash" aria-hidden="true"></i></button></div>
         </div>`;
   };
@@ -178,6 +181,7 @@ export function updateSidebar() {
       state.activeModuleId = null;
       state.activeSidePanelId = null;
       if (state.selectedModules) state.selectedModules.clear();
+      state.selectedSidePanels = new Set();
       initPropertiesPanel(); update3D(); updateSidebar();
     });
   }
@@ -201,25 +205,14 @@ export function updateSidebar() {
   document.querySelectorAll('.module-item').forEach(el => {
     el.addEventListener('click', (e) => {
       const id = e.currentTarget.getAttribute('data-id');
-      const clickedMod = state.project.modules.find(m => m.id === id);
-      
-      const gId = clickedMod && clickedMod.groupId;
-      const idsToSelect = gId ? state.project.modules.filter(m => m.groupId === gId).map(m => m.id) : [id];
-      
-      if (e.shiftKey || e.ctrlKey || e.metaKey) {
-          if (!state.selectedModules) state.selectedModules = new Set();
-          const allSelected = idsToSelect.every(i => state.selectedModules.has(i));
-          if (allSelected) {
-              idsToSelect.forEach(i => state.selectedModules.delete(i));
-              if (state.activeModuleId === id) state.activeModuleId = Array.from(state.selectedModules).pop() || null;
-          } else {
-              idsToSelect.forEach(i => state.selectedModules.add(i));
-              state.activeModuleId = id;
-          }
-      } else {
-          state.selectedModules = new Set(idsToSelect);
-          state.activeModuleId = id;
-      }
+      // Kliknięcie zaznacza całą grupę (szafki + jej blendy/boki); Shift/Ctrl dokłada albo zdejmuje.
+      const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+      const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels }, 'module', id, additive);
+      state.selectedModules = sel.moduleIds;
+      state.selectedSidePanels = sel.panelIds;
+      state.activeModuleId = sel.removed
+          ? (state.activeModuleId === id ? Array.from(state.selectedModules).pop() || null : state.activeModuleId)
+          : id;
       state.activeSidePanelId = null;
 
       initPropertiesPanel();
@@ -277,6 +270,7 @@ export function updateSidebar() {
     if (last && last.length) {
       state.activeModuleId = last[0].id;
       state.selectedModules = new Set(last.map(m => m.id));
+      state.selectedSidePanels = new Set(state.project.sidePanels.filter(p => p.groupId && p.groupId === last[0].groupId).map(p => p.id));
       state.activeSidePanelId = null;
     }
     initPropertiesPanel(); update3D(); updateSidebar();
@@ -319,9 +313,18 @@ export function updateSidebar() {
   document.querySelectorAll('.side-panel-item').forEach(el => {
     el.addEventListener('click', (e) => {
       const id = e.currentTarget.getAttribute('data-id');
-      state.activeSidePanelId = id;
-      state.activeModuleId = null;
-      if (state.selectedModules) state.selectedModules.clear();
+      // jak przy szafkach: Shift/Ctrl dokłada blendę/bok do zaznaczenia (np. do „Połącz w grupę”)
+      const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+      const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels }, 'panel', id, additive);
+      state.selectedModules = sel.moduleIds;
+      state.selectedSidePanels = sel.panelIds;
+      if (sel.removed) {
+        if (state.activeSidePanelId === id) state.activeSidePanelId = null;
+        if (!state.activeSidePanelId) state.activeModuleId = Array.from(state.selectedModules).pop() || null;
+      } else {
+        state.activeSidePanelId = id;
+        state.activeModuleId = null;
+      }
       initPropertiesPanel();
       update3D();
       updateSidebar();
