@@ -70,7 +70,7 @@ describe("rowProfile", () => {
     state.project.front.bodyGap = 4;
     const r = applyFillPlan({ wallId: "tyl", items: [{ kind: "blenda", u0: 0, width: 40, flange: "lewa" }], type: "base_cabinet", wallGap: 50 });
     // lico = z + 80 = 50 + 513 + 4 + 18
-    expect(r.panels[0].position.z + 80).toBe(585);
+    expect(r.panels[0].position.z + 98).toBe(585);
   });
 });
 
@@ -109,8 +109,8 @@ describe("odsunięcie od ściany (project.wallFill.wallGap)", () => {
     expect(pos("prawa").m).toMatchObject({ x: 4000 - 50 - 513, z: 1000 });
     expect(pos("lewa").m).toMatchObject({ x: 50 });
     expect(pos("przednia").m).toMatchObject({ z: 3000 - 50 - 513 });
-    // Blenda: lico równo z frontami (583 od ściany), głębokość 80 -> z = 583 - 80 = 503.
-    expect(pos("tyl").b).toMatchObject({ x: 1600, z: 503 });
+    // Blenda: lico równo z frontami (583 od ściany), głębokość 98 (listwa 80 + czoło 18) -> z = 583 - 98 = 485.
+    expect(pos("tyl").b).toMatchObject({ x: 1600, z: 485 });
   });
 
   it("pas rzędu sięga lica frontów odsuniętych szafek - blenda przy dużym odsunięciu nadal blokuje", () => {
@@ -286,7 +286,7 @@ describe("applyFillPlan", () => {
     expect(modules.map((m) => m.rotation)).toEqual([90, 90]);
     expect(modules.map((m) => m.position)).toEqual([{ x: 3487, y: 0, z: 0 }, { x: 3487, y: 0, z: 600 }]);
     expect(new Set(modules.map((m) => m.id)).size).toBe(2);
-    expect(panels[0]).toMatchObject({ kind: "blenda", flange: "lewa", rotation: 90, dimensions: { width: 50, height: 720, depth: 80 } });
+    expect(panels[0]).toMatchObject({ kind: "blenda", flange: "lewa", rotation: 90, dimensions: { width: 50, height: 720, depth: 98 } });
     // Lico blendy (d1) = głębokość korpusu + 2 mm szczeliny + 18 mm frontu.
     const lay = computeWallLayouts();
     expect(lay.walls.find((w) => w.id === "prawa").items.map((i) => [i.u0, i.u1])).toEqual([[0, 600], [600, 1200]]);

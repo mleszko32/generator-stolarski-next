@@ -10,7 +10,7 @@
 // (patrząc od środka pokoju), `d` = odległość od lica ściany w głąb pokoju.
 // Lokalna oś X szafki o obrocie danej ściany zawsze rośnie razem z `u`, więc
 // "lewa"/"prawa" w szafce i blendzie to lewa/prawa na rzucie ściany.
-import { state, createModuleObject, cloneModuleWithNewIds, ensureSidePanelsDefaults, frontBodyGap } from "./state.js";
+import { state, createModuleObject, cloneModuleWithNewIds, ensureSidePanelsDefaults, frontBodyGap, BLENDA_FLANGE_WIDTH } from "./state.js";
 import { getRoom, wallLength } from "./walls.js";
 import { getOpenings, OPENING_KINDS } from "./openings.js";
 import { getWorldFootprint } from "./layout.js";
@@ -78,7 +78,7 @@ export function setClearance(project, key, value) {
 export const MIN_FILLER = 3;
 export const MIN_CABINET_WIDTH = 150;
 const PREFERRED_WIDTH = 600;
-const BLENDA_DEPTH = 80;
+// Głębokość blendy = listwa mocująca (BLENDA_FLANGE_WIDTH, formatka zawsze 80 mm) + czoło.
 const EPS = 0.5;
 const MAX_SEARCH_NODES = 400000;
 
@@ -536,7 +536,8 @@ function addRowBlendas(project, wallId, room, row, template, items) {
   const frontCfg = { ...(project.front || {}), ...((template && template.front) || {}) };
   const frontType = frontCfg.type || "nakladane";
   const zF = row.gap + (frontType === "wpuszczane" ? row.depth - th : row.depth + frontBodyGap(frontCfg));
-  const d0 = zF - (BLENDA_DEPTH - th);
+  const BLENDA_DEPTH = BLENDA_FLANGE_WIDTH + th;
+  const d0 = zF - BLENDA_FLANGE_WIDTH;
   const rotation = WALL_ROTATION[wallId] ?? 0;
   return blendas.map((it) => {
     const count = project.sidePanels.filter((p) => p.kind === "blenda").length;

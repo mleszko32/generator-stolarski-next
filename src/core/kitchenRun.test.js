@@ -158,7 +158,7 @@ describe("planKitchenRun", () => {
     const lewa = plan.walls.find((w) => w.wallId === "lewa");
     expect(Math.max(...lewa.segments.map((s) => s.u1))).toBeLessThanOrEqual(3000 - 583 - 50);
     const blenda = plan.panels.find((p) => p.kind === "blenda" && p.rotation === 270);
-    expect(blenda.position.x).toBe(50 + 513 + 2 - 62);
+    expect(blenda.position.x).toBe(50 + 513 + 2 - 80);
     applyKitchenRun(plan);
     const { issues } = validateProject();
     expect(issues.filter((i) => /narożnik|Nachodzi/i.test(i.message) && i.level !== "info")).toEqual([]);

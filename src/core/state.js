@@ -452,8 +452,13 @@ export function addHorizontalPanel() {
 // (wzdłuż X), height = wysokość, depth = głębokość całości (czoło + kołnierz mocujący).
 // flange: krawędź czoła, przy której jest kołnierz mocujący do szafki:
 // 'lewa' | 'prawa' | 'gora' | 'dol' | 'brak'. Nieobrócona blenda ma czoło z przodu (+Z).
+// Szerokość listwy mocującej blendy (formatka „Mocowanie wewn.”) - zawsze 80 mm;
+// głębokość nowej blendy = listwa + grubość czoła.
+export const BLENDA_FLANGE_WIDTH = 80;
+
 export function addBlenda() {
   const newId = 'blenda-' + Date.now();
+  const th = parseFloat(state.project.materials?.boardThickness) || 18;
   const count = state.project.sidePanels.filter(p => p.kind === 'blenda').length;
   const newPanel = {
     id: newId,
@@ -463,7 +468,7 @@ export function addBlenda() {
     flange: 'prawa',
     position: { x: 0, y: 100, z: 0 },
     rotation: 0,
-    dimensions: { width: 50, height: 720, depth: 80 },
+    dimensions: { width: 50, height: 720, depth: BLENDA_FLANGE_WIDTH + th },
   };
   state.project.sidePanels.push(newPanel);
   state.activeSidePanelId = newId;
