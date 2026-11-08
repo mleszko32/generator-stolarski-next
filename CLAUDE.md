@@ -116,7 +116,9 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
   szufladzie (`front.drawerSideHeight`), formatki 2 boki + dno między bokami + tył +
   czoło wewn. (`getDrawerComponents` zwraca wtedy też `sides`/`innerFront`); na liście formatek
   tył i czoło wewn. to jedna formatka „Tył/Przód szuflady …” × 2 (ten sam wymiar). Nazwy formatek
-  szuflad nie zawierają szerokości szafki, żeby jednakowe formatki z różnych szafek się sumowały. Wiercenie
+  szuflad nie zawierają szerokości szafki, żeby jednakowe formatki z różnych szafek się sumowały. Czoło szuflady
+  wewnętrznej w systemach metalowych (MERIVOBOX itd.) to gotowy element Blum — bez formatki (`innerFrontIsSystem` w
+  `engine/cabinet.js`); formatka „Front szuflady wewn.” tylko przy skrzynce drewnianej. Wiercenie
   prowadnic MOVENTO wg karty Blum: wkręty 38 mm nad wieńcem/półką pod szufladą
   (`calculateDrawerHoles(..., nl, zoneBottom)`), w poziomie `moventoRunnerHoles(system, nl)`.
 - `drawerMath.js` — dobór długości nominalnej, dobór wariantu wysokości do dostępnego miejsca,
@@ -259,6 +261,11 @@ przez `zoneTree`: półki stałe + `assignFront`/`addEvenShelves`; `mod.wardrobe
 `applySlopeNiche` (zastępuje szafki z polem `slopeNiche`, ustawienia w `project.slopeNiche`, siedzisko = blat
 projektu). Edycja listy szafek/sekcji w oknie: `addNicheModule`, `newNicheSection`, `moveInList`. Widok z przodu `render/slopeNicheDrawing.js`, okno `ui/slopeNicheModal.js` (Narzędzia).
 
+**Dział Szuflady** (hub, sekcja `skrzynki`): `core/drawerAssembly.js` (czyste, z testami) — `collectDrawers` (wszystkie
+szuflady zwykłych szafek przez `drawerSpec`: system, wariant, NL, LW, front, dno/tył), `innerFrontSpec` (czoło szuflady
+wewn. MERIVOBOX = profil ZV4.1042M docinany na LW − 126 + mocowanie ZI4 wg wysokości, przy E reling ZR4.1059U na LW − 111),
+`packCuts` (ile profili 1042 kupić), `innerFrontPurchases` (też na liście okuć w `hardware.js`); UI `ui/drawersSection.js`
+(tabela + karta składania do druku), pod nim skrzynki drewniane MOVENTO.
 **Skrzynki szuflad (MOVENTO)**: `core/drawerBoxBuild.js` (czyste, z testami) zbiera skrzynki drewniane z całego
 projektu (`getDrawerBoxInfo` z `core/drawerBoxes.js`, skos przez `getSlopeFronts`), scala identyczne i liczy otwory
 łączników wg `project.drawerBox`; rysunki `render/drawerBoxDrawing2d.js`, okno `ui/drawerBoxDrawings.js`.

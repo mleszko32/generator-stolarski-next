@@ -74,7 +74,7 @@ describe("szafka ślepa - geometria", () => {
   it("okucie trafia na listę okuć w wersji strony ślepej", () => {
     state.project.modules = [blindModule({ side: "right", fitting: "lemans" })];
     const hw = calculateProjectHardware();
-    expect(hw.find((h) => h.name.startsWith("Okucie narożne Kesseböhmer LeMans II"))).toMatchObject({ qty: 1 });
+    expect(hw.find((h) => h.name.startsWith("Okucie narożne LeMans II"))).toMatchObject({ qty: 1 });
     expect(hw.some((h) => h.name.endsWith("strona ślepa prawa"))).toBe(true);
   });
 
@@ -87,7 +87,7 @@ describe("szafka ślepa - geometria", () => {
     expect(checkBlindCorner(narrow, state.project).join(" ")).toMatch(/co najmniej 450/);
     state.project.modules = [blindModule({ fitting: "lemans", frontWidth: 300 })];
     const { issues } = validateProject();
-    expect(issues.some((i) => i.level === "warn" && /LeMans II: front 300/.test(i.message))).toBe(true);
+    expect(issues.some((i) => i.level === "warn" && /LeMans II.*: front 300/.test(i.message))).toBe(true);
   });
 });
 

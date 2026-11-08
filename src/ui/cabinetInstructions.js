@@ -173,7 +173,7 @@ function cardHtml({ mod, idx, layouts, panels, th, scale, dims, lead, assembly, 
       <table class="parts"><thead><tr><th>Nr</th><th>Formatka</th><th>Szt.</th><th>Wymiar [mm]</th></tr></thead><tbody>${partsRows}</tbody></table>
       <div class="notes">
         <div>Numery formatek są takie same na rysunku montażu, w tabeli otworów i na rysunkach formatek.</div>
-        <div>Fronty, skrzynki szuflad i okucia: lista formatek, sekcja „Skrzynki szuflad” i „Okucia” w hubie Produkcja.</div>
+        <div>Fronty, skrzynki szuflad i okucia: lista formatek, sekcja „Szuflady” i „Okucia” w hubie Produkcja.</div>
         <div>Otwory w tych samych miejscach co na „Rysunkach 2D” (rysunek boku z wierceniami).</div>
         ${extraNote ? `<div>${escapeHtml(extraNote)}</div>` : ""}
       </div>

@@ -18,16 +18,17 @@
 //                Kesseböhmer MA 402118 / 405537), Magic Corner: kosze na drzwiach, zawias z dala.
 export const CORNER_FITTINGS = {
   lemans: {
-    label: "Kesseböhmer LeMans II",
+    label: "LeMans II (Kesseböhmer / Peka)",
     kind: "blind",
-    widths: [900, 1000],
-    fronts: [450, 500, 600],
+    // front 400 do szafki 800 - wersja z katalogu Peka (005.401.KPL/A prawy, 005.402.KPL/A lewy)
+    widths: [800, 900, 1000],
+    fronts: [400, 450, 500, 600],
     minInnerDepth: null,
     innerHeight: [650, 800],
     minOpening: { 400: 361, 450: 411, 500: 461, 600: 561 }, // tabela MA 402118: otwór 361–368 / 411–418 / …
     mounts: ["listwa", "zaslepka"],
     note: "Drzwi wiszą przy krawędzi otworu od strony ślepej i muszą otwierać się co najmniej o 85° (zawias 95°, nie 83°). Nośność 25 kg na tacę.",
-    hwName: "Okucie narożne Kesseböhmer LeMans II (2 tace)",
+    hwName: "Okucie narożne LeMans II (Kesseböhmer / Peka, 2 tace)",
   },
   magicCorner: {
     label: "Magic Corner (Kesseböhmer / Häfele)",

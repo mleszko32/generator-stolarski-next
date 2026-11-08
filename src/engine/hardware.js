@@ -18,6 +18,7 @@ import { getCornerFitting } from "../core/cornerFittings.js";
 import { wardrobeRodLength } from "../core/slopeNiche.js";
 import { moduleBoardThickness } from "../core/boardThickness.js";
 import { isFlap, flapHardware, frontThickness } from "../core/liftFlap.js";
+import { collectDrawers, innerFrontPurchases, profileKerf } from "../core/drawerAssembly.js";
 
 export function calculateProjectHardware() {
   recalculateAllLayouts();
@@ -193,6 +194,12 @@ export function calculateProjectHardware() {
         }
       });
     });
+  });
+
+  // Czoła szuflad wewnętrznych MERIVOBOX: profile do docięcia, mocowania wg wysokości, relingi
+  // (core/drawerAssembly.js - to samo zestawienie co dział Szuflady w hubie).
+  innerFrontPurchases(collectDrawers(config), profileKerf(config)).items.forEach(it => {
+    hardwareList[it.name] = { name: it.name, qty: it.qty, unit: it.unit };
   });
 
   // Okleina krawędziowa: wszystkie formatki dookoła (poza plecami HDF) - patrz

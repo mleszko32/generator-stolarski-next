@@ -32,6 +32,7 @@ import { openDrillSheetsDialog } from "./drillSheetsPrint.js";
 import { mountKosztorys } from "./kosztorysModal.js";
 import { collectDrawerBoxes, getDrawerBoxSettings, JOIN_METHODS, LAMELLO } from "../core/drawerBoxBuild.js";
 import { openDrawerBoxDrawings } from "./drawerBoxDrawings.js";
+import { drawersSectionHtml, bindDrawersSection } from "./drawersSection.js";
 import { openCabinetInstructions, supportsInstructions } from "./cabinetInstructions.js";
 import { getRcSettings, rcRearScrew, rcPinSideText } from "../core/rcSystem.js";
 
@@ -39,7 +40,7 @@ const SECTIONS = [
   { id: 'formatki', label: 'Formatki', icon: 'ti-list-details' },
   { id: 'rozkroj', label: 'Rozkrój i etykiety', icon: 'ti-cut' },
   { id: 'rysunki', label: 'Rysunki 2D', icon: 'ti-ruler-2' },
-  { id: 'skrzynki', label: 'Skrzynki szuflad', icon: 'ti-box' },
+  { id: 'skrzynki', label: 'Szuflady', icon: 'ti-box' },
   { id: 'instrukcje', label: 'Instrukcje montażu', icon: 'ti-tools' },
   { id: 'sciany', label: 'Rzuty ścian', icon: 'ti-wall' },
   { id: 'blaty', label: 'Blaty', icon: 'ti-layout-board' },
@@ -410,6 +411,13 @@ const DB_FIELDS = [
   ['lamelloEdge', 'Lamello: oś łącznika od końca formatki [mm]'],
   ['lamelloGroove', 'Lamello: długość rowka [mm] (0 = P-14 75, P-10 60)'],
 ];
+// Dział Szuflady: zestawienie wszystkich szuflad (ui/drawersSection.js), pod nim skrzynki drewniane MOVENTO.
+function renderSzuflady(el) {
+  el.innerHTML = drawersSectionHtml(state.project) + '<hr class="divider"><div id="db-wood"></div>';
+  bindDrawersSection(el, state.project, () => { scheduleCheckpoint(); renderSzuflady(el); });
+  renderSkrzynki(el.querySelector('#db-wood'));
+}
+
 function renderSkrzynki(el) {
   const p = state.project;
   const s = getDrawerBoxSettings(p);
@@ -417,7 +425,7 @@ function renderSkrzynki(el) {
   const total = boxes.reduce((n, b) => n + b.qty, 0);
   const save = (patch) => { p.drawerBox = { ...getDrawerBoxSettings(p), ...patch }; scheduleCheckpoint(); renderSkrzynki(el); };
   el.innerHTML = `
-    <div class="hub-bar"><div><h3>Skrzynki szuflad</h3>
+    <div class="hub-bar"><div><h3>Skrzynki drewniane (MOVENTO)</h3>
       <div class="hub-sub">Rysunki warsztatowe skrzynek szuflad drewnianych (Blum MOVENTO): boki, dno, tył i czoło wewnętrzne z ponumerowanymi otworami pod łączniki i zaczep tylny prowadnicy. Jednakowe skrzynki z całego projektu są zebrane w jedną pozycję.</div></div>
       ${total ? `<button type="button" class="btn btn-primary" id="db-open"><i class="ti ti-printer" aria-hidden="true"></i> Otwórz rysunki (${total} szt.)</button>` : ''}
     </div>
@@ -620,7 +628,7 @@ const RENDERERS = {
   formatki: renderFormatki,
   rozkroj: renderRozkroj,
   rysunki: renderRysunki,
-  skrzynki: renderSkrzynki,
+  skrzynki: renderSzuflady,
   instrukcje: renderInstrukcje,
   sciany: renderSciany,
   blaty: renderBlaty,

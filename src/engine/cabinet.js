@@ -2,6 +2,7 @@
 import { state } from "../core/state.js";
 import { calculateDrawerHoles, drawerComponentsToParts } from "../core/drawerMath.js";
 import { drawerSpec } from "../core/drawerSpec.js";
+import { drawerSystems } from "../core/drawerSystems.js";
 import { corpusInnerDepth } from "../core/backPanel.js";
 import { calculateHinges, stackedHingeObstacles } from "../core/hingeMath.js";
 import { fmtMm } from "../utils/math.js";
@@ -387,7 +388,11 @@ function getFrontsAndDrawers(mod, config) {
       partName = 'Drzwi';
     }
 
-    parts.push({ name: partName, length: parseFloat((front.h || 0).toFixed(1)), width: parseFloat((front.w || 0).toFixed(1)), qty: 1, category: "Front", materialId: front.materialId });
+    // Czoło szuflady wewnętrznej w systemie metalowym Blum (MERIVOBOX, TANDEMBOX, LEGRABOX…) to
+    // gotowy element systemu, nie formatka; z płyty tylko przy skrzynce drewnianej (MOVENTO).
+    if (!(front.subtype === 'szuflada-wewnetrzna' && innerFrontIsSystem(mod, config))) {
+      parts.push({ name: partName, length: parseFloat((front.h || 0).toFixed(1)), width: parseFloat((front.w || 0).toFixed(1)), qty: 1, category: "Front", materialId: front.materialId });
+    }
 
     if (front.subtype.includes('szuflada')) {
       const isBottomInZone = front.frontIndex === 0;
@@ -471,6 +476,12 @@ function getBlendaParts(panel, config) {
 // Kategoria "Front", bo to zwykle ten sam, droższy dekor co fronty (lakier/
 // fornir/okleina) - w Kosztorysie (calculateProjectCost) liczy się razem
 // z frontami, dając realną sumę m² tego dekoru do wyceny.
+// Czoło szuflady wewnętrznej systemowe (gotowy element Blum) - każdy system poza skrzynką drewnianą.
+function innerFrontIsSystem(mod, config) {
+  const sys = String({ ...(config.front || {}), ...(mod.front || {}) }.drawerSystem || "merivobox").toLowerCase();
+  return !(drawerSystems[sys] && drawerSystems[sys].woodenBox);
+}
+
 function getSidePanelParts(panel, config) {
   if (panel.kind === 'blenda') return getBlendaParts(panel, config);
   if (panel.kind === 'zmywarka') return getDishwasherParts(panel, config);

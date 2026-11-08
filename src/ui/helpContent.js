@@ -225,7 +225,7 @@ export const HELP_SECTIONS = [
         zaczyna się od numeru (np. „M1 Bok”; pełne nazwy w „Legendzie mebli” nad tabelą - kopiuj / drukuj), a jednakowe formatki sumują się tylko w obrębie mebla.</li>
         <li><b>Rozkrój i etykiety</b> - plan rozkroju na arkusze, etykiety do druku. Nad wynikiem ten sam wybór grup co w eksporcie formatek.</li>
         <li><b>Rysunki 2D</b> - rysunki formatek z wierceniami (przycisk „Drukuj… (A4)” otwiera listę formatek - boki, przegrody, wieńce, fronty z nawiertami zawiasów i szuflad - zaznaczone drukują się razem, każda na swoich kartkach; nad rysunkiem nazwa formatki jak w SAS, np. „M1 Bok (L/P)”, wieńce i półki stałe klikalne, „Cała grupa” pokazuje wszystkie szafki grupy). Przycisk „Arkusze nawierceń mebli” - wszystkie formatki z otworami z wybranych grup (też fronty z puszkami zawiasów), każda na kartce A4 na całą stronę, jednakowe razem z napisem „do nawiercenia: N szt.”, na początku legenda mebli i spis.</li>
-        <li><b>Skrzynki szuflad</b> - rysunki skrzynek drewnianych (MOVENTO) z otworami łączników.</li>
+        <li><b>Szuflady</b> - zestawienie wszystkich szuflad do składania (system, wysokość, NL, światło wnęki, front, dno i tył, czoła szuflad wewnętrznych MERIVOBOX z docinaniem profili), karta składania do druku i rysunki skrzynek drewnianych (MOVENTO) z otworami łączników.</li>
         <li><b>Instrukcje montażu</b> - kolejność składania i rysunki każdej szafki. Po zaznaczeniu
         „Wiercę na stole RC System” dochodzi karta wiercenia: która krawędź do pinów, otwór bazowy z pinem
         i ustawienie wiertarek dla każdego zestawu łączników - z numerem pinu i stroną szyny (np. „pin 7 po prawej”,

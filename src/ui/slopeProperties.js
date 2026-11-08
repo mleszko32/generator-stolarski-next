@@ -95,7 +95,7 @@ export function renderSlopeModuleProperties(rightSidebar, mod) {
         </select>
       </div>
       <div class="hint mb-8">${join
-        ? `Rowki frezarką Zeta P2 (gł. ${join.lam.depth} mm, długość ${String(join.len).replace('.', ',')} mm, oś skrajnego ${String(join.positions(1000)[0]).replace('.', ',')} mm od krawędzi - jak w skrzynkach szuflad: hub → Skrzynki szuflad). Dno, skośna płyta i półki stałe bez wkrętów na widoku.`
+        ? `Rowki frezarką Zeta P2 (gł. ${join.lam.depth} mm, długość ${String(join.len).replace('.', ',')} mm, oś skrajnego ${String(join.positions(1000)[0]).replace('.', ',')} mm od krawędzi - jak w skrzynkach szuflad: hub → Szuflady). Dno, skośna płyta i półki stałe bez wkrętów na widoku.`
         : 'Kołki + wkręty w tych samych miejscach co w zwykłej szafce (skos przykręcany od wierzchu).'}</div>
       ${(() => {
         if (!join) return '';
