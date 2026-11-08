@@ -6,18 +6,18 @@ import { initPropertiesPanel } from "./ui/properties.js";
 import { updateSidebar } from "./ui/sidebar.js";
 import { init3DViewer, update3D, updateRoom } from "./render/viewer3d.js";
 import { openProductionHub, closeProductionHub } from "./ui/productionHub.js";
-import { escapeHtml } from "./utils/dom.js";
 import { state, ensureRoomDefaults, ensurePricingDefaults, ensureSidePanelsDefaults, getActiveModule } from "./core/state.js";
 import { openRoomSettingsModal } from "./ui/roomPanel.js";
 import { clampModuleToRoom, migrateLegacyRoom } from "./core/layout.js";
 
 
 // ZMIANA: Importujemy funkcję do usuwania projektów oraz customowy dialog
-import { saveProjectToCloud, loadProjectFromCloud, getSavedProjectsList, deleteProjectFromCloud, showCustomDialog } from "./core/storage.js";
+import { saveProjectToCloud, loadProjectFromCloud, getSavedProjectsMeta, showCustomDialog } from "./core/storage.js";
+import { openLoadProjectModal } from "./ui/loadProjectModal.js";
 import { onAuthChange, signInWithGoogle, signOutUser, getCurrentUser, saveProjectSilently } from "./core/storage.js";
 import { undo, redo, onHistoryChange, resetHistory } from "./core/history.js";
 import { openVersionHistory } from "./ui/versionHistory.js";
-import { openModal, showAlert } from "./utils/modal.js";
+import { showAlert } from "./utils/modal.js";
 import { readLocalBackup, clearLocalBackup, startLocalBackup } from "./core/localBackup.js";
 import { applyProjectData } from "./core/storage.js";
 import { openHelp } from "./ui/helpModal.js";
@@ -205,61 +205,28 @@ if (btnLoad) {
     btnLoad.disabled = true;
     btnLoad.innerHTML = navIcon('loader-2', 'Szukam...');
 
-    const projects = await getSavedProjectsList();
+    const projects = await getSavedProjectsMeta();
     btnLoad.innerHTML = navIcon('folder-open', 'Wczytaj projekt');
     btnLoad.disabled = false;
+    if (!projects) return;
 
     if (projects.length === 0) {
       showAlert("Brak zapisanych projektów w chmurze.");
       return;
     }
 
-    // Lista projektów w chmurze - to samo okno co reszta aplikacji (utils/modal.js).
-    const dlg = openModal({
-      title: 'Wczytaj projekt',
-      subtitle: 'Wybierz projekt z chmury. Aktualnie otwarty projekt zostanie zastąpiony (niezapisane zmiany przepadną).',
-      width: 480,
-      body: '<div id="load-list"></div>',
-      footer: [{ label: 'Zamknij' }],
-    });
-    const listContainer = dlg.bodyEl.querySelector('#load-list');
-
-    projects.forEach(projName => {
-      const row = document.createElement('div');
-      row.className = 'list-row';
-      row.innerHTML = `<i class="ti ti-folder li-icon" aria-hidden="true"></i>
-        <div class="grow list-row-title">${escapeHtml(projName)}</div>
-        <button type="button" class="btn btn-sm btn-primary load-open">Wczytaj</button>
-        <button type="button" class="btn btn-sm btn-danger load-del" title="Usuń projekt bezpowrotnie"><i class="ti ti-trash" aria-hidden="true"></i></button>`;
-
-      // AKCJA: Wczytywanie projektu
-      row.querySelector('.load-open').onclick = async () => {
-        dlg.close();
-        // Dwa nakładające się wczytania mogłyby skończyć w odwrotnej kolejności.
-        btnLoad.disabled = true;
-        btnLoad.innerHTML = navIcon('loader-2', 'Wczytywanie...');
-        try {
-          const success = await loadProjectFromCloud(projName);
-          if (success) refreshAfterProjectLoad();
-        } finally {
-          btnLoad.innerHTML = navIcon('folder-open', 'Wczytaj projekt');
-          btnLoad.disabled = false;
-        }
-      };
-
-      // AKCJA: Usuwanie z bazy po potwierdzeniu
-      row.querySelector('.load-del').onclick = async () => {
-        const confirmDelete = await showCustomDialog(
-          'confirm',
-          'Usuwanie projektu',
-          `Czy na pewno chcesz usunąć projekt "${projName}" z chmury? Tej operacji NIE można cofnąć!`,
-          '',
-          'Usuń trwale',
-          'Zostaw'
-        );
-        if (confirmDelete && await deleteProjectFromCloud(projName)) row.remove();
-      };
-      listContainer.appendChild(row);
+    // Okno z zakładkami statusów i wyszukiwarką (ui/loadProjectModal.js).
+    openLoadProjectModal(projects, async (projName) => {
+      // Dwa nakładające się wczytania mogłyby skończyć w odwrotnej kolejności.
+      btnLoad.disabled = true;
+      btnLoad.innerHTML = navIcon('loader-2', 'Wczytywanie...');
+      try {
+        const success = await loadProjectFromCloud(projName);
+        if (success) refreshAfterProjectLoad();
+      } finally {
+        btnLoad.innerHTML = navIcon('folder-open', 'Wczytaj projekt');
+        btnLoad.disabled = false;
+      }
     });
   });
 }

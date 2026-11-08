@@ -273,7 +273,7 @@ export const HELP_SECTIONS = [
         <li><b>Zapisz projekt</b> - pierwszy zapis pyta o nazwę. Przy wczytanym projekcie: nadpisz
         albo zapisz jako nowy (pod istniejącą nazwą program zapyta o nadpisanie).</li>
         <li><b>Autozapis</b> co 2 minuty, gdy projekt ma już nazwę i coś się zmieniło.</li>
-        <li><b>Wczytaj projekt</b> - lista projektów w chmurze (także usuwanie).</li>
+        <li><b>Wczytaj projekt</b> - projekty w chmurze w zakładkach <b>Robocze</b> / <b>Do wyceny</b> / <b>Zakończone</b> (archiwum), od ostatnio zapisanych, z wyszukiwarką (szuka we wszystkich zakładkach). Status zmienia się listą przy projekcie; skończonych projektów nie trzeba usuwać - wystarczy oznaczyć je jako Zakończone.</li>
         <li><b>Historia</b> - poprzednie wersje projektu; każdą można przywrócić (bieżący stan trafia do historii, więc to też da się cofnąć).</li>
         <li><b>Kopia lokalna</b> - niezapisana praca jest trzymana w przeglądarce; po ponownym otwarciu program zaproponuje jej przywrócenie.</li>
       </ul>`,

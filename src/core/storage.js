@@ -14,6 +14,7 @@ import { resetHistory } from "./history.js";
 import { openModal, showAlert } from "../utils/modal.js";
 import { validateProjectData } from "./projectSchema.js";
 import { sanitizeProjectData } from "./projectSanitize.js";
+import { projectListEntry } from "./projectStatus.js";
 import { isAllowedEmail, FIREBASE_PROJECT_ID } from "./access.js";
 
 // Konfiguracja klienta Firebase jest z założenia publiczna (leci do przeglądarki)
@@ -193,6 +194,7 @@ async function archiveVersion(projectId, projectObj, label, { force = false } = 
   if (versionsDisabled || !projectObj) return false;
   const copy = JSON.parse(JSON.stringify(projectObj));
   delete copy.name;
+  delete copy.savedAt; // sama data zapisu to nie nowa wersja
   const json = canonJson(copy);
   if (json === lastArchivedCanon) return false;
   if (!force && Date.now() - lastArchiveAt < VERSION_MIN_GAP_MS) return false;
@@ -333,6 +335,7 @@ export async function saveProjectToCloud(projectId = null) {
     const projectRef = doc(db, "projects", targetId);
     const dataToSave = JSON.parse(JSON.stringify(state.project));
     dataToSave.name = targetId;
+    dataToSave.savedAt = Date.now();
 
     const prevSnap = await getDoc(projectRef).catch(() => null);
     // "Zapisz jako NOWY" / pierwszy zapis pod nazwą, która już istnieje: bez pytania
@@ -470,6 +473,44 @@ export async function getSavedProjectsList() {
   }
 }
 
+// LISTA Z METADANYMI (okno „Wczytaj projekt”): status, data zapisu, liczba szafek.
+// getDocs i tak pobiera całe dokumenty, więc nie kosztuje to dodatkowych odczytów.
+export async function getSavedProjectsMeta() {
+  if (!requireOwner()) return null;
+  try {
+    const snapshot = await getDocs(collection(db, "projects"));
+    const out = [];
+    snapshot.forEach((d) => out.push(projectListEntry(d.id, d.data())));
+    return out;
+  } catch (error) {
+    console.error("Błąd podczas pobierania listy projektów:", error);
+    showAlert("❌ Nie udało się pobrać listy projektów z chmury.");
+    return null;
+  }
+}
+
+// Zmiana statusu (robocze / do wyceny / zakończone). Dla otwartego projektu ustawiamy go
+// też w state.project — inaczej najbliższy autozapis nadpisałby status starym.
+export async function setProjectStatus(projectId, status) {
+  if (!requireOwner()) return false;
+  try {
+    const ref = doc(db, "projects", projectId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return false;
+    await setDoc(ref, { ...snap.data(), status });
+    if (state.loadedProjectId === projectId) {
+      const unchanged = !hasUnsavedChanges();
+      state.project.status = status;
+      if (unchanged) markSaved();
+    }
+    return true;
+  } catch (error) {
+    console.error("Błąd zmiany statusu projektu:", error);
+    showAlert("❌ Nie udało się zmienić statusu projektu:\n" + error.message);
+    return false;
+  }
+}
+
 // AUTOZAPIS — bez alertów/promptów (wołane cyklicznie w tle, patrz main.js).
 // Celowo NIE zakłada nazwy projektu: dopóki użytkownik choć raz nie zapisze
 // ręcznie (i tym samym nie ustali state.loadedProjectId), nie ma dokąd cicho
@@ -492,6 +533,7 @@ export async function saveProjectSilently() {
     const projectRef = doc(db, "projects", targetId);
     const dataToSave = JSON.parse(current);
     dataToSave.name = targetId;
+    dataToSave.savedAt = Date.now();
 
     // Historia wersji: raz na jakiś czas zachowujemy treść, którą zaraz nadpiszemy.
     if (!versionsDisabled && Date.now() - lastArchiveAt >= VERSION_MIN_GAP_MS) {

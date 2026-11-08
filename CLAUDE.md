@@ -312,7 +312,10 @@ zmianą tych funkcji.
 `src/core/storage.js` — Firebase Firestore, kolekcja `projects`, id dokumentu = nazwa projektu.
 `saveProjectToCloud` / `loadProjectFromCloud` / `deleteProjectFromCloud` /
 `getSavedProjectsList`. Eksportuje też `showCustomDialog(type, title, msg, ...)` — okno oparte
-na promise, używane zamiast natywnych `confirm` / `prompt`. Konfiguracja Firebase web jest
+na promise, używane zamiast natywnych `confirm` / `prompt`. Okno „Wczytaj projekt” (`ui/loadProjectModal.js`):
+zakładki statusu `state.project.status` (robocze / do wyceny / zakończone — `core/projectStatus.js`, czyste, z testami),
+wyszukiwarka, sortowanie po `savedAt` (stawiane przy zapisie ręcznym i autozapisie, pomijane w porównaniu wersji);
+lista z `getSavedProjectsMeta`, zmiana statusu `setProjectStatus`. Konfiguracja Firebase web jest
 w kodzie (z założenia jest publiczna).
 
 `applyProjectData(data, projectId)` to jedyne przejście, przez które musi przejść każdy wczytany
