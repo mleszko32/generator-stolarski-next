@@ -42,16 +42,22 @@ Rodzaj pleców zależy od typu mebla:
 - Szerokość frontu = szerokość korpusu − 3.
 - Wysokość: zależy od sytuacji.
   - Dolne kuchenne: −5 od góry, dół równo ze spodem korpusu.
-  - Pozostałe przypadki: do uzupełnienia.
+  - Wiszące i słupki: tak samo — −5 od góry, dół równo ze spodem korpusu.
+- Luz boczny frontu: 1,5 z każdej strony.
+
+## Szuflady
+- System: Blum MERIVOBOX.
+- Szczelina między czółkami: 3.
+- Szafka dolna z 3 szufladami: górna czółka 141, dwie dolne równe.
 
 ## Kuchnia
 - Cokół kuchenny: 100.
 
 ## Elementy dodatkowe
 Trzy rodzaje, rozróżniane w opisach:
-- cokół
-- blenda boczna
-- blenda górna
+- cokół — cofnięty 40 od lica frontu,
+- blenda boczna — z kołnierzem montażowym 80,
+- blenda górna — z kołnierzem montażowym 80.
 
 ## Nazewnictwo formatek
 | Nazwa | Element |
@@ -67,10 +73,6 @@ Liczba po literach to szerokość szafki.
 
 ## Okucia
 - Ok. 90% realizacji na Blum.
-- Szczegóły (zawiasy, prowadnice, odległości otworów): do uzupełnienia.
-
-## Do uzupełnienia
-- Wysokość frontów w innych sytuacjach niż dolne kuchenne.
-- Zasady dla szuflad (wysokości czółek, luzy).
-- Konstrukcja cokołu, blend bocznych i górnych (wymiary, cofnięcia).
-- Okucia: typy i odległości.
+- Zawias: Blum CLIP top 110° 71B3550 z prowadnikiem 173L6100.
+- Puszka zawiasu Ø35, 5 od krawędzi frontu.
+- Szuflady: MERIVOBOX (patrz sekcja Szuflady).

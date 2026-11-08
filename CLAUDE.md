@@ -28,7 +28,7 @@ Po angielsku zostają tylko identyfikatory w kodzie i nazwy z bibliotek/API.
 
 ## Domena
 
-Standardy konstrukcyjne i nazewnictwo formatek: `docs/standardy.md` (na razie szkielet) — czytaj tylko
+Standardy konstrukcyjne i nazewnictwo formatek: `docs/standardy.md` — czytaj tylko
 przy zadaniach o wymiarach, formatkach, obrzeżach, plecach lub frontach. Wymiary w mm.
 
 ## Polecenia
