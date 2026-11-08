@@ -261,6 +261,8 @@ export const HELP_SECTIONS = [
       <p>Przy materiale frontu pole <b>Kolor (RAL / NCS)</b> podpowiada całą paletę RAL Classic (nazwy po polsku
       i angielsku) i cały wzornik NCS 1950. Kod NCS spoza wzornika albo nieistniejący dostaje ostrzeżenie -
       lakiernia może nie mieć na niego receptury.</p>
+      <p>Pole <b>Szukaj w bazie SAS</b> pod każdą płytą i okuciem przeszukuje cały asortyment SAS (indeks albo
+      fragment nazwy) i wstawia cenę po Twoim rabacie, brutto. Przy płytach liczy cenę za m² z ceny arkusza.</p>
       <p><b>Baza cen</b> (przyciski na górze kosztorysu) zapamiętuje ceny z jednego projektu, żeby
       nałożyć je na kolejny bez przepisywania.</p>
       <p>Karta <b>Oferta dla klienta</b> drukuje ofertę z zakresem, ceną i (opcjonalnie) zdjęciem

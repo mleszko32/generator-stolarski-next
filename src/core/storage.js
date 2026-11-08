@@ -455,6 +455,47 @@ export async function deleteProjectFromCloud(projectId) {
   }
 }
 
+// KATALOG SAS (core/sasCatalog.js): kolekcja sasCatalog - dokument "meta" { date, count, parts } i części
+// "part-0".. z wierszami jako JSON (tablica tablic, której Firestore nie przyjmuje wprost; limit 1 MB na dokument).
+const SAS_PART_ROWS = 1500;
+
+export async function saveSasCatalogToCloud(catalog) {
+  if (!requireOwner()) return false;
+  try {
+    const parts = Math.ceil(catalog.rows.length / SAS_PART_ROWS);
+    const old = await getDoc(doc(db, "sasCatalog", "meta"));
+    const oldParts = old.exists() ? old.data().parts || 0 : 0;
+    const batch = writeBatch(db);
+    for (let i = 0; i < parts; i++) {
+      batch.set(doc(db, "sasCatalog", "part-" + i), { rows: JSON.stringify(catalog.rows.slice(i * SAS_PART_ROWS, (i + 1) * SAS_PART_ROWS)) });
+    }
+    for (let i = parts; i < oldParts; i++) batch.delete(doc(db, "sasCatalog", "part-" + i));
+    batch.set(doc(db, "sasCatalog", "meta"), { date: catalog.date, count: catalog.rows.length, parts, uploadedAt: new Date().toISOString() });
+    await batch.commit();
+    return true;
+  } catch (error) {
+    console.error("Błąd zapisu katalogu SAS:", error);
+    showAlert("❌ Nie udało się zapisać katalogu SAS w chmurze.");
+    return false;
+  }
+}
+
+// { date, rows } albo null (brak katalogu w chmurze / brak dostępu - bez komunikatu, gdy niezalogowany).
+export async function loadSasCatalogFromCloud() {
+  if (!isOwner()) return null;
+  try {
+    const meta = await getDoc(doc(db, "sasCatalog", "meta"));
+    if (!meta.exists()) return null;
+    const { date, parts } = meta.data();
+    const snaps = await Promise.all(Array.from({ length: parts }, (_, i) => getDoc(doc(db, "sasCatalog", "part-" + i))));
+    const rows = snaps.flatMap((sn) => (sn.exists() ? JSON.parse(sn.data().rows) : []));
+    return { date, rows };
+  } catch (error) {
+    console.error("Błąd odczytu katalogu SAS:", error);
+    return null;
+  }
+}
+
 // POBIERANIE LISTY
 export async function getSavedProjectsList() {
   if (!requireOwner()) return [];

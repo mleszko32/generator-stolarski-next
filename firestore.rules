@@ -34,6 +34,11 @@ service cloud.firestore {
       }
     }
 
+    // Katalog SAS z cenami po rabacie (core/sasCatalog.js) - dokument "meta" i części "part-N".
+    match /sasCatalog/{docId} {
+      allow read, write: if isOwner();
+    }
+
     // Wszystko poza tym jest zamknięte na głucho.
     match /{document=**} {
       allow read, write: if false;

@@ -12,6 +12,8 @@ import { loadPriceDefaults, savePriceDefaults, applyPriceDefaults, exportPriceDe
 import { showAlert } from "../utils/modal.js";
 import { baseCategory, catalogLabels } from "../core/materialCatalog.js";
 import { lacquerColor, lacquerSuggestions, lacquerWarning } from "../core/lacquerColors.js";
+import { loadSasCatalog, resetSasCatalog, parseSasCatalog, sasLabel, sasFromText, sasByIndex, sasPricePerM2, SAS_BOARD_GROUPS } from "../core/sasCatalog.js";
+import { saveSasCatalogToCloud } from "../core/storage.js";
 
 // "Zastosuj do wszystkich dolnych/górnych" (zgłoszona potrzeba: w kuchni
 // fronty szafek dolnych i wiszących często mają inny materiał/kolor, ale
@@ -71,8 +73,12 @@ export function mountKosztorys(root) {
                     <button id="kosztorys-price-export" type="button" class="btn btn-sm"><i class="ti ti-file-export" aria-hidden="true"></i> Eksport (plik JSON)</button>
                     <button id="kosztorys-price-import" type="button" class="btn btn-sm"><i class="ti ti-upload" aria-hidden="true"></i> Import z pliku</button>
                     <input id="kosztorys-price-file" type="file" accept="application/json,.json" style="display:none">
+                    <button id="kosztorys-sas-upload" type="button" class="btn btn-sm"><i class="ti ti-cloud-upload" aria-hidden="true"></i> Wgraj katalog SAS</button>
+                    <input id="kosztorys-sas-file" type="file" accept="application/json,.json" style="display:none">
+                    <span id="kosztorys-sas-status" class="hint"></span>
                 </div>
-                <div class="hint" style="margin-bottom:14px;">Baza cen to jeden zapamiętany cennik w tej przeglądarce (materiały, fronty, okucia) - "Zapisz" zapamiętuje ceny z TEGO projektu, "Wczytaj" nakłada je na aktywny projekt bez kasowania pozycji, których baza nie zna. Eksport/import JSON przenosi bazę na inny komputer.</div>
+                <datalist id="kosztorys-sas-all"></datalist><datalist id="kosztorys-sas-boards"></datalist>
+                <div class="hint" style="margin-bottom:14px;">Pole „Szukaj w bazie SAS” przy płytach i okuciach wstawia cenę po rabacie (brutto) z cennika SAS - wpisz indeks albo fragment nazwy. Baza cen to jeden zapamiętany cennik w tej przeglądarce (materiały, fronty, okucia) - "Zapisz" zapamiętuje ceny z TEGO projektu, "Wczytaj" nakłada je na aktywny projekt bez kasowania pozycji, których baza nie zna. Eksport/import JSON przenosi bazę na inny komputer.</div>
                 <h3>Materiały płytowe</h3>
                 <table class="cost-table">
                     <thead><tr><th>Materiał</th><th class="num">Powierzchnia</th><th class="num">Cena / m²</th><th class="num">Koszt</th><th></th></tr></thead>
@@ -260,6 +266,7 @@ export function mountKosztorys(root) {
         materialsTbody.querySelectorAll('.kosztorys-mat-price, .kosztorys-front-mat-price, .kosztorys-mat-name, .kosztorys-mat-board, .kosztorys-mat-color').forEach(input => {
             input.addEventListener('input', recalc);
         });
+        bindSasFields(materialsTbody);
         // Nazwa materiału: odśwież listę per front (ui/properties.js) dopiero po
         // skończeniu wpisywania (change, nie input) - żeby nie przerywać pisania
         // pełnym przebudowaniem panelu na każdą literę.
@@ -294,7 +301,7 @@ export function mountKosztorys(root) {
     function otherRowHtml(m) {
         return `
             <tr>
-                <td>${escapeHtml(MATERIAL_LABELS[m.category] || m.category)}</td>
+                <td>${escapeHtml(MATERIAL_LABELS[m.category] || m.category)}${sasFieldHtml('materials', m.category)}</td>
                 <td class="num kosztorys-mat-area" data-cat="${escapeHtml(m.category)}">${m.areaM2.toFixed(2)}&nbsp;m²</td>
                 <td class="num"><span class="cost-input"><input type="number" class="input kosztorys-mat-price" data-cat="${escapeHtml(m.category)}" value="${m.pricePerM2}" step="1" min="0"> zł</span></td>
                 <td class="num kosztorys-mat-cost" data-cat="${escapeHtml(m.category)}"><b>${formatPLN(m.cost)}</b></td>
@@ -334,7 +341,7 @@ export function mountKosztorys(root) {
         }
         hardwareTbody.innerHTML = cost.hardware.map(hw => `
             <tr>
-                <td>${escapeHtml(hw.name)}</td>
+                <td>${escapeHtml(hw.name)}${sasFieldHtml('hardware', hw.name)}</td>
                 <td class="num">${hw.qty} ${escapeHtml(hw.unit)}</td>
                 <td class="num"><span class="cost-input"><input type="number" class="input kosztorys-hw-price" data-name="${escapeHtml(hw.name)}" value="${hw.price}" step="0.1" min="0"> zł</span></td>
                 <td class="num kosztorys-hw-cost" data-name="${escapeHtml(hw.name)}"><b>${formatPLN(hw.cost)}</b></td>
@@ -342,6 +349,78 @@ export function mountKosztorys(root) {
         `).join('');
         hardwareTbody.querySelectorAll('.kosztorys-hw-price').forEach(input => {
             input.addEventListener('input', recalc);
+        });
+        bindSasFields(hardwareTbody);
+    }
+
+    // Pole wyszukiwania w katalogu SAS (core/sasCatalog.js) przy płycie / okuciu. Powiązanie w pricing.sas.
+    function sasFieldHtml(kind, key) {
+        const list = kind === 'materials' ? 'kosztorys-sas-boards' : 'kosztorys-sas-all';
+        const linked = ((pricing.sas || {})[kind] || {})[key] || '';
+        return `<div><input type="text" class="input kosztorys-sas" list="${list}" data-kind="${kind}" data-key="${escapeHtml(key)}" data-linked="${escapeHtml(linked)}" value="${escapeHtml(linked)}" placeholder="Szukaj w bazie SAS…"></div>`;
+    }
+
+    let sasReady = null;
+    function showSasStatus(cat) {
+        const el = modal.querySelector('#kosztorys-sas-status');
+        if (el) el.textContent = cat.rows.length
+            ? `Katalog SAS: ${cat.rows.length} pozycji, z ${cat.date.split('-').reverse().join('.')}`
+            : 'Katalog SAS: brak w chmurze (zaloguj się albo wgraj plik sasCatalog.json)';
+    }
+    loadSasCatalog().then(showSasStatus);
+    modal.querySelector('#kosztorys-sas-upload').addEventListener('click', () => modal.querySelector('#kosztorys-sas-file').click());
+    modal.querySelector('#kosztorys-sas-file').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        e.target.value = '';
+        if (!file) return;
+        const cat = parseSasCatalog(await file.text());
+        if (!cat) { showAlert('To nie jest plik katalogu SAS (sasCatalog.json ze skryptu scripts/sas/buduj.js).'); return; }
+        if (!(await saveSasCatalogToCloud(cat))) return;
+        resetSasCatalog();
+        sasReady = null;
+        showSasStatus(cat);
+        showAlert(`✅ Wgrano katalog SAS: ${cat.rows.length} pozycji.`);
+    });
+    function ensureSasLists() {
+        if (!sasReady) sasReady = loadSasCatalog().then(cat => {
+            if (!cat.rows.length) sasReady = null; // spróbuj ponownie po zalogowaniu / wgraniu
+            const opts = (rows) => rows.map(r => `<option value="${escapeHtml(sasLabel(r))}">`).join('');
+            modal.querySelector('#kosztorys-sas-all').innerHTML = opts(cat.rows);
+            modal.querySelector('#kosztorys-sas-boards').innerHTML = opts(cat.rows.filter(r => SAS_BOARD_GROUPS.includes(r[4])));
+            return cat;
+        });
+        return sasReady;
+    }
+
+    function bindSasFields(container) {
+        const fields = [...container.querySelectorAll('.kosztorys-sas')];
+        // pola z powiązaniem pokazują pełny opis pozycji (po załadowaniu katalogu)
+        if (fields.some(f => f.dataset.linked)) ensureSasLists().then(cat => fields.forEach(f => {
+            const r = sasByIndex(cat.rows, f.dataset.linked);
+            if (r) f.value = sasLabel(r);
+        }));
+        fields.forEach(input => {
+            input.addEventListener('focus', ensureSasLists, { once: true });
+            input.addEventListener('change', async () => {
+                const cat = await ensureSasLists();
+                const { kind, key } = input.dataset;
+                const links = (pricing.sas = pricing.sas || {});
+                links[kind] = links[kind] || {};
+                if (!input.value.trim()) { delete links[kind][key]; recalc(); return; }
+                const row = sasFromText(cat.rows, input.value);
+                if (!row) return;
+                const cp = state.project.cutPlan || {};
+                const area = ((+cp.sheetW || 2800) * (+cp.sheetH || 2070)) / 1e6;
+                const price = kind === 'materials' ? sasPricePerM2(row, area) : row[3];
+                if (price == null) return;
+                links[kind][key] = row[0];
+                input.value = sasLabel(row);
+                const sel = kind === 'materials' ? '.kosztorys-mat-price' : '.kosztorys-hw-price';
+                const attr = kind === 'materials' ? 'data-cat' : 'data-name';
+                const priceInput = [...modal.querySelectorAll(sel)].find(el => el.getAttribute(attr) === key);
+                if (priceInput) priceInput.value = String(price);
+                recalc();
+            });
         });
     }
 

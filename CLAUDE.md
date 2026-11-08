@@ -508,6 +508,15 @@ szafek, ale jeden slot (nie nazwana lista), bo nie ma realnej potrzeby kilku cen
 kategorie płyt/okuć i dopasowuje materiały frontów **po nazwie** (nie po id, bo id są
 generowane niezależnie w każdym projekcie), aktualizując cenę albo dodając brakujący.
 
+**Katalog SAS**: `core/sasCatalog.js` (czyste, z testami). Ceny po rabacie są poufne, a repo publiczne — katalog NIE jest w gicie:
+leży w Firestore (kolekcja `sasCatalog`: `meta` + `part-N` z wierszami jako JSON, `saveSasCatalogToCloud`/`loadSasCatalogFromCloud`
+w `storage.js`, reguła w `firestore.rules`), wgrywany w Kosztorysie przyciskiem „Wgraj katalog SAS” z pliku `sasCatalog.json`.
+Pole „Szukaj w bazie SAS” przy płytach (cena/m² = cena arkusza / arkusz z nazwy albo z `cutPlan`) i okuciach przepisuje cenę do pola;
+powiązanie w `pricing.sas = { hardware, materials }`. Nowy cennik: `scripts/sas/` — `odbierz.js` (serwer 127.0.0.1:8765) +
+`pobierz.js` wklejony w konsolę zalogowanego panelu SAS + `buduj.js <katalog> <data> <poprzedni .xlsx>` → „Cennik SAS z rabatami
+<data>.xlsx” i `sasCatalog.json` (oba na Dysk: Meble Leszko/00 Baza, nigdy do repo). Procenty rabatów czyta z zakładki „Rabaty”
+poprzedniego cennika; przypisanie grup nowym pozycjom w `scripts/sas/rabaty.js`.
+
 **Lokalna kopia zapasowa**: `core/localBackup.js` trzyma w `localStorage` kopię
 *niezapisanej* pracy (co 20 s i przy ukryciu karty; czyszczona, gdy projekt zgadza się z kopią
 w chmurze). Przy starcie `main.js` proponuje jej przywrócenie; przywrócony projekt celowo NIE
