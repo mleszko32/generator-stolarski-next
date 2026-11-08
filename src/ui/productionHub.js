@@ -27,6 +27,9 @@ import { C } from "../render/drawingPalette.js";
 import { updateSidebar } from "./sidebar.js";
 import { openCsvExport } from "./csvEditor.js";
 import { printHardwareList } from "./hardwareList.js";
+import { loadSasCatalog, linkLabel, linkPrice, stockLabel } from "../core/sasCatalog.js";
+import { hardwareSasRows, basketItems, basketText, BASKET_BOOKMARKLET } from "../core/sasBasket.js";
+import { showAlert } from "../utils/modal.js";
 import { openTechnicalDrawing } from "./technicalDrawing.js";
 import { openDrillSheetsDialog } from "./drillSheetsPrint.js";
 import { mountKosztorys } from "./kosztorysModal.js";
@@ -554,14 +557,49 @@ function renderOkucia(el) {
   el.innerHTML = `
     <div class="hub-bar">
       <div><h3>Okucia i okleina</h3><div class="hub-sub">Lista zakupów z całego projektu. Okleina wg wyboru krawędzi z listy formatek (domyślnie dookoła, bez pleców HDF), ${edge.toFixed(1)} mb netto, z ${Math.round(EDGE_BANDING_RESERVE * 100)}% zapasu ${(edge * (1 + EDGE_BANDING_RESERVE)).toFixed(1)} mb.</div></div>
-      <div class="hub-actions"><button type="button" id="hub-hw-print" class="btn btn-sm">Drukuj listę zakupów</button></div>
+      <div class="hub-actions"><button type="button" id="hub-hw-print" class="btn btn-sm">Drukuj listę zakupów</button>
+        <button type="button" id="hub-hw-basket" class="btn btn-sm btn-primary" disabled>Do koszyka SAS</button></div>
     </div>
     ${hw.length === 0 ? `<p class="hub-empty">Lista zakupów jest pusta.</p>` : `
     <table class="hub-table">
-      <thead><tr><th>Pozycja</th><th class="num">Ilość</th><th>J.m.</th></tr></thead>
-      <tbody>${hw.map(h => `<tr><td>${escapeHtml(h.name)}</td><td class="num">${h.qty}</td><td>${escapeHtml(h.unit || '')}</td></tr>`).join('')}</tbody>
-    </table>`}`;
+      <thead><tr><th>Pozycja</th><th class="num">Ilość</th><th>J.m.</th><th>W SAS (cena po rabacie, stan)</th></tr></thead>
+      <tbody>${hw.map((h, i) => `<tr><td>${escapeHtml(h.name)}</td><td class="num">${h.qty}</td><td>${escapeHtml(h.unit || '')}</td><td class="hub-sub" data-sas-row="${i}">…</td></tr>`).join('')}</tbody>
+    </table>
+    <div class="hub-card" style="margin-top:14px">
+      <div class="hub-strong" style="margin-bottom:4px">Zakupy w sklepie SAS</div>
+      <div class="hub-sub">Pozycje SAS dobierają się same (zawiasy, prowadniki, zestawy szuflad Blum, MOVENTO, nóżki); inną wybierzesz polem „Szukaj w bazie SAS” w Kosztorysie.
+      „Do koszyka SAS” kopiuje listę - potem na stronie panelu SAS (esklep.sassc.com.pl) kliknij zakładkę „Do koszyka SAS” i sprawdź koszyk przed zamówieniem.
+      Zakładkę dodasz raz: przeciągnij ten przycisk na pasek zakładek → <a class="btn btn-sm" id="hub-sas-bookmarklet" href="#">Do koszyka SAS</a></div>
+    </div>`}`;
   el.querySelector('#hub-hw-print').addEventListener('click', () => printHardwareList());
+  const bm = el.querySelector('#hub-sas-bookmarklet');
+  if (bm) {
+    bm.setAttribute('href', BASKET_BOOKMARKLET);
+    bm.addEventListener('click', (e) => { e.preventDefault(); showAlert('Przeciągnij ten przycisk na pasek zakładek przeglądarki, a potem kliknij zakładkę na stronie panelu SAS.'); });
+  }
+  if (!hw.length) return;
+  loadSasCatalog().then((cat) => {
+    const links = (state.project.pricing && state.project.pricing.sas && state.project.pricing.sas.hardware) || {};
+    hw.forEach((h, i) => {
+      const cell = el.querySelector(`[data-sas-row="${i}"]`);
+      if (!cell) return;
+      if (!cat.rows.length) { cell.textContent = 'brak katalogu SAS'; return; }
+      const list = hardwareSasRows(cat.rows, links, h.name);
+      cell.textContent = list
+        ? `${linkLabel(list)} · razem ${(linkPrice(list) * Math.ceil(h.qty)).toFixed(2).replace('.', ',')} zł${list.length === 1 && stockLabel(list[0]) ? ' · ' + stockLabel(list[0]) : ''}`
+        : '— wybierz w Kosztorysie';
+    });
+    const btn = el.querySelector('#hub-hw-basket');
+    if (!btn || !cat.rows.length) return;
+    btn.disabled = false;
+    btn.addEventListener('click', async () => {
+      const { items, missing } = basketItems(hw, cat.rows, links);
+      if (!items.length) { showAlert('Żadna pozycja nie ma odpowiednika w SAS z numerem do koszyka (wgraj nowy katalog SAS).'); return; }
+      try { await navigator.clipboard.writeText(basketText(items)); } catch (e) { showAlert('Nie udało się skopiować do schowka.'); return; }
+      showAlert(`Skopiowano ${items.length} pozycji do koszyka SAS. Otwórz panel SAS i kliknij zakładkę „Do koszyka SAS”.`
+        + (missing.length ? ` Bez odpowiednika w SAS (kup osobno): ${missing.join(', ')}.` : ''));
+    });
+  });
 }
 
 function renderKosztorys(el) {

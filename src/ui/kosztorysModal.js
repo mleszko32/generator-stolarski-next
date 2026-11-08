@@ -12,7 +12,8 @@ import { loadPriceDefaults, savePriceDefaults, applyPriceDefaults, exportPriceDe
 import { showAlert } from "../utils/modal.js";
 import { baseCategory, catalogLabels } from "../core/materialCatalog.js";
 import { lacquerColor, lacquerSuggestions, lacquerWarning } from "../core/lacquerColors.js";
-import { loadSasCatalog, resetSasCatalog, parseSasCatalog, sasLabel, sasFromText, sasByIndex, sasPricePerM2, SAS_BOARD_GROUPS } from "../core/sasCatalog.js";
+import { loadSasCatalog, resetSasCatalog, parseSasCatalog, sasLabel, sasFromText, sasPricePerM2, SAS_BOARD_GROUPS, rowsFromLink, linkLabel, linkPrice, linkFromRows } from "../core/sasCatalog.js";
+import { hardwareSasRows } from "../core/sasBasket.js";
 import { saveSasCatalogToCloud } from "../core/storage.js";
 
 // "Zastosuj do wszystkich dolnych/górnych" (zgłoszona potrzeba: w kuchni
@@ -87,7 +88,7 @@ export function mountKosztorys(root) {
                 </table>
             </section>
             <section class="cost-section">
-                <h3>Okucia</h3>
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><h3>Okucia</h3><button id="kosztorys-sas-auto" type="button" class="btn btn-sm" title="Wpisuje ceny po rabacie z katalogu SAS przy okuciach bez ceny (zawiasy, prowadniki, zestawy szuflad Blum, MOVENTO, nóżki)">Dobierz ceny okuć z SAS</button></div>
                 <table class="cost-table">
                     <thead><tr><th>Pozycja</th><th class="num">Ilość</th><th class="num">Cena jedn.</th><th class="num">Koszt</th></tr></thead>
                     <tbody id="kosztorys-hardware-tbody"></tbody>
@@ -381,6 +382,26 @@ export function mountKosztorys(root) {
         showSasStatus(cat);
         showAlert(`✅ Wgrano katalog SAS: ${cat.rows.length} pozycji.`);
     });
+    modal.querySelector('#kosztorys-sas-auto').addEventListener('click', async () => {
+        const cat = await ensureSasLists();
+        if (!cat.rows.length) { showAlert('Brak katalogu SAS w chmurze - zaloguj się albo wgraj plik sasCatalog.json.'); return; }
+        const links = (pricing.sas = pricing.sas || {});
+        links.hardware = links.hardware || {};
+        let n = 0;
+        modal.querySelectorAll('.kosztorys-hw-price').forEach(input => {
+            if (parseFloat(input.value) > 0) return; // cena wpisana ręcznie zostaje
+            const name = input.getAttribute('data-name');
+            const list = hardwareSasRows(cat.rows, links.hardware, name);
+            if (!list) return;
+            links.hardware[name] = linkFromRows(list);
+            input.value = String(linkPrice(list));
+            const field = [...modal.querySelectorAll('.kosztorys-sas[data-kind=hardware]')].find(x => x.dataset.key === name);
+            if (field) { field.value = linkLabel(list); field.dataset.linked = links.hardware[name]; }
+            n++;
+        });
+        recalc();
+        showAlert(n ? `Wpisano ceny SAS dla ${n} pozycji okuć (bez ceny). Pozostałe uzupełnij polem „Szukaj w bazie SAS”.` : 'Brak okuć bez ceny, które dałoby się dobrać z katalogu SAS.');
+    });
     function ensureSasLists() {
         if (!sasReady) sasReady = loadSasCatalog().then(cat => {
             if (!cat.rows.length) sasReady = null; // spróbuj ponownie po zalogowaniu / wgraniu
@@ -396,8 +417,8 @@ export function mountKosztorys(root) {
         const fields = [...container.querySelectorAll('.kosztorys-sas')];
         // pola z powiązaniem pokazują pełny opis pozycji (po załadowaniu katalogu)
         if (fields.some(f => f.dataset.linked)) ensureSasLists().then(cat => fields.forEach(f => {
-            const r = sasByIndex(cat.rows, f.dataset.linked);
-            if (r) f.value = sasLabel(r);
+            const list = rowsFromLink(cat.rows, f.dataset.linked);
+            if (list) f.value = linkLabel(list);
         }));
         fields.forEach(input => {
             input.addEventListener('focus', ensureSasLists, { once: true });

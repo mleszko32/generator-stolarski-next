@@ -17,20 +17,25 @@
 
   // Drzewo kategorii z menu: „/pl/<kategoria>/list” otwiera grupę, dalej jej podkategorie.
   const home = parseDoc(await fetch("/pl").then((r) => r.text()));
-  const links = [...home.querySelectorAll("a")].map((a) => {
-    try {
-      const u = new URL(a.getAttribute("href"), location.origin);
-      return u.host === location.host ? [u.pathname, txt(a).replace(/\s*\(\d+\)$/, "")] : null;
-    } catch (e) { return null; }
-  }).filter((x) => x && /^\/pl\/[a-z0-9-]+(\/list)?$/.test(x[0]) && !/\/web|basket|wishlist|search|promocje|nowosci|wyprzedaze|partnerzy|pakiety|obsluga|marki/.test(x[0]));
-  const tree = [], seen = new Set();
-  let top = null;
-  for (const [p, t] of links) {
-    if (seen.has(p)) continue;
-    seen.add(p);
-    if (p.endsWith("/list")) { top = { slug: p.replace("/list", ""), name: null, subs: [] }; tree.push(top); continue; }
-    if (top && p === top.slug) { top.name = t; continue; }
-    if (top) top.subs.push({ slug: p, name: t });
+  // Każda grupa menu (.menu-categories-item): link „/pl/<grupa>/list”, sama grupa i jej podkategorie.
+  const pathOf = (a) => { try { return new URL(a.getAttribute("href"), location.origin).pathname; } catch (e) { return ""; } };
+  const tree = [], seenTop = new Set();
+  for (const box of home.querySelectorAll(".menu-categories-item")) {
+    const anchors = [...box.querySelectorAll("a")].map((a) => [pathOf(a), txt(a).replace(/\s*\(\d+\)$/, "")]).filter(([p]) => /^\/pl\/[a-z0-9-]+(\/list)?$/.test(p));
+    const list = anchors.find(([p]) => p.endsWith("/list"));
+    if (!list) continue;
+    const slug = list[0].replace("/list", "");
+    if (seenTop.has(slug)) continue;
+    seenTop.add(slug);
+    const subs = [], seen = new Set([slug]);
+    let name = null;
+    for (const [p, t] of anchors) {
+      if (p === slug && t) name = name || t;
+      if (p.endsWith("/list") || seen.has(p)) continue;
+      seen.add(p);
+      subs.push({ slug: p, name: t });
+    }
+    tree.push({ slug, name, subs });
   }
 
   const stockOf = (title, city) => {
@@ -59,6 +64,8 @@
             net: txt(card.querySelector("strong.fs-5")), gross: txt(card.querySelector("span.fs-5")),
             badges: [...card.querySelectorAll(".badge")].map((b) => b.textContent.trim()).join(", "),
             stockWaw: stockOf(st, "Warszawa"), stockSte: stockOf(st, "Stęszew"),
+            // wewnętrzny numer produktu w sklepie - do dodawania do koszyka (POST /pl/web/basket/add)
+            pid: (card.querySelector("[data-target='basket-add']") || { getAttribute: () => "" }).getAttribute("data-id") || "",
           });
         });
         console.log(`${t.name} / ${sub.name} s.${p}: ${titles.length} (razem ${rows.length})`);

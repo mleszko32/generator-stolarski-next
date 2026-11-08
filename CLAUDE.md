@@ -14,6 +14,23 @@ odręcznego szkicu do modułów.
 komunikaty commitów, prompt AI, dokumentacja (w tym ten plik) i odpowiedzi dla użytkownika.
 Po angielsku zostają tylko identyfikatory w kodzie i nazwy z bibliotek/API.
 
+## Praca z kontekstem (oszczędzanie limitu)
+
+- Nie czytaj całych plików, gdy wystarczy fragment — najpierw Grep/Glob, potem Read z `offset`/`limit`.
+- Nie wchodź do `node_modules`, `.venv`, `dist`, `build`, `coverage`, `.git` ani `package-lock.json`
+  (część zablokowana w `.claude/settings.json`).
+- Zmiana dotykająca więcej niż 2 plików: najpierw krótki plan i czekaj na akceptację.
+- Ten sam błąd 3 razy → zatrzymaj się i zapytaj.
+- Odpowiadaj krótko, pokazuj tylko zmienione fragmenty.
+- Po drobnej zmianie: `npm run lint` albo konkretny test; pełny `npm run build` dopiero na koniec.
+- Nie refaktoryzuj rzeczy, o które nie proszono.
+- Szukanie „gdzie jest zdefiniowane/używane” zleć agentowi `szukacz` (`.claude/agents/szukacz.md`).
+
+## Domena
+
+Standardy konstrukcyjne i nazewnictwo formatek: `docs/standardy.md` (na razie szkielet) — czytaj tylko
+przy zadaniach o wymiarach, formatkach, obrzeżach, plecach lub frontach. Wymiary w mm.
+
 ## Polecenia
 
 - `npm run dev` — serwer deweloperski Vite.
@@ -516,6 +533,11 @@ powiązanie w `pricing.sas = { hardware, materials }`. Nowy cennik: `scripts/sas
 `pobierz.js` wklejony w konsolę zalogowanego panelu SAS + `buduj.js <katalog> <data> <poprzedni .xlsx>` → „Cennik SAS z rabatami
 <data>.xlsx” i `sasCatalog.json` (oba na Dysk: Meble Leszko/00 Baza, nigdy do repo). Procenty rabatów czyta z zakładki „Rabaty”
 poprzedniego cennika; przypisanie grup nowym pozycjom w `scripts/sas/rabaty.js`.
+Dobór okuć: `sasSuggest` (zawias = 71B3550 + 173L6100, komplet szuflady → zestaw SAS „Szuflada Blum <system> … <NL> <wys.>”
+na wkręty, 40 kg, biały, MOVENTO = prowadnice + sprzęgła T51.7601 L/P, nóżki, kody Blum w nazwie); powiązanie z Kosztorysu
+(„indeks+indeks”) ma pierwszeństwo, przycisk „Dobierz ceny okuć z SAS” wpisuje ceny pozycji bez ceny. Koszyk: `core/sasBasket.js` —
+hub „Okucia i okleina” pokazuje pozycję SAS, cenę i stan, „Do koszyka SAS” kopiuje `GSN-SAS-KOSZYK [[nr produktu, ilość]]`, a zakładka
+`BASKET_BOOKMARKLET` na stronie sklepu dodaje je przez `POST /pl/web/basket/add` (zamówienie składa użytkownik).
 
 **Lokalna kopia zapasowa**: `core/localBackup.js` trzyma w `localStorage` kopię
 *niezapisanej* pracy (co 20 s i przy ukryciu karty; czyszczona, gdy projekt zgadza się z kopią

@@ -128,8 +128,9 @@ rab.getColumn(5).width = 26;
 const xlsx = path.join(dir, `Cennik SAS z rabatami ${date}.xlsx`);
 await wb.xlsx.writeFile(xlsx);
 
-// Katalog dla aplikacji: [indeks, nazwa, jednostka, cena po rabacie brutto, grupa towarów].
+// Katalog dla aplikacji: [indeks, nazwa, jednostka, cena po rabacie brutto, grupa towarów, nr produktu w sklepie (koszyk),
+// stan Warszawa, stan Stęszew].
 const disc = new Map(RABATY.map(([n, , , d]) => [n, d]));
-const cat = rows.filter((r) => r.net != null).map((r) => [r.idx, r.name, r.unit, round2(round2(r.net * (1 - (disc.get(r.group) || 0))) * 1.23), r.grp]);
+const cat = rows.filter((r) => r.net != null).map((r) => [r.idx, r.name, r.unit, round2(round2(r.net * (1 - (disc.get(r.group) || 0))) * 1.23), r.grp, r.pid || "", r.wa, r.stz]);
 fs.writeFileSync(path.join(dir, "sasCatalog.json"), JSON.stringify({ format: "gsn-sas-catalog", date, rows: cat }));
 console.log(`Zapisano ${xlsx} (${rows.length} pozycji, nowych ${cnt((r) => r.isNew)}) i sasCatalog.json. Pewność:`, sures);

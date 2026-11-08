@@ -23,8 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 
-# Lokalne ustawienia Claude Code
-.claude/
+# Lokalne ustawienia Claude Code (settings.json i agents/ są w gicie)
+.claude/settings.local.json
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+.claude/skills/
 
 # Pliki mebli z projektów klientów (dane inwestorów)
 meble-import/

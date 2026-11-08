@@ -1,0 +1,18 @@
+{
+  "model": "opusplan",
+  "permissions": {
+    "deny": [
+      "Read(./node_modules/**)",
+      "Read(./.next/**)",
+      "Read(./out/**)",
+      "Read(./dist/**)",
+      "Read(./build/**)",
+      "Read(./coverage/**)",
+      "Read(./package-lock.json)",
+      "Read(./.env*)",
+      "Read(./.venv/**)",
+      "Read(./meble-import/**)",
+      "Read(./notatki/**)"
+    ]
+  }
+}

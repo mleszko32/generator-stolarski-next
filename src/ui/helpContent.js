@@ -244,7 +244,9 @@ export const HELP_SECTIONS = [
         (L / P - lewa / prawa strona szyny).</li>
         <li><b>Rzuty ścian</b> - widok każdej ściany z szafkami i otworami.</li>
         <li><b>Blaty</b> - odcinki blatów i łączenia w narożnikach.</li>
-        <li><b>Okucia i okleina</b> - lista zakupów (nóżki, łączniki, komplety szuflad, zawiasy, okleina w mb).</li>
+        <li><b>Okucia i okleina</b> - lista zakupów (nóżki, łączniki, komplety szuflad, zawiasy, okleina w mb) z odpowiednikiem
+        w sklepie SAS, ceną i stanem magazynu. <b>Do koszyka SAS</b> kopiuje listę; na stronie panelu SAS kliknij zakładkę
+        „Do koszyka SAS” (przeciągnij ją raz na pasek zakładek z tej sekcji) - pozycje trafią do koszyka, zamówienie składasz sam.</li>
         <li><b>Kontrola projektu</b> - kolizje, szafki poza pokojem, za szerokie drzwi i półki,
         za długie prowadnice, formatki większe niż płyta, problemy w narożnikach, kolor lakieru NCS spoza wzornika.</li>
       </ul>
@@ -262,7 +264,8 @@ export const HELP_SECTIONS = [
       i angielsku) i cały wzornik NCS 1950. Kod NCS spoza wzornika albo nieistniejący dostaje ostrzeżenie -
       lakiernia może nie mieć na niego receptury.</p>
       <p>Pole <b>Szukaj w bazie SAS</b> pod każdą płytą i okuciem przeszukuje cały asortyment SAS (indeks albo
-      fragment nazwy) i wstawia cenę po Twoim rabacie, brutto. Przy płytach liczy cenę za m² z ceny arkusza.</p>
+      fragment nazwy) i wstawia cenę po Twoim rabacie, brutto. Przy płytach liczy cenę za m² z ceny arkusza. <b>Dobierz ceny okuć
+      z SAS</b> wpisuje ceny okuć bez ceny (zawiasy z prowadnikami, zestawy szuflad Blum, MOVENTO, nóżki).</p>
       <p><b>Baza cen</b> (przyciski na górze kosztorysu) zapamiętuje ceny z jednego projektu, żeby
       nałożyć je na kolejny bez przepisywania.</p>
       <p>Karta <b>Oferta dla klienta</b> drukuje ofertę z zakresem, ceną i (opcjonalnie) zdjęciem
