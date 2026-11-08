@@ -18,6 +18,7 @@ const FAMILIES = {
 };
 // dekor bez rozpoznanego kodu - wyraźnie różne, stonowane barwy
 const OTHER = [0x7fa7c9, 0xc99a7f, 0x8fc19a, 0xc4a9d6, 0xd6c27f, 0x7fc4c2, 0xd68f8f, 0xa3a3d6];
+const WHITE = 0xf6f5f2;
 
 function hash(str) {
   let h = 2166136261;
@@ -31,6 +32,7 @@ export function decorColor(name) {
   if (!s) return null;
   const lac = lacquerColor(s); // „Lakier RAL 9016” / „NCS S 0502-Y” - odcień z palety
   if (lac != null) return lac;
+  if (/\bbia[łl][yaeo]?\b|\bwhite\b/i.test(s)) return WHITE; // „Front lamelowy biały” - biały, nie losowa barwa
   const m = s.match(/(?:^|[\s:(])([WUHF])\s?\d{3,4}\b/i);
   const pal = m ? FAMILIES[m[1].toUpperCase()] : OTHER;
   return pal[hash(s.toUpperCase()) % pal.length];
@@ -90,6 +92,11 @@ function plinthEntry(mod, project) {
   const pm = plinthMaterial(mod, project);
   if (pm.category === "Front") return frontEntry(pm.materialId, project);
   return korpusEntry(baseCategory(pm.category) === KORPUS && pm.category !== KORPUS ? pm.category.slice(KORPUS.length + 2) : "");
+}
+
+// Panel poziomy bez dekoru, z materiałem z cennika frontów = formatka frontu (engine/cabinet.js).
+export function horizontalPanelType(panel) {
+  return !String(panel.decor || "").trim() && panel.materialId ? "front" : "corpus";
 }
 
 function panelEntry(panel, type, project) {
@@ -161,7 +168,7 @@ export function projectDecorLegend(project, opts = {}) {
     if (mod.legs && mod.legs.active && mod.legs.plinth) add(plinthEntry(mod, project));
   });
   (project.sidePanels || []).forEach((p) => {
-    add(panelEntry(p, p.kind === "poziomy" ? "corpus" : "front", project));
+    add(panelEntry(p, p.kind === "poziomy" ? horizontalPanelType(p) : "front", project));
     if (p.kind === "zmywarka" && p.topBoard !== false) add(panelEntry(p, "corpus", project));
   });
   const out = [];

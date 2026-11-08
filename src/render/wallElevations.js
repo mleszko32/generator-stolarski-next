@@ -110,7 +110,7 @@ function generateWallSVG(wall, room, meta = {}) {
     svg += `<text x="${X(op.u + op.width / 2)}" y="${Y(op.sill + op.height) + fs * 1.3}" font-size="${fs * 0.95}" fill="${style.stroke}" text-anchor="middle">${op.kind === 'drzwi' ? 'drzwi' : op.kind === 'inne' ? 'przeszkoda' : 'okno'} ${fmtMm(op.width)} × ${fmtMm(op.height)}${op.sill > 0 ? ', parapet ' + fmtMm(op.sill) : ''}</text>`;
   });
 
-  if (wall.items.length === 0) {
+  if (wall.items.length === 0 && !(wall.panels || []).length) {
     svg += `<text x="${X(L / 2)}" y="${Y(Hroom / 2)}" font-size="${fs * 1.4}" fill="${C.slate400}" text-anchor="middle">brak szafek przy tej ścianie</text>`;
   }
 
@@ -172,6 +172,23 @@ function generateWallSVG(wall, room, meta = {}) {
     svg += `<text x="${X((it.u0 + it.u1) / 2)}" y="${Y(it.y1) + fs * 1.5}" font-size="${fs * 1.05}" font-weight="bold" fill="${C.slate900}" text-anchor="middle">${moduleCode(it)}</text>`;
     const label = moduleLabel(it);
     if (label) svg += `<text x="${X((it.u0 + it.u1) / 2)}" y="${Y(it.y1) + fs * 2.7}" font-size="${fs * 0.8}" fill="${C.slate600}" text-anchor="middle">${fit(label)}</text>`;
+  });
+
+  // boki dokładane, blendy i panele poziome (core/walls.js: wall.panels) - nad szafkami,
+  // z opisem wzdłuż dłuższego boku, gdy się mieści
+  (wall.panels || []).forEach(p => {
+    const w = p.u1 - p.u0, h = p.y1 - p.y0;
+    const style = p.kind === 'poziomy' ? { fill: C.slate200, stroke: C.slate600, ink: C.slate700 } : { fill: C.amber100, stroke: C.amber700, ink: C.amber700 };
+    svg += `<rect x="${X(p.u0)}" y="${Y(p.y1)}" width="${w}" height="${h}" fill="${style.fill}" stroke="${style.stroke}" stroke-width="${fs * 0.1}" />`;
+    const name = p.kind === 'blenda' ? 'blenda' : p.kind === 'poziomy' ? 'panel' : 'bok';
+    const text = `${name} ${fmtMm(p.kind === 'poziomy' ? w : p.kind === 'blenda' ? w : h)}`;
+    const tFs = fs * 0.7;
+    const cx = X((p.u0 + p.u1) / 2), cy = Y((p.y0 + p.y1) / 2);
+    if (h > w && h > text.length * tFs * 0.55 && w >= tFs * 0.9) {
+      svg += `<text x="${cx}" y="${cy}" font-size="${tFs}" fill="${style.ink}" text-anchor="middle" dominant-baseline="central" transform="rotate(-90 ${cx} ${cy})">${escapeHtml(text)}</text>`;
+    } else if (w > text.length * tFs * 0.55 && h >= tFs * 0.9) {
+      svg += `<text x="${cx}" y="${cy}" font-size="${tFs}" fill="${style.ink}" text-anchor="middle" dominant-baseline="central">${escapeHtml(text)}</text>`;
+    }
   });
 
   // blaty (core/worktops.js): przekrój blatu nad szafkami, z opisem długości

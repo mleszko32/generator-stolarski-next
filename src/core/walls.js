@@ -23,6 +23,7 @@ export const WALLS = [
 ];
 
 const ROT_TO_WALL = { 0: 'tyl', 90: 'prawa', 180: 'przednia', 270: 'lewa' };
+const PANEL_WALL_REACH = 1000; // mm - dalej od ściany z obrotu płyta idzie na najbliższą ścianę
 
 // Szafka narożna: [ściana, narożnik na wysokim końcu u?] dla ramion A i B przy
 // danym obrocie. Wyprowadzone z obrotu lokalnego narożnika (ramię A wzdłuż +x,
@@ -75,6 +76,7 @@ export function getRoom(project = state.project) {
 // item: { mod, kind: 'cabinet'|'corner', arm, u0, u1, floorY, y0, y1,
 //         fronts: [{u0,u1,y0,y1,subtype}], shelves: [{u0,u1,y0,y1}] }
 // floorY = spód nóżek nad podłogą, y0 = spód korpusu, y1 = góra korpusu.
+// wall.panels: [{ panel, kind: 'bok'|'blenda'|'poziomy', u0, u1, y0, y1 }] - boki dokładane, blendy, panele.
 export function computeWallLayouts(project = state.project) {
   const room = getRoom(project);
   const walls = WALLS.map(w => ({ ...w, length: wallLength(room, w.id), items: [] }));
@@ -135,6 +137,27 @@ export function computeWallLayouts(project = state.project) {
   });
 
   walls.forEach(w => w.items.sort((a, b) => a.u0 - b.u0));
+
+  // Boki dokładane, blendy i panele poziome (project.sidePanels) - osobno od szafek, żeby nie
+  // zmieniały łańcuchów wymiarów; ściana z obrotu tak jak szafki (tył / bok płyty przy ścianie).
+  walls.forEach(w => { w.panels = []; });
+  (project.sidePanels || []).forEach(panel => {
+    const kind = panel.kind || 'bok';
+    if (kind === 'zmywarka') return;
+    const rot = ((parseFloat(panel.rotation) || 0) % 360 + 360) % 360;
+    const { worldW, worldD } = getWorldFootprint(panel);
+    const px = parseFloat(panel.position?.x) || 0, pz = parseFloat(panel.position?.z) || 0;
+    // Ściana z obrotu, chyba że płyta stoi od niej dalej niż PANEL_WALL_REACH (np. półka na ścianie
+    // naprzeciwko z obrotem 0) - wtedy najbliższa ściana.
+    const dist = { tyl: pz, przednia: room.depth - (pz + worldD), lewa: px, prawa: room.width - (px + worldW) };
+    let wallId = ROT_TO_WALL[rot] || 'tyl';
+    if (dist[wallId] > PANEL_WALL_REACH) wallId = Object.keys(dist).reduce((a, b) => (dist[b] < dist[a] ? b : a));
+    const [u0, u1] = uInterval(wallId, room, px, pz, worldW, worldD);
+    const y0 = parseFloat(panel.position?.y) || 0;
+    const y1 = y0 + (parseFloat(panel.dimensions?.height) || 0);
+    if (u1 - u0 <= 0 || y1 - y0 <= 0) return;
+    byId[wallId].panels.push({ panel, kind, u0, u1, y0, y1 });
+  });
 
   // Okna, drzwi i przeszkody (core/openings.js) przypięte do swoich ścian.
   const openings = getOpenings(project);

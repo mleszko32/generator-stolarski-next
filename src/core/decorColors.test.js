@@ -12,6 +12,11 @@ describe("kolory dekorów w 3D", () => {
     expect(isLightColor(decorColor("Egger H1145 ST10 Dąb Bardolino"))).toBe(false);
   });
 
+  it("nazwa bez kodu ze słowem „biały” daje biel, nie losową barwę", () => {
+    expect(isLightColor(decorColor("Front lamelowy biały"))).toBe(true);
+    expect(isLightColor(decorColor("Lakier biały mat"))).toBe(true);
+  });
+
   const project = {
     pricing: { frontMaterials: [{ id: "default", name: "Standard" }, { id: "m2", name: "Lakier mat" }] },
     modules: [

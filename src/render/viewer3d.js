@@ -36,7 +36,7 @@ import { getBlindPanel, getBlindStile, blindGeometry, PARALLEL_PLATE_INSET } fro
 import { initMeasureTool, isMeasureActive, setMeasureButton, toggleMeasureMode, updateMeasureHover, handleMeasureClick, measureHoverMouse } from './measureTool.js';
 import { showAlert } from "../utils/modal.js";
 import { shelfStiffener } from '../core/shelfStiffener.js';
-import { projectDecorLegend, materialPaletteMap } from '../core/decorColors.js';
+import { projectDecorLegend, materialPaletteMap, horizontalPanelType } from '../core/decorColors.js';
 import { replaceMaterial } from '../core/materialReplace.js';
 import { frontMaterialSuggestions } from '../core/materialCatalog.js';
 import { escapeHtml } from '../utils/dom.js';
@@ -974,11 +974,32 @@ export function captureViewerSnapshot(maxWidth = 1400) {
 // rozmiar bufora) - całość synchronicznie, więc użytkownik nigdy nie widzi
 // pośrednich klatek ani pustego/skadrowanego widoku na żywym podglądzie.
 export function captureModuleSnapshot(moduleId, size = 160) {
-  if (!renderer || !scene || !camera || !controls || !cabinetGroup) return null;
+  if (!cabinetGroup) return null;
   const targetGroup = cabinetGroup.children.find((g) => g.userData && g.userData.moduleId === moduleId);
   if (!targetGroup) return null;
+  return snapshotGroups([targetGroup], { width: size, height: size, dir: [0.85, 0.65, 1], mime: 'image/png' });
+}
 
-  const box = new THREE.Box3().setFromObject(targetGroup);
+// Zdjęcie wybranych szafek i boków/blend/paneli (id modułów i sidePanels) z kierunku `dir`
+// (wektor od środka kadru do kamery w układzie pokoju), np. osobne widoki pomieszczeń do oferty.
+export function captureItemsSnapshot(ids, { width = 1600, height = 1100, dir = [1, 0.5, 1], fit = 1.15, worktops: withWorktops = false } = {}) {
+  if (!cabinetGroup) return null;
+  const set = new Set(ids);
+  const groups = cabinetGroup.children.filter((g) => g.userData && (set.has(g.userData.moduleId) || set.has(g.userData.sidePanelId)));
+  if (!groups.length) return null;
+  // opcjonalnie blaty leżące na wybranych szafkach (worktops: true)
+  const box = new THREE.Box3();
+  groups.forEach((g) => box.expandByObject(g));
+  const worktops = !withWorktops ? [] : cabinetGroup.children.filter((g) => g.userData && g.userData.worktop && new THREE.Box3().setFromObject(g).intersectsBox(box));
+  return snapshotGroups([...groups, ...worktops], { width, height, dir, fit, mime: 'image/jpeg' });
+}
+
+// Wspólne dla zdjęć: chowa resztę sceny i pokój, kadruje kamerę na `targets` z kierunku `dir`,
+// renderuje jedną klatkę i przywraca wszystko synchronicznie (patrz opis captureModuleSnapshot).
+function snapshotGroups(targets, { width, height, dir, fit = 1.5, mime = 'image/png' }) {
+  if (!renderer || !scene || !camera || !controls || !cabinetGroup) return null;
+  const box = new THREE.Box3();
+  targets.forEach((g) => box.expandByObject(g));
   if (box.isEmpty()) return null;
 
   const prevCamPos = camera.position.clone();
@@ -1000,20 +1021,27 @@ export function captureModuleSnapshot(moduleId, size = 160) {
     if (roomGroup) roomGroup.visible = false;
     if (labelsGroup) labelsGroup.visible = false;
     cabinetGroup.children.forEach((g) => {
-      if (g !== targetGroup && g.visible) { hidden.push(g); g.visible = false; }
+      if (!targets.includes(g) && g.visible) { hidden.push(g); g.visible = false; }
     });
 
     const center = box.getCenter(new THREE.Vector3());
     const diag = Math.max(box.getSize(new THREE.Vector3()).length(), 100);
 
-    renderer.setSize(size, size, false);
-    camera.aspect = 1;
-    camera.position.copy(center).add(new THREE.Vector3(0.85, 0.65, 1).normalize().multiplyScalar(diag * 1.5));
+    renderer.setSize(width, height, false);
+    camera.aspect = width / height;
+    camera.position.copy(center).add(new THREE.Vector3(...dir).normalize().multiplyScalar(diag * fit));
     camera.lookAt(center);
     camera.updateProjectionMatrix();
 
     renderer.render(scene, camera);
-    return renderer.domElement.toDataURL('image/png');
+    if (mime === 'image/png') return renderer.domElement.toDataURL('image/png');
+    // JPEG na białym tle (przezroczyste tło płótna wyszłoby czarne)
+    const c = document.createElement('canvas');
+    c.width = renderer.domElement.width; c.height = renderer.domElement.height;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(renderer.domElement, 0, 0);
+    return c.toDataURL('image/jpeg', 0.9);
   } catch (e) {
     return null;
   } finally {
@@ -1328,7 +1356,7 @@ export function update3D() {
       // generycznego W/H/D/innerGroup poniżej, które zakłada jeden
       // prostokątny korpus).
       if (mod.type === 'corner_cabinet') {
-          renderCornerCabinet(mod, mod.id === state.activeModuleId, th, cabinetGroup);
+          renderCornerCabinet(mod, mod.id === state.activeModuleId, th, cabinetGroup, isFrontsVisible);
           return;
       }
 
@@ -1774,6 +1802,7 @@ export function update3D() {
           const w = b.x1 - b.x0, d = b.z1 - b.z0, h = b.y1 - b.y0;
           const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), isXrayMode ? mats.xray.shelf : worktopMat);
           mesh.position.set(b.x0 + w / 2, b.y0 + h / 2, b.z0 + d / 2);
+          mesh.userData = { worktop: true };
           mesh.castShadow = !isXrayMode; mesh.receiveShadow = !isXrayMode;
           mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), new THREE.LineBasicMaterial({ color: 0x1f2937 })));
           cabinetGroup.add(mesh);
@@ -1817,8 +1846,8 @@ export function update3D() {
                   else addBox(W, bth, fd, -W / 2, -H / 2, -D / 2, 'corpus', isActiveSide, ud, panelGroup);
               }
           } else {
-              // panel poziomy z płyty korpusu, bok dokładany w dekorze frontów
-              addBox(W, H, D, -W / 2, -H / 2, -D / 2, panel.kind === 'poziomy' ? 'corpus' : 'front', isActiveSide, { sidePanelId: panel.id }, panelGroup);
+              // panel poziomy z płyty korpusu (albo w materiale frontów - horizontalPanelType), bok dokładany w dekorze frontów
+              addBox(W, H, D, -W / 2, -H / 2, -D / 2, panel.kind === 'poziomy' ? horizontalPanelType(panel) : 'front', isActiveSide, { sidePanelId: panel.id }, panelGroup);
           }
 
           cabinetGroup.add(panelGroup);

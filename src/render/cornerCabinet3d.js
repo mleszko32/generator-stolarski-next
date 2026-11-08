@@ -22,7 +22,7 @@ import { addBox, addHole, addCornerPanel } from './meshBuilders.js';
 // calculateHinges bez żadnych zmian (patrz core/layout.js:
 // getCornerArmRect) - są fizycznie płaskimi prostokątami, tylko inaczej
 // tu pozycjonowanymi niż w prostokątnym module.
-export function renderCornerCabinet(mod, isActive, th, parentGroup) {
+export function renderCornerCabinet(mod, isActive, th, parentGroup, frontsVisible = true) {
   const legA = parseFloat(mod.dimensions.width) || 860;
   const legB = parseFloat(mod.dimensions.legB) || 860;
   // Każde ramię ma WŁASNĄ głębokość (core/layout.js: getCornerDepths) -
@@ -161,6 +161,7 @@ export function renderCornerCabinet(mod, isActive, th, parentGroup) {
 
   (mod.elements || []).forEach(front => {
       if (front.typ !== 'front') return;
+      if (!frontsVisible) return; // przełącznik „Ukryj fronty zewn.” - widać wnętrze
       const fw = parseFloat(front.w) || 0;
       const fh = parseFloat(front.h) || 0;
       const fx = parseFloat(front.x) || 0;

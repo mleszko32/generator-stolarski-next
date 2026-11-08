@@ -21,6 +21,32 @@ describe('rzuty ścian - przypisanie szafek do ścian', () => {
     setProject(freshProject({ room, modules: [] }));
   });
 
+  it('boki dokładane, blendy i panele poziome trafiają do wall.panels (zmywarka nie)', () => {
+    state.project.sidePanels = [
+      { id: 'b', kind: 'blenda', rotation: 270, position: { x: 0, y: 100, z: 1000 }, dimensions: { width: 50, height: 2580, depth: 98 } },
+      { id: 's', rotation: 0, position: { x: 2342, y: 100, z: 0 }, dimensions: { width: 18, height: 2580, depth: 583 } },
+      { id: 'p', kind: 'poziomy', rotation: 0, position: { x: 0, y: 1520, z: 0 }, dimensions: { width: 2340, height: 18, depth: 320 } },
+      { id: 'z', kind: 'zmywarka', rotation: 0, position: { x: 600, y: 0, z: 0 }, dimensions: { width: 600, height: 880, depth: 513 } },
+    ];
+    const layout = computeWallLayouts();
+    const lewa = wall(layout, 'lewa').panels, tyl = wall(layout, 'tyl').panels;
+    // lewa: u = głębokość - z
+    expect(lewa).toHaveLength(1);
+    expect(lewa[0]).toMatchObject({ kind: 'blenda', u0: 1950, u1: 2000, y0: 100, y1: 2680 });
+    expect(tyl.map(p => p.kind)).toEqual(['bok', 'poziomy']);
+    expect(tyl[0]).toMatchObject({ u0: 2342, u1: 2360 });
+    expect(tyl[1]).toMatchObject({ u0: 0, u1: 2340, y0: 1520, y1: 1538 });
+  });
+
+  it('płyta daleko od ściany z obrotu idzie na najbliższą ścianę (półka przy ścianie przedniej z obrotem 0)', () => {
+    state.project.sidePanels = [
+      { id: 'p', kind: 'poziomy', rotation: 0, position: { x: 1000, y: 900, z: 2750 }, dimensions: { width: 1300, height: 40, depth: 250 } },
+    ];
+    const layout = computeWallLayouts();
+    expect(wall(layout, 'tyl').panels).toHaveLength(0);
+    expect(wall(layout, 'przednia').panels[0]).toMatchObject({ u0: 1700, u1: 3000 });
+  });
+
   it('rotacja 0 -> ściana tylna, u = x', () => {
     state.project.modules = [mod('a', 500, 0, 0)];
     const it = wall(computeWallLayouts(), 'tyl').items[0];

@@ -84,7 +84,7 @@ function renderBlendaProperties(rightSidebar, panel) {
   document.getElementById('input-blenda-flange-decor')?.addEventListener('change', (e) => { panel.flangeDecor = e.target.value.trim(); update3D(); updateSidebar(); });
 }
 
-// Panel poziomy (core/state.js: addHorizontalPanel) - płyta korpusu, więc bez cennika frontów.
+// Panel poziomy (core/state.js: addHorizontalPanel) - płyta korpusu albo (materialId bez dekoru) front z cennika.
 function renderHorizontalPanelProperties(rightSidebar, panel) {
   const d = panel.dimensions;
   rightSidebar.innerHTML = `
@@ -111,6 +111,15 @@ function renderHorizontalPanelProperties(rightSidebar, panel) {
         <label>Dekor (opis do formatki):</label>
         <input type="text" id="input-side-decor" list="side-decor-catalog" value="${escapeHtml(panel.decor || '')}" placeholder="pusty = dekor korpusu" />${decorDatalistHtml()}
       </div>
+      <div class="property-group">
+        <label>Materiał (cennik frontów):</label>
+        <select id="input-side-material">
+          <option value="" ${panel.materialId ? '' : 'selected'}>Płyta korpusu (dekor powyżej)</option>
+          ${(state.project.pricing?.frontMaterials || []).map(mat => `<option value="${escapeHtml(mat.id)}" ${panel.materialId === mat.id ? 'selected' : ''}>${escapeHtml(mat.name)}</option>`).join('')}
+          <option value="__new__">+ Nowy materiał…</option>
+        </select>
+      </div>
+      <div class="hint">Materiał z cennika frontów (przy pustym dekorze) robi z panelu formatkę frontu, np. lakierowany panel pod szafkami w kolorze ich frontów.</div>
     `)}
     ${groupSectionHtml(panel)}
   `;

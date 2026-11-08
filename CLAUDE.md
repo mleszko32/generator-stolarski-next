@@ -343,7 +343,8 @@ cofaniu i wstawieniu szablonu z biblioteki) i usuwane — reszta kodu nie czyta 
 Nowa droga wprowadzania modułów do projektu musi też przejść przez `ensureSidePanelsDefaults`.
 **Panel poziomy** (`kind: 'poziomy'`, `addHorizontalPanel`) to też wpis w `project.sidePanels`: płyta leżąca poza
 szafkami (półka/wieniec w niszy), `dimensions.width` = długość X, `height` = grubość, `depth` = Z, `position.y` = spód;
-formatka kategorii Korpus z `defaultEdges` (okleina tylko z przodu), pilot: `gsn.panel("poziomy", {...})`.
+formatka kategorii Korpus z `defaultEdges` (okleina tylko z przodu), pilot: `gsn.panel("poziomy", {...})`; bez dekoru, z
+`materialId` z cennika frontów (np. lakierowany panel pod szafkami) — formatka „Front” w tym materiale (`horizontalPanelType`).
 **Zmywarka do zabudowy** (`kind: 'zmywarka'`, 450 / 600, przyciski pod listą szafek, `addDishwasher`) to też wpis w
 `project.sidePanels`, bez korpusu: `core/dishwasher.js` (czyste, z testami) — wymiary, nóżki, dekor i front z zaznaczonej szafki
 dolnej (staje za nią), `dishwasherGeometry` (front z luzami jak fronty szafek, wieniec nad zmywarką `topBoard` w `decor`),

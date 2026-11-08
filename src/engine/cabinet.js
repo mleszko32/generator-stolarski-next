@@ -432,14 +432,18 @@ function getSinglePanelParts(panel) {
   if (panel.kind === 'poziomy') {
     // Panel poziomy (core/state.js: addHorizontalPanel): płyta korpusu długość × głębokość,
     // okleina domyślnie tylko na jednej dłuższej krawędzi (przód).
+    // Z materiałem z cennika frontów (panel.materialId, np. lakier jak fronty nad nim) i bez
+    // dekoru - formatka frontu w tym materiale, jak bok dokładany (lakierowana, bez okleiny).
     const label = panel.decor ? `Panel poziomy (${panel.decor})` : 'Panel poziomy';
+    const asFront = !String(panel.decor || '').trim() && !!panel.materialId;
     return [{
       name: panel.name ? `${label} — ${panel.name}` : label,
       length: parseFloat(panel.dimensions?.width) || 0,
       width: parseFloat(panel.dimensions?.depth) || 0,
       qty: 1,
-      category: korpusCategory(panel.decor), // wypełniony dekor = „Korpus: <dekor>”, razem z szafkami w tym dekorze
-      defaultEdges: [true, false, false, false],
+      ...(asFront
+        ? { category: "Front", materialId: panel.materialId }
+        : { category: korpusCategory(panel.decor), defaultEdges: [true, false, false, false] }), // wypełniony dekor = „Korpus: <dekor>”
     }];
   }
   // Bok dokładany z wypełnionym dekorem to płyta korpusu w tym dekorze („Korpus: <dekor>”),

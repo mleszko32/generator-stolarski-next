@@ -23,6 +23,15 @@ describe("panel poziomy (sidePanels kind 'poziomy')", () => {
     expect(withEdges({}, part, [true, false, false, false])).toEqual({});
   });
 
+  it("z materiałem z cennika frontów (bez dekoru) to formatka frontu w tym materiale", () => {
+    addPanel("poziomy", { name: "Pod wiszącymi", materialId: "lak", dimensions: { width: 1710, depth: 320 } });
+    const part = calculateAllProjectParts().find((x) => x.name.includes("Pod wiszącymi"));
+    expect(part).toMatchObject({ length: 1710, width: 320, category: "Front", materialId: "lak" });
+    // z dekorem zostaje płytą korpusu w tym dekorze
+    addPanel("poziomy", { name: "Z dekorem", decor: "U740 PM", materialId: "lak", dimensions: { width: 800, depth: 300 } });
+    expect(calculateAllProjectParts().find((x) => x.name.includes("Z dekorem")).category).toBe("Korpus: U740 PM");
+  });
+
   it("zmiana pól i ochrona id / rodzaju", () => {
     const p = addPanel("poziomy", {});
     patchPanel(p, { position: { y: 819 } });
