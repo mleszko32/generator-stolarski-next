@@ -22,3 +22,17 @@ describe("czoło szuflady wewnętrznej", () => {
     expect(calculateModuleParts(mod).parts.some((p) => p.name.startsWith("Front szuflady wewn."))).toBe(true);
   });
 });
+
+describe("skrzynki MOVENTO z płyty korpusu szafki", () => {
+  it("front.drawerBoxFromKorpus: formatki skrzynki w kategorii „Korpus: <dekor>”, bez opcji - Szuflada", async () => {
+    const { calculateAllProjectParts } = await import("./cabinet.js");
+    const mk = (fromKorpus) => {
+      setProject(freshProject({ modules: [baseModule({ id: "a", materials: { korpusDecor: "U702 18mm" },
+        front: { drawerSystem: "movento_forum", drawerBoxFromKorpus: fromKorpus }, elements: [{ ...inner }] })] }));
+      recalculateLayout(state.project.modules[0]);
+      return calculateAllProjectParts().filter((p) => /Bok szuflady|Front szuflady wewn/.test(p.name)).map((p) => p.category).sort();
+    };
+    expect(mk(true)).toEqual(["Korpus: U702 18mm", "Korpus: U702 18mm"]);   // skrzynka i front w korpusie
+    expect(mk(false)).toEqual(["Front", "Szuflada"]);
+  });
+});

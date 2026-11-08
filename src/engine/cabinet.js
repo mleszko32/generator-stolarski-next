@@ -172,7 +172,9 @@ export function collectProjectParts() {
     const korpusCat = korpusCategory(moduleKorpusDecor(mod));
     // Plecy HDF w kolorze wybranym przy szafce (mod.backPanel.decor) -> „Plecy: <dekor>”.
     const plecyCat = plecyCategory(moduleBackDecor(mod));
-    allParts.push(...modParts.map(p => ({ ...p, category: p.category === KORPUS ? korpusCat : p.category === PLECY ? plecyCat : p.category, moduleName: mod.name, furnitureKey: furn.moduleKey.get(mod.id) })));
+    // Skrzynki szuflad drewnianych (MOVENTO) z płyty korpusu tej szafki (front.drawerBoxFromKorpus) - „Korpus: <dekor>”.
+    const boxFromKorpus = !!({ ...(config.front || {}), ...(mod.front || {}) }).drawerBoxFromKorpus;
+    allParts.push(...modParts.map(p => ({ ...p, ...(boxFromKorpus && p.woodenBox ? { materialId: undefined } : {}), category: p.category === KORPUS || (boxFromKorpus && p.woodenBox) ? korpusCat : p.category === PLECY ? plecyCat : p.category, moduleName: mod.name, furnitureKey: furn.moduleKey.get(mod.id) })));
   });
 
   // Boki dokładane (core/state.js: addSidePanel) NIE należą do żadnego
@@ -391,7 +393,9 @@ function getFrontsAndDrawers(mod, config) {
     // Czoło szuflady wewnętrznej w systemie metalowym Blum (MERIVOBOX, TANDEMBOX, LEGRABOX…) to
     // gotowy element systemu, nie formatka; z płyty tylko przy skrzynce drewnianej (MOVENTO).
     if (!(front.subtype === 'szuflada-wewnetrzna' && innerFrontIsSystem(mod, config))) {
-      parts.push({ name: partName, length: parseFloat((front.h || 0).toFixed(1)), width: parseFloat((front.w || 0).toFixed(1)), qty: 1, category: "Front", materialId: front.materialId });
+      // front szuflady wewn. przy skrzynce drewnianej siedzi w korpusie - z płyty korpusu, gdy skrzynki są z korpusu
+      const ofBox = front.subtype === 'szuflada-wewnetrzna' ? { woodenBox: true } : {};
+      parts.push({ name: partName, length: parseFloat((front.h || 0).toFixed(1)), width: parseFloat((front.w || 0).toFixed(1)), qty: 1, category: "Front", materialId: front.materialId, ...ofBox });
     }
 
     if (front.subtype.includes('szuflada')) {
