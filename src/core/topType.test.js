@@ -48,3 +48,21 @@ describe("korpus bez wieńca górnego", () => {
     expect(drawerSpec(mod, f, state.project).availableSpace ?? 85).toBe(85);
   });
 });
+
+describe("front nakładany przy trawersie pionowym", () => {
+  it("zakrywa trawers jak wieniec: front 780 - luz 5 = 775, nie 693", async () => {
+    const { recalculateLayout } = await import("./layout.js");
+    const mk = (topType) => {
+      setProject(freshProject({ modules: [baseModule({ id: "a", dimensions: { width: 700, height: 780, depth: 560 },
+        construction: { topType, traverseWidth: 100 }, front: { clearance: { top: 5, bottom: 0 } },
+        elements: [{ id: "f", typ: "front", subtype: "szuflada", frontCount: 1, distribution: "1", frontIndex: 0,
+          baseZone: { minX: 18, maxX: 682, minY: 18, maxY: 680, boundLeft: "cab-left", boundRight: "cab-right", boundBottom: "cab-bottom", boundTop: "cab-top" } }] })] }));
+      const mod = state.project.modules[0];
+      recalculateLayout(mod);
+      return mod.elements[0].h;
+    };
+    expect(mk("trawersy_pion")).toBe(775);
+    expect(mk("pelny")).toBe(775);
+    expect(mk("trawersy_poziom")).toBe(775);
+  });
+});

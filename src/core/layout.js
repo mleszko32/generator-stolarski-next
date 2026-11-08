@@ -364,7 +364,9 @@ export function recalculateLayout(mod) {
               const overRight = isRightOuter ? (isInset ? -cRight : th - cRight) : (isBoundRightFront ? -gapVal : ((th / 2) - (gapVal / 2)));
               const overBottom = isBottomOuter ? (isInset ? -cBottom : th - cBottom) : (isBoundBottomFront ? -gapVal : (gapFromAxisBottom !== null ? (th / 2) - gapFromAxisBottom : (th / 2) - (gapVal / 2)));
               // bez wieńca górnego front nakładany nie ma czego zakryć u góry - kończy się luz pod górną krawędzią boków
-              const overTop = isTopOuter ? (isInset || cons.topType === 'brak' ? -cTop : th - cTop) : (isBoundTopFront ? -gapVal : (gapFromAxisTop !== null ? (th / 2) - gapFromAxisTop : (th / 2) - (gapVal / 2)));
+              // nakładany zakrywa całe zamknięcie góry: wieniec / trawers poziomy = th, trawers pionowy = jego szerokość
+              const topCover = slopeRect ? (cons.topType === 'brak' ? 0 : th) : height - topInnerY(cons, height, th);
+              const overTop = isTopOuter ? (isInset ? -cTop : topCover - cTop) : (isBoundTopFront ? -gapVal : (gapFromAxisTop !== null ? (th / 2) - gapFromAxisTop : (th / 2) - (gapVal / 2)));
 
               startX = minX - overLeft;
               totalW = (maxX - minX) + overLeft + overRight;
