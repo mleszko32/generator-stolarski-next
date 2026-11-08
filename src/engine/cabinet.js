@@ -7,18 +7,18 @@ import { corpusInnerDepth } from "../core/backPanel.js";
 import { calculateHinges, stackedHingeObstacles } from "../core/hingeMath.js";
 import { fmtMm } from "../utils/math.js";
 import { getWorktopParts } from "../core/worktops.js";
-import { recalculateAllLayouts, getWorldFootprint, getCornerDepths, getModuleBox } from "../core/layout.js";
-import { getCorpusHoles, getPionMountHoles, getCorpusParts, getBackPanelParts, sideFloorExt } from "./carcaseParts.js";
+import { recalculateAllLayouts, getCornerDepths, getModuleBox } from "../core/layout.js";
+import { getCorpusHoles, getPionMountHoles, getCorpusParts, getBackPanelParts } from "./carcaseParts.js";
 import { getCornerCorpusParts } from "./cornerParts.js";
 import { getSlopeCabinetParts, getSlopeFrontParts } from "../core/slopeCabinet.js";
 import { getBlindPanel, getBlindStile, blindGeometry, getBlindCorner } from "../core/blindCorner.js";
 import { isFlap } from "../core/liftFlap.js";
 import { splitPlinthRun, maxPlinthLength } from "./plinthSplit.js";
+import { buildPlinthRuns } from "./plinthRuns.js";
 import { shelfStiffener } from "../core/shelfStiffener.js";
 import { KORPUS, korpusCategory, moduleKorpusDecor, PLECY, plecyCategory, moduleBackDecor } from "../core/materialCatalog.js";
-import { plinthMaterial } from "../core/plinthMaterial.js";
 import { furnitureGroups, sharedFurnitureKey, COLLECTIVE_KEY } from "../core/furnitureGroups.js";
-import { getDishwasherParts, dishwasherPlinthModule } from "../core/dishwasher.js";
+import { getDishwasherParts } from "../core/dishwasher.js";
 import { moduleBoardThickness, sidePanelLayers } from "../core/boardThickness.js";
 
 export function calculateParts() {
@@ -185,75 +185,8 @@ export function collectProjectParts() {
     allParts.push(...getSidePanelParts(panel, config).map(p => ({ ...p, moduleName: panel.name || (panel.kind === 'blenda' ? 'Blenda' : panel.kind === 'poziomy' ? 'Panel poziomy' : panel.kind === 'zmywarka' ? 'Zmywarka' : 'Bok dokładany'), furnitureKey: furn.panelKey.get(panel.id) })));
   });
 
-  // Szafka narożna (mod.type === 'corner_cabinet') wyłączona z tego wspólnego
-  // biegu cokołu - jej odcisk to L (dwa ramiona), a ta logika liczy jeden
-  // prostokątny odcinek na bazie getWorldFootprint (bounding box legA×legB),
-  // co dałoby jedną fikcyjną, za długą listwę cokołu zamiast dwóch krótkich
-  // (po jednej na czoło każdego ramienia). Render 3D na razie też nie rysuje
-  // cokołu narożnika (patrz renderCornerCabinet) - tylko same nóżki.
-  // Zmywarka do zabudowy (core/dishwasher.js) stoi w biegu jak szafka - cokół idzie przez nią bez przerwy.
-  const baseCabinets = config.modules.filter(m => m.legs && m.legs.active && m.legs.plinth && m.type !== 'corner_cabinet')
-    .concat((config.sidePanels || []).filter(p => p.kind === 'zmywarka').map(dishwasherPlinthModule).filter(m => m.legs.active && m.legs.plinth));
-
-  // Tylko szafki o TEJ SAMEJ orientacji (rotation) mogą fizycznie stać w jednym,
-  // ciągłym biegu cokołu - stoją wtedy pod tą samą ścianą. Dla rotation 0/180
-  // bieg biegnie wzdłuż X (jak dawniej), dla 90/270 - wzdłuż Z, bo obrót zamienia
-  // odcisk szerokość/głębokość (patrz getWorldFootprint w core/layout.js).
-  const byRotation = new Map();
-  baseCabinets.forEach(mod => {
-      const rot = ((parseFloat(mod.rotation) || 0) % 360 + 360) % 360;
-      if (!byRotation.has(rot)) byRotation.set(rot, []);
-      byRotation.get(rot).push(mod);
-  });
-
-  let plinthRuns = [];
-  byRotation.forEach((mods, rot) => {
-      const alongZ = rot === 90 || rot === 270;
-      mods.sort((a, b) => {
-          const av = alongZ ? (parseFloat(a.position.z) || 0) : (parseFloat(a.position.x) || 0);
-          const bv = alongZ ? (parseFloat(b.position.z) || 0) : (parseFloat(b.position.x) || 0);
-          return av - bv;
-      });
-
-      mods.forEach(mod => {
-          const x = parseFloat(mod.position.x) || 0;
-          const y = parseFloat(mod.position.y) || 0;
-          const z = parseFloat(mod.position.z) || 0;
-          const { worldW, worldD } = getWorldFootprint(mod);
-          const h = parseFloat(mod.legs.height);
-          const offset = parseFloat(mod.legs.plinthOffset !== undefined ? mod.legs.plinthOffset : 40);
-
-          // "along" = pozycja wzdłuż kierunku, w którym rośnie bieg; "runLen" = ile
-          // zajmuje w tym kierunku; "crossPos"/"frontCoord" muszą się zgadzać u
-          // sąsiada, żeby w ogóle mogły się połączyć w jeden ciągły odcinek.
-          // Bok do podłogi: cokół zaczyna się / kończy na boku (grubość płyty mniej z tej strony).
-          const ext = sideFloorExt(mod, config);
-          const thB = moduleBoardThickness(mod, config);
-          const cutStart = ext.left ? thB : 0, cutEnd = ext.right ? thB : 0;
-          const along = (alongZ ? z : x) + (alongZ ? 0 : cutStart);
-          const runLen = (alongZ ? worldD : worldW) - (alongZ ? 0 : cutStart + cutEnd);
-          const crossPos = alongZ ? x : z;
-          const frontCoord = alongZ ? (x + worldW) : (z + worldD);
-
-          // Szukamy wśród WSZYSTKICH biegów (nie tylko ostatniego): szafka z innego rzędu o
-          // tym samym obrocie (np. wyspa) wpadała w sortowaniu między szafki pod ścianą i
-          // rozbijała ich wspólny cokół na kilka odcinków.
-          const mat = plinthMaterial(mod, config);
-          let joined = false;
-          const last = plinthRuns.find(r => r.rot === rot && Math.abs((r.along + r.runLen) - along) <= 1 &&
-              r.crossPos === crossPos && r.h === h && r.offset === offset && r.frontCoord === frontCoord && r.mat.key === mat.key);
-          if (last) {
-              // styk = początek dołączanej szafki (względem początku biegu) - tu wolno ciąć
-              last.joints.push(along - last.along);
-              last.mods.push(mod);
-              last.runLen += runLen + (along - (last.along + last.runLen));
-              joined = true;
-          }
-          if (!joined) {
-              plinthRuns.push({ rot, along, runLen, crossPos, y, h, offset, frontCoord, joints: [], mat, mods: [mod] });
-          }
-      });
-  });
+  // Biegi cokołu z domkniętymi narożnikami - engine/plinthRuns.js (wspólne z 3D).
+  const plinthRuns = buildPlinthRuns(config);
 
   // Bieg dłuższy niż arkusz (pełna ściana kuchni) dzielimy na części łączone na
   // stykach szafek - inaczej formatka nie zmieściłaby się w rozkroju.

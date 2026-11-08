@@ -90,6 +90,9 @@ do innego frontu po nim, niezależnie od kolejności w `mod.elements`.
   odcinki cokołu przez sąsiednie szafki dolne. Odcinek dłuższy niż arkusz (`project.cutPlan`,
   dłuższy bok minus obrzeże) dzieli `engine/plinthSplit.js` na „część i/n” łączone na stykach
   szafek (najmniej części, potem najrówniejsze). Render 3D rysuje cokół osobno pod każdą szafką.
+  Biegi składa `engine/plinthRuns.js` (`buildPlinthRuns`, czyste, z testami) i domyka wewnętrzne narożniki
+  (`closePlinthCorners`: bieg wzdłuż X przechodzi do zewnętrznej krawędzi listwy prostopadłej, ten zaczyna się na
+  jego licu, gdy końce są ≤ `CORNER_REACH`); dołożone kawałki (`cornerFills`) dorysowuje `update3D()`.
 
 Obok, w `src/engine/`: `carcaseParts.js` (formatki i wiercenia korpusu prostokątnego; `jointSetPositions` —
 jedyne miejsce rozmieszczenia zestawów kołek + wkręt dla wieńców, półek stałych i przegród: skrajne 37 mm od przodu

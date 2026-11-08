@@ -3,6 +3,7 @@ import { moduleBoardThickness } from "../core/boardThickness.js";
 import * as THREE from 'three';
 import { resolveBackPanel, backThicknessOf, isBoardOverlayBack } from '../core/backPanel.js';
 import { bottomSetbackOf, sideFloorExt } from '../engine/carcaseParts.js';
+import { buildPlinthRuns } from '../engine/plinthRuns.js';
 import { computeDimensions } from '../core/dimensions3d.js';
 import { buildDimensionGroup } from './dimensions3d.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -1763,6 +1764,12 @@ export function update3D() {
   // po uwzględnieniu obrotu (getWorldFootprint działa na tym obiekcie bez
   // zmian, bo ma ten sam kształt dimensions/rotation co moduł).
   {
+      // Domknięte narożniki cokołu (engine/plinthRuns.js) - pod szafkami cokół rysuje addLegsAndPlinth,
+      // tu tylko kawałki dołożone w narożniku między prostopadłymi biegami.
+      buildPlinthRuns(state.project).forEach(run => run.cornerFills.forEach(f => {
+          addBox(f.x1 - f.x0, run.h, f.z1 - f.z0, f.x0, run.y + 0.5, f.z0, 'plinth', false,
+              { moduleId: run.mods[0].id, type: 'plinth' }, cabinetGroup);
+      }));
       if (isWorktopsVisible) worktopBoxes(state.project).forEach(b => {
           const w = b.x1 - b.x0, d = b.z1 - b.z0, h = b.y1 - b.y0;
           const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), isXrayMode ? mats.xray.shelf : worktopMat);
