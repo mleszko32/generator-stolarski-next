@@ -17,6 +17,7 @@ import { shelfStiffener } from "../core/shelfStiffener.js";
 import { KORPUS, korpusCategory, moduleKorpusDecor, PLECY, plecyCategory, moduleBackDecor } from "../core/materialCatalog.js";
 import { plinthMaterial } from "../core/plinthMaterial.js";
 import { furnitureGroups, sharedFurnitureKey, COLLECTIVE_KEY } from "../core/furnitureGroups.js";
+import { getDishwasherParts, dishwasherPlinthModule } from "../core/dishwasher.js";
 import { moduleBoardThickness, sidePanelLayers } from "../core/boardThickness.js";
 
 export function calculateParts() {
@@ -178,7 +179,7 @@ export function collectProjectParts() {
   // więc trafiają do wspólnej listy formatek projektu, ale nie do
   // calculateParts() (lista formatek AKTYWNEGO modułu).
   (config.sidePanels || []).forEach(panel => {
-    allParts.push(...getSidePanelParts(panel, config).map(p => ({ ...p, moduleName: panel.name || (panel.kind === 'blenda' ? 'Blenda' : panel.kind === 'poziomy' ? 'Panel poziomy' : 'Bok dokładany'), furnitureKey: furn.panelKey.get(panel.id) })));
+    allParts.push(...getSidePanelParts(panel, config).map(p => ({ ...p, moduleName: panel.name || (panel.kind === 'blenda' ? 'Blenda' : panel.kind === 'poziomy' ? 'Panel poziomy' : panel.kind === 'zmywarka' ? 'Zmywarka' : 'Bok dokładany'), furnitureKey: furn.panelKey.get(panel.id) })));
   });
 
   // Szafka narożna (mod.type === 'corner_cabinet') wyłączona z tego wspólnego
@@ -187,7 +188,9 @@ export function collectProjectParts() {
   // co dałoby jedną fikcyjną, za długą listwę cokołu zamiast dwóch krótkich
   // (po jednej na czoło każdego ramienia). Render 3D na razie też nie rysuje
   // cokołu narożnika (patrz renderCornerCabinet) - tylko same nóżki.
-  const baseCabinets = config.modules.filter(m => m.legs && m.legs.active && m.legs.plinth && m.type !== 'corner_cabinet');
+  // Zmywarka do zabudowy (core/dishwasher.js) stoi w biegu jak szafka - cokół idzie przez nią bez przerwy.
+  const baseCabinets = config.modules.filter(m => m.legs && m.legs.active && m.legs.plinth && m.type !== 'corner_cabinet')
+    .concat((config.sidePanels || []).filter(p => p.kind === 'zmywarka').map(dishwasherPlinthModule).filter(m => m.legs.active && m.legs.plinth));
 
   // Tylko szafki o TEJ SAMEJ orientacji (rotation) mogą fizycznie stać w jednym,
   // ciągłym biegu cokołu - stoją wtedy pod tą samą ścianą. Dla rotation 0/180
@@ -265,7 +268,7 @@ export function collectProjectParts() {
         category: run.mat.category,
         ...(run.mat.materialId ? { materialId: run.mat.materialId } : {}),
         moduleName: "Elementy zbiorcze",
-        furnitureKey: sharedFurnitureKey(run.mods.map(m => furn.moduleKey.get(m.id)))
+        furnitureKey: sharedFurnitureKey(run.mods.map(m => furn.moduleKey.get(m.id) || furn.panelKey.get(m.id)))
       });
     });
   });
@@ -470,6 +473,7 @@ function getBlendaParts(panel, config) {
 // z frontami, dając realną sumę m² tego dekoru do wyceny.
 function getSidePanelParts(panel, config) {
   if (panel.kind === 'blenda') return getBlendaParts(panel, config);
+  if (panel.kind === 'zmywarka') return getDishwasherParts(panel, config);
   // Płyta grubsza niż jedna płyta (36 mm = 2 × 18 mm) to płyty sklejone: tyle formatek, ile warstw.
   const layers = sidePanelLayers(panel, config);
   const glued = layers > 1 ? ` [sklejane ×${layers}]` : '';

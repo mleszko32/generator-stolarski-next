@@ -13,6 +13,7 @@ import { calculateDrawerHoles } from '../core/drawerMath.js';
 import { drawerSpec } from '../core/drawerSpec.js';
 import { calculateHinges, stackedHingeObstacles, SHELF_PIN_DROP, SHELF_PIN_OFFSETS } from '../core/hingeMath.js';
 import { isFlap, flapHinges } from '../core/liftFlap.js';
+import { dishwasherGeometry } from '../core/dishwasher.js';
 import { recalculateLayout, getTraverseConfig, getWorldFootprint, clampModuleToRoom, getModuleBox } from '../core/layout.js';
 import { buildZoneTree, moveSplit } from '../core/zoneTree.js';
 import { scheduleCheckpoint } from '../core/history.js';
@@ -1771,7 +1772,7 @@ export function update3D() {
           cabinetGroup.add(mesh);
       });
       (state.project.sidePanels || []).forEach(panel => {
-          if (panel.kind === 'blenda' ? !isBlendsVisible : !isSidePanelsVisible) return;
+          if (panel.kind === 'blenda' ? !isBlendsVisible : panel.kind === 'zmywarka' ? false : !isSidePanelsVisible) return;
           const isActiveSide = panel.id === state.activeSidePanelId || !!(state.selectedSidePanels && state.selectedSidePanels.has(panel.id));
           const { worldW, worldD } = getWorldFootprint(panel);
           const x = parseFloat(panel.position?.x) || 0;
@@ -1786,7 +1787,16 @@ export function update3D() {
           panelGroup.position.set(x + worldW / 2, y + H / 2, z + worldD / 2);
           panelGroup.rotation.y = -((parseFloat(panel.rotation) || 0) * Math.PI / 180);
 
-          if (panel.kind === 'blenda') {
+          if (panel.kind === 'zmywarka') {
+              // zmywarka do zabudowy (core/dishwasher.js): urządzenie, wieniec, front, cokół
+              const g = dishwasherGeometry(panel, state.project);
+              const ud = { sidePanelId: panel.id };
+              const bx = (b, type, d, z, u = ud) => addBox(b.w, b.h, d, b.x - W / 2, b.y - H / 2, z - D / 2, type, isActiveSide, u, panelGroup);
+              bx(g.appliance, 'appliance', g.appliance.d, g.appliance.z);
+              if (g.top) bx({ x: 0, w: g.W, y: g.top.y, h: g.top.h }, 'corpus', g.D, 0);
+              if (isFrontsVisible) bx(g.front, 'front', g.front.th, g.front.z);
+              if (g.plinth) bx(g.plinth, 'plinth', g.plinth.th, g.plinth.z, { sidePanelId: panel.id, type: 'plinth' });
+          } else if (panel.kind === 'blenda') {
               // czoło z przodu (+Z) i kołnierz mocujący za nim, przy wskazanej krawędzi
               const ud = { sidePanelId: panel.id };
               const bth = parseFloat(state.project.materials?.boardThickness) || 18;

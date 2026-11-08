@@ -1,4 +1,4 @@
-import { state, addModule, deleteModule, duplicateModule, addSidePanel, deleteSidePanel, addCornerModule, addSlopeModule, ensureSidePanelsDefaults } from "../core/state.js";
+import { state, addModule, deleteModule, duplicateModule, addSidePanel, addDishwasher, getActiveModule, deleteSidePanel, addCornerModule, addSlopeModule, ensureSidePanelsDefaults } from "../core/state.js";
 import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel } from "./properties.js";
 import { openProductionHub } from "./productionHub.js";
@@ -74,6 +74,18 @@ export function updateSidebar() {
   const leftSidebar = document.querySelector(".sidebar-left");
   const modules = state.project.modules;
 
+  const sideItem = (p, icon, fallbackName, delTitle, meta) => {
+    const isActive = p.id === state.activeSidePanelId;
+    const isSelected = state.selectedSidePanels && state.selectedSidePanels.has(p.id);
+    const group = p.groupId ? `<i class="ti ti-link li-group" title="W grupie z szafkami" aria-hidden="true"></i>` : '';
+    return `
+        <div class="list-item side-panel-item${isActive ? ' is-active' : (isSelected ? ' is-selected' : '')}" data-id="${escapeHtml(p.id)}">
+          <i class="ti ${icon} li-icon" aria-hidden="true"></i>
+          <div class="li-main"><span class="li-name">${escapeHtml(p.name || fallbackName)}</span>${group}<span class="li-meta">${escapeHtml(meta)}</span></div>
+          <div class="li-actions"><button class="icon-btn btn-side-panel-del" data-id="${escapeHtml(p.id)}" title="${delTitle}"><i class="ti ti-trash" aria-hidden="true"></i></button></div>
+        </div>`;
+  };
+
   let html = `
     <section class="panel-section">
       <div class="panel-head">
@@ -104,6 +116,10 @@ export function updateSidebar() {
     });
   }
 
+  state.project.sidePanels.filter(p => p.kind === 'zmywarka').forEach(p => {
+    html += sideItem(p, 'ti-wash-machine', 'Zmywarka', 'Usuń zmywarkę', `${p.dimensions.width} × ${p.dimensions.height}${p.topBoard !== false ? ', z wieńcem' : ''}`);
+  });
+
   html += `
       <div class="btn-grid" style="margin-top:8px">
         <button id="btn-add-base" class="btn btn-sm" title="Szafka dolna"><i class="ti ti-plus" aria-hidden="true"></i> Dolna</button>
@@ -111,6 +127,8 @@ export function updateSidebar() {
         <button id="btn-add-tall" class="btn btn-sm" title="Słupek"><i class="ti ti-plus" aria-hidden="true"></i> Słupek</button>
         <button id="btn-add-corner" class="btn btn-sm" title="Szafka narożna z frontem łamanym (front prosty + skośny)"><i class="ti ti-plus" aria-hidden="true"></i> Narożna</button>
         <button id="btn-add-slope" class="btn btn-sm" title="Szafka pod skos (pod schodami, pod dachem)"><i class="ti ti-plus" aria-hidden="true"></i> Skos</button>
+        <button id="btn-add-dishwasher-45" class="btn btn-sm" title="Zmywarka do zabudowy 45 cm: front, wieniec nad nią, cokół (bez korpusu)"><i class="ti ti-plus" aria-hidden="true"></i> Zmywarka 45</button>
+        <button id="btn-add-dishwasher-60" class="btn btn-sm" title="Zmywarka do zabudowy 60 cm: front, wieniec nad nią, cokół (bez korpusu)"><i class="ti ti-plus" aria-hidden="true"></i> Zmywarka 60</button>
       </div>
     </section>
 
@@ -125,18 +143,7 @@ export function updateSidebar() {
 
   // Boki dokładane i blendy (core/state.js: addSidePanel / addBlenda) - samodzielne
   // obiekty projektu, obie listy z jednej tablicy project.sidePanels (pole kind).
-  const sideItem = (p, icon, fallbackName, delTitle, meta) => {
-    const isActive = p.id === state.activeSidePanelId;
-    const isSelected = state.selectedSidePanels && state.selectedSidePanels.has(p.id);
-    const group = p.groupId ? `<i class="ti ti-link li-group" title="W grupie z szafkami" aria-hidden="true"></i>` : '';
-    return `
-        <div class="list-item side-panel-item${isActive ? ' is-active' : (isSelected ? ' is-selected' : '')}" data-id="${escapeHtml(p.id)}">
-          <i class="ti ${icon} li-icon" aria-hidden="true"></i>
-          <div class="li-main"><span class="li-name">${escapeHtml(p.name || fallbackName)}</span>${group}<span class="li-meta">${escapeHtml(meta)}</span></div>
-          <div class="li-actions"><button class="icon-btn btn-side-panel-del" data-id="${escapeHtml(p.id)}" title="${delTitle}"><i class="ti ti-trash" aria-hidden="true"></i></button></div>
-        </div>`;
-  };
-  const boks = state.project.sidePanels.filter(p => p.kind !== 'blenda');
+  const boks = state.project.sidePanels.filter(p => p.kind !== 'blenda' && p.kind !== 'zmywarka');
   const blendy = state.project.sidePanels.filter(p => p.kind === 'blenda');
   if (boks.length === 0) html += `<div class="empty-note">Brak boków dokładanych.</div>`;
   boks.forEach(p => {
@@ -301,6 +308,18 @@ export function updateSidebar() {
       initPropertiesPanel(); update3D(); updateSidebar();
     });
   }
+
+  [450, 600].forEach(w => document.getElementById(`btn-add-dishwasher-${w / 10}`)?.addEventListener('click', () => {
+    // staje za aktywną szafką dolną (wymiary, nóżki, dekor i front z niej); bez niej - przyciąga się jak bok
+    const hadBase = getActiveModule()?.type === 'base_cabinet';
+    const panel = addDishwasher(w);
+    if (!hadBase) {
+      const at = snapSidePanel(panel, 0, 0, state.project);
+      panel.position.x = at.x;
+      panel.position.z = at.z;
+    }
+    initPropertiesPanel(); update3D(); updateSidebar();
+  }));
 
   document.getElementById('btn-add-horizontal-panel')?.addEventListener('click', () => {
     const panel = addSidePanel('poziomy');

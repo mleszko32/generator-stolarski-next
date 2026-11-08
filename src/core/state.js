@@ -1,6 +1,7 @@
 // src/core/state.js
 import { ensureCornerDefaults, getWorldFootprint } from "./layout.js";
 import { sanitizeProjectData } from "./projectSanitize.js";
+import { createDishwasher } from "./dishwasher.js";
 import { buildSlopeElements, migrateSlopeModule } from "./slopeCabinet.js";
 // depth:600 z poprzedniego (martwego, nigdy nie renderowanego) pola room nie ma
 // sensu jako realny pokój - to szerokość korytarza, nie mieściłby się w nim nawet
@@ -397,6 +398,7 @@ export function addSlopeModule() {
 export function addSidePanel(kind = 'bok') {
   if (kind === 'blenda') return addBlenda();
   if (kind === 'poziomy') return addHorizontalPanel();
+  if (kind === 'zmywarka') return addDishwasher();
   const newId = 'side-' + Date.now();
   const room = state.project.room || DEFAULT_ROOM;
   const bokCount = state.project.sidePanels.filter(p => p.kind !== 'blenda').length;
@@ -474,6 +476,26 @@ export function addBlenda() {
   state.activeSidePanelId = newId;
   state.activeModuleId = null;
   return newPanel;
+}
+
+// Zmywarka do zabudowy 450 / 600 (core/dishwasher.js) - wymiary, nóżki, dekor i materiał frontu
+// z aktywnej szafki (zwykle tej obok wnęki), stawiana tuż za nią w tym samym rzędzie.
+export function addDishwasher(width = 600) {
+  const ref = getActiveModule();
+  const base = ref && ref.type === 'base_cabinet' ? ref : null;
+  if (!Array.isArray(state.project.sidePanels)) state.project.sidePanels = [];
+  const count = state.project.sidePanels.filter(p => p.kind === 'zmywarka').length;
+  const panel = createDishwasher(width, base, count);
+  if (base) {
+    const { worldW, worldD } = getWorldFootprint(base);
+    const rot = ((parseFloat(base.rotation) || 0) % 360 + 360) % 360;
+    const alongZ = rot === 90 || rot === 270;
+    panel.position = { x: (parseFloat(base.position.x) || 0) + (alongZ ? 0 : worldW), y: parseFloat(base.position.y) || 0, z: (parseFloat(base.position.z) || 0) + (alongZ ? worldD : 0) };
+  }
+  state.project.sidePanels.push(panel);
+  state.activeSidePanelId = panel.id;
+  state.activeModuleId = null;
+  return panel;
 }
 
 export function deleteSidePanel(panelId) {

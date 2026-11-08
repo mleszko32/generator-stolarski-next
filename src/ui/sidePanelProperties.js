@@ -4,6 +4,7 @@
 // ui/properties.js, który woła renderSidePanelProperties() zamiast formularza szafki.
 import { lacquerSuggestions } from "../core/lacquerColors.js";
 import { applyPanelDecorThickness } from "../core/boardThickness.js";
+import { DISHWASHER_WIDTHS, dishwasherGeometry } from "../core/dishwasher.js";
 import { catalogLabels } from "../core/materialCatalog.js";
 import { state } from "../core/state.js";
 import { groupButtonsHtml, bindGroupButtons } from "./groupButtons.js";
@@ -116,6 +117,59 @@ function renderHorizontalPanelProperties(rightSidebar, panel) {
   bindSidePanelInputs(rightSidebar, panel);
 }
 
+// Zmywarka do zabudowy (core/dishwasher.js) - bez korpusu: front, wieniec nad nią, cokół.
+function renderDishwasherProperties(rightSidebar, panel) {
+  const d = panel.dimensions;
+  const g = dishwasherGeometry(panel, state.project);
+  rightSidebar.innerHTML = `
+    ${propHeaderHtml({ name: panel.name, dims: `${d.width}×${d.height}×${d.depth}`, extra: 'zmywarka', nameId: 'input-side-name', nameLabel: 'Nazwa:' })}
+
+    ${sectionHtml('wymiary', `
+      <h3>Wymiary</h3>
+      <div class="property-group"><label>Szerokość zmywarki (wnęki):</label>
+        <select id="input-dw-width">${DISHWASHER_WIDTHS.map(w => `<option value="${w}" ${Number(d.width) === w ? 'selected' : ''}>${w / 10} cm (${w} mm)</option>`).join('')}</select>
+      </div>
+      <div class="property-group"><label>Wysokość od podłogi do spodu blatu (mm):</label><input type="number" id="input-side-height" value="${d.height}" /></div>
+      <div class="property-group"><label>Głębokość korpusów obok (mm):</label><input type="number" id="input-side-depth" value="${d.depth}" /></div>
+      <div class="property-group"><label>Wysokość cokołu / nóżek (mm):</label><input type="number" id="input-dw-plinth" value="${panel.plinthHeight ?? 100}" /></div>
+      <div class="property-group"><label>Cofnięcie cokołu od czoła (mm):</label><input type="number" id="input-dw-plinth-offset" value="${panel.plinthOffset ?? 40}" /></div>
+      <div class="hint">Front: ${g.front.w} × ${g.front.h} mm (luzy jak przy frontach szafek). Wysokość i głębokość ustaw jak w szafkach obok - nowa zmywarka bierze je z zaznaczonej szafki dolnej.</div>
+
+      <hr class="divider">
+
+      ${positionRotationHtml({
+        prefix: 'input-side-pos', position: panel.position, rotation: panel.rotation, rotClass: 'btn-side-rotate',
+        yLabel: 'Wysokość od podłogi (Y) [mm]:',
+        hint: 'Przeciągnij zmywarkę myszą w widoku 3D - przyciągnie się do boku szafki. Cokół łączy się z cokołem szafek obok, a blat idzie nad nią bez przerwy.',
+      })}
+    `)}
+
+    ${sectionHtml('material', `
+      <h3>Wieniec nad zmywarką</h3>
+      <div class="property-group"><label><input type="checkbox" id="input-dw-top" ${panel.topBoard !== false ? 'checked' : ''} /> Wieniec górny w przestrzeni zmywarki (spina szafki obok, pod blatem)</label></div>
+      <div class="property-group">
+        <label>Dekor wieńca:</label>
+        <input type="text" id="input-dw-decor" list="side-decor-catalog" value="${escapeHtml(panel.decor || '')}" placeholder="pusty = dekor korpusu projektu" />${decorDatalistHtml()}
+      </div>
+      <hr class="divider">
+      ${materialSectionHtml(panel)}
+    `)}
+    ${groupSectionHtml(panel)}
+  `;
+  bindSidePanelInputs(rightSidebar, panel);
+  const refresh = () => { update3D(); updateSidebar(); initPropertiesPanel(); };
+  document.getElementById('input-dw-width')?.addEventListener('change', (e) => {
+    const w = parseInt(e.target.value, 10);
+    if (/^Zmywarka (45|60)\b/.test(panel.name || '')) panel.name = panel.name.replace(/^Zmywarka (45|60)/, `Zmywarka ${w / 10}`);
+    panel.dimensions.width = w;
+    refresh();
+  });
+  document.getElementById('input-dw-plinth')?.addEventListener('change', (e) => { panel.plinthHeight = parseFloat(e.target.value) || 0; refresh(); });
+  document.getElementById('input-dw-plinth-offset')?.addEventListener('change', (e) => { panel.plinthOffset = parseFloat(e.target.value) || 0; refresh(); });
+  document.getElementById('input-dw-top')?.addEventListener('change', (e) => { panel.topBoard = e.target.checked; refresh(); });
+  document.getElementById('input-dw-decor')?.addEventListener('change', (e) => { panel.decor = e.target.value.trim(); refresh(); });
+}
+
 // Grupowanie (ui/groupButtons.js) - blendę/bok zaznacza się z szafkami Shift/Ctrl i łączy w grupę.
 function groupSectionHtml(panel) {
   const html = groupButtonsHtml(panel.groupId);
@@ -125,6 +179,7 @@ function groupSectionHtml(panel) {
 export function renderSidePanelProperties(rightSidebar, panel) {
   if (panel.kind === 'blenda') { renderBlendaProperties(rightSidebar, panel); return; }
   if (panel.kind === 'poziomy') { renderHorizontalPanelProperties(rightSidebar, panel); return; }
+  if (panel.kind === 'zmywarka') { renderDishwasherProperties(rightSidebar, panel); return; }
   const d = panel.dimensions;
   rightSidebar.innerHTML = `
     ${propHeaderHtml({ name: panel.name, dims: `${d.width}×${d.height}×${d.depth}`, extra: 'bok dokładany', nameId: 'input-side-name', nameLabel: 'Nazwa:' })}

@@ -162,6 +162,11 @@ export const HELP_SECTIONS = [
       <b>Blenda</b> to listwa maskująca między szafką a ścianą albo w narożniku - czoło z
       dekoru frontów i kołnierz mocujący (wybierasz, z której strony). <b>Dekor listwy mocującej</b>
       ustaw jak korpus szafki, do której blenda jest przykręcona - listwa trafi do formatek w tym dekorze.</p>
+      <p><b>Zmywarka 45 / Zmywarka 60</b> (przyciski pod listą szafek) - zmywarka do zabudowy bez korpusu:
+      front w materiale frontów (wysokość i luzy jak fronty szafek obok), <b>wieniec nad zmywarką</b> z płyty
+      korpusu pod blatem (można wyłączyć) i cokół, który łączy się z cokołem szafek obok; blat idzie nad nią
+      bez przerwy. Zaznacz najpierw szafkę dolną obok wnęki - zmywarka stanie zaraz za nią i weźmie z niej
+      wysokość, głębokość, nóżki, dekor korpusu i materiał frontu.</p>
       <p>Bok dokładany szerszy niż wysoki (np. blat biurka, półka na ścianie) liczy się na liście formatek jako <b>Płyta pozioma</b> szerokość × głębokość.</p>
       <p>Dodaje się je przyciskami <b>Dodaj</b> w lewym panelu. Przy przeciąganiu przyciągają się
       do boków szafek i do ścian, a nachodzące na szafkę same się z niej wysuwają. Materiał

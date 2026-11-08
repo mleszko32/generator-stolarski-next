@@ -24,7 +24,8 @@ export const mats = {
       shelf: new THREE.MeshStandardMaterial({ color: 0xfbfaf7, roughness: 0.7, metalness: 0.0 }),
       drawerBox: new THREE.MeshStandardMaterial({ color: 0xd8c39a, roughness: 0.78, metalness: 0.0 }), // ciemniejsza, drewniana skrzynka - odcina się od białego korpusu po ukryciu frontów
       hdf: new THREE.MeshStandardMaterial({ color: 0xf4f2ed, roughness: 0.9, metalness: 0.0 }),
-      plinth: new THREE.MeshStandardMaterial({ color: 0x3a3532, roughness: 0.8, metalness: 0.0 })
+      plinth: new THREE.MeshStandardMaterial({ color: 0x3a3532, roughness: 0.8, metalness: 0.0 }),
+      appliance: new THREE.MeshStandardMaterial({ color: 0xb8bec6, roughness: 0.35, metalness: 0.6 }) // urządzenie AGD (zmywarka)
   },
   xray: {
       corpus: new THREE.MeshStandardMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.15, depthWrite: false }),
@@ -32,7 +33,8 @@ export const mats = {
       shelf: new THREE.MeshStandardMaterial({ color: 0x64748b, transparent: true, opacity: 0.3, depthWrite: false }),
       drawerBox: new THREE.MeshStandardMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.6, depthWrite: false }),
       hdf: new THREE.MeshStandardMaterial({ color: 0x475569, transparent: true, opacity: 0.3, depthWrite: false }),
-      plinth: new THREE.MeshStandardMaterial({ color: 0x1c1917, transparent: true, opacity: 0.7, depthWrite: true })
+      plinth: new THREE.MeshStandardMaterial({ color: 0x1c1917, transparent: true, opacity: 0.7, depthWrite: true }),
+      appliance: new THREE.MeshStandardMaterial({ color: 0x64748b, transparent: true, opacity: 0.25, depthWrite: false })
   }
 };
 export const worktopMat = new THREE.MeshStandardMaterial({ color: 0x8a6a4a, roughness: 0.55, metalness: 0.0 });

@@ -47,6 +47,12 @@ export function replaceMaterial(project, key, newName) {
   });
 
   (project.sidePanels || []).forEach((panel) => {
+    if (panel.kind === "zmywarka") {
+      // front z cennika i wieniec w dekorze to dwa niezależne materiały
+      if (is(partMaterial("front", { sidePanelId: panel.id }, project))) { panel.materialId = frontMaterialId(); changed++; }
+      if (panel.topBoard !== false && is(partMaterial("corpus", { sidePanelId: panel.id }, project))) { panel.decor = name; changed++; }
+      return;
+    }
     const type = panel.kind === "poziomy" ? "corpus" : "front";
     const e = partMaterial(type, { sidePanelId: panel.id }, project);
     if (!is(e)) return;

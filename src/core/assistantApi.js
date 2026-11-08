@@ -206,10 +206,10 @@ export function findPanel(ref, project = state.project) {
   return hit;
 }
 
-// Nowy element project.sidePanels ('bok' | 'blenda' | 'poziomy') z polami z props (głębokie scalenie),
+// Nowy element project.sidePanels ('bok' | 'blenda' | 'poziomy' | 'zmywarka') z polami z props (głębokie scalenie),
 // np. addPanel("poziomy", { name: "Półka", dimensions: { width: 2102, depth: 300 }, position: { x: 1688, y: 819, z: 0 } }).
 export function addPanel(kind = "bok", props = {}) {
-  if (!["bok", "blenda", "poziomy"].includes(kind)) throw new Error("Rodzaj: bok | blenda | poziomy.");
+  if (!["bok", "blenda", "poziomy", "zmywarka"].includes(kind)) throw new Error("Rodzaj: bok | blenda | poziomy | zmywarka.");
   const panel = addSidePanel(kind);
   if (props) patchPanel(panel, props);
   return panel;

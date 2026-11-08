@@ -73,7 +73,7 @@ export function furnitureGroups(project) {
     const name = String(p.name || "").trim();
     const hit = prefixes.find(({ prefix }) => name === prefix || name.startsWith(prefix + " "));
     if (hit) { panelKey.set(p.id, hit.key); return; }
-    const label = name || (p.kind === "blenda" ? "Blenda" : p.kind === "poziomy" ? "Panel poziomy" : "Bok dokładany");
+    const label = name || (p.kind === "blenda" ? "Blenda" : p.kind === "poziomy" ? "Panel poziomy" : p.kind === "zmywarka" ? "Zmywarka" : "Bok dokładany");
     panelKey.set(p.id, add(p.id, label));
   });
   return { groups, moduleKey, panelKey };

@@ -43,7 +43,8 @@ ZMIANY (każda odświeża aplikację; cofnięcie: undo())
   removeDivider(szafka, wnęka)  usuń dzielnik (scala wnękę)
   add(typ)                      nowa szafka: base_cabinet | upper_cabinet | tall_cabinet
   duplicate(szafka) / remove(szafka)
-  panel(rodzaj, pola)           nowy bok / blenda / panel poziomy: rodzaj bok | blenda | poziomy
+  panel(rodzaj, pola)           nowy bok / blenda / panel poziomy / zmywarka: rodzaj bok | blenda | poziomy | zmywarka
+                                zmywarka: dimensions { width: 450 | 600, height: podłoga→spód blatu, depth }, topBoard, decor, materialId
                                 panel poziomy: dimensions { width: długość X, depth: głębokość Z, height: grubość },
                                 position { x, z, y: spód płyty }, decor; np. panel("poziomy", { name: "Półka",
                                 dimensions: { width: 2102, depth: 300 }, position: { x: 1688, y: 819, z: 0 } })

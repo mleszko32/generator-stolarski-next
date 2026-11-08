@@ -76,10 +76,12 @@ export function buildOfferHtml({ project, cost, snapshot, now = new Date() }) {
 
   const extras = [];
   if (project.worktop && project.worktop.enabled) extras.push("blat roboczy");
-  const boks = (project.sidePanels || []).filter((p) => p.kind !== "blenda" && p.kind !== "poziomy").length;
+  const boks = (project.sidePanels || []).filter((p) => p.kind !== "blenda" && p.kind !== "poziomy" && p.kind !== "zmywarka").length;
   const blendy = (project.sidePanels || []).filter((p) => p.kind === "blenda").length;
   if (boks) extras.push(`${boks} ${plural(boks, "bok dokładany", "boki dokładane", "boków dokładanych")}`);
   if (blendy) extras.push(`${blendy} ${plural(blendy, "blenda", "blendy", "blend")}`);
+  const zmywarki = (project.sidePanels || []).filter((p) => p.kind === "zmywarka").length;
+  if (zmywarki) extras.push(`zabudowa ${plural(zmywarki, "zmywarki", "zmywarek", "zmywarek")} (front)`);
   const pricing = project.pricing || {};
   if ((pricing.assembly && pricing.assembly.hours > 0)) extras.push("montaż");
   if (pricing.transport > 0) extras.push("transport");

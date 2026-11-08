@@ -7,6 +7,7 @@
 // a ten sam dekor ma zawsze ten sam kolor. Czyste funkcje (bez Three.js).
 import { moduleKorpusDecor, baseCategory, KORPUS } from "./materialCatalog.js";
 import { plinthMaterial, moduleFrontMaterialId } from "./plinthMaterial.js";
+import { dishwasherPlinthModule } from "./dishwasher.js";
 import { lacquerColor, lacquerCode } from "./lacquerColors.js";
 
 const FAMILIES = {
@@ -94,6 +95,12 @@ function plinthEntry(mod, project) {
 function panelEntry(panel, type, project) {
   // listwa mocująca blendy - płyta korpusu w dekorze szafki obok (flangeDecor)
   if (panel.kind === "blenda" && type !== "front") return korpusEntry(String(panel.flangeDecor || "").trim());
+  // zmywarka: front z cennika frontów, cokół jak cokół szafki, wieniec w dekorze (pusty = korpus projektu)
+  if (panel.kind === "zmywarka") {
+    if (type === "front") return frontEntry(panel.materialId, project);
+    if (type === "plinth") return plinthEntry(dishwasherPlinthModule(panel), project);
+    return korpusEntry(String(panel.decor || "").trim());
+  }
   const decor = String(panel.decor || "").trim();
   if (decor) return entry(panel.kind === "blenda" ? "Front" : "Korpus", decor, decorColor(decor));
   return type === "front" ? frontEntry(panel.materialId, project) : korpusEntry("");
@@ -144,7 +151,10 @@ export function projectDecorLegend(project, opts = {}) {
     });
     if (mod.legs && mod.legs.active && mod.legs.plinth) add(plinthEntry(mod, project));
   });
-  (project.sidePanels || []).forEach((p) => add(panelEntry(p, p.kind === "poziomy" ? "corpus" : "front", project)));
+  (project.sidePanels || []).forEach((p) => {
+    add(panelEntry(p, p.kind === "poziomy" ? "corpus" : "front", project));
+    if (p.kind === "zmywarka" && p.topBoard !== false) add(panelEntry(p, "corpus", project));
+  });
   const out = [];
   ["Korpus", "Front", "Szuflada"].forEach((g) => {
     const items = [...entries.values()].filter((e) => e.group === g);
