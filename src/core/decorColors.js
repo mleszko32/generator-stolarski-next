@@ -92,6 +92,8 @@ function plinthEntry(mod, project) {
 }
 
 function panelEntry(panel, type, project) {
+  // listwa mocująca blendy - płyta korpusu w dekorze szafki obok (flangeDecor)
+  if (panel.kind === "blenda" && type !== "front") return korpusEntry(String(panel.flangeDecor || "").trim());
   const decor = String(panel.decor || "").trim();
   if (decor) return entry(panel.kind === "blenda" ? "Front" : "Korpus", decor, decorColor(decor));
   return type === "front" ? frontEntry(panel.materialId, project) : korpusEntry("");

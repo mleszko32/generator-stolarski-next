@@ -60,5 +60,11 @@ export function replaceMaterial(project, key, newName) {
     }
     changed++;
   });
+  // listwy mocujące blend (płyta korpusu, panel.flangeDecor)
+  (project.sidePanels || []).filter((p) => p.kind === "blenda").forEach((panel) => {
+    if (!is(partMaterial("corpus", { sidePanelId: panel.id }, project))) return;
+    panel.flangeDecor = name;
+    changed++;
+  });
   return changed;
 }

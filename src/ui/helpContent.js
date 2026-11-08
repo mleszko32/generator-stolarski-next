@@ -160,7 +160,8 @@ export const HELP_SECTIONS = [
     body: `
       <p><b>Bok dokładany</b> to samodzielna płyta w dekorze frontów (np. zakończenie zabudowy).
       <b>Blenda</b> to listwa maskująca między szafką a ścianą albo w narożniku - czoło z
-      dekoru frontów i kołnierz mocujący (wybierasz, z której strony).</p>
+      dekoru frontów i kołnierz mocujący (wybierasz, z której strony). <b>Dekor listwy mocującej</b>
+      ustaw jak korpus szafki, do której blenda jest przykręcona - listwa trafi do formatek w tym dekorze.</p>
       <p>Bok dokładany szerszy niż wysoki (np. blat biurka, półka na ścianie) liczy się na liście formatek jako <b>Płyta pozioma</b> szerokość × głębokość.</p>
       <p>Dodaje się je przyciskami <b>Dodaj</b> w lewym panelu. Przy przeciąganiu przyciągają się
       do boków szafek i do ścian, a nachodzące na szafkę same się z niej wysuwają. Materiał

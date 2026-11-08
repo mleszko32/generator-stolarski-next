@@ -92,6 +92,14 @@ describe("blenda jako osobny element", () => {
     expect(mocowanie).toMatchObject({ length: 720, width: 62, category: "Korpus" });
   });
 
+  it("listwa mocująca w dekorze korpusu szafki (flangeDecor) - formatka „Korpus: <dekor>”", () => {
+    const b = addBlenda();
+    b.dimensions = { width: 50, height: 720, depth: 80 };
+    b.flangeDecor = "Swiss Krono U3053 VL Cappuccino";
+    const listwa = calculateAllProjectParts().find((p) => p.name === "Listwa mocująca");
+    expect(listwa.category).toBe("Korpus: Swiss Krono U3053 VL Cappuccino");
+  });
+
   it("blenda górna/dolna ma mocowanie o długości równej szerokości, a 'brak' - bez mocowania", () => {
     const b = addBlenda();
     b.dimensions = { width: 650, height: 50, depth: 80 };

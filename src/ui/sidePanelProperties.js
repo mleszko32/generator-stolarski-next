@@ -60,7 +60,10 @@ function renderBlendaProperties(rightSidebar, panel) {
       <div class="property-group"><label>Kołnierz mocujący do szafki:</label>
         <select id="input-blenda-flange">${flanges.map(([v, l]) => `<option value="${v}" ${(panel.flange || 'prawa') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
       </div>
-      <div class="hint">Czoło jest z przodu (dekor frontów), kołnierz to płyta korpusu za nim. Górną blendę zrób szerokością na całą zabudowę i kołnierzem przy dolnej krawędzi.</div>
+      <div class="property-group"><label>Dekor listwy mocującej:</label>
+        <input type="text" id="input-blenda-flange-decor" list="side-decor-catalog" value="${escapeHtml(panel.flangeDecor || '')}" placeholder="pusty = dekor korpusu projektu" />${decorDatalistHtml()}
+      </div>
+      <div class="hint">Czoło jest z przodu (dekor frontów), kołnierz to płyta korpusu za nim - wpisz dekor korpusu szafki, do której jest przykręcony. Górną blendę zrób szerokością na całą zabudowę i kołnierzem przy dolnej krawędzi.</div>
 
       <hr class="divider">
 
@@ -77,6 +80,7 @@ function renderBlendaProperties(rightSidebar, panel) {
   bindSidePanelInputs(rightSidebar, panel);
   const flangeSel = document.getElementById('input-blenda-flange');
   if (flangeSel) flangeSel.addEventListener('change', (e) => { panel.flange = e.target.value; update3D(); updateSidebar(); });
+  document.getElementById('input-blenda-flange-decor')?.addEventListener('change', (e) => { panel.flangeDecor = e.target.value.trim(); update3D(); updateSidebar(); });
 }
 
 // Panel poziomy (core/state.js: addHorizontalPanel) - płyta korpusu, więc bez cennika frontów.

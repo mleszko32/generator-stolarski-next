@@ -455,7 +455,8 @@ function getBlendaParts(panel, config) {
   const flange = panel.flange || 'prawa';
   if (flange !== 'brak' && d - th > 0) {
     const along = (flange === 'lewa' || flange === 'prawa') ? h : w;
-    parts.push({ name: "Listwa mocująca", length: along, width: d - th, qty: 1, category: "Korpus" });
+    // listwa z płyty korpusu szafki, do której jest przykręcona (panel.flangeDecor), inaczej zwykły Korpus
+    parts.push({ name: "Listwa mocująca", length: along, width: d - th, qty: 1, category: korpusCategory(panel.flangeDecor) });
   }
   return parts;
 }
