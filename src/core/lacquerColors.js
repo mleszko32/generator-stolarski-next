@@ -5,15 +5,12 @@
 // Wynik to przybliżenie ekranowe do podglądu 3D i legendy - nie do dobierania lakieru.
 // Czyste funkcje.
 import { RAL_CLASSIC } from "./data/ralClassic.js";
+import { RAL_NAMES_PL } from "./data/ralNamesPl.js";
+import { NCS_STANDARD } from "./data/ncsStandard.js";
 
 const RAL_BY_CODE = new Map(RAL_CLASSIC.map(([code, name, color]) => [code.replace(/\s/g, ""), { code, name, color }]));
 
-// Popularne kody NCS do podpowiedzi (wpisać można dowolny poprawny kod).
-export const NCS_COMMON = [
-  "S 0300-N", "S 0500-N", "S 0502-Y", "S 0502-G50Y", "S 0502-Y50R", "S 0505-Y20R", "S 1000-N", "S 1002-Y",
-  "S 1002-Y50R", "S 1005-Y20R", "S 1505-Y20R", "S 2000-N", "S 2002-Y", "S 2005-Y20R", "S 3000-N", "S 3005-Y20R",
-  "S 4000-N", "S 4005-Y20R", "S 5000-N", "S 6000-N", "S 7000-N", "S 7500-N", "S 8000-N", "S 8500-N", "S 9000-N",
-];
+const NCS_SET = new Set(NCS_STANDARD);
 
 const RAL_RE = /\bRAL\s*(\d{4})\b/i;
 const NCS_RE = /\b(?:NCS\s*)?S?\s*(\d{2})(\d{2})-(N|[RGBY])(?:(\d{2})([RGBY]))?\b/i;
@@ -88,7 +85,32 @@ export function lacquerColor(text) {
   return ncsToColor(blackness, chroma, m[3], m[4] ? parseInt(m[4], 10) : 0);
 }
 
-// Podpowiedzi do pola koloru lakieru: „RAL 9016 Traffic white”, „NCS S 0502-Y”.
+// Czy kod NCS jest we wzorniku NCS 1950 Original (tekst z kodem, np. „NCS S 0502-Y”).
+// Kody RAL i teksty bez kodu NCS: null.
+export function isNcsStandard(text) {
+  const code = lacquerCode(text);
+  if (!code.startsWith("NCS")) return null;
+  return NCS_SET.has(code.slice("NCS S ".length));
+}
+
+// Ostrzeżenie o kodzie koloru: kod NCS spoza wzornika (lakiernia może nie mieć receptury)
+// albo nieistniejący (czerń + chromatyczność > 100), RAL spoza palety Classic. "" gdy w porządku.
+export function lacquerWarning(text) {
+  const code = lacquerCode(text);
+  if (!code) return "";
+  if (lacquerColor(text) == null) return `${code} - taki kolor nie istnieje`;
+  if (code.startsWith("NCS") && !isNcsStandard(code)) return `${code} - poza wzornikiem NCS 1950, lakiernia może nie mieć receptury`;
+  return "";
+}
+
+// Podpowiedzi do pola koloru lakieru: „RAL 9016 Biały drogowy / Traffic white”, „NCS S 0502-Y”
+// (pełna paleta RAL Classic i cały wzornik NCS 1950).
 export function lacquerSuggestions() {
-  return [...RAL_CLASSIC.map(([code, name]) => `${code} ${name}`), ...NCS_COMMON.map((c) => `NCS ${c}`)];
+  return [
+    ...RAL_CLASSIC.map(([code, name]) => {
+      const pl = RAL_NAMES_PL[code.slice(4)];
+      return pl ? `${code} ${pl} / ${name}` : `${code} ${name}`;
+    }),
+    ...NCS_STANDARD.map((c) => `NCS S ${c}`),
+  ];
 }

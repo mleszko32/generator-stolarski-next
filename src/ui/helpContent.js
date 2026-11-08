@@ -246,7 +246,7 @@ export const HELP_SECTIONS = [
         <li><b>Blaty</b> - odcinki blatów i łączenia w narożnikach.</li>
         <li><b>Okucia i okleina</b> - lista zakupów (nóżki, łączniki, komplety szuflad, zawiasy, okleina w mb).</li>
         <li><b>Kontrola projektu</b> - kolizje, szafki poza pokojem, za szerokie drzwi i półki,
-        za długie prowadnice, formatki większe niż płyta, problemy w narożnikach.</li>
+        za długie prowadnice, formatki większe niż płyta, problemy w narożnikach, kolor lakieru NCS spoza wzornika.</li>
       </ul>
       <p class="help-note">Przed wysłaniem zlecenia zawsze zajrzyj do <b>Kontroli projektu</b>.</p>`,
   },
@@ -258,6 +258,9 @@ export const HELP_SECTIONS = [
       <p>Tryb <b>Wycena</b> otwiera <b>Kosztorys</b>: ceny płyt (zł/m²), cennik materiałów frontów,
       cięcie formatek, ceny okuć, robocizna, lakiernia, montaż, transport, narzut na materiały,
       marża na pracę, rabat i VAT. Wszystko liczy się na bieżąco i zapisuje w projekcie.</p>
+      <p>Przy materiale frontu pole <b>Kolor (RAL / NCS)</b> podpowiada całą paletę RAL Classic (nazwy po polsku
+      i angielsku) i cały wzornik NCS 1950. Kod NCS spoza wzornika albo nieistniejący dostaje ostrzeżenie -
+      lakiernia może nie mieć na niego receptury.</p>
       <p><b>Baza cen</b> (przyciski na górze kosztorysu) zapamiętuje ceny z jednego projektu, żeby
       nałożyć je na kolejny bez przepisywania.</p>
       <p>Karta <b>Oferta dla klienta</b> drukuje ofertę z zakresem, ceną i (opcjonalnie) zdjęciem

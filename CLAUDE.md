@@ -478,7 +478,9 @@ w sekcji Nóżki i Cokół; w 3D cokół w kolorze materiału. Materiał frontu 
 `LACQUER_BOARD` w `core/materialCatalog.js`), widać to w kolumnie Materiał listy formatek.
 Kolor lakieru: materiał frontu może mieć `color` (pole „Kolor (RAL / NCS)” w Kosztorysie, podpowiedzi + próbka) —
 `core/lacquerColors.js` (czyste, z testami): RAL Classic z tabeli `core/data/ralClassic.js` (wygenerowana z pakietu
-ral-colors, MIT), NCS przeliczany wzorem (port ncs-color, MIT) — każdy poprawny kod. Kod idzie do opisu formatki
+ral-colors, MIT, + RAL 6039; polskie nazwy w `core/data/ralNamesPl.js`), NCS przeliczany wzorem (port ncs-color, MIT) — każdy
+poprawny kod; podpowiedzi = cały wzornik NCS 1950 (`core/data/ncsStandard.js`, same kody), `lacquerWarning` ostrzega o kodzie
+spoza wzornika (pole w Kosztorysie i kontrola projektu). Kod idzie do opisu formatki
 („Front: Lakier RAL 9016 (…)”), legendy i daje prawdziwy odcień frontów w 3D; dekor z kodem RAL/NCS też.
 
 **Oferta dla klienta**: `core/offer.js` (czysta: ustawienia w `project.offer`, `buildOfferHtml`)

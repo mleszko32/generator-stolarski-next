@@ -1,7 +1,7 @@
 // src/core/data/ralClassic.js
 // Paleta RAL Classic: [kod, nazwa (ang.), kolor 0xRRGGBB]. Wartości RGB to przybliżenie ekranowe
 // (dane z pakietu npm ral-colors 1.0.1, licencja MIT) - do podglądu 3D i podpowiedzi, nie do dobierania lakieru.
-// Plik wygenerowany, nie edytuj ręcznie.
+// Plik wygenerowany; dopisany ręcznie RAL 6039 (dodany do palety w 2018, brak w pakiecie).
 export const RAL_CLASSIC = [
   ["RAL 1000", "Green beige", 0xCDBA88],
   ["RAL 1001", "Beige", 0xD0B084],
@@ -145,6 +145,7 @@ export const RAL_CLASSIC = [
   ["RAL 6036", "Pearl opal green", 0x005D4C],
   ["RAL 6037", "Pure green", 0x25E712],
   ["RAL 6038", "Luminous green", 0x00F700],
+  ["RAL 6039", "Fibrous green", 0xB3C43E],
   ["RAL 7000", "Squirrel grey", 0x7E8B92],
   ["RAL 7001", "Silver grey", 0x8F999F],
   ["RAL 7002", "Olive grey", 0x817F68],

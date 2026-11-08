@@ -55,7 +55,7 @@ describe("lakier RAL / NCS z listy materiałów frontów", async () => {
   const { assignFrontMaterialByName, frontMaterialSuggestions } = await import("./materialCatalog.js");
   it("podpowiedzi zawierają lakiery RAL i NCS oraz płyty", () => {
     const s = frontMaterialSuggestions({ pricing: { frontMaterials: [{ id: "a", name: "Lakier" }] } });
-    expect(s).toContain("Lakier RAL 9016 Traffic white");
+    expect(s).toContain("Lakier RAL 9016 Biały drogowy / Traffic white");
     expect(s).toContain("Lakier NCS S 0502-Y");
     expect(s.some((l) => /W1000/.test(l))).toBe(true);
   });

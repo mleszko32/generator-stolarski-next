@@ -22,6 +22,7 @@ import { checkCornerFitting, getCornerFitting } from "./cornerFittings.js";
 import { cornerFrontIssues, footprintBoxes, passageIssues } from "./cornerChecks.js";
 import { computeWorktops, MIN_WORKTOP_OVERHANG } from "./worktops.js";
 import { boxInNotch } from "./roomShape.js";
+import { lacquerWarning } from "./lacquerColors.js";
 
 export const MAX_DOOR_WIDTH = 600;   // szersze drzwi się wichrują / zawiasy nie dają rady
 export const MAX_SHELF_SPAN = 800;   // dłuższa półka ugina się pod obciążeniem
@@ -102,6 +103,7 @@ export function validateProject(project = state.project) {
     checkCorners();
     checkOpenings();
     checkWorktops();
+    checkLacquerColors();
     checkParts();
   } finally {
     state.project = prev;
@@ -246,6 +248,14 @@ export function validateProject(project = state.project) {
       add("warn", null, o < 0
         ? `Blat przy ścianie ${r.wallLabel} (głęb. ${Math.round(r.depth)} mm) kończy się ${-o} mm przed licem frontów - zwiększ głębokość blatu.`
         : `Blat przy ścianie ${r.wallLabel} wystaje przed fronty tylko ${o} mm (zalecane co najmniej ${MIN_WORKTOP_OVERHANG} mm, typowo 20-40) - zwiększ głębokość blatu.`);
+    });
+  }
+
+  // Kolor lakieru materiałów frontów: kod NCS spoza wzornika / nieistniejący kod.
+  function checkLacquerColors() {
+    ((project.pricing || {}).frontMaterials || []).forEach((m) => {
+      const w = lacquerWarning(m.color);
+      if (w) add("warn", null, `Materiał frontów „${m.name || m.id}”: ${w}.`);
     });
   }
 

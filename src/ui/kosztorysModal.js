@@ -11,7 +11,7 @@ import { showCustomDialog } from "../core/storage.js";
 import { loadPriceDefaults, savePriceDefaults, applyPriceDefaults, exportPriceDefaultsJson, importPriceDefaultsJson } from "../core/priceLibrary.js";
 import { showAlert } from "../utils/modal.js";
 import { baseCategory, catalogLabels } from "../core/materialCatalog.js";
-import { lacquerColor, lacquerSuggestions } from "../core/lacquerColors.js";
+import { lacquerColor, lacquerSuggestions, lacquerWarning } from "../core/lacquerColors.js";
 
 // "Zastosuj do wszystkich dolnych/górnych" (zgłoszona potrzeba: w kuchni
 // fronty szafek dolnych i wiszących często mają inny materiał/kolor, ale
@@ -165,6 +165,8 @@ export function mountKosztorys(root) {
             const sw = input.parentElement.querySelector('.kosztorys-mat-swatch');
             const c = lacquerColor(v);
             if (sw) { sw.hidden = c == null; if (c != null) sw.style.background = '#' + c.toString(16).padStart(6, '0'); }
+            const warn = input.parentElement.querySelector('.kosztorys-mat-color-warn');
+            if (warn) { const w = lacquerWarning(v); warn.hidden = !w; warn.textContent = w; }
         });
         modal.querySelectorAll('.kosztorys-hw-price').forEach(input => {
             const name = input.getAttribute('data-name');
@@ -305,7 +307,7 @@ export function mountKosztorys(root) {
         const v = (pricing.frontMaterials.find(x => x.id === materialId) || {}).color || '';
         const c = lacquerColor(v);
         const bg = c == null ? '' : '#' + c.toString(16).padStart(6, '0');
-        return `<label class="kosztorys-mat-color-label">Kolor (RAL / NCS): <span class="decor-legend-swatch kosztorys-mat-swatch" ${c == null ? 'hidden' : ''} style="background:${bg}"></span> <input type="text" class="input kosztorys-mat-color" list="kosztorys-color-catalog" data-material-id="${escapeHtml(materialId)}" value="${escapeHtml(v)}" placeholder="np. RAL 9016 albo S 0502-Y"></label>`;
+        return `<label class="kosztorys-mat-color-label">Kolor (RAL / NCS): <span class="decor-legend-swatch kosztorys-mat-swatch" ${c == null ? 'hidden' : ''} style="background:${bg}"></span> <input type="text" class="input kosztorys-mat-color" list="kosztorys-color-catalog" data-material-id="${escapeHtml(materialId)}" value="${escapeHtml(v)}" placeholder="np. RAL 9016 albo S 0502-Y"> <span class="badge badge-warn kosztorys-mat-color-warn" ${lacquerWarning(v) ? '' : 'hidden'}>${escapeHtml(lacquerWarning(v))}</span></label>`;
     }
 
     function frontRowHtml(m) {

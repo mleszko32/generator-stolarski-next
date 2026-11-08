@@ -761,7 +761,7 @@ button, input, select, textarea { font-family: inherit; }
 .decor-legend-row { display: flex; align-items: center; gap: 6px; line-height: 1.5; }
 .decor-legend-swatch { flex: none; width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border); }
 .kosztorys-mat-swatch { display: inline-block; vertical-align: middle; }
-.kosztorys-mat-swatch[hidden] { display: none; }
+.kosztorys-mat-swatch[hidden], .kosztorys-mat-color-warn[hidden] { display: none; }
 .decor-legend-hint { font-size: var(--fs-xs, 11px); margin-bottom: 4px; opacity: 0.8; }
 .decor-legend-row { cursor: pointer; border-radius: 3px; padding: 0 4px; margin: 0 -4px; }
 .decor-legend-row:hover { background: var(--surface-subtle); }
