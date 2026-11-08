@@ -85,8 +85,65 @@ export function buildPlinthRuns(config) {
     });
   });
 
-  closePlinthCorners(runs);
-  return runs;
+  runs.forEach(r => { r.cornerFills = []; });
+  const merged = bridgeRaisedSidePanels(runs, config);
+  closePlinthCorners(merged);
+  return merged;
+}
+
+// Szczelina (mm) między końcem biegu a bokiem / sąsiednim biegiem, którą jeszcze uznajemy za styk.
+const GAP = 3;
+
+// Bok dokładany stojący NA cokole (spód na wysokości nóżek, nie do podłogi): cokół przechodzi pod nim,
+// więc bieg przedłużamy o grubość boku, a biegi po obu stronach boku łączymy w jeden (styk przy boku).
+// Bok do podłogi (y = 0) dalej przerywa cokół.
+export function bridgeRaisedSidePanels(runs, config) {
+  const boki = (config.sidePanels || []).filter(p => (!p.kind || p.kind === 'bok') && (parseFloat(p.position?.y) || 0) > 0.5);
+  // Każdy bok przedłuża jeden bieg: ten, który kończy się przy nim, a gdy takiego nie ma - ten,
+  // który się przy nim zaczyna (biegi po obu stronach łączy dopiero scalanie niżej).
+  boki.forEach(p => {
+    const py = parseFloat(p.position.y) || 0;
+    const rot = normRot(p);
+    const { worldW, worldD } = getWorldFootprint(p);
+    const px = parseFloat(p.position.x) || 0, pz = parseFloat(p.position.z) || 0;
+    const fits = runs.filter(run => {
+      if (Math.abs(py - (run.y + run.h)) > 1) return false;
+      if ((run.axis === 'z') !== (rot === 90 || rot === 270)) return false;
+      const [c0, c1] = run.axis === 'x' ? [pz, pz + worldD] : [px, px + worldW];
+      return c0 <= run.band[0] + 0.5 && c1 >= run.band[1] - 0.5;
+    });
+    const span = run => (run.axis === 'x' ? [px, px + worldW] : [pz, pz + worldD]);
+    const atEnd = fits.find(run => { const [b0] = span(run), a1 = run.along + run.runLen; return b0 >= a1 - 1 && b0 <= a1 + GAP; });
+    if (atEnd) { extendRun(atEnd, 'end', span(atEnd)[1]); return; }
+    const atStart = fits.find(run => { const [, b1] = span(run); return b1 <= run.along + 1 && b1 >= run.along - GAP; });
+    if (atStart) extendRun(atStart, 'start', span(atStart)[0]);
+  });
+
+  // Łączenie biegów, które po przedłużeniu stykają się (ta sama ściana i linia listwy).
+  const sorted = [...runs].sort((a, b) => a.along - b.along);
+  const out = [];
+  sorted.forEach(run => {
+    const prev = out.find(r => r.rot === run.rot && r.axis === run.axis && r.band[0] === run.band[0] && r.band[1] === run.band[1] &&
+      r.h === run.h && Math.abs(r.y - run.y) <= 1 && r.mat.key === run.mat.key &&
+      Math.abs(r.along + r.runLen - run.along) <= GAP);
+    if (!prev) { out.push(run); return; }
+    const gapEnd = run.along;
+    if (gapEnd > prev.along + prev.runLen) extendRun(prev, 'end', gapEnd);
+    const shift = run.along - prev.along;
+    prev.joints.push(shift, ...run.joints.map(j => j + shift));
+    prev.runLen = run.along + run.runLen - prev.along;
+    prev.mods.push(...run.mods);
+    prev.cornerFills.push(...run.cornerFills);
+  });
+  // zachowujemy kolejność pierwotną (numeracja odcinków na liście formatek)
+  return runs.filter(r => out.includes(r));
+}
+
+function extendRun(run, which, value) {
+  const rect = run.axis === 'x'
+    ? (a, b) => ({ x0: a, x1: b, z0: run.band[0], z1: run.band[1] })
+    : (a, b) => ({ x0: run.band[0], x1: run.band[1], z0: a, z1: b });
+  setEnd(run, which, value, rect);
 }
 
 const dist = (v, [lo, hi]) => (v < lo ? lo - v : v > hi ? v - hi : 0);

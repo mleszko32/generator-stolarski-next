@@ -41,6 +41,24 @@ describe("buildPlinthRuns - narożniki", () => {
     expect(x.cornerFills).toEqual([]);
   });
 
+  it("bok dokładany na cokole: cokół przechodzi pod nim i łączy biegi; bok do podłogi przerywa", () => {
+    const a = baseModule({ id: "a", position: { x: 0, y: 0, z: 0 } });
+    const b = baseModule({ id: "b", position: { x: 620, y: 0, z: 0 } });
+    const bok = { id: "s", kind: "bok", position: { x: 602, y: 100, z: 0 }, rotation: 0, dimensions: { width: 18, height: 2000, depth: 583 } };
+    const p = freshProject({ room: { width: 3000, height: 2600, depth: 3000 }, modules: [a, b], sidePanels: [bok] });
+    setProject(p);
+    let runs = buildPlinthRuns(p);
+    expect(runs).toHaveLength(1);
+    expect(runs[0].along).toBe(0);
+    expect(runs[0].runLen).toBe(1220);
+    expect(runs[0].joints).toEqual([620]);
+    expect(runs[0].cornerFills).toEqual([{ x0: 600, x1: 620, z0: 455, z1: 473 }]);
+
+    bok.position.y = 0;
+    runs = buildPlinthRuns(p);
+    expect(runs).toHaveLength(2);
+  });
+
   it("różna wysokość nóżek - bez łączenia", () => {
     const p = lKitchen();
     p.modules[1].legs.height = 150;
