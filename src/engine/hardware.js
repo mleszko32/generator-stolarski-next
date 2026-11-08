@@ -15,6 +15,7 @@ import { getCornerPanels } from "./cornerDrillings.js";
 import { getSlopePanels } from "./slopeDrillings.js";
 import { getBlindCorner, blindGeometry, BLIND_MOUNTS } from "../core/blindCorner.js";
 import { getCornerFitting } from "../core/cornerFittings.js";
+import { cornerHingeName } from "../core/cornerHinge.js";
 import { wardrobeRodLength } from "../core/slopeNiche.js";
 import { moduleBoardThickness } from "../core/boardThickness.js";
 import { isFlap, flapHardware, frontThickness } from "../core/liftFlap.js";
@@ -188,7 +189,7 @@ export function calculateProjectHardware() {
           // (listwa - nakładany, zaślepka - wpuszczany), patrz core/blindCorner.js.
           const bg = blind ? blindGeometry(mod, config) : null;
           const parallelName = bg && side === bg.side ? BLIND_MOUNTS[bg.mount].hwName : null;
-          const hingeKey = parallelName || `Zawias meblowy + prowadnik krzyżakowy (puszka 35mm)`;
+          const hingeKey = parallelName || cornerHingeName(mod, front) || `Zawias meblowy + prowadnik krzyżakowy (puszka 35mm)`;
           if (!hardwareList[hingeKey]) hardwareList[hingeKey] = { name: hingeKey, qty: 0, unit: 'kpl.' };
           hardwareList[hingeKey].qty += hingeCount;
         }

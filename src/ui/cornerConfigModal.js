@@ -50,6 +50,7 @@ export function openCornerConfigModal(mod) {
       <h3 style="font-size:13px; margin:0 0 4px 0;">Fronty w rogu — zakładka</h3>
       <div class="property-group" style="max-width:420px;"><label>Rodzaj frontów narożnika:</label><select id="input-corner-front-mode"><option value="separate" ${mod.cornerFrontMode !== 'bifold' ? 'selected' : ''}>Dwa oddzielne fronty (każdy na własnych zawiasach)</option><option value="bifold" ${mod.cornerFrontMode === 'bifold' ? 'selected' : ''}>Front łamany (dwa skrzydła, zawias 60°)</option></select></div>
       <div id="corner-front-mode-hint" class="hint" style="margin-top:0; margin-bottom:6px;"></div>
+      <div id="corner-wide-hinge-options" class="property-group" style="max-width:420px; display:${mod.cornerFrontMode === 'bifold' ? 'none' : 'block'};"><label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="input-corner-wide-hinge" ${mod.cornerWideHinge ? 'checked' : ''} /> Zawiasy Blum 170° (CLIP top) zamiast zwykłych 110°</label></div>
       <div id="corner-bifold-options" class="property-group" style="max-width:340px; display:${mod.cornerFrontMode === 'bifold' ? 'block' : 'none'};"><label>Luz w miejscu łamania (mm):</label><input type="number" step="0.5" id="input-corner-bifold-gap" value="${mod.cornerBifold?.breakGap ?? 2}" /><label style="margin-top:8px;">Luz od korpusu (mm):</label><input type="number" step="0.5" id="input-corner-front-clearance" value="${cornerClearanceNow}" /></div>
       <div class="property-group" style="max-width:340px;"><label id="corner-front-primary-label">Który front zamyka się jako pierwszy (sięga do rogu):</label><select id="input-corner-front-primary"><option value="A" ${(!mod.cornerFrontOverlap || mod.cornerFrontOverlap.primaryArm !== 'B') ? 'selected' : ''}>Ramię A</option><option value="B" ${(mod.cornerFrontOverlap && mod.cornerFrontOverlap.primaryArm === 'B') ? 'selected' : ''}>Ramię B</option></select></div>
     </div>
@@ -306,10 +307,16 @@ export function openCornerConfigModal(mod) {
     clearManualFrontWidths();
     renderFrontModeHint();
     modal.querySelector('#corner-bifold-options').style.display = mod.cornerFrontMode === 'bifold' ? 'block' : 'none';
+    modal.querySelector('#corner-wide-hinge-options').style.display = mod.cornerFrontMode === 'bifold' ? 'none' : 'block';
     update3D();
     updateSidebar();
     armAEditor.render();
     armBEditor.render();
+  });
+  // Oddzielne fronty na zawiasach 170° (core/cornerHinge.js) - tylko lista okuć.
+  modal.querySelector('#input-corner-wide-hinge').addEventListener('change', e => {
+    mod.cornerWideHinge = e.target.checked;
+    updateSidebar();
   });
   modal.querySelector('#input-corner-front-clearance').addEventListener('input', e => {
     const v = parseFloat(e.target.value);
