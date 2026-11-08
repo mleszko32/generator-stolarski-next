@@ -106,6 +106,12 @@ function panelEntry(panel, type, project) {
   return type === "front" ? frontEntry(panel.materialId, project) : korpusEntry("");
 }
 
+// Skrzynki szuflad MOVENTO z płyty korpusu szafki (front.drawerBoxFromKorpus, engine/cabinet.js).
+function boxFromKorpus(mod, project) {
+  const f = { ...(project.front || {}), ...(mod.front || {}) };
+  return !!f.drawerBoxFromKorpus && /^movento/.test(String(f.drawerSystem || ""));
+}
+
 // Materiał bryły z jej userData (moduleId / elementId / sidePanelId) i typu ('corpus', 'shelf',
 // 'front', 'plinth', 'drawerBox'); null = bryła bez materiału z legendy (nóżki, plecy HDF…).
 export function partMaterial(type, userData, project) {
@@ -119,10 +125,12 @@ export function partMaterial(type, userData, project) {
   if (userData.type === "plinth") return type === "plinth" ? plinthEntry(mod, project) : null; // nóżki bez materiału
   if (type === "front") {
     const el = userData.elementId && (mod.elements || []).find((e) => e.id === userData.elementId);
+    // front szuflady wewn. MOVENTO ze skrzynką z płyty korpusu - w dekorze korpusu (jak na liście formatek)
+    if (el && el.subtype === "szuflada-wewnetrzna" && boxFromKorpus(mod, project)) return korpusEntry(korpusDecorOf(mod, project));
     return frontEntry(el ? el.materialId : moduleFrontMaterialId(mod, project), project);
   }
   if (type === "corpus" || type === "shelf") return korpusEntry(korpusDecorOf(mod, project));
-  if (type === "drawerBox") return drawerEntry(project);
+  if (type === "drawerBox") return boxFromKorpus(mod, project) ? korpusEntry(korpusDecorOf(mod, project)) : drawerEntry(project);
   return null;
 }
 
@@ -146,6 +154,7 @@ export function projectDecorLegend(project, opts = {}) {
     add(korpusEntry(korpusDecorOf(mod, project)));
     (mod.elements || []).forEach((el) => {
       if (el.typ !== "front") return;
+      if (el.subtype === "szuflada-wewnetrzna" && boxFromKorpus(mod, project)) return; // w dekorze korpusu (już w legendzie)
       add(frontEntry(el.materialId, project));
       if (/szuflada/.test(el.subtype || "")) add(drawerEntry(project));
     });

@@ -66,6 +66,28 @@ export function drawerCardsHtml(mod, { sideInfo, extraHtml = () => '', list = dr
           <div class="prop-box">
             <div class="prop-box-title"><i class="ti ti-box" aria-hidden="true"></i> ${escapeHtml(label)}</div>
             ${extraHtml(front)}
+            <div class="property-group mb-8">
+              <label class="fs-xs">Szuflada:</label>
+              <select class="input-drawer-kind" data-front-id="${escapeHtml(front.id)}">
+                <option value="szuflada" ${isInner ? '' : 'selected'}>zewnętrzna (front na korpusie)</option>
+                <option value="szuflada-wewnetrzna" ${isInner ? 'selected' : ''}>wewnętrzna (front w korpusie)</option>
+              </select>
+            </div>
+            ${isInner ? `
+            <div class="row mb-8">
+              <div class="property-group grow">
+                <label class="fs-xs">Luz z boków [mm]:</label>
+                <input type="number" class="input-inner-gap-x" data-front-id="${escapeHtml(front.id)}" value="${front.intGapX ?? 15}" />
+              </div>
+              <div class="property-group grow">
+                <label class="fs-xs">Luz góra/dół [mm]:</label>
+                <input type="number" class="input-inner-gap-y" data-front-id="${escapeHtml(front.id)}" value="${front.intGapY ?? 5}" />
+              </div>
+              <div class="property-group grow">
+                <label class="fs-xs">Między szufladami [mm]:</label>
+                <input type="number" class="input-inner-gap" data-front-id="${escapeHtml(front.id)}" value="${front.gap ?? 3}" />
+              </div>
+            </div>` : ''}
             ${sizeHtml}
             <div class="property-group mb-8">
               <label class="fs-xs">Wymuszona głębokość (NL, mm):</label>
@@ -144,6 +166,29 @@ export function bindDrawerCards(root, mod, refresh) {
   onChange('input-front-force-w', (front, v) => { front.forceW = numOrNull(v); });
   onChange('input-front-force-offset-y', (front, v) => { front.forceOffsetY = numOrNull(v) ?? 0; });
   onChange('input-front-force-offset-x', (front, v) => { front.forceOffsetX = numOrNull(v) ?? 0; });
+  // Szuflady jednej grupy (ta sama wnęka i podział) zmieniają się razem - inaczej rozjedzie się podział.
+  const siblings = (front) => {
+    const bz = front.baseZone || {};
+    const key = (el) => [el.subtype, el.distribution, (el.baseZone || {}).boundLeft, (el.baseZone || {}).boundRight, (el.baseZone || {}).boundBottom, (el.baseZone || {}).boundTop].join("|");
+    return bz.boundBottom || bz.boundTop ? (mod.elements || []).filter((el) => el.typ === "front" && key(el) === key(front)) : [front];
+  };
+  const onGroup = (cls, apply) => onChange(cls, (front, v) => siblings(front).forEach((el) => apply(el, v)));
+  onGroup('input-drawer-kind', (front, v) => {
+    if (front.subtype === v) return;
+    front.subtype = v;
+    if (v === 'szuflada-wewnetrzna') {
+      const sys = drawerSystems[(({ ...(state.project.front || {}), ...(mod.front || {}) }).drawerSystem || 'merivobox').toLowerCase()] || {};
+      // MOVENTO wewnętrzna: front w korpusie z luzem 3 mm, 30 mm między szufladami na chwyt
+      Object.assign(front, sys.woodenBox ? { intGapX: 3, intGapY: 3, gap: 30 } : { intGapX: 15, intGapY: 5 });
+      front.innerFrontThickness = front.innerFrontThickness ?? 18;
+      front.innerSetback = front.innerSetback ?? 2;
+    } else {
+      front.gap = parseFloat(state.project.front?.gap ?? 3);
+    }
+  });
+  onGroup('input-inner-gap-x', (front, v) => { front.intGapX = Math.max(0, parseFloat(v) || 0); });
+  onGroup('input-inner-gap-y', (front, v) => { front.intGapY = Math.max(0, parseFloat(v) || 0); });
+  onGroup('input-inner-gap', (front, v) => { front.gap = Math.max(0, parseFloat(v) || 0); });
   onChange('input-inner-front-thickness', (front, v) => { front.innerFrontThickness = parseFloat(v) || 18; });
   onChange('input-inner-front-setback', (front, v) => { front.innerSetback = parseFloat(v) || 0; });
   onChange('input-inner-basezone-bottom', (front, v) => { if (front.baseZone) front.baseZone.offsetBottom = parseFloat(v) || 0; });
@@ -193,7 +238,7 @@ export function bindDrawerCards(root, mod, refresh) {
         offsetTop: Math.max(0, baseMaxY - newInnerTopY)
       },
       frontCount: 1, distribution: "1", frontIndex: 0, gap: parseFloat(state.project.front?.gap || 3),
-      intGapX: 15, intGapY: 5, forceVariant: 'auto', forceNL: null,
+      ...(drawerSystems[sysName]?.woodenBox ? { intGapX: 3, intGapY: 3 } : { intGapX: 15, intGapY: 5 }), forceVariant: 'auto', forceNL: null,
       innerFrontThickness: 18, innerSetback: 2
     });
 
