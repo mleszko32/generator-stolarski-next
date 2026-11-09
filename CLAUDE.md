@@ -535,7 +535,9 @@ powiązanie w `pricing.sas = { hardware, materials }`. Nowy cennik: `scripts/sas
 <data>.xlsx” i `sasCatalog.json` (oba na Dysk: Meble Leszko/00 Baza, nigdy do repo). Procenty rabatów czyta z zakładki „Rabaty”
 poprzedniego cennika; przypisanie grup nowym pozycjom w `scripts/sas/rabaty.js`.
 Dobór okuć: `sasSuggest` (zawias = 71B3550 + 173L6100, komplet szuflady → zestaw SAS „Szuflada Blum <system> … <NL> <wys.>”
-na wkręty, 40 kg, biały, MOVENTO = prowadnice + sprzęgła T51.7601 L/P, nóżki, kody Blum w nazwie); powiązanie z Kosztorysu
+na wkręty, 40 kg, biały, MOVENTO = prowadnice + sprzęgła T51.7601 L/P, nóżki, siłownik HK-XS wg LF, drążek fi 25 + rozety, konfirmaty + kołki,
+kody Blum w nazwie, też bez słowa „Blum”; pozycje w opakowaniach/odcinkach mają `list.per` — ułamek na sztukę okucia, z niego ilość
+do koszyka i cena); powiązanie z Kosztorysu
 („indeks+indeks”) ma pierwszeństwo, przycisk „Dobierz ceny okuć z SAS” wpisuje ceny pozycji bez ceny. Koszyk: `core/sasBasket.js` —
 hub „Okucia i okleina” pokazuje pozycję SAS, cenę i stan, „Do koszyka SAS” kopiuje `GSN-SAS-KOSZYK [[nr produktu, ilość]]`, a zakładka
 `BASKET_BOOKMARKLET` na stronie sklepu dodaje je przez `POST /pl/web/basket/add` (zamówienie składa użytkownik).

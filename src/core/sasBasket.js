@@ -21,15 +21,16 @@ export function basketItems(hardware, rows, links) {
   for (const hw of hardware) {
     const list = hardwareSasRows(rows, links, hw.name);
     if (!list || list.some((r) => !r[5])) { missing.push(hw.name); continue; }
-    const qty = Math.ceil(Number(hw.qty) || 0);
-    if (!qty) continue;
-    for (const r of list) {
-      const it = byPid.get(r[5]) || { pid: r[5], idx: r[0], name: r[1], qty: 0 };
-      it.qty += qty;
+    const hwQty = Number(hw.qty) || 0;
+    if (!hwQty) continue;
+    list.forEach((r, i) => {
+      const it = byPid.get(r[5]) || { pid: r[5], idx: r[0], name: r[1], qty: 0, raw: 0 };
+      it.raw += hwQty * ((list.per && list.per[i]) || 1); // opakowania/odcinki: sumuj ułamki, zaokrąglaj na końcu
+      it.qty = Math.ceil(it.raw - 1e-9);
       byPid.set(r[5], it);
-    }
+    });
   }
-  return { items: [...byPid.values()], missing };
+  return { items: [...byPid.values()].map(({ raw, ...it }) => it), missing };
 }
 
 export function basketText(items) {

@@ -83,3 +83,49 @@ describe("koszyk SAS", () => {
     expect(BASKET_BOOKMARKLET).toContain(BASKET_PREFIX);
   });
 });
+
+describe("dobór okuć spoza Blum i w opakowaniach", () => {
+  const more = [
+    R("A1", "AVENTOS HK-XS do frontów uchylnych, siłownik, współczynnik mocy=800-1600 (siłownik jednostronny), do TIP-ON, niklowany, BLUM 20K1501T V40", 36, "201"),
+    R("A2", "AVENTOS HK-XS do frontów uchylnych, siłownik, współczynnik mocy=500-1200 (siłownik jednostronny), do TIP-ON, niklowany, BLUM 20K1301T V40", 36, "202"),
+    R("A3", "AVENTOS HK-XS do frontów uchylnych, siłownik, współczynnik mocy=800-1800 (siłownik jednostronny), niklowany, BLUM 20K1501", 33, "203"),
+    R("A4", "AVENTOS HK-XS do frontów uchylnych, Mocowanie korpusu, na wkręty, niklowany, BLUM 20K5101 V200", 2, "204"),
+    R("D1", "TIP-ON do drzwi (zestaw), Wersja standardowa, z magnesem, czarny, carbon, BLUM 956.1004 V50", 13, "205"),
+    R("D2", "TIP-ON do drzwi (zestaw), Wersja standardowa, z magnesem, biała, BLUM 956.1004 V50", 13.5, "206"),
+    R("D3", "Adapter TIP-ON do drzwi, Wersja standardowa, prosty, Wkręty, Biała, BLUM 956.1201 V250", 3, "207"),
+    R("H1", "CLIP top zawias standard. 110°, Drzwi nakładane, bez sprężyny, puszka: na wkręty, niklowany, BLUM 70T3550", 5.5, "208"),
+    R("K1", "Konfirmaty 7.0 x 50mm, Galv. HAFELE 264.45.922, Opakowanie 1000 szt.", 76, "209"),
+    R("K2", "Kołki drewniane (1kg) 8x35mm cięte", 30, "210"),
+    R("R1", "Drążek / Rura chrom FI 25 dł. 3000mm, Grubościenna, grubość ścianki 1mm", 11, "211"),
+    R("R2", "Uchwyt / mocowanie / rozeta rury / drążka fi 25 chrom / stal stopka 500", 0.5, "212"),
+  ];
+  const all = [...rows, ...more];
+  const ids = (name) => (sasSuggest(all, name) || []).map((r) => r[0]);
+
+  it("siłownik HK-XS z zakresu LF (najbliższy, gdy poza), TIP-ON zgodnie z nazwą", () => {
+    expect(ids("AVENTOS HK-XS TIP-ON - siłownik do doboru (LF ok. 400)")).toEqual(["A2"]);
+    expect(ids("AVENTOS HK-XS TIP-ON - siłownik do doboru (LF ok. 1610)")).toEqual(["A1"]);
+    expect(ids("AVENTOS HK-XS - siłownik do doboru (LF ok. 1610)")).toEqual(["A3"]);
+  });
+
+  it("kody Blum bez słowa Blum: mocowanie, TIP-ON + adapter (białe), zawias bez sprężyny + prowadnik", () => {
+    expect(ids("AVENTOS HK-XS - mocowanie korpusu 20K5101")).toEqual(["A4"]);
+    expect(ids("TIP-ON do drzwi 956.1004 + adapter prosty 956.1201")).toEqual(["D2", "D3"]);
+    expect(ids("Zawias CLIP top 110° bez sprężyny 70T3550 + prowadnik 173L6100")).toEqual(["H1", "P1"]);
+  });
+
+  it("konfirmaty i kołki w opakowaniach, drążek w odcinkach 3 m - ilości i cena na sztukę", () => {
+    const join = sasSuggest(all, "Złącze korpusowe (Kołek 8x30 + Konfirmat)");
+    expect(join.map((r) => r[0])).toEqual(["K1", "K2"]);
+    expect(linkPrice(join)).toBe(0.14); // 76/1000 + 30/500
+    const hw = [
+      { name: "Złącze korpusowe (Kołek 8x30 + Konfirmat)", qty: 301 },
+      { name: "Drążek garderobowy L=998 mm", qty: 1 },
+      { name: "Drążek garderobowy L=2400 mm", qty: 1 },
+      { name: "Wspornik drążka", qty: 4 },
+    ];
+    const { items, missing } = basketItems(hw, all, {});
+    expect(missing).toEqual([]);
+    expect(items.map((i) => [i.idx, i.qty])).toEqual([["K1", 1], ["K2", 1], ["R1", 2], ["R2", 4]]);
+  });
+});

@@ -79,10 +79,20 @@ export function sasPricePerM2(row, fallbackArea = null) {
 // Wiersz katalogu po pełnym napisie (np. kod Blum) z preferencją wykończenia: niklowany / jedwabiście biały,
 // bez czarnych / antracytowych / złotych; przy remisie najtańszy.
 function pickRow(rows, test) {
-  const score = (r) => (/czarn|antracyt|onyx|złot|indium|grafit|stal szlach/i.test(r[1]) ? 2 : 0)
-    + (/niklowan|jedwabi[sś]cie bia|bia[łl]y/i.test(r[1]) ? 0 : 1);
+  const score = (r) => (/czarn|antracyt|onyx|złot|indium|grafit|stal szlach|carbon|platyn|R70\d\d/i.test(r[1]) ? 2 : 0)
+    + (/niklowan|jedwabi[sś]cie bia|bia[łl][ya]/i.test(r[1]) ? 0 : 1);
   return rows.filter(test).sort((a, b) => score(a) - score(b) || a[3] - b[3])[0] || null;
 }
+
+// Pozycja sprzedawana w opakowaniu / odcinku: `per` = ile sztuk z katalogu na jedną sztukę okucia
+// (konfirmaty 1/1000, drążek 998/3000). Ilość do koszyka i cena okucia liczą się z tym mnożnikiem.
+function withPer(list, per) {
+  if (!list.every(Boolean)) return null;
+  list.per = per;
+  return list;
+}
+
+const PACK_SIZE = (r) => Number((r[1].match(/Opakowanie\s+(\d+)\s*szt/i) || [])[1]) || 1;
 
 const DRAWER_SET_NAMES = { ANTARO: "TANDEMBOX ANTARO", MERIVOBOX: "MERIVOBOX", LEGRABOX: "LEGRABOX" };
 const HINGE_STD = "Zawias meblowy + prowadnik krzyżakowy (puszka 35mm)";
@@ -125,6 +135,36 @@ export function sasSuggest(rows, hwName) {
     const r = pickRow(rows, (x) => /^N[óo]żka do mebli/i.test(x[1]) && x[1].includes(`H-${m[1]} `));
     return r ? [r] : null;
   }
+  // Siłownik AVENTOS HK-XS: zakres współczynnika mocy obejmujący LF (inaczej najbliższy), TIP-ON jak w nazwie
+  m = name.match(/^AVENTOS HK-XS( TIP-ON)? - siłownik.*LF ok\. (\d+)/);
+  if (m) {
+    const lf = Number(m[2]), tipOn = Boolean(m[1]);
+    const dist = (r) => { const [a, b] = (r[1].match(/mocy=(\d+)-(\d+)/) || []).slice(1).map(Number); return lf < a ? a - lf : lf > b ? lf - b : 0; };
+    const r = rows.filter((x) => /^AVENTOS HK-XS .*siłownik.*mocy=\d+-\d+/i.test(x[1]) && /TIP-ON/i.test(x[1]) === tipOn)
+      .sort((a, b) => dist(a) - dist(b) || a[3] - b[3])[0];
+    return r ? [r] : null;
+  }
+  // Drążek garderobowy: rura chrom fi 25 w odcinkach 3000 mm (część odcinka na sztukę), wspornik = rozeta fi 25
+  m = name.match(/^Drążek garderobowy L=(\d+)/);
+  if (m) {
+    const r = pickRow(rows, (x) => /^Drążek \/ Rura chrom FI 25 dł\. 3000/i.test(x[1]));
+    return r ? withPer([r], [Number(m[1]) / 3000]) : null;
+  }
+  if (name === "Wspornik drążka") {
+    const r = pickRow(rows, (x) => /^Uchwyt .*drążka fi 25/i.test(x[1]));
+    return r ? [r] : null;
+  }
+  // Złącze korpusowe: konfirmat 7x50 (opakowanie) + kołki 8x35 na wagę (1 kg ≈ 500 szt.)
+  if (/^Złącze korpusowe/.test(name)) {
+    const k = pickRow(rows, (x) => /^Konfirmaty 7\.0 x 50/i.test(x[1]));
+    const d = pickRow(rows, (x) => /^Kołki drewniane \(1kg\) 8x35/i.test(x[1]));
+    return k && d ? withPer([k, d], [1 / PACK_SIZE(k), 1 / 500]) : null;
+  }
+  // Kody Blum w nazwie bez słowa „Blum”: „20K5101”, „70T3550 + prowadnik 173L6100”, „956.1004 + adapter 956.1201”
+  const codes = name.match(/\b(\d{2,3}[A-Z]\d{4}|\d{3}\.\d{4})\b/g);
+  if (codes && !/\bBlum\b/i.test(name)) {
+    return all(codes.map((c) => pickRow(rows, (x) => x[1].includes(c))));
+  }
   // Kod katalogowy Blum w nazwie, np. „(Blum 79T8500)”, „(79B9950)”
   m = name.match(/\bBlum\s+([0-9]{2}[A-Z][0-9]{4}[A-Z0-9.]*|[A-Z]{1,3}[0-9]\.[0-9A-Z.]+)/i) || name.match(/\(([0-9]{2}[A-Z][0-9]{4})\)/);
   if (m) {
@@ -147,7 +187,7 @@ export function rowsFromLink(rows, link) {
 
 // Cena jednej sztuki okucia z powiązanych pozycji (suma, zaokrąglona do grosza).
 export function linkPrice(list) {
-  return Math.round(list.reduce((s, r) => s + r[3], 0) * 100) / 100;
+  return Math.round(list.reduce((s, r, i) => s + r[3] * ((list.per && list.per[i]) || 1), 0) * 100) / 100;
 }
 
 // Opis pozycji w polu: pojedyncza pozycja - jak sasLabel, kilka - „idx + idx · suma zł”.
