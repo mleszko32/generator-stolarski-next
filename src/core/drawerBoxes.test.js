@@ -32,6 +32,19 @@ describe("getDrawerBoxRect", () => {
     expect(r.y0).toBeCloseTo(230, 5);
   });
 
+  it("skrzynka drewniana szuflady wewnętrznej nie wychodzi ponad czoło (bez zjazdu na wieniec)", () => {
+    state.project.front.drawerSystem = "tandem_560f";
+    const mod = state.project.modules[0];
+    const inner = (over) => drawer({ subtype: "szuflada-wewnetrzna", intGapY: 3, w: 558, h: 227, ...over });
+    const low = getDrawerBoxRect(mod, inner({ y: 21 }), state.project);
+    expect(low.y0).toBeCloseTo(18 + 14.5, 5);          // wieniec + luz TANDEM
+    expect(low.y1).toBeLessThanOrEqual(21 + 227);
+    const up = getDrawerBoxRect(mod, inner({ frontIndex: 1, y: 288 }), state.project);
+    expect(up.y0).toBeCloseTo(285 + 14.5, 5);           // dół szczeliny czoła + luz
+    expect(up.y1).toBeLessThanOrEqual(288 + 227);
+    expect(up.y1 - up.y0).toBeCloseTo(low.y1 - low.y0, 5); // ta sama wysokość boku
+  });
+
   it("zwraca null dla nieznanego systemu szuflad", () => {
     state.project.front.drawerSystem = "nie-ma-takiego";
     const orig = console.error;

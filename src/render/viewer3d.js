@@ -11,7 +11,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { state, DEFAULT_ROOM, frontBodyGap } from '../core/state.js';
 
 import { calculateDrawerHoles } from '../core/drawerMath.js';
-import { drawerSpec } from '../core/drawerSpec.js';
+import { drawerSpec, drawerBaseY } from '../core/drawerSpec.js';
 import { calculateHinges, stackedHingeObstacles, SHELF_PIN_DROP, SHELF_PIN_OFFSETS } from '../core/hingeMath.js';
 import { isFlap, flapHinges } from '../core/liftFlap.js';
 import { dishwasherGeometry } from '../core/dishwasher.js';
@@ -1619,7 +1619,9 @@ export function update3D() {
                           const isBottomOuter = el.baseZone && parseFloat(el.baseZone.minY) <= th + 0.5;
                           const fcMerged = { ...(state.project.front?.clearance || {}), ...(mod.front?.clearance || {}) };
                           // NL z doboru szuflady - MOVENTO ma tylne otwory prowadnicy zależne od długości.
-                          const dHoles = calculateDrawerHoles(sysName, el.y, simulatedSpace, th, el.frontIndex, isBottomInZone && isBottomOuter && !isInsetFront, spec.nl, el.baseZone ? (parseFloat(el.baseZone.minY) || 0) + (parseFloat(el.baseZone.offsetBottom) || 0) : null, fcMerged);
+                          // Szuflada wewnętrzna drewniana: prowadnica od dołu szczeliny czoła (drawerBaseY).
+                          const holeY = drawerComps?.woodenBox && isInternal ? drawerBaseY(el, th, isInsetFront) : el.y;
+                          const dHoles = calculateDrawerHoles(sysName, holeY, simulatedSpace, th, el.frontIndex, isBottomInZone && isBottomOuter && !isInsetFront, spec.nl, el.baseZone ? (parseFloat(el.baseZone.minY) || 0) + (parseFloat(el.baseZone.offsetBottom) || 0) : null, fcMerged);
 
                           if (drawerComps && drawerComps.woodenBox) {
                               // MOVENTO: skrzynka z płyty (core/drawerMath.js) - boki na całą
@@ -1631,7 +1633,7 @@ export function update3D() {
                               const sH = drawerComps.sideHeight;
                               const bH = drawerComps.back.height;
                               const dX = posX + openingX0 + (innerWidth - dw) / 2;
-                              const dY = posY + el.y + (isBottomInZone && isBottomOuter && !isInsetFront ? th : 0) + drawerComps.bottomClearance;
+                              const dY = posY + drawerBaseY(el, th, isInsetFront) + drawerComps.bottomClearance;
                               const bY = dY + drawerComps.bottomRecess;
                               const boxStartZ = zForFront - L;
                               addBox(t, sH, L, dX - t, dY, boxStartZ, 'drawerBox', isActive, udElement, innerGroup);

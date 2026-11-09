@@ -19,6 +19,17 @@ import { moduleBoardThickness } from "./boardThickness.js";
 const NL_SAFETY = 5;
 
 // mod: szafka, el: front szufladowy, project: state.project.
+// Poziom (y w układzie korpusu), od którego liczy się skrzynka szuflady drewnianej i jej
+// prowadnica. Zwykły dolny front nakładany zjeżdża na wieniec - skrzynka zaczyna się nad
+// wieńcem (+ th). Czoło szuflady wewnętrznej stoi już w świetle korpusu: skrzynka zaczyna
+// się na dole jego szczeliny (dolna szuflada = wieniec / półka), inaczej wychodziła ponad czoło.
+export function drawerBaseY(el, th, isInset) {
+  const y = num(el.y);
+  if (el.subtype === "szuflada-wewnetrzna") return y - num(el.intGapY, 5);
+  const isBottomOuter = !!el.baseZone && num(el.baseZone.minY) <= th + 0.5;
+  return y + (el.frontIndex === 0 && isBottomOuter && !isInset ? th : 0);
+}
+
 export function drawerSpec(mod, el, project) {
   const th = moduleBoardThickness(mod, project);
   const W = num(mod.dimensions && mod.dimensions.width);
