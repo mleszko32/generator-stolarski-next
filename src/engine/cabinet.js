@@ -12,6 +12,7 @@ import { getCorpusHoles, getPionMountHoles, getCorpusParts, getBackPanelParts } 
 import { getCornerCorpusParts } from "./cornerParts.js";
 import { getSlopeCabinetParts, getSlopeFrontParts } from "../core/slopeCabinet.js";
 import { getBlindPanel, getBlindStile, blindGeometry, getBlindCorner } from "../core/blindCorner.js";
+import { frontClearance } from "../core/autoClearance.js";
 import { isFlap } from "../core/liftFlap.js";
 import { splitPlinthRun, maxPlinthLength } from "./plinthSplit.js";
 import { buildPlinthRuns } from "./plinthRuns.js";
@@ -310,7 +311,7 @@ function getFrontsAndDrawers(mod, config) {
   fronts.sort((a, b) => a.y - b.y);
 
   const board = moduleBoardThickness(mod, config);
-  const fc = { ...(config.front?.clearance || {}), ...(mod.front?.clearance || {}) };
+  const fc = frontClearance(mod, config);
 
   fronts.forEach((front, index) => {
     let partName = "Front";

@@ -24,6 +24,8 @@ import { drawerCardsHtml, bindDrawerCards } from "./drawerSettings.js";
 import { propHeaderHtml, sectionHtml, bindSections, setSectionDots, positionRotationHtml } from "./propertiesShell.js";
 import { blindCornerSectionHtml, bindBlindCornerSection } from "./blindCornerProperties.js";
 import { findRowAround } from "../core/wallFill.js";
+import { isAutoClearance, describeClearance, frontClearance } from "../core/autoClearance.js";
+import { frontRoundingHints, roundingHintText } from "../core/frontRounding.js";
 import { getStiffenerSettings } from "../core/shelfStiffener.js";
 import { findKitchenRunAround } from "../core/kitchenRun.js";
 import { openWallFillModal } from "./wallFillModal.js";
@@ -66,7 +68,7 @@ export function computeOverridden(mod) {
     .filter(k => !skip.includes(k) && JSON.stringify(local[k]) !== JSON.stringify((base || {})[k]));
   const proj = state.project;
   return {
-    front: diffKeys(mod.front, proj.front, ['hinges', 'distribution', 'drawerSystem']).length > 0,
+    front: diffKeys(mod.front, proj.front, ['hinges', 'distribution', 'drawerSystem', 'clearanceAuto']).length > 0,
     szuflady: diffKeys(mod.front, proj.front, Object.keys(mod.front || {}).filter(k => k !== 'drawerSystem')).length > 0,
     konstrukcja: diffKeys(mod.construction, proj.construction).length > 0,
   };
@@ -77,6 +79,49 @@ function refreshOverrideDots() {
   const rs = document.querySelector('.sidebar-right');
   if (!mod || !rs) return;
   setSectionDots(rs, computeOverridden(mod));
+}
+
+// Luzy frontów w sekcji Front. Tryb Auto (core/autoClearance.js): cztery luzy liczą się z
+// sąsiadów szafki - panel pokazuje wynik z powodem, a pola ręczne (puste = Auto) są schowane
+// pod "Ręczne nadpisanie". Tryb ręczny: cztery pola jak dotąd. Id pól te same w obu trybach
+// (input-front-left...), więc obsługuje je ta sama pętla numberInputs.
+const CLEARANCE_EDGES = [['left', 'Lewy'], ['right', 'Prawy'], ['top', 'Góra'], ['bottom', 'Dół']];
+function clearanceBlockHtml(mod, f, fc) {
+  const inset = f.type === 'wpuszczane';
+  const auto = isAutoClearance(mod, state.project);
+  const toggle = inset ? '' : `<div class="property-group row-center">
+        <input type="checkbox" id="input-clearance-auto" ${auto ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer;" />
+        <label for="input-clearance-auto" style="cursor: pointer; margin: 0; font-weight: bold;" title="Luzy liczą się same z tego, co stoi przy szafce: szafka obok, blenda, bok dokładany, zmywarka, szafka wyżej, blat, sufit, cokół">Luzy automatyczne (wg sąsiadów)</label>
+      </div>`;
+  if (!auto) {
+    const manual = { left: fc.left ?? fc.sides ?? 1.5, right: fc.right ?? fc.sides ?? 1.5, top: fc.top ?? 2, bottom: fc.bottom ?? 2 };
+    return `<h3>Luzy frontów</h3>${toggle}
+      ${CLEARANCE_EDGES.map(([k, label]) => `<div class="property-group"><label>Luz ${label.toLowerCase()} (mm):</label><input type="number" id="input-front-${k}" value="${manual[k]}" step="0.5" /></div>`).join('')}
+      <div class="hint">Luzy dotyczą zewnętrznych krawędzi korpusu.</div>`;
+  }
+  const d = describeClearance(mod, state.project);
+  const anyManual = CLEARANCE_EDGES.some(([k]) => d[k].manual);
+  return `<h3>Luzy frontów</h3>${toggle}
+      <div class="prop-box">
+        ${CLEARANCE_EDGES.map(([k, label]) => `<div class="info-row"><span class="info-k">${label}</span><span class="info-v"><b>${fmtMm(d[k].value)} mm</b> · ${d[k].manual ? `wpisany ręcznie (Auto: ${fmtMm(d[k].auto)})` : escapeHtml(d[k].reason)}</span></div>`).join('')}
+      </div>
+      <details class="prop-info" ${anyManual ? 'open' : ''}>
+        <summary>Ręczne nadpisanie</summary>
+        <div class="info-body">
+          ${CLEARANCE_EDGES.map(([k, label]) => `<div class="property-group"><label class="fs-xs">Luz ${label.toLowerCase()} (mm, puste = Auto):</label><input type="number" id="input-front-${k}" value="${d[k].manual ? d[k].value : ''}" placeholder="Auto: ${fmtMm(d[k].auto)}" step="0.5" /></div>`).join('')}
+        </div>
+      </details>`;
+}
+
+// Podpowiedź równych wymiarów (core/frontRounding.js): fronty z ułamkiem milimetra i o ile
+// zmienić luz, żeby wyszły w pełnych mm. Liczone po calculateParts() (aktualny layout).
+function roundingHintsHtml(mod, th, f, frontsList) {
+  const hints = frontRoundingHints(mod, th, { inset: f.type === 'wpuszczane' });
+  if (!hints.length) return '';
+  const labelOf = (id) => (frontsList.find(x => x.front.id === id) || {}).label || 'Front';
+  return `<div class="notice-warn fs-xs" style="margin-top: 8px;"><b>Fronty z ułamkiem milimetra</b>
+      ${hints.map(h => `<div style="margin-top: 4px;">${escapeHtml(h.frontIds.map(labelOf).join(', '))} — ${escapeHtml(roundingHintText(h))}</div>`).join('')}
+    </div>`;
 }
 
 // Kolejność i znaczenie indeksów 0-3 MUSI się zgadzać z kolejnością addBox()
@@ -239,12 +284,9 @@ export function initPropertiesPanel() {
         <div class="property-group"><label>Typ frontów:</label><select id="input-front-type"><option value="nakladane" ${(!f.type || f.type === 'nakladane') ? 'selected' : ''}>Nakładane</option><option value="wpuszczane" ${f.type === 'wpuszczane' ? 'selected' : ''}>Wpuszczane</option></select></div>
         <div class="property-group"><label>Przerwa między frontami (mm):</label><input type="number" id="input-front-gap" value="${f.gap ?? 3}" step="0.5" /></div>
         <div class="property-group"><label title="Odstęp tyłu frontu nakładanego od czoła korpusu (miejsce na domknięcie drzwi). Wliczany do lica frontów przy rozmieszczaniu szafek i w narożnikach.">Odsunięcie frontu od korpusu (mm):</label><input type="number" id="input-front-body-gap" value="${frontBodyGap(f)}" step="0.5" min="0" /></div>
-        <div class="property-group"><label>Luz lewy (mm):</label><input type="number" id="input-front-left" value="${fc.left ?? 1.5}" step="0.5" /></div>
-        <div class="property-group"><label>Luz prawy (mm):</label><input type="number" id="input-front-right" value="${fc.right ?? 1.5}" step="0.5" /></div>
-        <div class="property-group"><label>Luz góra (mm):</label><input type="number" id="input-front-top" value="${fc.top ?? 2}" step="0.5" /></div>
-        <div class="property-group"><label>Luz dół (mm):</label><input type="number" id="input-front-bottom" value="${fc.bottom ?? 2}" step="0.5" /></div>
       </div>
-      <div class="hint">Powyższe "Luz góra/dół" działają tylko na krawędzi, które dotykają prawdziwej góry/dołu korpusu. Front kończący się na wewnętrznym wieńcu/półce ma nakładanie liczone osobno (patrz niżej).</div>
+      ${clearanceBlockHtml(activeModule, f, fc)}
+      ${roundingHintsHtml(activeModule, th, f, allFrontsList)}
 
       ${allFrontsList.length ? `
         <h3>Materiał frontów szafki</h3>
@@ -561,6 +603,7 @@ function setupEventListeners() {
   const typeInput = document.getElementById('input-front-type');
   if (typeInput) typeInput.addEventListener('change', (e) => {
       getSelectedMods().forEach(mod => { mod.front = mod.front || {}; mod.front.type = e.target.value; }); updateAll();
+      initPropertiesPanel(); // luzy Auto są tylko dla frontów nakładanych - blok luzów się zmienia
   });
   document.getElementById('input-drawerbox-korpus')?.addEventListener('change', (e) => {
       getSelectedMods().forEach(mod => { mod.front = mod.front || {}; mod.front.drawerBoxFromKorpus = e.target.checked; }); updateAll();
@@ -570,6 +613,25 @@ function setupEventListeners() {
       getSelectedMods().forEach(mod => { mod.front = mod.front || {}; mod.front.drawerSystem = e.target.value; }); updateAll();
       // Lista szuflad zależy od systemu (warianty boku albo wysokość boku MOVENTO).
       initPropertiesPanel();
+  });
+  // Przełącznik luzów Auto / ręcznych. Włączenie kasuje luzy wpisane w szafce (inaczej
+  // miałyby pierwszeństwo przed Auto); wyłączenie wpisuje do szafki obecnie obowiązujące
+  // wartości, żeby fronty nie zmieniły wymiaru od samego przełączenia.
+  document.getElementById('input-clearance-auto')?.addEventListener('change', (e) => {
+    getSelectedMods().forEach(mod => {
+      if (mod.type === 'corner_cabinet' || mod.type === 'slope_cabinet') return;
+      mod.front = mod.front || {};
+      if (e.target.checked) {
+        mod.front.clearanceAuto = true;
+        delete mod.front.clearance;
+      } else {
+        const now = frontClearance(mod, state.project);
+        mod.front.clearanceAuto = false;
+        mod.front.clearance = { left: now.left ?? now.sides ?? 1.5, right: now.right ?? now.sides ?? 1.5, top: now.top ?? 2, bottom: now.bottom ?? 2 };
+      }
+    });
+    updateAll();
+    initPropertiesPanel();
   });
   const backType = document.getElementById('input-back-type');
   const nutOptions = document.getElementById('nut-options');

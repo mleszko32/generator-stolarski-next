@@ -292,7 +292,9 @@ export function createModuleObject(type = "base_cabinet") {
     backPanel: { type: "nakladane", offset: 20, grooveDepth: 13, nutBuild: "sides", clearance: 2 }, // ustawienia nutu po przełączeniu na plecy w nucie: boki nutowane, wieńce skracane, nut 13 mm
     legs: legs,
     // NOWOŚĆ: Lokalne, edytowalne ustawienia zawiasów dla konkretnego modułu
-    front: { hinges: { topOffset: 100, bottomOffset: 100, margin: 40 } },
+    // clearanceAuto: luzy frontów liczone z sąsiadów (core/autoClearance.js) - nowe szafki
+    // mają je włączone, starsze (bez pola) zostają przy luzach wpisanych ręcznie
+    front: { clearanceAuto: true, hinges: { topOffset: 100, bottomOffset: 100, margin: 40 } },
     elements: []
   };
 }

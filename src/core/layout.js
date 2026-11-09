@@ -17,6 +17,7 @@ import { getSlopeInnerRect } from "./slopeCabinet.js";
 import { applyBlindCorner } from "./blindCorner.js";
 import { moduleBoardThickness } from "./boardThickness.js";
 import { topInnerY } from "./topType.js";
+import { frontClearance, isAutoClearance } from "./autoClearance.js";
 
 // Przelicza layout wszystkich modułów projektu. Wołaj przed każdym liczeniem
 // formatek/okuć całego projektu — fronty z sąsiednich modułów też muszą mieć
@@ -245,13 +246,10 @@ export function recalculateLayout(mod) {
   const height = parseFloat(mod.dimensions.height) || 720;
 
   const f = { ...(config.front || {}), ...(mod.front || {}) };
-  const fc = { ...(config.front?.clearance || {}), ...(mod.front?.clearance || {}) };
+  const fc = frontClearance(mod, config); // luzy ręczne albo "Auto" z sąsiadów (core/autoClearance.js)
   const isInset = f.type === 'wpuszczane';
 
-  const cLeft = parseFloat(fc.left ?? fc.sides ?? 1.5) || 0;
-  const cRight = parseFloat(fc.right ?? fc.sides ?? 1.5) || 0;
-  const cTop = parseFloat(fc.top ?? fc.gora ?? 2) || 0;
-  const cBottom = parseFloat(fc.bottom ?? fc.dol ?? 2) || 0;
+  const autoFc = isAutoClearance(mod, config);
 
   const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(config.construction || {}), ...(mod.construction || {}) };
   // Szafka pod skos: granice cab-* z prostokąta wnętrza skosu (wnętrze do
@@ -328,6 +326,13 @@ export function recalculateLayout(mod) {
               startY = minY + gY;
               totalH = (maxY - minY) - (gY * 2);
           } else {
+              // luzy Auto liczą się dla wnęki TEGO frontu (co stoi obok niego), ręczne - dla szafki
+              const fcEl = autoFc ? frontClearance(mod, config, { minX, maxX, minY, maxY }) : fc;
+              const cLeft = parseFloat(fcEl.left ?? fcEl.sides ?? 1.5) || 0;
+              const cRight = parseFloat(fcEl.right ?? fcEl.sides ?? 1.5) || 0;
+              const cTop = parseFloat(fcEl.top ?? fcEl.gora ?? 2) || 0;
+              const cBottom = parseFloat(fcEl.bottom ?? fcEl.dol ?? 2) || 0;
+
               const isBoundLeftFront = el.baseZone.boundLeft && el.baseZone.boundLeft.startsWith('front');
               const isBoundRightFront = el.baseZone.boundRight && el.baseZone.boundRight.startsWith('front');
               const isBoundBottomFront = el.baseZone.boundBottom && el.baseZone.boundBottom.startsWith('front');

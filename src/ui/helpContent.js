@@ -116,7 +116,14 @@ export const HELP_SECTIONS = [
       <ul>
         <li><b>Wymiary</b> - szerokość, wysokość, głębokość, pozycja i obrót. Tu też przyciski
         <b>Zmień podział rzędu</b> i <b>Zmień podział kuchni L/U</b>.</li>
-        <li><b>Front</b> - nakładane / wpuszczane, luzy, szczelina, materiał frontu.</li>
+        <li><b>Front</b> - nakładane / wpuszczane, luzy, szczelina, materiał frontu.
+          <b>Luzy automatyczne (wg sąsiadów)</b> - włączone w nowych szafkach: luz każdej krawędzi liczy się z tego,
+          co przy niej stoi. Boki: szafka obok, ściana albo pusto 1,5 mm, blenda albo bok dokładany 3 mm, zmywarka
+          0,5 mm. Góra: szafka wyżej albo blenda 3 mm, blat albo sufit 5 mm, pusto 1,5 mm. Szafka otwarta wysunięta do lica frontów liczy się jak blenda (3 mm z boku, nad i pod frontem). Dół: cokół w licu frontów
+          3 mm, cokół cofnięty albo szafka niżej 0, panel poziomy pod szafką - front schodzi o grubość panelu + 12 mm.
+          Gdy front wychodzi z ułamkiem milimetra, pod luzami pojawia się podpowiedź, o ile zmienić który luz, żeby
+          wyszedł w pełnych milimetrach. Panel pokazuje wynik z powodem; wyjątek wpisz w „Ręczne nadpisanie” (puste pole = Auto). Po odznaczeniu
+          wracają cztery pola luzów wpisywane ręcznie - tak działają szafki ze starszych projektów.</li>
         <li><b>Szuflady</b> - system szuflad (Blum, GTV, MOVENTO) i ustawienia ręczne
         (wariant wysokości, długość prowadnicy NL, wymiary frontu, szuflada wewnętrzna). Przy każdej szufladzie wybór
         <b>zewnętrzna</b> (front na korpusie) albo <b>wewnętrzna</b> (front w korpusie) - dla wewnętrznej luz z boków,
@@ -167,7 +174,7 @@ export const HELP_SECTIONS = [
       dekoru frontów i kołnierz mocujący (wybierasz, z której strony). <b>Dekor listwy mocującej</b>
       ustaw jak korpus szafki, do której blenda jest przykręcona - listwa trafi do formatek w tym dekorze.</p>
       <p><b>Zmywarka 45 / Zmywarka 60</b> (przyciski pod listą szafek) - zmywarka do zabudowy bez korpusu:
-      front w materiale frontów (wysokość i luzy jak fronty szafek obok), <b>wieniec nad zmywarką</b> z płyty
+      front w materiale frontów (wysokość jak fronty szafek obok, szerokość mniejsza o 5 mm), <b>wieniec nad zmywarką</b> z płyty
       korpusu pod blatem (można wyłączyć) i cokół, który łączy się z cokołem szafek obok; blat idzie nad nią
       bez przerwy. Zaznacz najpierw szafkę dolną obok wnęki - zmywarka stanie zaraz za nią i weźmie z niej
       wysokość, głębokość, nóżki, dekor korpusu i materiał frontu.</p>

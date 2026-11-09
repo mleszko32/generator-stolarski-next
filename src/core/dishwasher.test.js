@@ -23,15 +23,15 @@ describe("zmywarka do zabudowy", () => {
     expect(dw).toMatchObject({ plinthHeight: 100, decor: "U3053 VL", materialId: "mat-x", topBoard: true });
   });
 
-  it("front jak front szafki obok (597 × 775), wieniec 600 × 560 pod blatem", () => {
+  it("front węższy o 5 mm (595 × 775), wieniec 600 × 560 pod blatem", () => {
     const dw = createDishwasher(600);
     dw.dimensions = { width: 600, height: 880, depth: 560 };
     const g = dishwasherGeometry(dw, project());
-    expect(g.front).toMatchObject({ x: 1.5, w: 597, y: 100, h: 775, z: 562 });
+    expect(g.front).toMatchObject({ x: 2.5, w: 595, y: 100, h: 775, z: 562 });
     expect(g.top).toMatchObject({ y: 862, h: 18 });
     const parts = getDishwasherParts(dw, project());
     expect(parts.map((p) => [p.name, p.length, p.width, p.category])).toEqual([
-      ["Front zmywarki 60", 775, 597, "Front"],
+      ["Front zmywarki 60", 775, 595, "Front"],
       ["Wieniec nad zmywarką", 600, 560, "Korpus"],
     ]);
     dw.topBoard = false;

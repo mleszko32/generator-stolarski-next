@@ -151,6 +151,15 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
   wysokość wnęki, głębokość i NL z frontem wpuszczanym / czołem szuflady wewn. / `forceNL`,
   składniki skrzynki). Korzystają z niego lista formatek, lista okuć, obrys skrzynki
   (`drawerBoxes.js`) i 3D — nie licz tego ponownie gdzie indziej.
+- `autoClearance.js` — luzy frontów. `frontClearance(mod, project)` to **jedyne** miejsce scalania luzów zwykłej
+  szafki (layout, formatki, 3D, szafka ślepa) — nie pisz `{ ...project.front.clearance, ...mod.front.clearance }`.
+  `mod.front.clearanceAuto` (nowe szafki z `createModuleObject`; tylko fronty nakładane, nie narożna/skos) = luzy z
+  sąsiadów (`computeAutoClearance`, geometrycznie): boki 1,5 / blenda i bok dokładany 3 / zmywarka 0,5; góra: szafka
+  wyżej i blenda 3, blat i sufit 5, pusto 1,5; dół: cokół w licu (`plinthOffset < 0`) 3, panel poziomy pod szafką
+  −(grubość + 12), inaczej 0; sąsiednia szafka wysunięta przed korpus ≥ 10 mm (otwarta, w licu frontów) = jak blenda, 3. W `recalculateLayout` luz liczy się dla wnęki każdego frontu osobno (`frontClearance(mod, project, zone)`). Luz wpisany w `mod.front.clearance` ma pierwszeństwo. Stałe w
+  `project.front.autoClearance` (bez UI). Front zmywarki węższy o 2 × `dishwasherSideClearance` (2,5).
+- `frontRounding.js` — `frontRoundingHints(mod, th)`: fronty z ułamkiem mm i o ile zmienić luz na zewnętrznej
+  krawędzi (para drzwi / kolumna równych szuflad dzieli zmianę); podpowiedź pod luzami w sekcji Front.
 - `backPanel.js` — `resolveBackPanel(mod, project)` (domyślne ustawienia pleców = te z
   formularza) i `corpusInnerDepth(...)` (głębokość wieńców); nie pisz własnych fallbacków
   `mod.backPanel || {...}`.

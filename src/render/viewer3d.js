@@ -33,6 +33,7 @@ import { mats, worktopMat, disposeObject, createLabelSprite, addBox, addHole, ad
 import { renderCornerCabinet } from './cornerCabinet3d.js';
 import { renderSlopeCabinet } from './slopeCabinet3d.js';
 import { getBlindPanel, getBlindStile, blindGeometry, PARALLEL_PLATE_INSET } from '../core/blindCorner.js';
+import { frontClearance } from '../core/autoClearance.js';
 import { initMeasureTool, isMeasureActive, setMeasureButton, toggleMeasureMode, updateMeasureHover, handleMeasureClick, measureHoverMouse } from './measureTool.js';
 import { showAlert } from "../utils/modal.js";
 import { shelfStiffener } from '../core/shelfStiffener.js';
@@ -1617,7 +1618,7 @@ export function update3D() {
                           // (baseZone.minY ~ th), nie tag "boundBottom" - starsze projekty (import AI)
                           // budują baseZone bez tego taga wcale.
                           const isBottomOuter = el.baseZone && parseFloat(el.baseZone.minY) <= th + 0.5;
-                          const fcMerged = { ...(state.project.front?.clearance || {}), ...(mod.front?.clearance || {}) };
+                          const fcMerged = frontClearance(mod, state.project);
                           // NL z doboru szuflady - MOVENTO ma tylne otwory prowadnicy zależne od długości.
                           // Szuflada wewnętrzna drewniana: prowadnica od dołu szczeliny czoła (drawerBaseY).
                           const holeY = drawerComps?.woodenBox && isInternal ? drawerBaseY(el, th, isInsetFront) : el.y;

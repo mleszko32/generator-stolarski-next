@@ -14,6 +14,7 @@
 import { projectBoardThickness, decorThickness } from "./boardThickness.js";
 import { korpusCategory } from "./materialCatalog.js";
 import { frontBodyGap } from "./state.js";
+import { dishwasherSideClearance } from "./autoClearance.js";
 
 export const DISHWASHER_WIDTHS = [450, 600];
 export const DISHWASHER_DEFAULTS = { height: 820, depth: 560, plinthHeight: 100, plinthOffset: 40 };
@@ -55,10 +56,12 @@ export function dishwasherGeometry(panel, project) {
   const plinthH = Math.max(0, num(panel.plinthHeight, DISHWASHER_DEFAULTS.plinthHeight));
   const plinthOffset = num(panel.plinthOffset, DISHWASHER_DEFAULTS.plinthOffset);
   const fc = (project && project.front && project.front.clearance) || {};
-  const cLeft = num(fc.left ?? fc.sides, 1.5), cRight = num(fc.right ?? fc.sides, 1.5);
+  // front zmywarki węższy o 5 mm (2 × 2,5): szafka obok z luzami Auto ma front 0,5 mm od
+  // swojego boku, razem zwykła szczelina 3 mm (core/autoClearance.js)
+  const cLeft = dishwasherSideClearance(project), cRight = cLeft;
   const cTop = num(fc.top ?? fc.gora, 2), cBottom = num(fc.bottom ?? fc.dol, 2);
   const top = panel.topBoard !== false ? { y: H - th, h: th, w: W, d: D } : null;
-  // front jak front szafki obok: od spodu korpusu (nad cokołem) z luzem dolnym do luzu pod blatem
+  // w pionie jak front szafki obok: od spodu korpusu (nad cokołem) z luzem dolnym do luzu pod blatem
   const front = { x: cLeft, w: W - cLeft - cRight, y: plinthH + cBottom, h: H - cTop - plinthH - cBottom, z: D + frontBodyGap(project && project.front), th };
   const appliance = { x: 1, w: W - 2, y: plinthH, h: (top ? top.y : H) - plinthH, z: 0, d: D - 10 };
   const plinth = plinthH > 0 ? { x: 0, w: W, y: 0, h: plinthH, z: D - plinthOffset - th, th } : null;

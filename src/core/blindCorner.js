@@ -12,6 +12,7 @@ import { num } from "../utils/math.js";
 import { corpusInnerDepth } from "./backPanel.js";
 import { checkCornerFitting, getCornerFitting } from "./cornerFittings.js";
 import { moduleBoardThickness } from "./boardThickness.js";
+import { frontClearance } from "./autoClearance.js";
 
 export const DEFAULT_BLIND_FRONT = 450;
 const MIN_FRONT = 100;
@@ -66,7 +67,7 @@ export function blindHingeSide(mod) {
 function frontContext(mod, project) {
   const th = moduleBoardThickness(mod, project);
   const f = { ...(project.front || {}), ...(mod.front || {}) };
-  const fc = { ...((project.front && project.front.clearance) || {}), ...((mod.front && mod.front.clearance) || {}) };
+  const fc = frontClearance(mod, project);
   return {
     th,
     isInset: f.type === "wpuszczane",
