@@ -9,6 +9,7 @@ import { calculateParts } from "../engine/cabinet.js";
 import { calculateHinges } from "../core/hingeMath.js";
 import { getTraverseConfig, clampModuleToRoom, restModuleOnNeighbors, shiftRowAfterResize } from "../core/layout.js";
 import { getDrawerBoxInfo } from "../core/drawerBoxes.js";
+import { drawerSystems } from "../core/drawerSystems.js";
 import { escapeHtml } from "../utils/dom.js";
 import { evalDimensionExpr, fmtMm } from "../utils/math.js";
 import { scheduleCheckpoint } from "../core/history.js";
@@ -286,8 +287,8 @@ export function initPropertiesPanel() {
 
     ${tabContent("szuflady", `
       <h3>Ustawienia Szuflad</h3>
-      <div class="property-group"><label>System szuflad:</label><select id="input-drawer-system"><option value="merivobox" ${f.drawerSystem === 'merivobox' ? 'selected' : ''}>Blum Merivobox</option><option value="legrabox" ${f.drawerSystem === 'legrabox' ? 'selected' : ''}>Blum Legrabox</option><option value="tandembox" ${f.drawerSystem === 'tandembox' ? 'selected' : ''}>Blum TANDEMBOX</option><option value="antaro" ${f.drawerSystem === 'antaro' ? 'selected' : ''}>Blum TANDEMBOX antaro</option><option value="gtv_axis_16" ${f.drawerSystem === 'gtv_axis_16' ? 'selected' : ''}>GTV Axis Pro (płyta 16mm)</option><option value="gtv_axis_18" ${f.drawerSystem === 'gtv_axis_18' ? 'selected' : ''}>GTV Axis Pro (płyta 18mm)</option><option value="movento_katalog" ${f.drawerSystem === 'movento_katalog' ? 'selected' : ''}>Blum MOVENTO — katalog (bok 16 mm)</option><option value="movento_forum" ${f.drawerSystem === 'movento_forum' ? 'selected' : ''}>Blum MOVENTO — forum (bok 18 mm)</option></select></div>
-      ${/^movento/.test(f.drawerSystem || '') ? `<div class="property-group"><label><input type="checkbox" id="input-drawerbox-korpus" ${f.drawerBoxFromKorpus ? 'checked' : ''} /> Skrzynki szuflad z płyty korpusu tej szafki (w jego dekorze)</label></div>` : ''}
+      <div class="property-group"><label>System szuflad:</label><select id="input-drawer-system"><option value="merivobox" ${f.drawerSystem === 'merivobox' ? 'selected' : ''}>Blum Merivobox</option><option value="legrabox" ${f.drawerSystem === 'legrabox' ? 'selected' : ''}>Blum Legrabox</option><option value="tandembox" ${f.drawerSystem === 'tandembox' ? 'selected' : ''}>Blum TANDEMBOX</option><option value="antaro" ${f.drawerSystem === 'antaro' ? 'selected' : ''}>Blum TANDEMBOX antaro</option><option value="gtv_axis_16" ${f.drawerSystem === 'gtv_axis_16' ? 'selected' : ''}>GTV Axis Pro (płyta 16mm)</option><option value="gtv_axis_18" ${f.drawerSystem === 'gtv_axis_18' ? 'selected' : ''}>GTV Axis Pro (płyta 18mm)</option><option value="movento_katalog" ${f.drawerSystem === 'movento_katalog' ? 'selected' : ''}>Blum MOVENTO — katalog (bok 16 mm)</option><option value="movento_forum" ${f.drawerSystem === 'movento_forum' ? 'selected' : ''}>Blum MOVENTO — forum (bok 18 mm)</option><option value="tandem_560f" ${f.drawerSystem === 'tandem_560f' ? 'selected' : ''}>Blum TANDEM 560F (bok 17-19 mm)</option></select></div>
+      ${drawerSystems[f.drawerSystem || '']?.woodenBox ? `<div class="property-group"><label><input type="checkbox" id="input-drawerbox-korpus" ${f.drawerBoxFromKorpus ? 'checked' : ''} /> Skrzynki szuflad z płyty korpusu tej szafki (w jego dekorze)</label></div>` : ''}
 
       <h3>Szuflady — ustawienia ręczne</h3>
       ${drawerCardsHtml(activeModule, {

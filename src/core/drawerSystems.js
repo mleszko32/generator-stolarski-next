@@ -188,6 +188,33 @@ export const drawerSystems = {
     nl760H: [250, 270, 300, 320, 350, 380, 400, 420, 450, 480, 500, 520, 550, 600],
     variants: {},
     mounting: { railOffset: 38, frontHolesBase: 0, frontHolesXBase: 0 }
+  },
+
+  // Blum TANDEM 560F (pełny wysuw, BLUMOTION, 30 kg) - ukryte prowadnice pod szufladę
+  // DREWNIANĄ z płyty 17-19 mm, mocowanie na sprzęgło. Konstrukcja skrzynki jak MOVENTO.
+  // ŹRÓDŁO: katalog Blum PL, strona „TANDEM z BLUMOTION – 560F – technika mocowania na
+  // sprzęgło” (zdjęcia od użytkownika): SKW = LW - 49 (+0/-1,5), bok 17-19 mm, wcięcie dna
+  // 12-15 mm, od dna szafki do spodu dna szuflady min. 27,5 mm, min. 7 mm nad szufladą,
+  // wkręty prowadnicy 37 mm nad dnem szafki, otwory 37 i +32 mm od frontu.
+  // Z katalogu Blum 2022 (560H, ta sama rodzina): SKL = NL - 10.
+  // Długości NL i otwory prowadnicy w boku szafki: katalog Blum 2027/2028 str. 477,
+  // tabela „Prowadnica - 560F - 30 kg” (wkręty 37 i 69 od frontu + tylne wg NL).
+  'tandem_560f': {
+    name: 'Blum TANDEM 560F (bok 17-19 mm)',
+    woodenBox: true,
+    sideThickness: 18,
+    innerWidthDeduct: 49,    // SKW = LW - 49 mm
+    lengthDeduct: 10,        // SKL = NL - 10 mm
+    bottomRecess: 13,        // wcięcie dna 12-15 mm
+    bottomClearance: 14.5,   // 27,5 (dno szafki → spód dna szuflady) - 13
+    topClearance: 7,
+    minSideHeight: 60,
+    nlSeries: [250, 270, 300, 350, 400, 450, 500, 550, 600],
+    runnerHoles: (nl) => [37, 69, ...(nl <= 270 ? [133, 197] : nl <= 350 ? [165, 261] : nl <= 400 ? [165, 229]
+      : nl <= 450 ? [165, 261] : nl <= 550 ? [261, 284] : [261, 325])],
+    runnerName: (nl) => `Prowadnice Blum TANDEM 560F BLUMOTION NL-${nl} + sprzęgła`,
+    variants: {},
+    mounting: { railOffset: 37, frontHolesBase: 0, frontHolesXBase: 0 }
   }
 };
 
@@ -195,6 +222,7 @@ export const drawerSystems = {
 // "Hole spacing - runners": 37 i 37+32, tylne mierzone od otworu 37 o 160 / 224 /
 // 256 (760H) albo 224 / 256 / 320 / 416 (766H) - zależnie od długości NL.
 export function moventoRunnerHoles(system, nl) {
+  if (system.runnerHoles) return system.runnerHoles(nl);
   const is760 = (system.nl760H || []).includes(nl);
   const rear = is760
     ? (nl <= 270 ? [160] : nl <= 350 ? [224] : [224, 256])
@@ -205,6 +233,7 @@ export function moventoRunnerHoles(system, nl) {
 // Nazwa kompletu prowadnic MOVENTO dla listy okuć: 760H (40 kg), gdy ta długość
 // jest w tej wersji, inaczej 766H (60 kg). Para sprzęgieł T51.7601 na szufladę.
 export function moventoRunnerName(system, nl) {
+  if (system.runnerName) return system.runnerName(nl);
   const model = (system.nl760H || []).includes(nl) ? '760H (40 kg)' : '766H (60 kg)';
   return `Prowadnice Blum MOVENTO ${model} NL-${nl} + sprzęgła T51.7601`;
 }

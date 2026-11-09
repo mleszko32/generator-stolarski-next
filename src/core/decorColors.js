@@ -9,6 +9,7 @@ import { moduleKorpusDecor, baseCategory, KORPUS } from "./materialCatalog.js";
 import { plinthMaterial, moduleFrontMaterialId } from "./plinthMaterial.js";
 import { dishwasherPlinthModule } from "./dishwasher.js";
 import { lacquerColor, lacquerCode } from "./lacquerColors.js";
+import { drawerSystems } from "./drawerSystems.js";
 
 const FAMILIES = {
   W: [0xfaf9f6, 0xf3efe6, 0xeceae4, 0xf6f1e7],
@@ -114,10 +115,10 @@ function panelEntry(panel, type, project) {
   return type === "front" ? frontEntry(panel.materialId, project) : korpusEntry("");
 }
 
-// Skrzynki szuflad MOVENTO z płyty korpusu szafki (front.drawerBoxFromKorpus, engine/cabinet.js).
+// Skrzynki szuflad drewnianych (MOVENTO, TANDEM) z płyty korpusu szafki (front.drawerBoxFromKorpus, engine/cabinet.js).
 function boxFromKorpus(mod, project) {
   const f = { ...(project.front || {}), ...(mod.front || {}) };
-  return !!f.drawerBoxFromKorpus && /^movento/.test(String(f.drawerSystem || ""));
+  return !!f.drawerBoxFromKorpus && !!drawerSystems[String(f.drawerSystem || "")]?.woodenBox;
 }
 
 // Materiał bryły z jej userData (moduleId / elementId / sidePanelId) i typu ('corpus', 'shelf',

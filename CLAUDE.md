@@ -130,11 +130,12 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
 ### Matematyka dziedzinowa (`src/core/`)
 
 - `drawerSystems.js` — **jedyny** katalog danych systemów szuflad (Blum antaro / tandembox /
-  merivobox / legrabox, GTV Axis): potrącenia wymiarów, warianty wysokości, offsety montażowe.
+  merivobox / legrabox, GTV Axis, Blum TANDEM 560F): potrącenia wymiarów, warianty wysokości, offsety montażowe.
   Nigdy nie duplikuj tych danych gdzie indziej; komentarze w pliku opisują błędy, które
   wcześniej z tego wynikły. Blum MOVENTO (`movento_katalog` / `movento_forum`) to
   skrzynka drewniana (`woodenBox: true`): bez wariantów, wysokość boku wpisywana przy
-  szufladzie (`front.drawerSideHeight`), formatki 2 boki + dno między bokami + tył +
+  szufladzie (`front.drawerSideHeight`), tak samo Blum TANDEM 560F (`tandem_560f`, bok 17-19 mm,
+  SKW = LW − 49, nazwa prowadnic z `runnerName`), formatki 2 boki + dno między bokami + tył +
   czoło wewn. (`getDrawerComponents` zwraca wtedy też `sides`/`innerFront`); na liście formatek
   tył i czoło wewn. to jedna formatka „Tył/Przód szuflady …” × 2 (ten sam wymiar). Nazwy formatek
   szuflad nie zawierają szerokości szafki, żeby jednakowe formatki z różnych szafek się sumowały. Czoło szuflady

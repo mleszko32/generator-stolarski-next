@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { drawerSystems, moventoRunnerName, moventoRunnerHoles } from "./drawerSystems.js";
+import { getDrawerComponents } from "./drawerMath.js";
 
 // Katalog systemów szuflad to jedyne źródło tych danych. Ten test pilnuje
 // kompletności wpisów — regresja "brakującego tandemboxa" (system był do
@@ -108,6 +109,29 @@ describe("MOVENTO - katalog i forum", () => {
   it("nazwa prowadnic: 760H gdy NL jest w wersji 40 kg, inaczej 766H", () => {
     expect(moventoRunnerName(drawerSystems.movento_katalog, 500)).toContain("760H (40 kg) NL-500");
     expect(moventoRunnerName(drawerSystems.movento_katalog, 650)).toContain("766H (60 kg) NL-650");
+  });
+});
+
+describe("TANDEM 560F - skrzynka z płyty 17-19 mm", () => {
+  const sys = drawerSystems.tandem_560f;
+  it("wg katalogu Blum: SKW = LW - 49, SKL = NL - 10, wkręty 37 mm nad dnem", () => {
+    expect(sys).toMatchObject({ woodenBox: true, sideThickness: 18, innerWidthDeduct: 49, lengthDeduct: 10, bottomRecess: 13 });
+    expect(sys.mounting.railOffset).toBe(37);
+    // od dna szafki do spodu dna szuflady min. 27,5 mm
+    expect(sys.bottomClearance + sys.bottomRecess).toBe(27.5);
+  });
+  it("skrzynka liczona z LW i NL, nazwa prowadnic TANDEM", () => {
+    const c = getDrawerComponents("tandem_560f", 448, 560, 227);
+    expect(c.nominalLength).toBe(550);
+    expect(c.bottom).toMatchObject({ width: 399, length: 540 });
+    expect(c.sideHeight).toBe(205);
+    expect(moventoRunnerName(sys, 550)).toBe("Prowadnice Blum TANDEM 560F BLUMOTION NL-550 + sprzęgła");
+  });
+  it("otwory prowadnicy wg tabeli 560F (katalog 2027/28 str. 477)", () => {
+    expect(moventoRunnerHoles(sys, 270)).toEqual([37, 69, 133, 197]);
+    expect(moventoRunnerHoles(sys, 400)).toEqual([37, 69, 165, 229]);
+    expect(moventoRunnerHoles(sys, 550)).toEqual([37, 69, 261, 284]);
+    expect(moventoRunnerHoles(sys, 600)).toEqual([37, 69, 261, 325]);
   });
 });
 
