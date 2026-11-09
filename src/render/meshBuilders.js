@@ -177,7 +177,11 @@ export function setHighlightKey(key) { highlightKey = key || null; }
 // półprzezroczysta; z cache po kolorze.
 const tintCache = new Map();
 const COLORABLE = new Set(['corpus', 'shelf', 'front', 'plinth', 'drawerBox']);
-function materialFor(type, userData) {
+// active = bryła klikniętej (aktywnej) szafki: kolor płyty podbarwiony na niebiesko, żeby w
+// zaznaczonej grupie było widać, którą szafkę zmienia prawy panel.
+const ACTIVE_TINT = new THREE.Color(0x2563eb);
+const ACTIVE_TYPES = new Set(['corpus', 'shelf', 'front', 'plinth', 'hdf']);
+function materialFor(type, userData, active = false) {
   const matObj = isXrayMode ? mats.xray : mats.solid;
   const base = matObj[type] || matObj.corpus;
   const ent = COLORABLE.has(type) ? partMaterial(type, userData, state.project) : null;
@@ -185,14 +189,19 @@ function materialFor(type, userData) {
   if (ent) color = colorMode === 'materials' ? (materialPalette.get(ent.key) ?? null) : ent.color;
   if (color != null && colorMode === 'real' && isXrayMode && isLightColor(color)) color = null;
   const faded = highlightKey != null && (!ent || ent.key !== highlightKey);
-  if (color == null && !faded) return base;
-  const key = `${isXrayMode ? 'x' : 's'}|${type}|${color}|${faded ? 'f' : ''}`;
+  const tinted = !!active && !faded && ACTIVE_TYPES.has(type);
+  if (color == null && !faded && !tinted) return base;
+  const key = `${isXrayMode ? 'x' : 's'}|${type}|${color}|${faded ? 'f' : ''}|${tinted ? 'a' : ''}`;
   let m = tintCache.get(key);
   if (!m) {
     m = base.clone();
     if (color != null) m.color.setHex(color);
     if (faded) { m.transparent = true; m.opacity = 0.08; m.depthWrite = false; }
-    else if (isXrayMode) m.opacity = Math.max(base.opacity, 0.35);
+    else if (isXrayMode && color != null) m.opacity = Math.max(base.opacity, 0.35);
+    if (tinted) {
+      m.color.lerp(ACTIVE_TINT, isXrayMode ? 0.7 : 0.4);
+      if (isXrayMode) { m.transparent = true; m.opacity = Math.max(m.opacity, 0.55); }
+    }
     m.userData.shared = true;
     tintCache.set(key, m);
   }
@@ -202,7 +211,7 @@ function materialFor(type, userData) {
 export function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, parentGroup, rotationY = 0) {
   const dimKey = `${w}|${h}|${d}`;
   const geo = cachedGeometry('box|' + dimKey, () => new THREE.BoxGeometry(w, h, d));
-  const mat = materialFor(type, userData);
+  const mat = materialFor(type, userData, isActiveModule);
 
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(x + w/2, y + h/2, z + d/2);
@@ -218,7 +227,9 @@ export function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, 
   const edges = cachedGeometry('edges|' + dimKey, () => new THREE.EdgesGeometry(geo));
   const isSelected = isActiveModule || (userData && state.selectedModules && state.selectedModules.has(userData.moduleId));
   let edgeColor = isXrayMode ? (type === 'drawerBox' ? 0xd97706 : 0x64748b) : 0x334155; 
-  if (isSelected && type !== 'drawerBox') edgeColor = 0x2563eb; // skrzynki szuflad zostają w swoim kolorze także w zaznaczonej szafce
+  // aktywna szafka - mocny niebieski, pozostałe zaznaczone (reszta grupy) - jasny;
+  // skrzynki szuflad zostają w swoim kolorze także w zaznaczonej szafce
+  if (isSelected && type !== 'drawerBox') edgeColor = isActiveModule ? 0x2563eb : 0x93c5fd;
   
   const line = new THREE.LineSegments(edges, getLineMat(edgeColor));
   if (userData) line.userData = userData; 
@@ -267,7 +278,7 @@ export function addHardware(type, x, y, z, axis, parentGroup) {
 export function addPrism(points, z0, depth, type, isActiveModule, userData, parentGroup) {
   const shape = new THREE.Shape(points.map(([x, y]) => new THREE.Vector2(x, y)));
   const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
-  const mesh = new THREE.Mesh(geo, materialFor(type, userData));
+  const mesh = new THREE.Mesh(geo, materialFor(type, userData, isActiveModule));
   mesh.position.set(0, 0, z0);
   if (userData) mesh.userData = userData;
   mesh.castShadow = !isXrayMode; mesh.receiveShadow = !isXrayMode;
@@ -275,7 +286,7 @@ export function addPrism(points, z0, depth, type, isActiveModule, userData, pare
   const edges = new THREE.EdgesGeometry(geo);
   const isSelected = isActiveModule || (userData && state.selectedModules && state.selectedModules.has(userData.moduleId));
   let edgeColor = isXrayMode ? 0x64748b : 0x334155;
-  if (isSelected) edgeColor = 0x2563eb;
+  if (isSelected) edgeColor = isActiveModule ? 0x2563eb : 0x93c5fd;
   const line = new THREE.LineSegments(edges, getLineMat(edgeColor));
   if (userData) line.userData = userData;
   mesh.add(line);

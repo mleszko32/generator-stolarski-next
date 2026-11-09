@@ -81,7 +81,7 @@ export const HELP_SECTIONS = [
         <li><b>Obracanie widoku</b> - przeciągnij lewym przyciskiem w pustym miejscu; <b>przybliżanie</b> - kółko myszy; <b>przesuwanie widoku</b> - prawy przycisk.</li>
         <li><b>Zaznaczenie</b> - kliknij szafkę. <b>Shift + klik</b> dodaje kolejne do zaznaczenia; klik w puste miejsce odznacza.
           Szafka z grupy zaznacza się razem z całą grupą (mebel przesuwa się w całości), ale prawy panel zmienia
-          wtedy tylko klikniętą szafkę. Kilka szafek naraz panel zmienia dopiero po dobraniu ich Shift + klik -
+          wtedy tylko klikniętą szafkę - w widoku 3D jest ona podbarwiona na niebiesko, a reszta grupy ma jasnoniebieskie krawędzie. Kilka szafek naraz panel zmienia dopiero po dobraniu ich Shift + klik -
           pokazuje wtedy u góry, ilu szafek dotyczą zmiany.</li>
         <li><b>Przesuwanie szafki</b> - przeciągnij ją. Przyciąga się do ścian i krawędzi sąsiadów (także do lica frontów) i zatrzymuje na sąsiadach, nie przepycha ich.</li>
         <li><b>Shift</b> w trakcie przeciągania - ruch tylko wzdłuż jednej osi.</li>

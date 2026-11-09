@@ -182,7 +182,8 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
   przebudowie). Kliknięcie bez ruchu nie przebudowuje sceny drugi raz (`dragMoved`). Wydzielone z niego:
   - `meshBuilders.js` — materiały i budowanie brył (`addBox`, `addHole`, `addHardware`,
     `createLabelSprite`, `disposeObject`); trzyma flagę x-ray (`isXrayMode` / `setXrayMode`).
-    Geometrie płyt/otworów, okucia i etykiety są współdzielone z cache (`userData.shared` —
+    Aktywna szafka (`isActiveModule` w `addBox`) ma płyty podbarwione na niebiesko i mocne krawędzie, reszta
+    zaznaczenia jasne krawędzie. Geometrie płyt/otworów, okucia i etykiety są współdzielone z cache (`userData.shared` —
     `disposeObject` ich nie zwalnia); nie modyfikuj geometrii siatki po `addBox`.
   - `cornerCabinet3d.js` — `renderCornerCabinet(mod, isActive, th, parentGroup)`.
   - `measureTool.js` — miarka; scenę/kamerę/raycaster dostaje raz przez `initMeasureTool()`.

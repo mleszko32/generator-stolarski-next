@@ -1252,7 +1252,10 @@ function handle3DClick(event) {
               updateSidebar();
               initPropertiesPanel();
               update3D();
-          } else if (state.selectedModules.size + (state.selectedSidePanels?.size || 0) > group.moduleIds.length + group.panelIds.length) {
+          // klik w szafkę już zaznaczonej grupy: ta szafka staje się aktywna (jej panel
+          // właściwości), a zaznaczenie wraca do samej grupy
+          } else if (state.activeModuleId !== data.moduleId || state.activeSidePanelId
+              || state.selectedModules.size + (state.selectedSidePanels?.size || 0) > group.moduleIds.length + group.panelIds.length) {
               state.selectedModules = new Set(group.moduleIds);
               state.selectedSidePanels = new Set(group.panelIds);
               state.activeModuleId = data.moduleId;
