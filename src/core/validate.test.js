@@ -89,6 +89,39 @@ describe("validateProject", () => {
   });
 });
 
+describe("szczelina między frontami szafek postawionych na sobie", () => {
+  // Dolna 720 na nóżkach 100 (wierzch 820), górna stoi na niej bez nóżek.
+  const stack = (upperFront) => {
+    const low = baseModule({ id: "low", name: "Dół", elements: [fullZoneFront({ id: "f-low" })] });
+    const up = baseModule({
+      id: "up", name: "Góra", type: "tall_cabinet", position: { x: 0, y: 820, z: 0 },
+      legs: { active: false, height: 0 },
+      elements: upperFront ? [fullZoneFront({ id: "f-up" })] : [],
+    });
+    setProject(freshProject({ modules: [low, up] }));
+    return low;
+  };
+
+  it("ostrzega, gdy luz u góry dolnej daje 5 mm zamiast 3 mm", () => {
+    stack(true);
+    expect(has(validateProject(), "warn", "ma 5 mm zamiast 3 mm")).toBe(true);
+  });
+
+  it("nie ostrzega, gdy szczelina = szczelina frontów", () => {
+    const low = stack(true);
+    low.front.clearance = { top: 3, sides: 1.5, bottom: 0 };
+    expect(has(validateProject(), "warn", "Szczelina do frontów")).toBe(false);
+  });
+
+  it("pomija górną szafkę bez frontów i szafkę przesuniętą w głąb", () => {
+    stack(false);
+    expect(has(validateProject(), "warn", "Szczelina do frontów")).toBe(false);
+    stack(true);
+    state.project.modules[1].dimensions.depth = 400;
+    expect(has(validateProject(), "warn", "Szczelina do frontów")).toBe(false);
+  });
+});
+
 describe("kolizje wnętrza: półka w strefie szuflad", () => {
   const drawerFront = (over = {}) => ({
     id: "front-d1", typ: "front", subtype: "szuflada", frontIndex: 0, frontCount: 3, gap: 3,

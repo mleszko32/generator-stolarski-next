@@ -248,7 +248,8 @@ export const HELP_SECTIONS = [
         w sklepie SAS, ceną i stanem magazynu. <b>Do koszyka SAS</b> kopiuje listę; na stronie panelu SAS kliknij zakładkę
         „Do koszyka SAS” (przeciągnij ją raz na pasek zakładek z tej sekcji) - pozycje trafią do koszyka, zamówienie składasz sam.</li>
         <li><b>Kontrola projektu</b> - kolizje, szafki poza pokojem, za szerokie drzwi i półki,
-        za długie prowadnice, formatki większe niż płyta, problemy w narożnikach, kolor lakieru NCS spoza wzornika.</li>
+        za długie prowadnice, formatki większe niż płyta, problemy w narożnikach, kolor lakieru NCS spoza wzornika, nierówna szczelina między frontami
+        szafek postawionych na sobie (np. 5 mm luzu u góry zamiast 3 mm szczeliny).</li>
       </ul>
       <p class="help-note">Przed wysłaniem zlecenia zawsze zajrzyj do <b>Kontroli projektu</b>.</p>`,
   },

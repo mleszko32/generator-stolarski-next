@@ -101,6 +101,7 @@ export function validateProject(project = state.project) {
     modules.forEach((mod) => checkModule(mod));
     checkCollisions();
     checkCorners();
+    checkStackedFrontGaps();
     checkOpenings();
     checkWorktops();
     checkLacquerColors();
@@ -217,6 +218,55 @@ export function validateProject(project = state.project) {
 
   function checkCorners() {
     [...cornerFrontIssues(project), ...passageIssues(project)].forEach((i) => add(i.level, i.mod, i.message));
+  }
+
+  // Szafki postawione na sobie (ten sam obrót, wspólny rzut, lico w jednej płaszczyźnie,
+  // wierzch dolnej = spód górnej): odstęp między najwyższym frontem dolnej a najniższym
+  // frontem górnej powinien być taki jak szczelina między frontami. Inaczej wychodzi np.
+  // 5 mm (luz u góry pod blat) zamiast 3 mm albo fronty na siebie nachodzą.
+  function checkStackedFrontGaps() {
+    const simple = modules.filter((m) => m.type !== "corner_cabinet" && m.type !== "slope_cabinet");
+    simple.forEach((low) => {
+      const lb = moduleBox(low);
+      const lowFronts = frontSpans(low);
+      if (!lowFronts.length) return;
+      simple.forEach((up) => {
+        if (up === low || num(up.rotation) !== num(low.rotation)) return;
+        const ub = moduleBox(up);
+        if (Math.abs(ub.y0 - lb.y1) > OVERLAP_TOL) return;
+        if (Math.abs(frontEdge(ub, up) - frontEdge(lb, low)) > OVERLAP_TOL) return;
+        const along = [0, 180].includes(((num(low.rotation) % 360) + 360) % 360)
+          ? overlap1d(lb.x0, lb.x1, ub.x0, ub.x1) : overlap1d(lb.z0, lb.z1, ub.z0, ub.z1);
+        if (along <= MIN_FRONT_SIZE) return;
+        const upFronts = frontSpans(up);
+        if (!upFronts.length) return;
+        const top = Math.max(...lowFronts.map((f) => f.y1));
+        const bottom = Math.min(...upFronts.map((f) => f.y0));
+        const gap = Math.round((bottom - top) * 10) / 10;
+        const want = num({ ...(project.front || {}), ...(low.front || {}) }.gap, 3);
+        if (Math.abs(gap - want) < 0.5) return;
+        add("warn", low, gap < 0
+          ? `Fronty nachodzą na fronty szafki „${nameOf(up)}" (${Math.abs(gap)} mm) - zmniejsz luz u góry/dołu frontów.`
+          : `Szczelina do frontów szafki „${nameOf(up)}" ma ${gap} mm zamiast ${want} mm - popraw luz u góry (Front) tej szafki albo luz u dołu górnej.`);
+      });
+    });
+  }
+
+  // Pionowe zakresy frontów szafki w układzie pokoju (spód korpusu = pozycja + nóżki).
+  function frontSpans(mod) {
+    const base = num(mod.position && mod.position.y) + (mod.legs && mod.legs.active ? num(mod.legs.height) : 0);
+    return (mod.elements || [])
+      .filter((e) => e.typ === "front" && e.subtype !== "szuflada-wewnetrzna" && num(e.h) > 0)
+      .map((e) => ({ y0: base + num(e.y), y1: base + num(e.y) + num(e.h) }));
+  }
+
+  // Płaszczyzna lica korpusu: tył przy ścianie wg obrotu (0 tylna, 90 prawa, 180 przednia, 270 lewa).
+  function frontEdge(box, mod) {
+    const r = ((num(mod.rotation) % 360) + 360) % 360;
+    if (r === 90) return box.x0;
+    if (r === 180) return box.z0;
+    if (r === 270) return box.x1;
+    return box.z1;
   }
 
   // Szafka stojąca przy ścianie, która zasłania okno/drzwi/przeszkodę (nakładanie
