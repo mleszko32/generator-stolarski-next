@@ -107,7 +107,9 @@ export function partMaterialLabel(part, project) {
     if (!m || !m.name) return category;
     const board = frontMaterialBoard(m);
     const color = String(m.color || "").trim();
-    const name = color ? `${m.name} ${color}` : m.name;
+    // kolor z kodem RAL/NCS, który już jest w nazwie materiału - nie dopisuj drugi raz
+    const sameCode = lacquerCode(color) && lacquerCode(m.name) === lacquerCode(color);
+    const name = color && !sameCode ? `${m.name} ${color}` : m.name;
     return board ? `Front: ${name} (${board})` : `Front: ${name}`;
   }
   const decor = project && project.materials && project.materials.decors && project.materials.decors[category];

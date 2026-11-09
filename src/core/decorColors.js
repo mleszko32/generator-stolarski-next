@@ -72,7 +72,8 @@ function frontMaterialName(materialId, project) {
   const mat = list.find((m) => m.id === materialId) || list[0];
   if (!mat) return "";
   const code = lacquerCode(mat.color);
-  return code ? `${mat.name} ${code}` : mat.name;
+  // kod już w nazwie („Lakier NCS S 2005-Y60R (kaszmir)”) - nie dopisuj drugi raz
+  return code && lacquerCode(mat.name) !== code ? `${mat.name} ${code}` : mat.name;
 }
 
 // Materiał bryły 3D jako pozycja legendy: { key, group: 'Korpus'|'Front'|'Szuflada', label, color }
