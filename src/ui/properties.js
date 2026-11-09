@@ -26,6 +26,7 @@ import { blindCornerSectionHtml, bindBlindCornerSection } from "./blindCornerPro
 import { findRowAround } from "../core/wallFill.js";
 import { isAutoClearance, describeClearance, frontClearance } from "../core/autoClearance.js";
 import { frontRoundingHints, roundingHintText } from "../core/frontRounding.js";
+import { editTargets } from "../core/groupSelection.js";
 import { getStiffenerSettings } from "../core/shelfStiffener.js";
 import { findKitchenRunAround } from "../core/kitchenRun.js";
 import { openWallFillModal } from "./wallFillModal.js";
@@ -48,12 +49,11 @@ function plinthMaterialHtml(mod) {
         <div class="property-group mb-8" style="display: ${isDecor ? '' : 'none'};"><label style="font-size: 11px;">Dekor cokołu:</label><input type="text" id="input-plinth-decor" list="plinth-decor-catalog" value="${escapeHtml(isDecor ? cur.slice(6) : '')}" placeholder="np. Egger W1000 ST9"><datalist id="plinth-decor-catalog">${catalogLabels(state.project).map(l => `<option value="${escapeHtml(l)}">`).join('')}</datalist></div>`;
 }
 
+// Szafki, których dotyczą zmiany w panelu: kliknięta szafka, a kilka naraz tylko po dobraniu
+// ich Shift/Ctrl - sama grupa zaznaczona kliknięciem nie liczy się (core/groupSelection.js).
 function getSelectedMods() {
-    if (state.selectedModules && state.selectedModules.size > 0) {
-        return Array.from(state.selectedModules).map(id => state.project.modules.find(m => m.id === id)).filter(Boolean);
-    }
-    const active = getActiveModule();
-    return active ? [active] : [];
+    const ids = editTargets(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels }, state.activeModuleId);
+    return ids.map(id => state.project.modules.find(m => m.id === id)).filter(Boolean);
 }
 
 // Sekcje panelu (zwijane, kilka może być otwartych naraz) i ich stan otwarcia są
@@ -165,7 +165,7 @@ export function initPropertiesPanel() {
     return;
   }
 
-  const multiCount = state.selectedModules && state.selectedModules.size > 1 ? state.selectedModules.size : 1;
+  const multiCount = Math.max(1, getSelectedMods().length);
   if (!activeModule.legs) activeModule.legs = { active: false, height: 100, plinth: false, plinthOffset: 40 };
 
   const cons = { joinType: 'boki_przelotowe', topType: 'pelny', traverseWidth: 100, ...(state.project.construction || {}), ...(activeModule.construction || {}) };
@@ -251,6 +251,9 @@ export function initPropertiesPanel() {
       extra: multiCount > 1 ? `zaznaczono ${multiCount}` : '',
       nameId: 'input-mod-name',
     })}
+
+    ${multiCount > 1 ? `<div class="notice-warn fs-xs" style="margin-bottom: 8px;">Zmiany w tym panelu dotyczą <b>${multiCount} zaznaczonych szafek</b>.
+      <button type="button" id="btn-only-this" class="btn btn-sm" style="margin-top: 6px;">Tylko ta szafka</button></div>` : ''}
 
     ${moduleInfoHtml(activeModule)}
 
@@ -978,4 +981,11 @@ function setupEventListeners() {
   });
 
   bindGroupButtons(getActiveModule()?.groupId, () => { updateAll(); initPropertiesPanel(); });
+
+  document.getElementById('btn-only-this')?.addEventListener('click', () => {
+    state.selectedModules = new Set(state.activeModuleId ? [state.activeModuleId] : []);
+    state.selectedSidePanels = new Set();
+    updateAll();
+    initPropertiesPanel();
+  });
 }

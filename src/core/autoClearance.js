@@ -11,6 +11,8 @@
 //          o grubość panelu + 12 (luz ujemny), cokół cofnięty / szafka niżej / nic -> 0.
 // Szafka otwarta stojąca w licu frontów (korpus wysunięty przed sąsiadów o grubość frontu)
 // liczy się jak blenda: cała szczelina po stronie frontu - z boku, u góry i na dole.
+// Szafka z frontem nad / pod otwartą ma bok frontu równo z krawędzią otwartego korpusu (0),
+// a całe 3 mm bierze front szafki obok - pionowa linia szczeliny idzie prosto.
 // Sąsiedztwo jest geometryczne (co faktycznie przylega), nie po grupach. Czysta logika:
 // dostaje szafkę i projekt, niczego nie zmienia.
 import { getModuleBox } from "./layout.js";
@@ -82,7 +84,7 @@ export function computeAutoClearance(mod, project, zone = null) {
   const rot = rotOf(mod);
   const me = toFrame(getModuleBox(mod), rot);
   const others = (project.modules || []).filter((m) => m && m.id !== mod.id && m.dimensions && m.position)
-    .map((m) => ({ kind: "szafka", b: toFrame(getModuleBox(m), rot) }));
+    .map((m) => ({ kind: "szafka", id: m.id, b: toFrame(getModuleBox(m), rot) }));
   const panels = (project.sidePanels || []).filter((p) => p && p.dimensions && p.position)
     .map((p) => ({ kind: p.kind || "bok", th: parseFloat(p.dimensions.height) || 0, b: toFrame(getModuleBox(p), rot) }));
 
@@ -94,14 +96,27 @@ export function computeAutoClearance(mod, project, zone = null) {
   const proud = (b) => b.fr - me.fr >= PROUD_MIN; // sąsiad w licu frontów (szafka otwarta)
   const overD = (b, min = MIN_OVERLAP) => overlap(me.d0 - FRONT_REACH, me.d1 + FRONT_REACH, b.d0, b.d1) > min;
 
+  // Szafka stoi w jednej linii z otwartą szafką nad albo pod sobą (ta sama krawędź boczna):
+  // jej front idzie wtedy równo z krawędzią otwartego korpusu (luz 0), a całą szczelinę
+  // bierze front sąsiedniej szafki. `b` = bryła sprawdzanej szafki (moja albo sąsiada).
+  const everyone = [{ id: mod.id, b: me }, ...others];
+  const inLine = (b, id, leftSide) => everyone.some((o) => o.id !== id && o.b.fr - b.fr >= PROUD_MIN
+    && (near(o.b.y0, b.y1) || near(o.b.y1, b.y0)) && overlap(b.u0, b.u1, o.b.u0, o.b.u1) > MIN_OVERLAP
+    && (leftSide ? near(o.b.u0, b.u0) : near(o.b.u1, b.u1)));
+
   const side = (isLeft) => {
     const touches = (b) => (isLeft ? near(b.u1, me.u0) : near(b.u0, me.u1)) && overY(b) && overD(b, 1);
     const hit = panels.filter((p) => p.kind !== "poziomy" && touches(p.b));
     if (hit.some((p) => p.kind === "zmywarka")) return { value: gap - dishwasherSideClearance(project), reason: "zmywarka obok" };
     if (hit.some((p) => p.kind === "blenda")) return { value: gap, reason: "blenda obok" };
     if (hit.length) return { value: gap, reason: "bok dokładany obok" };
-    if (others.some((o) => touches(o.b) && proud(o.b))) return { value: gap, reason: "otwarta szafka obok" };
-    if (others.some((o) => touches(o.b))) return { value: free, reason: "szafka obok" };
+    const nb = others.filter((o) => touches(o.b));
+    const meLine = inLine(me, mod.id, isLeft);
+    const nbLine = nb.some((o) => inLine(o.b, o.id, !isLeft));
+    if (meLine && !nbLine) return { value: 0, reason: "w linii z otwartą szafką" };
+    if (nb.some((o) => proud(o.b))) return { value: gap, reason: "otwarta szafka obok" };
+    if (nbLine && !meLine) return { value: gap, reason: "szafka obok w linii z otwartą" };
+    if (nb.length) return { value: free, reason: "szafka obok" };
     return { value: free, reason: "wolna krawędź" };
   };
 

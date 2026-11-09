@@ -156,7 +156,7 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
   `mod.front.clearanceAuto` (nowe szafki z `createModuleObject`; tylko fronty nakładane, nie narożna/skos) = luzy z
   sąsiadów (`computeAutoClearance`, geometrycznie): boki 1,5 / blenda i bok dokładany 3 / zmywarka 0,5; góra: szafka
   wyżej i blenda 3, blat i sufit 5, pusto 1,5; dół: cokół w licu (`plinthOffset < 0`) 3, panel poziomy pod szafką
-  −(grubość + 12), inaczej 0; sąsiednia szafka wysunięta przed korpus ≥ 10 mm (otwarta, w licu frontów) = jak blenda, 3. W `recalculateLayout` luz liczy się dla wnęki każdego frontu osobno (`frontClearance(mod, project, zone)`). Luz wpisany w `mod.front.clearance` ma pierwszeństwo. Stałe w
+  −(grubość + 12), inaczej 0; sąsiednia szafka wysunięta przed korpus ≥ 10 mm (otwarta, w licu frontów) = jak blenda, 3; szafka nad / pod otwartą w tej samej linii boku ma tam 0, a sąsiad obok 3. W `recalculateLayout` luz liczy się dla wnęki każdego frontu osobno (`frontClearance(mod, project, zone)`). Luz wpisany w `mod.front.clearance` ma pierwszeństwo. Stałe w
   `project.front.autoClearance` (bez UI). Front zmywarki węższy o 2 × `dishwasherSideClearance` (2,5).
 - `frontRounding.js` — `frontRoundingHints(mod, th)`: fronty z ułamkiem mm i o ile zmienić luz na zewnętrznej
   krawędzi (para drzwi / kolumna równych szuflad dzieli zmianę); podpowiedź pod luzami w sekcji Front.
@@ -211,6 +211,8 @@ Wszystkie panele renderują się przez przypisanie szablonów tekstowych do `inn
   `kosztorysModal.js`, `hardwareList.js` (wydruk listy zakupów), `technicalDrawing.js` (okno
   rysunku 2D z wierceniami + wydruk pojedynczej formatki na A4).
 - `properties.js` — prawy panel: formularze właściwości modułu i globalnych.
+  Pola zapisują do szafek z `getSelectedMods()` = `editTargets` (`core/groupSelection.js`): kliknięta szafka, a kilka
+  naraz tylko po dobraniu Shift/Ctrl (grupa zaznaczona samym kliknięciem się nie liczy).
   `updateAll = () => { update3D(); updateSidebar(); }` to standardowe odświeżenie „coś się
   zmieniło”; pola tekstowe mają debounce 50 ms. Boki dokładane i blendy mają własny panel w
   `sidePanelProperties.js`, szafka narożna w `cornerProperties.js`, skos w `slopeProperties.js`

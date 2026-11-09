@@ -119,14 +119,19 @@ describe("otwarta szafka w licu frontów", () => {
 });
 
 describe("luz liczony dla wnęki frontu", () => {
-  it("słupek obok szafek z frontami i otwartej: 3 mm tylko na wysokości otwartej", () => {
+  it("słupek obok kolumny z otwartą szafką: 3 mm na całej wysokości, kolumna 0", () => {
     const slupek = mod("s", { type: "tall_cabinet", rotation: 180, legs: { active: false }, position: { x: 550, y: 518, z: 3732 }, dimensions: { width: 550, height: 2087, depth: 483 } });
     const part = (id, y, depth) => mod(id, { rotation: 180, legs: { active: false }, position: { x: 0, y, z: 4215 - depth }, dimensions: { width: 550, height: 694, depth } });
     const p = project([slupek, part("d", 518, 483), part("o", 1212, 500), part("g", 1906, 483)], [], { room: { width: 5586, depth: 4215, height: 4000 } });
+    // szafki z frontem nad i pod otwartą idą równo z jej krawędzią (0), więc słupek obok
+    // bierze całe 3 mm na całej wysokości - linia szczeliny jest prosta
     const right = (minY, maxY) => frontClearance(slupek, p, { minX: 18, maxX: 532, minY, maxY }).right;
-    expect(right(18, 685)).toBe(1.5);
+    expect(right(18, 685)).toBe(3);
     expect(right(703, 1379)).toBe(3);
-    expect(right(1397, 2069)).toBe(1.5);
+    expect(right(1397, 2069)).toBe(3);
+    const gorna = p.modules[3];
+    expect(computeAutoClearance(gorna, p).left).toEqual({ value: 0, reason: "w linii z otwartą szafką" });
+    expect(computeAutoClearance(gorna, p).right).toEqual({ value: 0, reason: "w linii z otwartą szafką" });
   });
 });
 

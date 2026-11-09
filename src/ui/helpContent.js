@@ -79,7 +79,10 @@ export const HELP_SECTIONS = [
     body: `
       <ul>
         <li><b>Obracanie widoku</b> - przeciągnij lewym przyciskiem w pustym miejscu; <b>przybliżanie</b> - kółko myszy; <b>przesuwanie widoku</b> - prawy przycisk.</li>
-        <li><b>Zaznaczenie</b> - kliknij szafkę. <b>Shift + klik</b> dodaje kolejne do zaznaczenia; klik w puste miejsce odznacza.</li>
+        <li><b>Zaznaczenie</b> - kliknij szafkę. <b>Shift + klik</b> dodaje kolejne do zaznaczenia; klik w puste miejsce odznacza.
+          Szafka z grupy zaznacza się razem z całą grupą (mebel przesuwa się w całości), ale prawy panel zmienia
+          wtedy tylko klikniętą szafkę. Kilka szafek naraz panel zmienia dopiero po dobraniu ich Shift + klik -
+          pokazuje wtedy u góry, ilu szafek dotyczą zmiany.</li>
         <li><b>Przesuwanie szafki</b> - przeciągnij ją. Przyciąga się do ścian i krawędzi sąsiadów (także do lica frontów) i zatrzymuje na sąsiadach, nie przepycha ich.</li>
         <li><b>Shift</b> w trakcie przeciągania - ruch tylko wzdłuż jednej osi.</li>
         <li><b>Alt</b> przy chwyceniu - przesuwanie w górę / w dół.</li>
@@ -119,7 +122,8 @@ export const HELP_SECTIONS = [
         <li><b>Front</b> - nakładane / wpuszczane, luzy, szczelina, materiał frontu.
           <b>Luzy automatyczne (wg sąsiadów)</b> - włączone w nowych szafkach: luz każdej krawędzi liczy się z tego,
           co przy niej stoi. Boki: szafka obok, ściana albo pusto 1,5 mm, blenda albo bok dokładany 3 mm, zmywarka
-          0,5 mm. Góra: szafka wyżej albo blenda 3 mm, blat albo sufit 5 mm, pusto 1,5 mm. Szafka otwarta wysunięta do lica frontów liczy się jak blenda (3 mm z boku, nad i pod frontem). Dół: cokół w licu frontów
+          0,5 mm. Góra: szafka wyżej albo blenda 3 mm, blat albo sufit 5 mm, pusto 1,5 mm. Szafka otwarta wysunięta do lica frontów liczy się jak blenda (3 mm z boku, nad i pod frontem); front szafki
+          stojącej nad albo pod otwartą idzie bokiem równo z jej krawędzią (0), a 3 mm bierze front szafki obok. Dół: cokół w licu frontów
           3 mm, cokół cofnięty albo szafka niżej 0, panel poziomy pod szafką - front schodzi o grubość panelu + 12 mm.
           Gdy front wychodzi z ułamkiem milimetra, pod luzami pojawia się podpowiedź, o ile zmienić który luz, żeby
           wyszedł w pełnych milimetrach. Panel pokazuje wynik z powodem; wyjątek wpisz w „Ręczne nadpisanie” (puste pole = Auto). Po odznaczeniu

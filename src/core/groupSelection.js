@@ -37,6 +37,22 @@ export function clickSelection(project, selection, kind, id, additive) {
   return { moduleIds, panelIds, removed: all };
 }
 
+// Których szafek dotyczą zmiany w prawym panelu. Kliknięcie szafki z grupy zaznacza całą
+// grupę (żeby mebel przesuwał się razem), ale panel ma wtedy zmieniać tylko klikniętą szafkę -
+// inaczej luz albo wymiar wpisany w jednej trafiał do wszystkich szafek mebla. Kilka szafek
+// naraz zmienia się tylko po świadomym dobraniu ich Shift/Ctrl, czyli gdy zaznaczenie różni
+// się od samej grupy aktywnej szafki. Zwraca id szafek.
+export function editTargets(project, selection, activeId) {
+  const selected = [...((selection && selection.moduleIds) || [])];
+  if (!activeId) return selected;
+  if (!selected.includes(activeId)) return [activeId];
+  const g = groupMembers(project, "module", activeId);
+  const panels = [...((selection && selection.panelIds) || [])];
+  const onlyGroup = selected.length === g.moduleIds.length && selected.every((id) => g.moduleIds.includes(id))
+    && panels.every((id) => g.panelIds.includes(id));
+  return onlyGroup ? [activeId] : selected;
+}
+
 // Czy zaznaczenie można połączyć w grupę: co najmniej dwa elementy (szafki i/lub blendy, boki,
 // panele - np. same panele na ścianę), nie wszystkie już w tej samej grupie.
 export function canCombine(project, selection) {

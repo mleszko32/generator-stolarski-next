@@ -1,11 +1,28 @@
 import { describe, it, expect } from "vitest";
-import { groupMembers, clickSelection, canCombine, combineIntoGroup, splitGroup } from "./groupSelection.js";
+import { groupMembers, clickSelection, canCombine, combineIntoGroup, splitGroup, editTargets } from "./groupSelection.js";
 
 const make = () => ({
   modules: [{ id: "m1", groupId: "g" }, { id: "m2", groupId: "g" }, { id: "m3" }],
   sidePanels: [{ id: "p1", groupId: "g" }, { id: "p2" }],
 });
 const sel = (m, p) => ({ moduleIds: new Set(m), panelIds: new Set(p) });
+
+describe("editTargets - których szafek dotyczą zmiany w panelu", () => {
+  it("grupa zaznaczona kliknięciem: tylko kliknięta szafka", () => {
+    const s = clickSelection(make(), sel([], []), "module", "m1", false);
+    expect(editTargets(make(), s, "m1")).toEqual(["m1"]);
+  });
+
+  it("szafki dobrane Shift/Ctrl: wszystkie zaznaczone", () => {
+    expect(editTargets(make(), sel(["m1", "m2", "m3"], ["p1"]), "m3")).toEqual(["m1", "m2", "m3"]);
+    expect(editTargets(make(), sel(["m3", "m1"], []), "m1")).toEqual(["m3", "m1"]);
+  });
+
+  it("pojedyncza szafka bez grupy i brak zaznaczenia", () => {
+    expect(editTargets(make(), sel(["m3"], []), "m3")).toEqual(["m3"]);
+    expect(editTargets(make(), sel([], []), "m3")).toEqual(["m3"]);
+  });
+});
 
 describe("groupSelection", () => {
   it("członkowie grupy - szafki i boki", () => {
