@@ -232,7 +232,8 @@ export const HELP_SECTIONS = [
     body: `
       <p>Tryb <b>Produkcja</b> (albo przycisk <b>Produkcja i raporty</b>) otwiera hub z sekcjami:</p>
       <ul>
-        <li><b>Formatki</b> - zbiorcza lista formatek z okleiną (kliknij krawędź ikonki, żeby ją
+        <li><b>Formatki</b> - w widoku „wg szafki” szafki są zwijane i zebrane w meble (grupy): kliknij nagłówek, żeby
+          rozwinąć, użyj „Szukaj szafki”, „Rozwiń wszystko” albo „Zwiń wszystko”. Zbiorcza lista formatek z okleiną (kliknij krawędź ikonki, żeby ją
         przełączyć; środek ikonki = dookoła / brak) i eksport CSV; w tym samym oknie „Zapisz plik FC2” - plik importu FC2 (symbole materiałów i okleiny wpisujesz raz, zapamiętują się w projekcie), a „Kopiuj do SAS” - te same formatki
         w układzie eSAS do schowka: w zamówieniu SAS „Import danych” → „Wklej ze schowka” → „Importuj” (symbole płyt eSAS biorą się z dekorów projektu,
         formatki idą bez oklejania; „Struktura” zaznacz dla płyt z usłojeniem). Na górze okna lista grup (grupy, „Bez grupy” - szafki i boki niepołączone, „Elementy zbiorcze” - cokół, blaty) - odznaczone nie idą

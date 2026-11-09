@@ -5,6 +5,7 @@
 // okleina, Kosztorys), zawartość po prawej. Akcje (wydruki, CSV, kosztorys)
 // to te same funkcje co dotąd (ui/sidebar.js), tylko w jednym miejscu.
 import { escapeHtml, openHtmlWindow } from "../utils/dom.js";
+import { furnitureChoices, filterByChoice } from "../core/furnitureGroups.js";
 import { fmtMm, num, round1 } from "../utils/math.js";
 import { state, getActiveModule } from "../core/state.js";
 import { collectProjectParts, calculateAllProjectParts } from "../engine/cabinet.js";
@@ -53,6 +54,10 @@ const SECTIONS = [
 ];
 
 let groupMode = 'module';
+// Lista formatek „wg szafki”: które szafki / meble są rozwinięte (klucze m:<nazwa>, g:<mebel>).
+const openFolds = new Set();
+let foldsReady = false;
+const FOLD_OPEN_ALL_MAX = 4; // do tylu szafek wszystko rozwinięte od razu
 
 const CATEGORY_ORDER = ['Korpus', 'Front', 'Szuflada', 'Plecy', 'Blat'];
 
@@ -131,28 +136,58 @@ function renderFormatki(el) {
   if (raw.length === 0) {
     body = `<p class="hub-empty">Projekt nie ma jeszcze formatek. Dodaj szafkę w trybie projektowania.</p>`;
   } else if (groupMode === 'module') {
-    const byModule = new Map();
-    raw.forEach(p => {
-      const k = p.moduleName || 'Inne';
-      if (!byModule.has(k)) byModule.set(k, []);
-      byModule.get(k).push(p);
-    });
-    byModule.forEach((list, name) => {
-      const count = list.reduce((s, p) => s + (parseInt(p.qty, 10) || 1), 0);
-      // Grupujemy po nazwie (tak samo jak reszta tej funkcji, patrz moduleName
-      // wyżej) - jeśli dwie szafki mają tę samą nazwę, podgląd dostaje ta
-      // znaleziona jako pierwsza (ten sam, już istniejący kompromis co przy
-      // łączeniu ich formatek w jedną grupę).
-      const mod = state.project.modules.find((m) => m.name === name);
-      // Prawdziwe zdjęcie z podglądu 3D (nie płaski rysunek, zgłoszona
-      // uwaga) - captureModuleSnapshot chowa na chwilę resztę sceny, kadruje
-      // kamerę na samą tę bryłę i oddaje canvas jako obrazek; klik na nie
-      // przełącza aktywną szafkę i od razu otwiera jej rysunek 2D (to samo,
-      // co przycisk "Otwórz rysunek" w Rysunki 2D).
-      const snapshot = mod ? captureModuleSnapshot(mod.id, 40) : null;
-      const thumb = snapshot ? `<img class="hub-group-thumb" src="${snapshot}" data-module-id="${escapeHtml(mod.id)}" title="Kliknij, żeby otworzyć rysunek 2D tej szafki" alt="">` : '';
-      body += `<h4 class="hub-group${name === activeName ? ' active' : ''}">${thumb}${escapeHtml(name)} <span>${count} szt.${name === activeName ? ' · aktywna' : ''}</span></h4>${partsTable(aggregate(list), false)}`;
-    });
+    // Duży projekt: szafki zwijane i zebrane w meble (grupy), żeby nie przewijać wszystkich
+    // tabel. Stan rozwinięcia pamiętany w openFolds; na start otwarta tylko aktywna szafka
+    // (mały projekt - wszystkie).
+    const choices = furnitureChoices(state.project, raw);
+    const sections = choices.map(c => ({ ...c, parts: filterByChoice(raw, state.project, choices.filter(x => x.key !== c.key).map(x => x.key)) }));
+    const moduleCount = new Set(raw.map(p => p.moduleName || 'Inne')).size;
+    if (!foldsReady) {
+      foldsReady = true;
+      if (moduleCount <= FOLD_OPEN_ALL_MAX) raw.forEach(p => openFolds.add('m:' + (p.moduleName || 'Inne')));
+      else if (activeName) openFolds.add('m:' + activeName);
+      sections.forEach(sec => { if (moduleCount <= FOLD_OPEN_ALL_MAX || sec.parts.some(p => p.moduleName === activeName)) openFolds.add('g:' + sec.key); });
+    }
+    const qtyOf = (list) => list.reduce((sum, p) => sum + (parseInt(p.qty, 10) || 1), 0);
+    const moduleFolds = (parts) => {
+      const byModule = new Map();
+      parts.forEach(p => {
+        const k = p.moduleName || 'Inne';
+        if (!byModule.has(k)) byModule.set(k, []);
+        byModule.get(k).push(p);
+      });
+      let html = '';
+      byModule.forEach((list, name) => {
+        // Grupujemy po nazwie - przy dwóch szafkach o tej samej nazwie podgląd dostaje pierwsza.
+        const mod = state.project.modules.find((m) => m.name === name);
+        // Zdjęcie z podglądu 3D; klik przełącza aktywną szafkę i otwiera jej rysunek 2D.
+        const snapshot = mod ? captureModuleSnapshot(mod.id, 40) : null;
+        const thumb = snapshot ? `<img class="hub-group-thumb" src="${snapshot}" data-module-id="${escapeHtml(mod.id)}" title="Kliknij, żeby otworzyć rysunek 2D tej szafki" alt="">` : '';
+        const key = 'm:' + name;
+        html += `<details class="hub-fold${name === activeName ? ' active' : ''}" data-fold="${escapeHtml(key)}" data-name="${escapeHtml(name.toLowerCase())}" ${openFolds.has(key) ? 'open' : ''}>
+          <summary>${thumb}<b>${escapeHtml(name)}</b> <span>${qtyOf(list)} szt.${name === activeName ? ' · aktywna' : ''}</span></summary>
+          ${partsTable(aggregate(list), false)}
+        </details>`;
+      });
+      return { html, count: byModule.size };
+    };
+    if (sections.length <= 1) {
+      body = moduleFolds(raw).html;
+    } else {
+      sections.forEach(sec => {
+        const inner = moduleFolds(sec.parts);
+        const key = 'g:' + sec.key;
+        body += `<details class="hub-fold hub-fold-mebel" data-fold="${escapeHtml(key)}" ${openFolds.has(key) ? 'open' : ''}>
+          <summary><i class="ti ti-chevron-right hub-fold-chev" aria-hidden="true"></i><b>${escapeHtml(sec.label)}</b> <span>${inner.count} poz. · ${qtyOf(sec.parts)} szt.</span></summary>
+          <div class="hub-fold-body">${inner.html}</div>
+        </details>`;
+      });
+    }
+    body = `<div class="hub-fold-bar">
+        <input type="search" id="hub-fold-search" class="input" placeholder="Szukaj szafki..." />
+        <button type="button" id="hub-fold-open" class="btn btn-sm">Rozwiń wszystko</button>
+        <button type="button" id="hub-fold-close" class="btn btn-sm">Zwiń wszystko</button>
+      </div>${body}`;
   } else if (groupMode === 'material') {
     const byCat = new Map();
     raw.forEach(p => {
@@ -190,8 +225,26 @@ function renderFormatki(el) {
     ${body}`;
   el.querySelector('#hub-group').addEventListener('change', e => { groupMode = e.target.value; renderFormatki(el); });
   bindMaterialsBar(el, () => renderFormatki(el));
+  // zwijanie szafek i mebli + wyszukiwarka (lista „wg szafki”)
+  el.querySelectorAll('details.hub-fold').forEach(d => d.addEventListener('toggle', () => {
+    if (d.open) openFolds.add(d.dataset.fold); else openFolds.delete(d.dataset.fold);
+  }));
+  const setAllFolds = (open) => el.querySelectorAll('details.hub-fold').forEach(d => { d.open = open; });
+  el.querySelector('#hub-fold-open')?.addEventListener('click', () => setAllFolds(true));
+  el.querySelector('#hub-fold-close')?.addEventListener('click', () => setAllFolds(false));
+  el.querySelector('#hub-fold-search')?.addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    el.querySelectorAll('details.hub-fold[data-name]').forEach(d => { d.hidden = !!q && !d.dataset.name.includes(q); });
+    // mebel bez pasujących szafek znika, z pasującymi rozwija się na czas szukania
+    el.querySelectorAll('details.hub-fold-mebel').forEach(g => {
+      const any = [...g.querySelectorAll('details.hub-fold[data-name]')].some(d => !d.hidden);
+      g.hidden = !any;
+      if (q && any) g.open = true;
+    });
+  });
   el.querySelectorAll('.hub-group-thumb[data-module-id]').forEach(img => {
-    img.addEventListener('click', () => {
+    img.addEventListener('click', (ev) => {
+      ev.preventDefault(); // miniatura jest w nagłówku zwijanej szafki - nie zwijaj jej
       const id = img.getAttribute('data-module-id');
       state.activeModuleId = id;
       state.selectedModules = new Set([id]);
