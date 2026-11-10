@@ -535,8 +535,11 @@ details.menu[open] > summary { border-color: var(--accent); color: var(--accent)
 }
 .menu-item:hover { background: var(--surface-subtle); }
 .menu-item .ti { font-size: 16px; opacity: 0.8; }
-/* poszerzony po najechaniu (ui/sidebar.js: fitWide) - przykrywa widok 3D */
-.sidebar-left.is-wide { position: relative; z-index: 30; box-shadow: 6px 0 24px rgba(0, 0, 0, 0.16); }
+/* panele poszerzone po najechaniu (ui/panelHover.js) - przykrywają widok 3D */
+/* nad paskiem przycisków widoku 3D (.view-toolbar, z-index 100), pod oknami */
+.sidebar-left.is-wide, .sidebar-right.is-wide { position: relative; z-index: 150; }
+.sidebar-left.is-wide { box-shadow: 6px 0 24px rgba(0, 0, 0, 0.16); }
+.sidebar-right.is-wide { box-shadow: -6px 0 24px rgba(0, 0, 0, 0.16); }
 .sidebar-left .empty-note, .sidebar-left .panel-hint { max-width: 290px; }
 .sidebar-search { display: flex; align-items: center; gap: 4px; margin-top: 8px; }
 .sidebar-search .input { flex: 1; min-width: 0; }

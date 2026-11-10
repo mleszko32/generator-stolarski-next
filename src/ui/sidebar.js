@@ -14,6 +14,7 @@ import { sanitizeAiModules, buildModulesFromAi } from "../core/aiSketchImport.js
 import { getIdToken } from "../core/storage.js";
 import { clampModuleToRoom } from "../core/layout.js";
 import { parseFurnitureJson, insertFurniture } from "../core/furnitureImport.js";
+import { bindHoverExpand, refitPanel } from "./panelHover.js";
 import { clickSelection, activePicks } from "../core/groupSelection.js";
 
 // Okno oczekiwania na wynik AI (wspólne openModal, bez zamykania w trakcie).
@@ -131,46 +132,7 @@ function renderTree() {
   if (!root) return;
   root.innerHTML = treeHtml();
   bindTree(root);
-  if (wideTimer === true) fitWide();
-}
-
-// Panel poszerza się po najechaniu myszą do szerokości najdłuższej nazwy (najwyżej WIDE_MAX),
-// przykrywając widok 3D: ujemny margines trzyma jego miejsce w układzie, więc scena się nie
-// przesuwa ani nie przelicza. wideTimer: null = wąski, liczba = czeka na poszerzenie, true = szeroki.
-const WIDE_MAX = 640;
-const WIDE_DELAY = 200;
-let wideTimer = null;
-
-function fitWide() {
-  const el = document.querySelector('.sidebar-left');
-  if (!el) return;
-  el.style.width = 'max-content';
-  el.style.marginRight = '';
-  const base = parseFloat(getComputedStyle(el).minWidth) || el.offsetWidth;
-  const w = Math.min(el.offsetWidth, WIDE_MAX, Math.round(window.innerWidth * 0.6));
-  el.style.width = '';
-  if (w <= base + 1) { el.classList.remove('is-wide'); return; }
-  el.classList.add('is-wide');
-  el.style.width = w + 'px';
-  el.style.marginRight = (base - w) + 'px';
-}
-
-function setNarrow(el) {
-  if (typeof wideTimer === 'number') clearTimeout(wideTimer);
-  wideTimer = null;
-  el.classList.remove('is-wide');
-  el.style.width = '';
-  el.style.marginRight = '';
-}
-
-function bindHoverExpand(el) {
-  el.addEventListener('mouseenter', (e) => {
-    // nie w trakcie przeciągania (szafka, kamera) i nie w układzie jednokolumnowym (telefon)
-    if (e.buttons !== 0 || wideTimer !== null) return;
-    if (getComputedStyle(el.parentElement).flexDirection === 'column') return;
-    wideTimer = setTimeout(() => { wideTimer = true; fitWide(); }, WIDE_DELAY);
-  });
-  el.addEventListener('mouseleave', () => setNarrow(el));
+  refitPanel(document.querySelector('.sidebar-left')); // poszerzony po najechaniu - dopasuj do nowej treści
 }
 
 function bindTree(root) {
@@ -312,7 +274,8 @@ export function updateSidebar() {
   });
   if (!menuCloserBound) {
     menuCloserBound = true;
-    bindHoverExpand(leftSidebar);
+    // po najechaniu panel poszerza się do najdłuższej nazwy (ui/panelHover.js)
+    bindHoverExpand(leftSidebar, { side: 'left', width: 'content', max: 640 });
     document.addEventListener('click', (e) => {
       document.querySelectorAll('.sidebar-left details.menu[open]').forEach(d => { if (!d.contains(e.target)) d.open = false; });
     });

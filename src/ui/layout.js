@@ -1,4 +1,6 @@
 // src/ui/layout.js
+import { bindHoverExpand } from "./panelHover.js";
+
 export function initLayout() {
   const app = document.getElementById('app');
   app.innerHTML = `
@@ -43,4 +45,6 @@ export function initLayout() {
     
     <div class="status-bar">Status: Pełny tryb 3D aktywny | Baza danych podpięta</div>
   `;
+  // prawy panel poszerza się po najechaniu (łatwiejsze formularze), lewy - patrz ui/sidebar.js
+  bindHoverExpand(app.querySelector('.sidebar-right'), { side: 'right', width: 440 });
 }
