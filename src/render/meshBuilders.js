@@ -178,7 +178,8 @@ export function setHighlightKey(key) { highlightKey = key || null; }
 const tintCache = new Map();
 const COLORABLE = new Set(['corpus', 'shelf', 'front', 'plinth', 'drawerBox']);
 // active = bryła klikniętej (aktywnej) szafki: kolor płyty podbarwiony na niebiesko, żeby w
-// zaznaczonej grupie było widać, którą szafkę zmienia prawy panel.
+// zaznaczonej grupie było widać, którą szafkę zmienia prawy panel. Pozostałe zaznaczone szafki
+// (Shift/Ctrl, grupa) mają słabsze podbarwienie - sam jasny obrys krawędzi był niewidoczny.
 const ACTIVE_TINT = new THREE.Color(0x2563eb);
 const ACTIVE_TYPES = new Set(['corpus', 'shelf', 'front', 'plinth', 'hdf']);
 function materialFor(type, userData, active = false) {
@@ -189,9 +190,10 @@ function materialFor(type, userData, active = false) {
   if (ent) color = colorMode === 'materials' ? (materialPalette.get(ent.key) ?? null) : ent.color;
   if (color != null && colorMode === 'real' && isXrayMode && isLightColor(color)) color = null;
   const faded = highlightKey != null && (!ent || ent.key !== highlightKey);
-  const tinted = !!active && !faded && ACTIVE_TYPES.has(type);
+  const selected = !active && !!(userData && userData.moduleId && state.selectedModules && state.selectedModules.has(userData.moduleId));
+  const tinted = (active || selected) && !faded && ACTIVE_TYPES.has(type);
   if (color == null && !faded && !tinted) return base;
-  const key = `${isXrayMode ? 'x' : 's'}|${type}|${color}|${faded ? 'f' : ''}|${tinted ? 'a' : ''}`;
+  const key = `${isXrayMode ? 'x' : 's'}|${type}|${color}|${faded ? 'f' : ''}|${tinted ? (active ? 'a' : 'z') : ''}`;
   let m = tintCache.get(key);
   if (!m) {
     m = base.clone();
@@ -199,8 +201,8 @@ function materialFor(type, userData, active = false) {
     if (faded) { m.transparent = true; m.opacity = 0.08; m.depthWrite = false; }
     else if (isXrayMode && color != null) m.opacity = Math.max(base.opacity, 0.35);
     if (tinted) {
-      m.color.lerp(ACTIVE_TINT, isXrayMode ? 0.7 : 0.4);
-      if (isXrayMode) { m.transparent = true; m.opacity = Math.max(m.opacity, 0.55); }
+      m.color.lerp(ACTIVE_TINT, (isXrayMode ? 0.7 : 0.4) * (active ? 1 : 0.5));
+      if (isXrayMode) { m.transparent = true; m.opacity = Math.max(m.opacity, active ? 0.55 : 0.35); }
     }
     m.userData.shared = true;
     tintCache.set(key, m);
