@@ -15,7 +15,7 @@ export const HELP_SECTIONS = [
       list formatek, planu rozkroju, rysunków z wierceniami, listy okuć i wyceny.</p>
       <h4>Układ ekranu</h4>
       <ul>
-        <li><b>Lewy panel</b> - lista szafek, boków dokładanych i blend oraz Narzędzia.</li>
+        <li><b>Lewy panel</b> - menu Dodaj i Narzędzia, wyszukiwarka oraz lista elementów projektu (szafki, boki, blendy) pogrupowana po meblach.</li>
         <li><b>Środek</b> - widok 3D pomieszczenia (albo edytor „Wnętrze 2D”).</li>
         <li><b>Prawy panel</b> - właściwości zaznaczonej szafki, boku albo blendy.</li>
         <li><b>Górny pasek</b> - tryby <b>Projekt / Produkcja / Wycena</b>, cofnij/ponów,
@@ -54,23 +54,30 @@ export const HELP_SECTIONS = [
     title: "Dodawanie szafek",
     icon: "layout-bottombar",
     body: `
-      <p>W lewym panelu, w sekcji <b>Szafki</b>:</p>
+      <p>Na górze lewego panelu jest menu <b>Dodaj</b>:</p>
       <ul>
-        <li><b>Dolna</b>, <b>Wisząca</b>, <b>Słupek</b> - zwykłe szafki; nowa staje na prawo od ostatniej.</li>
-        <li><b>Narożna</b> - szafka narożna L (dwa ramiona); ustawia się ją w konfiguratorze (przycisk <b>Konfiguruj szafkę narożną</b> w prawym panelu).</li>
-        <li><b>Skos</b> - szafka pod skos dachu.</li>
+        <li><b>Szafka dolna</b>, <b>Szafka wisząca</b>, <b>Słupek</b> - zwykłe szafki; nowa staje na prawo od ostatniej.</li>
+        <li><b>Szafka narożna</b> - szafka narożna L (dwa ramiona); ustawia się ją w konfiguratorze (przycisk <b>Konfiguruj szafkę narożną</b> w prawym panelu).</li>
+        <li><b>Szafka pod skos</b> - szafka pod skos dachu.</li>
+        <li><b>Zmywarka 45 / 60 cm</b>, <b>Bok dokładany</b>, <b>Panel poziomy</b>, <b>Blenda</b> - elementy bez korpusu.</li>
       </ul>
-      <p>Przy każdej szafce na liście są przyciski <b>kopiuj</b> i <b>usuń</b>. Usuwanie jest
+      <p>Pod spodem jest jedna lista <b>Elementy projektu</b>: szafki, boki, blendy i zmywarki
+      pogrupowane po meblach (grupach), z numerem mebla M1… jak na listach formatek. Nagłówek
+      mebla zwija i rozwija jego elementy, elementy spoza grup są w „Bez grupy”. Pole
+      <b>Szukaj</b> filtruje listę po nazwie szafki albo mebla, a ikona obok odznacza wszystko.
+      Po najechaniu na wiersz pokazują się przyciski <b>kopiuj</b> i <b>usuń</b>. Usuwanie jest
       tylko na liście, nie w prawym panelu.</p>
       <h4>Narzędzia</h4>
+      <p>Menu <b>Narzędzia</b> obok menu Dodaj:</p>
       <ul>
         <li><b>Rozmieść szafki (ściana / L / U)</b> - wypełnia ścianę albo całą kuchnię szafkami (patrz rozdział „Rozmieszczanie na ścianie”).</li>
         <li><b>Zabudowa wnęki pod skosem</b> - rząd prostokątnych szafek pod skosem (poddasze). Podajesz ścianę kolanową, gdzie skos dochodzi do sufitu, wysokość sufitu, luz pod skosem i szerokości szafek; „Kształt szafek”: <i>dopasowane do skosu</i> - szafki pod skosem są szafkami pod skos (trapez: niski bok = sufit nad lewą krawędzią minus luz, wysoki = nad prawą), a szafka z siedziskiem i szafki pod płaskim sufitem zostają prostokątne; wszystkie stoją na nóżkach z jednym cokołem, więc szuflady są w jednej linii; <i>prostokątne (schodki)</i> - wysokość każdej szafki to najniższy punkt sufitu nad nią minus luz. Każdą szafkę można zmienić: nazwa, szerokość, „Siedzisko / blat” (odznaczone = szafka do samego skosu) i sekcje od dołu (szuflady z ilością, drzwi, drzwi L+P, otwarta; wysokość albo „Półka nad na” od podłogi, półki w środku, drążek); szafki i sekcje można dodawać, usuwać i przesuwać, a „Układ domyślny (A-E)” przywraca startowy układ. Okno pokazuje widok z przodu z wymiarami (też do druku) i zestawienie formatek. Po pomiarze na miejscu otwórz okno ponownie, popraw liczby i kliknij „Przelicz zabudowę” - szafki zabudowy zostaną zastąpione nowymi.</li>
         <li><b>Biblioteka szafek</b> - zapisane szablony szafek (z wnętrzem); eksport i import pliku JSON przenosi je na inny komputer.</li>
         <li><b>Wstaw mebel z pliku</b> - cały mebel (kilka korpusów, blendy) z pliku JSON; staje na prawo od szafek w projekcie, a jego szafki tworzą jedną grupę (przesuwa się w całości, „Rozbij grupę” je rozdziela). Można wybrać kilka plików naraz.</li>
         <li><b>Zbuduj projekt ze zdjęcia (AI)</b> - zdjęcie odręcznego szkicu zamienia się w szafki. Wymaga zalogowania.</li>
-        <li><b>Produkcja i raporty</b> - listy, rysunki, rozkrój, okucia, kontrola i kosztorys.</li>
-      </ul>`,
+      </ul>
+      <p>Listy, rysunki, rozkrój, okucia, kontrola i kosztorys są w oknie <b>Produkcja i raporty</b> -
+      zakładki <b>Produkcja</b> i <b>Wycena</b> na górnym pasku.</p>`,
   },
   {
     id: "widok3d",
@@ -183,7 +190,7 @@ export const HELP_SECTIONS = [
       bez przerwy. Zaznacz najpierw szafkę dolną obok wnęki - zmywarka stanie zaraz za nią i weźmie z niej
       wysokość, głębokość, nóżki, dekor korpusu i materiał frontu.</p>
       <p>Bok dokładany szerszy niż wysoki (np. blat biurka, półka na ścianie) liczy się na liście formatek jako <b>Płyta pozioma</b> szerokość × głębokość.</p>
-      <p>Dodaje się je przyciskami <b>Dodaj</b> w lewym panelu. Przy przeciąganiu przyciągają się
+      <p>Dodaje się je z menu <b>Dodaj</b> w lewym panelu. Przy przeciąganiu przyciągają się
       do boków szafek i do ścian, a nachodzące na szafkę same się z niej wysuwają. Materiał
       wybiera się z cennika materiałów frontów.</p>`,
   },

@@ -1,7 +1,7 @@
 import { state, addModule, deleteModule, duplicateModule, addSidePanel, addDishwasher, getActiveModule, deleteSidePanel, addCornerModule, addSlopeModule, ensureSidePanelsDefaults } from "../core/state.js";
 import { update3D } from "../render/viewer3d.js";
 import { initPropertiesPanel } from "./properties.js";
-import { openProductionHub } from "./productionHub.js";
+import { buildSidebarTree } from "../core/sidebarTree.js";
 import { escapeHtml } from "../utils/dom.js";
 import { openModuleLibrary } from "./moduleLibraryModal.js";
 import { openWallFillModal } from "./wallFillModal.js";
@@ -65,122 +65,212 @@ const MODULE_ICONS = {
   slope_cabinet: 'ti-stairs',
 };
 
-// Lewy panel: Szafki (lista + dodawanie), Boki dokładane, Narzędzia. Listy
-// formatek, nawiertów i okuć, które dawniej dublowały się tu i w oknie
-// "Produkcja i raporty", mieszkają teraz tylko w tym oknie (ui/productionHub.js).
+const PANEL_ICONS = { bok: 'ti-layout-board', poziomy: 'ti-layout-rows', blenda: 'ti-layout-distribute-vertical', zmywarka: 'ti-wash-machine' };
+const PANEL_DEL = { bok: 'Usuń bok dokładany', poziomy: 'Usuń panel poziomy', blenda: 'Usuń blendę', zmywarka: 'Usuń zmywarkę' };
+const LOOSE_KEY = 'bez-grupy';
+
+// Stan samego panelu (nie projektu): tekst wyszukiwarki i zwinięte meble.
+let treeQuery = '';
+const collapsedGroups = new Set();
+let menuCloserBound = false;
+
+const refreshAll = () => { initPropertiesPanel(); update3D(); updateSidebar(); };
+
+function isMarked(it) {
+  if (it.kind === 'module') return it.id === state.activeModuleId || !!(state.selectedModules && state.selectedModules.has(it.id));
+  return it.id === state.activeSidePanelId || !!(state.selectedSidePanels && state.selectedSidePanels.has(it.id));
+}
+
+function itemHtml(it) {
+  const isModule = it.kind === 'module';
+  const isActive = it.id === (isModule ? state.activeModuleId : state.activeSidePanelId);
+  const cls = isActive ? ' is-active' : (isMarked(it) ? ' is-selected' : '');
+  const icon = isModule ? (MODULE_ICONS[it.type] || MODULE_ICONS.base_cabinet) : PANEL_ICONS[it.panelKind];
+  const id = escapeHtml(it.id);
+  const code = it.code ? `<span class="li-code" title="Numer mebla na listach formatek">${escapeHtml(it.code)}</span>` : '';
+  const actions = isModule
+    ? `<button class="icon-btn btn-mod-dup" data-id="${id}" title="Kopiuj szafkę"><i class="ti ti-copy" aria-hidden="true"></i></button>
+       <button class="icon-btn btn-mod-del" data-id="${id}" title="Usuń szafkę"><i class="ti ti-trash" aria-hidden="true"></i></button>`
+    : `<button class="icon-btn btn-side-panel-del" data-id="${id}" title="${PANEL_DEL[it.panelKind]}"><i class="ti ti-trash" aria-hidden="true"></i></button>`;
+  return `
+    <div class="list-item ${isModule ? 'module-item' : 'side-panel-item'}${cls}" data-id="${id}" title="${escapeHtml(it.name)} - ${escapeHtml(it.meta)}">
+      <i class="ti ${icon} li-icon" aria-hidden="true"></i>
+      <div class="li-main">${code}<span class="li-name">${escapeHtml(it.name)}</span><span class="li-meta">${escapeHtml(it.meta)}</span></div>
+      <div class="li-actions">${actions}</div>
+    </div>`;
+}
+
+// Lista elementów projektu jako drzewo mebli (core/sidebarTree.js). Projekt bez grup = płaska lista.
+function treeHtml() {
+  const tree = buildSidebarTree(state.project, treeQuery);
+  if (tree.total === 0) return `<div class="empty-note">Projekt jest pusty. Dodaj pierwszą szafkę z menu „Dodaj” albo zbuduj projekt ze zdjęcia (menu „Narzędzia”).</div>`;
+  if (tree.shown === 0) return `<div class="empty-note">Nic nie pasuje do „${escapeHtml(treeQuery.trim())}”.</div>`;
+  const filtering = treeQuery.trim() !== '';
+  const group = (key, code, label, items) => {
+    const open = filtering || !collapsedGroups.has(key);
+    return `
+      <div class="tree-group">
+        <button type="button" class="tree-head${items.some(isMarked) ? ' has-sel' : ''}" data-key="${escapeHtml(key)}" aria-expanded="${open}">
+          <i class="ti ti-chevron-${open ? 'down' : 'right'}" aria-hidden="true"></i>
+          ${code ? `<span class="li-code" title="Numer mebla na listach formatek">${escapeHtml(code)}</span>` : ''}
+          <span class="tree-label">${escapeHtml(label)}</span>
+          <span class="tree-count">${items.length}</span>
+        </button>
+        ${open ? `<div class="tree-items">${items.map(itemHtml).join('')}</div>` : ''}
+      </div>`;
+  };
+  let html = tree.furniture.map(g => group(g.key, g.code, g.label, g.items)).join('');
+  if (tree.loose.length) html += tree.furniture.length ? group(LOOSE_KEY, '', 'Bez grupy', tree.loose) : tree.loose.map(itemHtml).join('');
+  return html;
+}
+
+function renderTree() {
+  const root = document.getElementById('sidebar-tree');
+  if (!root) return;
+  root.innerHTML = treeHtml();
+  bindTree(root);
+}
+
+function bindTree(root) {
+  root.querySelectorAll('.tree-head').forEach(el => {
+    el.addEventListener('click', () => {
+      const key = el.getAttribute('data-key');
+      if (collapsedGroups.has(key)) collapsedGroups.delete(key); else collapsedGroups.add(key);
+      renderTree();
+    });
+  });
+
+  root.querySelectorAll('.btn-mod-dup').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      duplicateModule(e.currentTarget.getAttribute('data-id'));
+      refreshAll();
+    });
+  });
+
+  root.querySelectorAll('.btn-mod-del').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteModule(e.currentTarget.getAttribute('data-id'));
+      refreshAll();
+    });
+  });
+
+  root.querySelectorAll('.module-item').forEach(el => {
+    el.addEventListener('click', (e) => {
+      const id = e.currentTarget.getAttribute('data-id');
+      // Kliknięcie zaznacza całą grupę (szafki + jej blendy/boki); Shift/Ctrl dokłada albo zdejmuje.
+      // Tylko JEDNA szafka jest „aktywna” (activeModuleId) - ma otwarty panel właściwości.
+      const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+      const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels }, 'module', id, additive);
+      state.selectedModules = sel.moduleIds;
+      state.selectedSidePanels = sel.panelIds;
+      state.activeModuleId = sel.removed
+          ? (state.activeModuleId === id ? Array.from(state.selectedModules).pop() || null : state.activeModuleId)
+          : id;
+      state.activeSidePanelId = null;
+      refreshAll();
+    });
+  });
+
+  root.querySelectorAll('.side-panel-item').forEach(el => {
+    el.addEventListener('click', (e) => {
+      const id = e.currentTarget.getAttribute('data-id');
+      // jak przy szafkach: Shift/Ctrl dokłada blendę/bok do zaznaczenia (np. do „Połącz w grupę”)
+      const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+      const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels }, 'panel', id, additive);
+      state.selectedModules = sel.moduleIds;
+      state.selectedSidePanels = sel.panelIds;
+      if (sel.removed) {
+        if (state.activeSidePanelId === id) state.activeSidePanelId = null;
+        if (!state.activeSidePanelId) state.activeModuleId = Array.from(state.selectedModules).pop() || null;
+      } else {
+        state.activeSidePanelId = id;
+        state.activeModuleId = null;
+      }
+      refreshAll();
+    });
+  });
+
+  root.querySelectorAll('.btn-side-panel-del').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteSidePanel(e.currentTarget.getAttribute('data-id'));
+      refreshAll();
+    });
+  });
+}
+
+// Lewy panel: u góry (przyklejone) menu „Dodaj” i „Narzędzia” + wyszukiwarka, pod nimi jedna
+// lista elementów projektu pogrupowana po meblach. Listy formatek, rysunki i kosztorys są
+// tylko w oknie „Produkcja i raporty” (zakładki Produkcja / Wycena na górnym pasku).
 export function updateSidebar() {
   scheduleCheckpoint(); // patrz core/history.js — debounce'owany checkpoint historii cofnij/wprzód
   renderInteriorEditorIfVisible(); // patrz ui/interiorEditor.js
   const leftSidebar = document.querySelector(".sidebar-left");
-  const modules = state.project.modules;
+  const item = (id, icon, label, title) => `<button type="button" id="${id}" class="menu-item" title="${title}"><i class="ti ${icon}" aria-hidden="true"></i> ${label}</button>`;
 
-  const sideItem = (p, icon, fallbackName, delTitle, meta) => {
-    const isActive = p.id === state.activeSidePanelId;
-    const isSelected = state.selectedSidePanels && state.selectedSidePanels.has(p.id);
-    const group = p.groupId ? `<i class="ti ti-link li-group" title="W grupie z szafkami" aria-hidden="true"></i>` : '';
-    return `
-        <div class="list-item side-panel-item${isActive ? ' is-active' : (isSelected ? ' is-selected' : '')}" data-id="${escapeHtml(p.id)}">
-          <i class="ti ${icon} li-icon" aria-hidden="true"></i>
-          <div class="li-main"><span class="li-name">${escapeHtml(p.name || fallbackName)}</span>${group}<span class="li-meta">${escapeHtml(meta)}</span></div>
-          <div class="li-actions"><button class="icon-btn btn-side-panel-del" data-id="${escapeHtml(p.id)}" title="${delTitle}"><i class="ti ti-trash" aria-hidden="true"></i></button></div>
-        </div>`;
-  };
-
-  let html = `
-    <section class="panel-section">
-      <div class="panel-head">
-        <h2>Szafki</h2>
-        <span class="panel-hint">Shift / Ctrl = zaznacz wiele</span>
-      </div>`;
-
-  if (modules.length === 0) {
-    html += `<div class="empty-note">Brak szafek. Dodaj pierwszą albo zbuduj projekt ze szkicu.</div>`;
-  } else {
-    html += `<button id="btn-show-all" class="btn btn-sm btn-block${state.activeModuleId === null ? ' active' : ''}" style="margin-bottom:8px"><i class="ti ti-eye-off" aria-hidden="true"></i> Odznacz wszystko</button>`;
-    modules.forEach(m => {
-      // Kliknięcie zgrupowanej szafki zaznacza CAŁĄ grupę (selectedModules), ale tylko
-      // JEDNA z nich jest "aktywna" (activeModuleId) - ma otwarty panel właściwości.
-      const isActive = m.id === state.activeModuleId;
-      const isSelected = state.selectedModules && state.selectedModules.has(m.id);
-      const cls = isActive ? ' is-active' : (isSelected ? ' is-selected' : '');
-      const group = m.groupId ? `<i class="ti ti-link li-group" title="Zgrupowana z innymi szafkami" aria-hidden="true"></i>` : '';
-      html += `
-        <div class="list-item module-item${cls}" data-id="${escapeHtml(m.id)}">
-          <i class="ti ${MODULE_ICONS[m.type] || MODULE_ICONS.base_cabinet} li-icon" aria-hidden="true"></i>
-          <div class="li-main"><span class="li-name">${escapeHtml(m.name)}</span>${group}<span class="li-meta">${escapeHtml(m.dimensions.width)} × ${escapeHtml(m.dimensions.height)}</span></div>
-          <div class="li-actions">
-            <button class="icon-btn btn-mod-dup" data-id="${escapeHtml(m.id)}" title="Kopiuj szafkę"><i class="ti ti-copy" aria-hidden="true"></i></button>
-            <button class="icon-btn btn-mod-del" data-id="${escapeHtml(m.id)}" title="Usuń szafkę"><i class="ti ti-trash" aria-hidden="true"></i></button>
+  leftSidebar.innerHTML = `
+    <div class="sidebar-head">
+      <div class="sidebar-menus">
+        <details class="menu">
+          <summary class="btn btn-sm"><i class="ti ti-plus" aria-hidden="true"></i> Dodaj <i class="ti ti-chevron-down" aria-hidden="true"></i></summary>
+          <div class="menu-pop">
+            <div class="menu-title">Szafki</div>
+            ${item('btn-add-base', MODULE_ICONS.base_cabinet, 'Szafka dolna', 'Szafka dolna')}
+            ${item('btn-add-upper', MODULE_ICONS.upper_cabinet, 'Szafka wisząca', 'Szafka wisząca')}
+            ${item('btn-add-tall', MODULE_ICONS.tall_cabinet, 'Słupek', 'Słupek')}
+            ${item('btn-add-corner', MODULE_ICONS.corner_cabinet, 'Szafka narożna', 'Szafka narożna z frontem łamanym (front prosty + skośny)')}
+            ${item('btn-add-slope', MODULE_ICONS.slope_cabinet, 'Szafka pod skos', 'Szafka pod skos (pod schodami, pod dachem)')}
+            <div class="menu-title">AGD</div>
+            ${item('btn-add-dishwasher-45', PANEL_ICONS.zmywarka, 'Zmywarka 45 cm', 'Zmywarka do zabudowy 45 cm: front, wieniec nad nią, cokół (bez korpusu)')}
+            ${item('btn-add-dishwasher-60', PANEL_ICONS.zmywarka, 'Zmywarka 60 cm', 'Zmywarka do zabudowy 60 cm: front, wieniec nad nią, cokół (bez korpusu)')}
+            <div class="menu-title">Panele</div>
+            ${item('btn-add-side-panel', PANEL_ICONS.bok, 'Bok dokładany', 'Dekoracyjny panel niezależny od szafek, np. na cały słup')}
+            ${item('btn-add-horizontal-panel', PANEL_ICONS.poziomy, 'Panel poziomy', 'Płyta leżąca poza szafkami: półka albo wieniec w niszy (płyta korpusu)')}
+            ${item('btn-add-blenda', PANEL_ICONS.blenda, 'Blenda', 'Listwa maskująca szczelinę przy ścianie lub suficie (czoło + kołnierz mocujący)')}
           </div>
-        </div>`;
+        </details>
+        <details class="menu">
+          <summary class="btn btn-sm"><i class="ti ti-tools" aria-hidden="true"></i> Narzędzia <i class="ti ti-chevron-down" aria-hidden="true"></i></summary>
+          <div class="menu-pop">
+            ${item('btn-wall-fill', 'ti-layout-columns', 'Rozmieść szafki (ściana / L / U)', 'Wypełnij ścianę albo całą kuchnię L/U szafkami: narożniki, podział, blendy, kolizje z szafkami, oknami i drzwiami')}
+            ${item('btn-slope-niche', 'ti-stairs', 'Zabudowa wnęki pod skosem', 'Rząd prostokątnych szafek pod skosem (poddasze): wysokości liczone ze skosu, widok z przodu z wymiarami i zestawienie formatek')}
+            ${item('btn-module-library', 'ti-books', 'Biblioteka szafek', 'Własne szablony szafek: zapisz skonfigurowaną szafkę i wstawiaj ją do projektów')}
+            ${item('btn-import-furniture', 'ti-file-import', 'Wstaw mebel z pliku', 'Wstaw cały mebel (kilka korpusów, blendy) z pliku JSON - szafki trafiają do projektu jako jedna grupa')}
+            ${item('btn-import-ai', 'ti-wand', 'Zbuduj projekt ze zdjęcia (AI)', 'Zdjęcie odręcznego szkicu zamienia się w szafki (wymaga zalogowania)')}
+          </div>
+        </details>
+        <input type="file" id="input-furniture" accept="application/json,.json" multiple style="display: none;" />
+        <input type="file" id="input-ai-image" accept="image/png, image/jpeg" style="display: none;" />
+      </div>
+      <div class="sidebar-search">
+        <input id="sidebar-search" class="input" type="search" placeholder="Szukaj szafki lub mebla…" value="${escapeHtml(treeQuery)}" />
+        <button id="btn-show-all" class="icon-btn" title="Odznacz wszystko"><i class="ti ti-deselect" aria-hidden="true"></i></button>
+      </div>
+    </div>
+    <div class="panel-head">
+      <h2>Elementy projektu</h2>
+      <span class="panel-hint">Shift / Ctrl = zaznacz wiele</span>
+    </div>
+    <div id="sidebar-tree" class="tree"></div>
+  `;
+  renderTree();
+
+  document.getElementById('sidebar-search').addEventListener('input', (e) => { treeQuery = e.target.value; renderTree(); });
+
+  // Menu rozwijane: jedno otwarte naraz, wybór pozycji albo kliknięcie obok zamyka.
+  const menus = Array.from(leftSidebar.querySelectorAll('details.menu'));
+  menus.forEach(d => {
+    d.addEventListener('toggle', () => { if (d.open) menus.forEach(o => { if (o !== d) o.open = false; }); });
+    d.querySelectorAll('.menu-item').forEach(b => b.addEventListener('click', () => { d.open = false; }));
+  });
+  if (!menuCloserBound) {
+    menuCloserBound = true;
+    document.addEventListener('click', (e) => {
+      document.querySelectorAll('.sidebar-left details.menu[open]').forEach(d => { if (!d.contains(e.target)) d.open = false; });
     });
   }
-
-  state.project.sidePanels.filter(p => p.kind === 'zmywarka').forEach(p => {
-    html += sideItem(p, 'ti-wash-machine', 'Zmywarka', 'Usuń zmywarkę', `${p.dimensions.width} × ${p.dimensions.height}${p.topBoard !== false ? ', z wieńcem' : ''}`);
-  });
-
-  html += `
-      <div class="btn-grid" style="margin-top:8px">
-        <button id="btn-add-base" class="btn btn-sm" title="Szafka dolna"><i class="ti ti-plus" aria-hidden="true"></i> Dolna</button>
-        <button id="btn-add-upper" class="btn btn-sm" title="Szafka wisząca"><i class="ti ti-plus" aria-hidden="true"></i> Wisząca</button>
-        <button id="btn-add-tall" class="btn btn-sm" title="Słupek"><i class="ti ti-plus" aria-hidden="true"></i> Słupek</button>
-        <button id="btn-add-corner" class="btn btn-sm" title="Szafka narożna z frontem łamanym (front prosty + skośny)"><i class="ti ti-plus" aria-hidden="true"></i> Narożna</button>
-        <button id="btn-add-slope" class="btn btn-sm" title="Szafka pod skos (pod schodami, pod dachem)"><i class="ti ti-plus" aria-hidden="true"></i> Skos</button>
-        <button id="btn-add-dishwasher-45" class="btn btn-sm" title="Zmywarka do zabudowy 45 cm: front, wieniec nad nią, cokół (bez korpusu)"><i class="ti ti-plus" aria-hidden="true"></i> Zmywarka 45</button>
-        <button id="btn-add-dishwasher-60" class="btn btn-sm" title="Zmywarka do zabudowy 60 cm: front, wieniec nad nią, cokół (bez korpusu)"><i class="ti ti-plus" aria-hidden="true"></i> Zmywarka 60</button>
-      </div>
-    </section>
-
-    <section class="panel-section">
-      <div class="panel-head">
-        <h2>Boki dokładane</h2>
-        <div class="li-actions">
-          <button id="btn-add-side-panel" class="btn btn-sm" title="Dekoracyjny panel niezależny od szafek, np. na cały słup"><i class="ti ti-plus" aria-hidden="true"></i> Bok</button>
-          <button id="btn-add-horizontal-panel" class="btn btn-sm" title="Płyta leżąca poza szafkami: półka albo wieniec w niszy (płyta korpusu)"><i class="ti ti-plus" aria-hidden="true"></i> Poziomy</button>
-        </div>
-      </div>`;
-
-  // Boki dokładane i blendy (core/state.js: addSidePanel / addBlenda) - samodzielne
-  // obiekty projektu, obie listy z jednej tablicy project.sidePanels (pole kind).
-  const boks = state.project.sidePanels.filter(p => p.kind !== 'blenda' && p.kind !== 'zmywarka');
-  const blendy = state.project.sidePanels.filter(p => p.kind === 'blenda');
-  if (boks.length === 0) html += `<div class="empty-note">Brak boków dokładanych.</div>`;
-  boks.forEach(p => {
-    if (p.kind === 'poziomy') html += sideItem(p, 'ti-layout-rows', 'Panel poziomy', 'Usuń panel poziomy', `${p.dimensions.width} × ${p.dimensions.depth}, Y ${p.position?.y ?? 0}`);
-    else html += sideItem(p, 'ti-layout-board', 'Bok dokładany', 'Usuń bok dokładany', `${p.dimensions.height} × ${p.dimensions.depth}`);
-  });
-
-  html += `
-    </section>
-
-    <section class="panel-section">
-      <div class="panel-head">
-        <h2>Blendy</h2>
-        <button id="btn-add-blenda" class="btn btn-sm" title="Listwa maskująca szczelinę przy ścianie lub suficie (czoło + kołnierz mocujący)"><i class="ti ti-plus" aria-hidden="true"></i> Dodaj</button>
-      </div>`;
-  if (blendy.length === 0) html += `<div class="empty-note">Brak blend.</div>`;
-  blendy.forEach(p => { html += sideItem(p, 'ti-layout-distribute-vertical', 'Blenda', 'Usuń blendę', `${p.dimensions.width} × ${p.dimensions.height}`); });
-
-  html += `
-    </section>
-
-    <section class="panel-section">
-      <div class="panel-head"><h2>Narzędzia</h2></div>
-      <div class="btn-stack">
-        <button id="btn-wall-fill" class="btn btn-sm btn-block" title="Wypełnij ścianę albo całą kuchnię L/U szafkami: narożniki, podział, blendy, kolizje z szafkami, oknami i drzwiami"><i class="ti ti-layout-columns" aria-hidden="true"></i> Rozmieść szafki (ściana / L / U)</button>
-        <button id="btn-slope-niche" class="btn btn-sm btn-block" title="Rząd prostokątnych szafek pod skosem (poddasze): wysokości liczone ze skosu, widok z przodu z wymiarami i zestawienie formatek"><i class="ti ti-stairs" aria-hidden="true"></i> Zabudowa wnęki pod skosem</button>
-        <button id="btn-module-library" class="btn btn-sm btn-block" title="Własne szablony szafek: zapisz skonfigurowaną szafkę i wstawiaj ją do projektów"><i class="ti ti-books" aria-hidden="true"></i> Biblioteka szafek</button>
-        <button id="btn-import-furniture" class="btn btn-sm btn-block" title="Wstaw cały mebel (kilka korpusów, blendy) z pliku JSON - szafki trafiają do projektu jako jedna grupa"><i class="ti ti-file-import" aria-hidden="true"></i> Wstaw mebel z pliku</button>
-        <input type="file" id="input-furniture" accept="application/json,.json" multiple style="display: none;" />
-        <button id="btn-import-ai"class="btn btn-sm btn-block"><i class="ti ti-wand" aria-hidden="true"></i> Zbuduj projekt ze zdjęcia (AI)</button>
-        <input type="file" id="input-ai-image" accept="image/png, image/jpeg" style="display: none;" />
-        ${modules.length > 0 ? `<button id="btn-production" class="btn btn-sm btn-block btn-primary"><i class="ti ti-building-factory-2" aria-hidden="true"></i> Produkcja i raporty</button>` : ''}
-      </div>
-    </section>
-  `;
-
-  leftSidebar.innerHTML = html; 
 
   const btnShowAll = document.getElementById('btn-show-all');
   if (btnShowAll) {
@@ -193,40 +283,6 @@ export function updateSidebar() {
     });
   }
 
-  document.querySelectorAll('.btn-mod-dup').forEach(el => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation(); 
-      duplicateModule(e.currentTarget.getAttribute('data-id'));
-      initPropertiesPanel(); update3D(); updateSidebar();
-    });
-  });
-
-  document.querySelectorAll('.btn-mod-del').forEach(el => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation(); 
-      deleteModule(e.currentTarget.getAttribute('data-id'));
-      initPropertiesPanel();  update3D(); updateSidebar();
-    });
-  });
-
-  document.querySelectorAll('.module-item').forEach(el => {
-    el.addEventListener('click', (e) => {
-      const id = e.currentTarget.getAttribute('data-id');
-      // Kliknięcie zaznacza całą grupę (szafki + jej blendy/boki); Shift/Ctrl dokłada albo zdejmuje.
-      const additive = e.shiftKey || e.ctrlKey || e.metaKey;
-      const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels }, 'module', id, additive);
-      state.selectedModules = sel.moduleIds;
-      state.selectedSidePanels = sel.panelIds;
-      state.activeModuleId = sel.removed
-          ? (state.activeModuleId === id ? Array.from(state.selectedModules).pop() || null : state.activeModuleId)
-          : id;
-      state.activeSidePanelId = null;
-
-      initPropertiesPanel();
-      update3D();
-      updateSidebar();
-    });
-  });
 
   const setupAddBtn = (id, type) => {
     const btn = document.getElementById(id);
@@ -329,37 +385,6 @@ export function updateSidebar() {
     initPropertiesPanel(); update3D(); updateSidebar();
   });
 
-  document.querySelectorAll('.side-panel-item').forEach(el => {
-    el.addEventListener('click', (e) => {
-      const id = e.currentTarget.getAttribute('data-id');
-      // jak przy szafkach: Shift/Ctrl dokłada blendę/bok do zaznaczenia (np. do „Połącz w grupę”)
-      const additive = e.shiftKey || e.ctrlKey || e.metaKey;
-      const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels }, 'panel', id, additive);
-      state.selectedModules = sel.moduleIds;
-      state.selectedSidePanels = sel.panelIds;
-      if (sel.removed) {
-        if (state.activeSidePanelId === id) state.activeSidePanelId = null;
-        if (!state.activeSidePanelId) state.activeModuleId = Array.from(state.selectedModules).pop() || null;
-      } else {
-        state.activeSidePanelId = id;
-        state.activeModuleId = null;
-      }
-      initPropertiesPanel();
-      update3D();
-      updateSidebar();
-    });
-  });
-
-  document.querySelectorAll('.btn-side-panel-del').forEach(el => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      deleteSidePanel(e.currentTarget.getAttribute('data-id'));
-      initPropertiesPanel();
-      update3D();
-      updateSidebar();
-    });
-  });
-
   const btnAi = document.getElementById('btn-import-ai');
   const inputAi = document.getElementById('input-ai-image');
 
@@ -409,9 +434,6 @@ export function updateSidebar() {
           }
       });
   }
-
-  const productionBtn = document.getElementById('btn-production');
-  if (productionBtn) productionBtn.addEventListener('click', () => openProductionHub());
 
 
 }

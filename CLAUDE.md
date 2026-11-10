@@ -207,7 +207,9 @@ Wszystkie panele renderują się przez przypisanie szablonów tekstowych do `inn
 
 - `layout.js` — statyczny szkielet 3 kolumn: `.sidebar-left`, `.center-panel #editor-3d-container`,
   `.sidebar-right`.
-- `sidebar.js` — lewy panel: lista modułów, przyciski dodawania, import szkicu AI. Okna
+- `sidebar.js` — lewy panel: przyklejona góra z menu „Dodaj” (szafki / AGD / panele) i „Narzędzia”
+  oraz wyszukiwarką, pod nią jedna lista elementów projektu pogrupowana po meblach (czyste
+  `core/sidebarTree.js` na `furnitureGroups`; zwijane grupy, numery M1…, „Bez grupy”). Okna
   wynikowe, które kiedyś w nim siedziały, mają własne pliki: `csvEditor.js` (eksport CSV),
   `kosztorysModal.js`, `hardwareList.js` (wydruk listy zakupów), `technicalDrawing.js` (okno
   rysunku 2D z wierceniami + wydruk pojedynczej formatki na A4).
@@ -252,8 +254,8 @@ w `ui/helpContent.js`. Przy zmianie nazwy przycisku/sekcji albo nowej funkcji za
   **komunikaty**: `.notice-*`, `.badge-*`, `.empty-note`; tabele: `.hub-table` / `.cost-table`.
 - **Jedno wejście na funkcję**: listy formatek, rysunki wierceń, lista zakupów, plan
   rozkroju/etykiety, kosztorys i kontrola projektu są tylko w hubie „Produkcja i raporty”
-  (`ui/productionHub.js`). Lewy panel to wyłącznie Szafki / Boki dokładane / Narzędzia — nie
-  dodawaj tam z powrotem zdublowanych list.
+  (`ui/productionHub.js`). Lewy panel to wyłącznie menu Dodaj / Narzędzia i lista elementów projektu — nie
+  dodawaj tam z powrotem zdublowanych list ani przycisku huba (otwierają go zakładki Produkcja / Wycena).
 
 ### Przepływ aktualizacji
 
