@@ -7,7 +7,7 @@ import { updateSidebar } from "./sidebar.js";
 import { update3D } from "../render/viewer3d.js";
 import { calculateParts } from "../engine/cabinet.js";
 import { calculateHinges } from "../core/hingeMath.js";
-import { getTraverseConfig, clampModuleToRoom, restModuleOnNeighbors, shiftRowAfterResize } from "../core/layout.js";
+import { getTraverseConfig, clampModuleToRoom, restModuleOnNeighbors, shiftRowAfterResize, recalculateLayout } from "../core/layout.js";
 import { getDrawerBoxInfo } from "../core/drawerBoxes.js";
 import { drawerSystems } from "../core/drawerSystems.js";
 import { escapeHtml } from "../utils/dom.js";
@@ -99,6 +99,8 @@ function clearanceBlockHtml(mod, f, fc) {
       ${CLEARANCE_EDGES.map(([k, label]) => `<div class="property-group"><label>Luz ${label.toLowerCase()} (mm):</label><input type="number" id="input-front-${k}" value="${manual[k]}" step="0.5" /></div>`).join('')}
       <div class="hint">Luzy dotyczą zewnętrznych krawędzi korpusu.</div>`;
   }
+  // panel pokazuje luzy faktycznie użyte przez layout (z resztą z zaokrąglenia frontów) - layout musi być aktualny
+  recalculateLayout(mod);
   const d = describeClearance(mod, state.project);
   const anyManual = CLEARANCE_EDGES.some(([k]) => d[k].manual);
   return `<h3>Luzy frontów</h3>${toggle}

@@ -165,7 +165,9 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
   `mod.backPanel || {...}`.
 - `autoClearance.js` — luzy frontów „Auto” z sąsiadów (`frontClearance` — jedyne miejsce scalania luzów). Front z
   ułamkiem mm jest zaokrąglany w dół, a reszta trafia do krawędzi bez sąsiedniego frontu (`roundToFullMm`,
-  `ROUND_RANK`); `layout.js` podaje rozmiar frontu przed luzami (`zone.span`).
+  `ROUND_RANK`); `layout.js` podaje rozmiar frontu przed luzami (`zone.span`) i podzielnik (`wDiv` dwoje drzwi,
+  `hDiv` szuflady), żeby skrzydła i szuflady wyszły równe; bez krawędzi na resztę - środkowa szczelina drzwi / dolne
+  szuflady +1 mm. Panel czyta luzy faktycznie użyte przez layout (`applied`).
 - `hingeMath.js` — `calculateHinges()`: liczba zawiasów + pozycje Y puszek z omijaniem kolizji
   z półkami/przeszkodami (pętla przesuwania naprzemiennie o 1 mm). `cabinet.js` dodatkowo
   wylicza „globalne” zawiasy między modułami (nachodzenie odcisków z obrotem + ten sam obrót),

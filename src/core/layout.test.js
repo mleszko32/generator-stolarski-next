@@ -293,3 +293,48 @@ describe("shiftRowAfterResize", () => {
     expect(far.position.x).toBe(700);
   });
 });
+
+describe("luzy Auto: równe fronty w pełnych mm", () => {
+  const auto = (over = {}) => baseModule({ front: { clearanceAuto: true, hinges: { topOffset: 100, bottomOffset: 100, margin: 40 } }, ...over });
+  const doors = (maxX) => [0, 1].map((i) => ({ id: `lp-${i}`, typ: "front", subtype: "drzwi-lp", frontIndex: i, gap: 3, baseZone: { ...FULL_ZONE, maxX } }));
+
+  it("dwoje drzwi, nieparzysta szerokość, wolna krawędź: 1 mm idzie do luzu, szczelina środkowa 3", () => {
+    const mod = auto({ dimensions: { width: 595, height: 720, depth: 513 }, elements: doors(577) });
+    setProject(freshProject({ modules: [mod] }));
+    recalculateLayout(mod);
+    const [l, r] = mod.elements;
+    expect([l.w, r.w]).toEqual([294, 294]);
+    expect(r.x - (l.x + l.w)).toBeCloseTo(3);
+    expect(l.x).toBeCloseTo(1.5);
+  });
+
+  it("dwoje drzwi między szafkami: skrzydła równe, środkowa szczelina 4", () => {
+    const mod = auto({ dimensions: { width: 595, height: 720, depth: 513 }, position: { x: 600, y: 0, z: 0 }, elements: doors(577) });
+    const left = auto({ id: "l", position: { x: 0, y: 0, z: 0 } });
+    const right = auto({ id: "r", position: { x: 1195, y: 0, z: 0 } });
+    setProject(freshProject({ modules: [left, mod, right] }));
+    recalculateLayout(mod);
+    const [l, r] = mod.elements;
+    expect([l.w, r.w]).toEqual([294, 294]);
+    expect(r.x - (l.x + l.w)).toBeCloseTo(4);
+    expect(l.x).toBeCloseTo(1.5);
+    expect(r.x + r.w).toBeCloseTo(595 - 1.5);
+  });
+
+  it("trzy szuflady pod blatem: równe 236, reszta 1 mm do luzu przy blacie", () => {
+    const mod = auto({ elements: drawerStack("1:1:1") });
+    setProject(freshProject({ modules: [mod] }));
+    recalculateLayout(mod);
+    expect(mod.elements.map((e) => e.h)).toEqual([236, 236, 236]);
+    expect(mod.elements[2].y + mod.elements[2].h).toBeCloseTo(720 - 6);
+  });
+
+  it("szuflady bez krawędzi na resztę (góra wpisana ręcznie): 1 mm dostaje dolna szuflada", () => {
+    const mod = auto({ elements: drawerStack("1:1:1") });
+    mod.front.clearance = { top: 5 };
+    setProject(freshProject({ modules: [mod] }));
+    recalculateLayout(mod);
+    expect(mod.elements.map((e) => e.h)).toEqual([237, 236, 236]);
+    expect(mod.elements[2].y + mod.elements[2].h).toBeCloseTo(720 - 5);
+  });
+});

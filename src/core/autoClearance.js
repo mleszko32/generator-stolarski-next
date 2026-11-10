@@ -169,7 +169,10 @@ const EPS = 1e-6;
 
 // Dopisuje do `values` resztę z zaokrąglenia frontu w dół. `span` = { w, h, outer } z layoutu:
 // rozmiar frontu przed odjęciem luzów zewnętrznych i które krawędzie frontu są krawędziami
-// korpusu; bez niego - front na całą szafkę. Zwraca { krawędź: dodana reszta }.
+// korpusu; bez niego - front na całą szafkę. span.wDiv / span.hDiv = { off, n }: po odjęciu
+// `off` (szczeliny, fronty o stałej wysokości) rozmiar ma się dzielić przez `n` - dwoje drzwi
+// (n = 2) i szuflady (n = suma podziału) wychodzą wtedy równe i w pełnych mm.
+// Zwraca { krawędź: dodana reszta }.
 function roundToFullMm(values, auto, local, mod, zone) {
   const dims = (mod && mod.dimensions) || {};
   const span = (zone && zone.span) || { w: parseFloat(dims.width), h: parseFloat(dims.height), outer: { left: true, right: true, top: true, bottom: true } };
@@ -177,8 +180,10 @@ function roundToFullMm(values, auto, local, mod, zone) {
   [["w", ["right", "left"]], ["h", ["top", "bottom"]]].forEach(([dim, edges]) => {
     if (!Number.isFinite(span[dim])) return;
     const outer = edges.filter((k) => span.outer[k]);
-    const size = span[dim] - outer.reduce((sum, k) => sum + values[k], 0);
-    const rest = size - Math.floor(size + EPS);
+    const div = span[dim + "Div"] || { off: 0, n: 1 };
+    const size = span[dim] - outer.reduce((sum, k) => sum + values[k], 0) - div.off;
+    if (!(size > 0) || !(div.n >= 1)) return;
+    const rest = size - Math.floor(size / div.n + EPS) * div.n;
     if (rest < EPS) return;
     const pick = outer.filter((k) => !isSet(local[k]) && ROUND_RANK[auto[k].reason])
       .sort((a, b) => ROUND_RANK[auto[a].reason] - ROUND_RANK[auto[b].reason])[0];
@@ -188,6 +193,11 @@ function roundToFullMm(values, auto, local, mod, zone) {
   });
   return added;
 }
+
+// Luzy faktycznie użyte przez layout dla frontów szafki (największy na krawędź) - do panelu,
+// bo reszta z zaokrąglenia zależy od podziału frontów, którego opis szafki nie zna.
+const applied = new WeakMap();
+export function resetAppliedClearance(mod) { if (mod) applied.delete(mod); }
 
 const isSet = (v) => v !== undefined && v !== null && v !== "" && Number.isFinite(parseFloat(v));
 
@@ -205,6 +215,11 @@ export function frontClearance(mod, project, zone = null) {
     out[k] = isSet(local[k]) ? parseFloat(local[k]) : auto[k].value;
   });
   roundToFullMm(out, auto, local, mod, zone);
+  if (zone && zone.span && mod) {
+    const seen = applied.get(mod) || {};
+    Object.keys(out).forEach((k) => { if (zone.span.outer[k]) seen[k] = Math.max(seen[k] ?? -Infinity, out[k]); });
+    applied.set(mod, seen);
+  }
   return out;
 }
 
@@ -219,11 +234,17 @@ export function describeClearance(mod, project) {
     values[k] = manual ? parseFloat(local[k]) : auto[k].value;
     out[k] = { value: values[k], auto: auto[k].value, reason: auto[k].reason, manual };
   });
-  const added = roundToFullMm(values, auto, local, mod, null);
+  const seen = applied.get(mod);
+  const added = seen ? {} : roundToFullMm(values, auto, local, mod, null);
+  if (seen) {
+    Object.keys(out).forEach((k) => {
+      if (!out[k].manual && Number.isFinite(seen[k]) && Math.abs(seen[k] - values[k]) > EPS) { values[k] = seen[k]; added[k] = true; }
+    });
+  }
   Object.keys(added).forEach((k) => {
     out[k].value = values[k];
     out[k].auto = values[k];
-    out[k].reason += " (+ reszta, żeby front miał pełne mm)";
+    out[k].reason += " (+ reszta, żeby fronty miały równe, pełne mm)";
   });
   return out;
 }

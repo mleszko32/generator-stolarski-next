@@ -17,7 +17,7 @@ import { getSlopeInnerRect } from "./slopeCabinet.js";
 import { applyBlindCorner } from "./blindCorner.js";
 import { moduleBoardThickness } from "./boardThickness.js";
 import { topInnerY } from "./topType.js";
-import { frontClearance, isAutoClearance } from "./autoClearance.js";
+import { frontClearance, isAutoClearance, resetAppliedClearance } from "./autoClearance.js";
 
 // Przelicza layout wszystkich modułów projektu. Wołaj przed każdym liczeniem
 // formatek/okuć całego projektu — fronty z sąsiednich modułów też muszą mieć
@@ -238,8 +238,25 @@ export function elementsInBoundOrder(elements) {
   return out;
 }
 
+// Podział wysokości frontów szuflad z napisu distribution ("3", "1:1:2", "3fr:100").
+function parseDistribution(el) {
+  const distributionStr = String(el.distribution || el.frontCount || "1").trim();
+  if (!distributionStr.includes(':') && !distributionStr.includes(',') && !isNaN(distributionStr)) {
+    const count = parseInt(distributionStr, 10) || 1;
+    return Array.from({ length: count }, () => ({ type: 'fr', value: 1 }));
+  }
+  const separator = distributionStr.includes(':') ? ':' : ',';
+  return distributionStr.split(separator).map(s => {
+    const zone = s.trim();
+    if (zone.toLowerCase().endsWith('fr')) return { type: 'fr', value: parseFloat(zone) || 1 };
+    const val = parseFloat(zone) || 1;
+    return (val <= 10) ? { type: 'fr', value: val } : { type: 'fixed', value: val };
+  });
+}
+
 export function recalculateLayout(mod) {
   if (!mod || !mod.elements) return;
+  resetAppliedClearance(mod);
   const config = state.project;
   const th = moduleBoardThickness(mod, config);
   const width = parseFloat(mod.dimensions.width) || 600;
@@ -375,6 +392,16 @@ export function recalculateLayout(mod) {
                   w: (maxX - minX) + (isLeftOuter ? th : innerLeft) + (isRightOuter ? th : innerRight),
                   h: (maxY - minY) + (isBottomOuter ? th : innerBottom) + (isTopOuter ? topCover : innerTop),
               };
+              // dwoje drzwi i szuflady mają wyjść równe i w pełnych mm - reszta trafia do luzu
+              if (el.subtype === 'drzwi-lp') span.wDiv = { off: gapVal, n: 2 };
+              if (el.subtype === 'szuflada') {
+                  const zs = parseDistribution(el);
+                  const fr = zs.filter(z => z.type === 'fr');
+                  const frTotal = fr.reduce((sum, z) => sum + z.value, 0);
+                  if (frTotal > 0 && fr.every(z => Number.isInteger(z.value))) {
+                      span.hDiv = { off: gapVal * (zs.length - 1) + zs.filter(z => z.type === 'fixed').reduce((sum, z) => sum + z.value, 0), n: frTotal };
+                  }
+              }
               const fcEl = autoFc ? frontClearance(mod, config, { minX, maxX, minY, maxY, span }) : fc;
               const cLeft = parseFloat(fcEl.left ?? fcEl.sides ?? 1.5) || 0;
               const cRight = parseFloat(fcEl.right ?? fcEl.sides ?? 1.5) || 0;
@@ -393,20 +420,7 @@ export function recalculateLayout(mod) {
           }
 
           if (el.subtype === 'szuflada' || el.subtype === 'szuflada-wewnetrzna') {
-              const distributionStr = String(el.distribution || el.frontCount || "1").trim();
-              let parsedZones = [];
-              if (!distributionStr.includes(':') && !distributionStr.includes(',') && !isNaN(distributionStr)) {
-                  const count = parseInt(distributionStr, 10) || 1;
-                  for (let i = 0; i < count; i++) parsedZones.push({ type: 'fr', value: 1 });
-              } else {
-                  const separator = distributionStr.includes(':') ? ':' : ',';
-                  parsedZones = distributionStr.split(separator).map(s => {
-                      let zone = s.trim();
-                      if (zone.toLowerCase().endsWith('fr')) return { type: 'fr', value: parseFloat(zone) || 1 };
-                      const val = parseFloat(zone) || 1;
-                      return (val <= 10) ? { type: 'fr', value: val } : { type: 'fixed', value: val };
-                  });
-              }
+              const parsedZones = parseDistribution(el);
 
               const count = parsedZones.length;
               const totalGaps = gapVal * (count - 1);
@@ -417,15 +431,26 @@ export function recalculateLayout(mod) {
               availableHeight -= fixedTotal;
               const singleFrValue = frTotal > 0 ? availableHeight / frTotal : 0;
 
-              let currentY = startY;
-              for (let i = 0; i < el.frontIndex; i++) {
-                  const z = parsedZones[i] || { type: 'fr', value: 1 };
-                  const h = z.type === 'fixed' ? z.value : z.value * singleFrValue;
-                  currentY += h + gapVal;
+              // Luzy Auto: fronty w pełnych mm. Gdy reszta nie miała krawędzi, do której mogła trafić
+              // (core/autoClearance.js), fronty są zaokrąglane w dół, a pełne milimetry reszty
+              // dostają po 1 mm szuflady od dołu.
+              const heights = parsedZones.map(z => (z.type === 'fixed' ? z.value : z.value * singleFrValue));
+              if (autoFc && el.subtype === 'szuflada' && heights.some(h => Math.abs(h - Math.round(h)) > 1e-6)) {
+                  let spare = 0;
+                  parsedZones.forEach((z, i) => {
+                      if (z.type !== 'fr') return;
+                      const full = Math.floor(heights[i] + 1e-6);
+                      spare += heights[i] - full;
+                      heights[i] = full;
+                  });
+                  for (let i = 0; i < heights.length && spare >= 1 - 1e-6; i++) {
+                      if (parsedZones[i].type === 'fr') { heights[i] += 1; spare -= 1; }
+                  }
               }
 
-              const myZone = parsedZones[el.frontIndex] || { type: 'fr', value: 1 };
-              const myHeight = myZone.type === 'fixed' ? myZone.value : myZone.value * singleFrValue;
+              let currentY = startY;
+              for (let i = 0; i < el.frontIndex; i++) currentY += (heights[i] ?? singleFrValue) + gapVal;
+              const myHeight = heights[el.frontIndex] ?? singleFrValue;
 
               el.x = isNaN(startX) ? 0 : startX;
               el.w = isNaN(totalW) ? 100 : totalW;
@@ -436,9 +461,12 @@ export function recalculateLayout(mod) {
               el.x = isNaN(startX) ? 0 : startX; el.w = isNaN(totalW) ? 100 : totalW;
               el.y = isNaN(startY) ? 0 : startY; el.h = isNaN(totalH) ? 100 : totalH;
           } else if (el.subtype === 'drzwi-lp') {
-              const singleW = (totalW - gapVal) / 2;
+              let singleW = (totalW - gapVal) / 2;
+              // Luzy Auto: równe skrzydła w pełnych mm; gdy reszta nie miała krawędzi, do której
+              // mogła trafić (szafki z obu stron), bierze ją środkowa szczelina (np. 4 zamiast 3)
+              if (autoFc && singleW > 0) singleW = Math.floor(singleW + 1e-6);
               el.w = isNaN(singleW) ? 50 : singleW; el.h = isNaN(totalH) ? 100 : totalH; el.y = isNaN(startY) ? 0 : startY;
-              let myX = el.frontIndex === 0 ? startX : startX + singleW + gapVal;
+              let myX = el.frontIndex === 0 ? startX : startX + totalW - singleW;
               el.x = isNaN(myX) ? 0 : myX;
           }
 

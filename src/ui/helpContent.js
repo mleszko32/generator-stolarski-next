@@ -134,7 +134,9 @@ export const HELP_SECTIONS = [
           3 mm, cokół cofnięty albo szafka niżej 0, panel poziomy pod szafką - front schodzi o grubość panelu + 12 mm.
           Front, który przy tych luzach wyszedłby z ułamkiem milimetra (np. blenda 3 + szafka obok 1,5), jest zaokrąglany w dół,
           a reszta trafia do luzu przy blendzie, boku dokładanym, blacie, suficie albo wolnej krawędzi (np. 3,5 mm przy blendzie) -
-          szczeliny między frontami zostają bez zmian. Gdy mimo to front wychodzi z ułamkiem (np. podział szuflad), pod luzami pojawia się podpowiedź, o ile zmienić który luz, żeby
+          szczeliny między frontami zostają bez zmian. Tak samo dwoje drzwi i szuflady o równym podziale wychodzą równe i w pełnych
+          milimetrach: reszta idzie do tego luzu (np. 6 mm pod blatem zamiast 5), a gdy takiej krawędzi nie ma - do środkowej
+          szczeliny dwojga drzwi (4 mm zamiast 3) albo po 1 mm na dolne szuflady. Gdy mimo to front wychodzi z ułamkiem, pod luzami pojawia się podpowiedź, o ile zmienić który luz, żeby
           wyszedł w pełnych milimetrach. Panel pokazuje wynik z powodem; wyjątek wpisz w „Ręczne nadpisanie” (puste pole = Auto). Po odznaczeniu
           wracają cztery pola luzów wpisywane ręcznie - tak działają szafki ze starszych projektów.</li>
         <li><b>Szuflady</b> - system szuflad (Blum, GTV, MOVENTO) i ustawienia ręczne
