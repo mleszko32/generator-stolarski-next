@@ -38,6 +38,8 @@ export function drawerCardsHtml(mod, { sideInfo, extraHtml = () => '', list = dr
 
   return list.map(({ front, label }) => {
     const isInner = front.subtype === 'szuflada-wewnetrzna';
+    // Ręczny wymiar i przesunięcie frontu: pola nieużywane - widoczne tylko, gdy szuflada ma je już ustawione.
+    const hasForce = !!(front.forceH || front.forceW || front.forceOffsetX || front.forceOffsetY);
     const bz = front.baseZone || {};
     let sizeHtml;
     if (isWooden) {
@@ -55,9 +57,9 @@ export function drawerCardsHtml(mod, { sideInfo, extraHtml = () => '', list = dr
       ).join('');
       sizeHtml = `
             <div class="property-group mb-8">
-              <label class="fs-xs">Wymuszony wariant boku:</label>
+              <label class="fs-xs">Wysokość boku szuflady:</label>
               <select class="input-drawer-force-variant" data-front-id="${escapeHtml(front.id)}">
-                <option value="auto" ${(!front.forceVariant || front.forceVariant === 'auto') ? 'selected' : ''}>Auto (maksymalny)</option>
+                <option value="auto" ${(!front.forceVariant || front.forceVariant === 'auto') ? 'selected' : ''}>Auto (najwyższy, który się mieści)</option>
                 ${variantOptionsHtml}
               </select>
             </div>`;
@@ -90,10 +92,12 @@ export function drawerCardsHtml(mod, { sideInfo, extraHtml = () => '', list = dr
             </div>` : ''}
             ${sizeHtml}
             <div class="property-group mb-8">
-              <label class="fs-xs">Wymuszona głębokość (NL, mm):</label>
-              <input type="number" class="input-drawer-force-nl" data-front-id="${escapeHtml(front.id)}" placeholder="Auto" value="${front.forceNL || ''}" />
+              <label class="fs-xs">Długość prowadnicy (NL, mm):</label>
+              <input type="number" class="input-drawer-force-nl" data-front-id="${escapeHtml(front.id)}" placeholder="Auto (wg głębokości szafki)" value="${front.forceNL || ''}" />
             </div>
 
+            ${hasForce ? `
+            <div class="hint" style="margin-bottom: 4px;">Ręczny wymiar / przesunięcie frontu (ze starszego projektu) — wyczyść pola, żeby wrócić do automatu.</div>
             <div class="row mb-8">
               <div class="property-group grow">
                 <label class="fs-xs">Wymuś wys. [mm]:</label>
@@ -113,7 +117,7 @@ export function drawerCardsHtml(mod, { sideInfo, extraHtml = () => '', list = dr
                 <label class="fs-xs">Przesuń X ↔ [mm]:</label>
                 <input type="number" class="input-front-force-offset-x" data-front-id="${escapeHtml(front.id)}" value="${front.forceOffsetX || 0}" />
               </div>
-            </div>
+            </div>` : ''}
 
             ${isInner ? `
               <hr class="divider">
@@ -123,17 +127,17 @@ export function drawerCardsHtml(mod, { sideInfo, extraHtml = () => '', list = dr
                   <input type="number" class="input-inner-front-thickness" data-front-id="${escapeHtml(front.id)}" value="${front.innerFrontThickness ?? 18}" />
                 </div>
                 <div class="property-group grow">
-                  <label class="fs-xs">Luz do krawędzi [mm]:</label>
+                  <label class="fs-xs" title="O ile czoło szuflady wewnętrznej jest cofnięte od przedniej krawędzi korpusu">Cofnięcie czoła od przodu [mm]:</label>
                   <input type="number" class="input-inner-front-setback" data-front-id="${escapeHtml(front.id)}" value="${front.innerSetback ?? 2}" />
                 </div>
               </div>
               <div class="row mb-8">
                 <div class="property-group grow">
-                  <label class="fs-xs">Wolne miejsce od dołu:</label>
+                  <label class="fs-xs">Odstęp pod szufladą [mm]:</label>
                   <input type="number" class="input-inner-basezone-bottom" data-front-id="${escapeHtml(front.id)}" value="${bz.offsetBottom || 0}" />
                 </div>
                 <div class="property-group grow">
-                  <label class="fs-xs">Wolne miejsce od góry:</label>
+                  <label class="fs-xs">Odstęp nad szufladą [mm]:</label>
                   <input type="number" class="input-inner-basezone-top" data-front-id="${escapeHtml(front.id)}" value="${bz.offsetTop || 0}" />
                 </div>
               </div>
