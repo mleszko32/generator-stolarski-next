@@ -135,6 +135,40 @@ describe("luz liczony dla wnęki frontu", () => {
   });
 });
 
+describe("fronty w pełnych milimetrach", () => {
+  it("koniec ciągu przy blendzie: reszta 0,5 trafia do blendy, szczelina między frontami bez zmian", () => {
+    const a = mod("a", { position: { x: 30, y: 0, z: 0 } });
+    const b = mod("b", { position: { x: 630, y: 0, z: 0 } });
+    const bl = { id: "bl", kind: "blenda", dimensions: { width: 30, height: 720, depth: 98 }, position: { x: 0, y: 0, z: 480 } };
+    const p = project([a, b], [bl]);
+    expect(computeAutoClearance(a, p).left).toEqual({ value: 3, reason: "blenda obok" });
+    const fc = frontClearance(a, p);
+    expect(fc.left).toBe(3.5);
+    expect(fc.right).toBe(1.5);
+    expect(describeClearance(a, p).left.value).toBe(3.5);
+  });
+
+  it("środek ciągu i luz wpisany ręcznie zostają bez zmian", () => {
+    const a = mod("a", { position: { x: 0, y: 0, z: 0 } });
+    const b = mod("b", { position: { x: 600, y: 0, z: 0 } });
+    const c = mod("c", { position: { x: 1200, y: 0, z: 0 } });
+    const fc = frontClearance(b, project([a, b, c]));
+    expect([fc.left, fc.right]).toEqual([1.5, 1.5]);
+    const bl = { id: "bl", kind: "blenda", dimensions: { width: 30, height: 720, depth: 98 }, position: { x: 1800, y: 0, z: 480 } };
+    const manual = { ...c, front: { ...c.front, clearance: { right: 3 } } };
+    expect(frontClearance(manual, project([a, b, manual], [bl])).right).toBe(3);
+  });
+
+  it("rozmiar frontu z layoutu (span): zaokrągla tylko, gdy wychodzi ułamek", () => {
+    const a = mod("a", { position: { x: 0, y: 1500, z: 0 }, type: "upper_cabinet", legs: { active: false } });
+    const p = project([a], [], { room: { width: 4000, depth: 3000, height: 2700 } });
+    const outer = { left: true, right: true, top: true, bottom: true };
+    // wolna góra 1,5: front 720 - 1,5 = 718,5 -> 718, góra 2
+    expect(frontClearance(a, p, { minX: 18, maxX: 582, minY: 18, maxY: 702, span: { w: 600, h: 720, outer } }).top).toBe(2);
+    expect(frontClearance(a, p, { minX: 18, maxX: 582, minY: 18, maxY: 702, span: { w: 600, h: 720.5, outer } }).top).toBe(1.5);
+  });
+});
+
 describe("frontClearance", () => {
   it("tryb ręczny: ustawienia projektu nadpisane ustawieniami szafki", () => {
     const m = mod("a", { front: { clearance: { top: 2 } } });

@@ -13,6 +13,10 @@
 // liczy się jak blenda: cała szczelina po stronie frontu - z boku, u góry i na dole.
 // Szafka z frontem nad / pod otwartą ma bok frontu równo z krawędzią otwartego korpusu (0),
 // a całe 3 mm bierze front szafki obok - pionowa linia szczeliny idzie prosto.
+// Fronty w pełnych milimetrach: gdy przy tych luzach front wyszedłby z ułamkiem (np. blenda 3 +
+// szafka obok 1,5), jest zaokrąglany w dół, a reszta trafia do luzu przy krawędzi, przy której
+// nie ma sąsiedniego frontu (ROUND_RANK: blenda / bok / blat / sufit, potem wolna krawędź,
+// na końcu otwarta szafka - tam szczelina 3 mm jest na widoku) - szczeliny między frontami zostają bez zmian.
 // Sąsiedztwo jest geometryczne (co faktycznie przylega), nie po grupach. Czysta logika:
 // dostaje szafkę i projekt, niczego nie zmienia.
 import { getModuleBox } from "./layout.js";
@@ -154,6 +158,37 @@ export function computeAutoClearance(mod, project, zone = null) {
   return { left: side(true), right: side(false), top: top(), bottom: bottom() };
 }
 
+// Do której krawędzi może trafić reszta z zaokrąglenia (niższy numer = chętniej). Krawędzi
+// przy froncie sąsiada, zmywarce, szafce niżej / wyżej i panelu pod szafką nie ruszamy.
+const ROUND_RANK = {
+  "blenda obok": 1, "bok dokładany obok": 1, "blenda górna": 1, "blat": 1, "sufit": 1,
+  "otwarta szafka obok": 3, "szafka obok w linii z otwartą": 3, "otwarta szafka niżej": 3, "cokół w licu frontów": 3,
+  "wolna krawędź": 2,
+};
+const EPS = 1e-6;
+
+// Dopisuje do `values` resztę z zaokrąglenia frontu w dół. `span` = { w, h, outer } z layoutu:
+// rozmiar frontu przed odjęciem luzów zewnętrznych i które krawędzie frontu są krawędziami
+// korpusu; bez niego - front na całą szafkę. Zwraca { krawędź: dodana reszta }.
+function roundToFullMm(values, auto, local, mod, zone) {
+  const dims = (mod && mod.dimensions) || {};
+  const span = (zone && zone.span) || { w: parseFloat(dims.width), h: parseFloat(dims.height), outer: { left: true, right: true, top: true, bottom: true } };
+  const added = {};
+  [["w", ["right", "left"]], ["h", ["top", "bottom"]]].forEach(([dim, edges]) => {
+    if (!Number.isFinite(span[dim])) return;
+    const outer = edges.filter((k) => span.outer[k]);
+    const size = span[dim] - outer.reduce((sum, k) => sum + values[k], 0);
+    const rest = size - Math.floor(size + EPS);
+    if (rest < EPS) return;
+    const pick = outer.filter((k) => !isSet(local[k]) && ROUND_RANK[auto[k].reason])
+      .sort((a, b) => ROUND_RANK[auto[a].reason] - ROUND_RANK[auto[b].reason])[0];
+    if (!pick) return;
+    values[pick] += rest;
+    added[pick] = rest;
+  });
+  return added;
+}
+
 const isSet = (v) => v !== undefined && v !== null && v !== "" && Number.isFinite(parseFloat(v));
 
 // Luzy frontów szafki do obliczeń: JEDYNE miejsce scalania. Tryb ręczny - ustawienia projektu
@@ -169,6 +204,7 @@ export function frontClearance(mod, project, zone = null) {
   ["left", "right", "top", "bottom"].forEach((k) => {
     out[k] = isSet(local[k]) ? parseFloat(local[k]) : auto[k].value;
   });
+  roundToFullMm(out, auto, local, mod, zone);
   return out;
 }
 
@@ -177,9 +213,17 @@ export function describeClearance(mod, project) {
   const local = (mod && mod.front && mod.front.clearance) || {};
   const auto = computeAutoClearance(mod, project);
   const out = {};
+  const values = {};
   ["left", "right", "top", "bottom"].forEach((k) => {
     const manual = isSet(local[k]);
-    out[k] = { value: manual ? parseFloat(local[k]) : auto[k].value, auto: auto[k].value, reason: auto[k].reason, manual };
+    values[k] = manual ? parseFloat(local[k]) : auto[k].value;
+    out[k] = { value: values[k], auto: auto[k].value, reason: auto[k].reason, manual };
+  });
+  const added = roundToFullMm(values, auto, local, mod, null);
+  Object.keys(added).forEach((k) => {
+    out[k].value = values[k];
+    out[k].auto = values[k];
+    out[k].reason += " (+ reszta, żeby front miał pełne mm)";
   });
   return out;
 }

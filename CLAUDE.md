@@ -163,6 +163,9 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
 - `backPanel.js` — `resolveBackPanel(mod, project)` (domyślne ustawienia pleców = te z
   formularza) i `corpusInnerDepth(...)` (głębokość wieńców); nie pisz własnych fallbacków
   `mod.backPanel || {...}`.
+- `autoClearance.js` — luzy frontów „Auto” z sąsiadów (`frontClearance` — jedyne miejsce scalania luzów). Front z
+  ułamkiem mm jest zaokrąglany w dół, a reszta trafia do krawędzi bez sąsiedniego frontu (`roundToFullMm`,
+  `ROUND_RANK`); `layout.js` podaje rozmiar frontu przed luzami (`zone.span`).
 - `hingeMath.js` — `calculateHinges()`: liczba zawiasów + pozycje Y puszek z omijaniem kolizji
   z półkami/przeszkodami (pętla przesuwania naprzemiennie o 1 mm). `cabinet.js` dodatkowo
   wylicza „globalne” zawiasy między modułami (nachodzenie odcisków z obrotem + ten sam obrót),

@@ -326,13 +326,6 @@ export function recalculateLayout(mod) {
               startY = minY + gY;
               totalH = (maxY - minY) - (gY * 2);
           } else {
-              // luzy Auto liczą się dla wnęki TEGO frontu (co stoi obok niego), ręczne - dla szafki
-              const fcEl = autoFc ? frontClearance(mod, config, { minX, maxX, minY, maxY }) : fc;
-              const cLeft = parseFloat(fcEl.left ?? fcEl.sides ?? 1.5) || 0;
-              const cRight = parseFloat(fcEl.right ?? fcEl.sides ?? 1.5) || 0;
-              const cTop = parseFloat(fcEl.top ?? fcEl.gora ?? 2) || 0;
-              const cBottom = parseFloat(fcEl.bottom ?? fcEl.dol ?? 2) || 0;
-
               const isBoundLeftFront = el.baseZone.boundLeft && el.baseZone.boundLeft.startsWith('front');
               const isBoundRightFront = el.baseZone.boundRight && el.baseZone.boundRight.startsWith('front');
               const isBoundBottomFront = el.baseZone.boundBottom && el.baseZone.boundBottom.startsWith('front');
@@ -365,13 +358,33 @@ export function recalculateLayout(mod) {
               const gapFromAxisTop = axisGap(el.gapFromAxisTop);
               const gapFromAxisBottom = axisGap(el.gapFromAxisBottom);
 
-              const overLeft = isLeftOuter ? (isInset ? -cLeft : th - cLeft) : (isBoundLeftFront ? -gapVal : ((th / 2) - (gapVal / 2)));
-              const overRight = isRightOuter ? (isInset ? -cRight : th - cRight) : (isBoundRightFront ? -gapVal : ((th / 2) - (gapVal / 2)));
-              const overBottom = isBottomOuter ? (isInset ? -cBottom : th - cBottom) : (isBoundBottomFront ? -gapVal : (gapFromAxisBottom !== null ? (th / 2) - gapFromAxisBottom : (th / 2) - (gapVal / 2)));
               // bez wieńca górnego front nakładany nie ma czego zakryć u góry - kończy się luz pod górną krawędzią boków
               // nakładany zakrywa całe zamknięcie góry: wieniec / trawers poziomy = th, trawers pionowy = jego szerokość
               const topCover = slopeRect ? (cons.topType === 'brak' ? 0 : th) : height - topInnerY(cons, height, th);
-              const overTop = isTopOuter ? (isInset ? -cTop : topCover - cTop) : (isBoundTopFront ? -gapVal : (gapFromAxisTop !== null ? (th / 2) - gapFromAxisTop : (th / 2) - (gapVal / 2)));
+              // nakładanie na granicach wewnętrznych (wieniec / półka / przegroda / inny front) nie zależy od luzów
+              const innerLeft = isBoundLeftFront ? -gapVal : ((th / 2) - (gapVal / 2));
+              const innerRight = isBoundRightFront ? -gapVal : ((th / 2) - (gapVal / 2));
+              const innerBottom = isBoundBottomFront ? -gapVal : (gapFromAxisBottom !== null ? (th / 2) - gapFromAxisBottom : (th / 2) - (gapVal / 2));
+              const innerTop = isBoundTopFront ? -gapVal : (gapFromAxisTop !== null ? (th / 2) - gapFromAxisTop : (th / 2) - (gapVal / 2));
+
+              // luzy Auto liczą się dla wnęki TEGO frontu (co stoi obok niego), ręczne - dla szafki.
+              // `span` = rozmiar frontu przed odjęciem luzów zewnętrznych - z niego Auto zaokrągla
+              // front do pełnych mm (core/autoClearance.js: roundToFullMm).
+              const span = {
+                  outer: { left: isLeftOuter, right: isRightOuter, top: isTopOuter, bottom: isBottomOuter },
+                  w: (maxX - minX) + (isLeftOuter ? th : innerLeft) + (isRightOuter ? th : innerRight),
+                  h: (maxY - minY) + (isBottomOuter ? th : innerBottom) + (isTopOuter ? topCover : innerTop),
+              };
+              const fcEl = autoFc ? frontClearance(mod, config, { minX, maxX, minY, maxY, span }) : fc;
+              const cLeft = parseFloat(fcEl.left ?? fcEl.sides ?? 1.5) || 0;
+              const cRight = parseFloat(fcEl.right ?? fcEl.sides ?? 1.5) || 0;
+              const cTop = parseFloat(fcEl.top ?? fcEl.gora ?? 2) || 0;
+              const cBottom = parseFloat(fcEl.bottom ?? fcEl.dol ?? 2) || 0;
+
+              const overLeft = isLeftOuter ? (isInset ? -cLeft : th - cLeft) : innerLeft;
+              const overRight = isRightOuter ? (isInset ? -cRight : th - cRight) : innerRight;
+              const overBottom = isBottomOuter ? (isInset ? -cBottom : th - cBottom) : innerBottom;
+              const overTop = isTopOuter ? (isInset ? -cTop : topCover - cTop) : innerTop;
 
               startX = minX - overLeft;
               totalW = (maxX - minX) + overLeft + overRight;
