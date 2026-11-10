@@ -214,7 +214,8 @@ Wszystkie panele renderują się przez przypisanie szablonów tekstowych do `inn
   `.sidebar-right`.
 - `sidebar.js` — lewy panel: przyklejona góra z menu „Dodaj” (szafki / AGD / panele) i „Narzędzia”
   oraz wyszukiwarką, pod nią jedna lista elementów projektu pogrupowana po meblach (czyste
-  `core/sidebarTree.js` na `furnitureGroups`; zwijane grupy, numery M1…, „Bez grupy”). Okna
+  `core/sidebarTree.js` na `furnitureGroups`; zwijane grupy, numery M1…, „Bez grupy”,
+  nazwy w gałęzi bez nazwy mebla - `shortName`; po najechaniu panel poszerza się nad widok 3D - `fitWide`). Okna
   wynikowe, które kiedyś w nim siedziały, mają własne pliki: `csvEditor.js` (eksport CSV),
   `kosztorysModal.js`, `hardwareList.js` (wydruk listy zakupów), `technicalDrawing.js` (okno
   rysunku 2D z wierceniami + wydruk pojedynczej formatki na A4).

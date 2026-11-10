@@ -6,7 +6,7 @@
 // w kolejności mebli w projekcie, jak furnitureCodes (tam pomijane są meble bez formatek).
 // Czyste - bez state, z testami.
 
-import { furnitureGroups } from "./furnitureGroups.js";
+import { furnitureGroups, commonNamePrefix } from "./furnitureGroups.js";
 
 const PANEL_NAMES = { blenda: "Blenda", poziomy: "Panel poziomy", zmywarka: "Zmywarka" };
 
@@ -25,7 +25,25 @@ function panelItem(p) {
   return { kind: "panel", id: p.id, panelKind, name: p.name || PANEL_NAMES[p.kind] || "Bok dokładany", meta };
 }
 
-// Zwraca { furniture: [{ key, code, label, items }], loose: [item + code], shown, total }.
+// Nazwa elementu w gałęzi mebla bez powtarzanej nazwy mebla („S.6.2 Szafa lewa” → „Szafa lewa”).
+export function shortName(name, label) {
+  const n = String(name || "");
+  const l = String(label || "").trim();
+  if (!l || !n.startsWith(l) || !/^[\s\-–—:,]/.test(n.slice(l.length))) return n;
+  return n.slice(l.length).replace(/^[\s\-–—:,]+/, "") || n;
+}
+
+// Wspólny numer na początku nazw elementów mebla („S.6.2”), gdy grupa ma własną nazwę:
+// początkowe wspólne słowa zawierające cyfrę. Zwykłe słowa („Szafka”) zostają w nazwach.
+export function codePrefix(names) {
+  if (names.length < 2) return "";
+  const out = [];
+  for (const w of commonNamePrefix(names).split(" ")) { if (/\d/.test(w)) out.push(w); else break; }
+  return out.join(" ");
+}
+
+// Zwraca { furniture: [{ key, code, label, items }], loose: [item + code], shown, total };
+// element mebla ma też `short` - nazwę bez nazwy mebla.
 // query filtruje po nazwie elementu; pasująca nazwa mebla pokazuje cały mebel.
 export function buildSidebarTree(project, query = "") {
   const modules = (project && project.modules) || [];
@@ -45,7 +63,11 @@ export function buildSidebarTree(project, query = "") {
     const items = whole ? node.items : node.items.filter((it) => hit(it.name));
     if (!items.length) return;
     shown += items.length;
-    if (node.grouped) furniture.push({ key: node.key, code: node.code, label: node.label, items });
+    if (node.grouped) {
+      const prefix = codePrefix(node.items.map((it) => it.name));
+      const short = (name) => { const s = shortName(name, node.label); return s === name ? shortName(name, prefix) : s; };
+      furniture.push({ key: node.key, code: node.code, label: node.label, items: items.map((it) => ({ ...it, short: short(it.name) })) });
+    }
     else items.forEach((it) => loose.push({ ...it, code: node.code }));
   });
   return { furniture, loose, shown, total: modules.length + panels.length };

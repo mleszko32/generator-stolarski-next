@@ -65,7 +65,8 @@ export const HELP_SECTIONS = [
       pogrupowane po meblach (grupach), z numerem mebla M1… jak na listach formatek. Nagłówek
       mebla zwija i rozwija jego elementy, elementy spoza grup są w „Bez grupy”. Pole
       <b>Szukaj</b> filtruje listę po nazwie szafki albo mebla, a ikona obok odznacza wszystko.
-      Po najechaniu na wiersz pokazują się przyciski <b>kopiuj</b> i <b>usuń</b>. Usuwanie jest
+      W gałęzi mebla nazwy są bez powtarzanej nazwy mebla, a po najechaniu myszą panel poszerza się nad widok 3D, żeby
+      długie nazwy były widoczne w całości. Po najechaniu na wiersz pokazują się przyciski <b>kopiuj</b> i <b>usuń</b>. Usuwanie jest
       tylko na liście, nie w prawym panelu.</p>
       <h4>Narzędzia</h4>
       <p>Menu <b>Narzędzia</b> obok menu Dodaj:</p>

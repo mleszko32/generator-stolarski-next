@@ -96,7 +96,7 @@ function itemHtml(it) {
   return `
     <div class="list-item ${isModule ? 'module-item' : 'side-panel-item'}${cls}" data-id="${id}" title="${escapeHtml(it.name)} - ${escapeHtml(it.meta)}">
       <i class="ti ${icon} li-icon" aria-hidden="true"></i>
-      <div class="li-main">${code}<span class="li-name">${escapeHtml(it.name)}</span><span class="li-meta">${escapeHtml(it.meta)}</span></div>
+      <div class="li-main">${code}<span class="li-name">${escapeHtml(it.short || it.name)}</span><span class="li-meta">${escapeHtml(it.meta)}</span></div>
       <div class="li-actions">${actions}</div>
     </div>`;
 }
@@ -131,6 +131,46 @@ function renderTree() {
   if (!root) return;
   root.innerHTML = treeHtml();
   bindTree(root);
+  if (wideTimer === true) fitWide();
+}
+
+// Panel poszerza się po najechaniu myszą do szerokości najdłuższej nazwy (najwyżej WIDE_MAX),
+// przykrywając widok 3D: ujemny margines trzyma jego miejsce w układzie, więc scena się nie
+// przesuwa ani nie przelicza. wideTimer: null = wąski, liczba = czeka na poszerzenie, true = szeroki.
+const WIDE_MAX = 640;
+const WIDE_DELAY = 200;
+let wideTimer = null;
+
+function fitWide() {
+  const el = document.querySelector('.sidebar-left');
+  if (!el) return;
+  el.style.width = 'max-content';
+  el.style.marginRight = '';
+  const base = parseFloat(getComputedStyle(el).minWidth) || el.offsetWidth;
+  const w = Math.min(el.offsetWidth, WIDE_MAX, Math.round(window.innerWidth * 0.6));
+  el.style.width = '';
+  if (w <= base + 1) { el.classList.remove('is-wide'); return; }
+  el.classList.add('is-wide');
+  el.style.width = w + 'px';
+  el.style.marginRight = (base - w) + 'px';
+}
+
+function setNarrow(el) {
+  if (typeof wideTimer === 'number') clearTimeout(wideTimer);
+  wideTimer = null;
+  el.classList.remove('is-wide');
+  el.style.width = '';
+  el.style.marginRight = '';
+}
+
+function bindHoverExpand(el) {
+  el.addEventListener('mouseenter', (e) => {
+    // nie w trakcie przeciągania (szafka, kamera) i nie w układzie jednokolumnowym (telefon)
+    if (e.buttons !== 0 || wideTimer !== null) return;
+    if (getComputedStyle(el.parentElement).flexDirection === 'column') return;
+    wideTimer = setTimeout(() => { wideTimer = true; fitWide(); }, WIDE_DELAY);
+  });
+  el.addEventListener('mouseleave', () => setNarrow(el));
 }
 
 function bindTree(root) {
@@ -272,6 +312,7 @@ export function updateSidebar() {
   });
   if (!menuCloserBound) {
     menuCloserBound = true;
+    bindHoverExpand(leftSidebar);
     document.addEventListener('click', (e) => {
       document.querySelectorAll('.sidebar-left details.menu[open]').forEach(d => { if (!d.contains(e.target)) d.open = false; });
     });

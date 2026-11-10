@@ -535,6 +535,9 @@ details.menu[open] > summary { border-color: var(--accent); color: var(--accent)
 }
 .menu-item:hover { background: var(--surface-subtle); }
 .menu-item .ti { font-size: 16px; opacity: 0.8; }
+/* poszerzony po najechaniu (ui/sidebar.js: fitWide) - przykrywa widok 3D */
+.sidebar-left.is-wide { position: relative; z-index: 30; box-shadow: 6px 0 24px rgba(0, 0, 0, 0.16); }
+.sidebar-left .empty-note, .sidebar-left .panel-hint { max-width: 290px; }
 .sidebar-search { display: flex; align-items: center; gap: 4px; margin-top: 8px; }
 .sidebar-search .input { flex: 1; min-width: 0; }
 
