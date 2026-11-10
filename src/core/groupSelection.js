@@ -24,24 +24,44 @@ export function groupMembers(project, kind, id) {
 }
 
 // Kliknięcie w liście / 3D: bez Shift/Ctrl = tylko ta grupa; z Shift/Ctrl = dołóż albo zdejmij
-// (zdejmuje, gdy cała grupa już była zaznaczona). Zwraca nowe { moduleIds, panelIds } (Sety)
+// (zdejmuje, gdy cała grupa już była zaznaczona). Zwraca nowe { moduleIds, panelIds, picks } (Sety)
 // i removed = czy klik odznaczył.
+// Shift/Ctrl + klik w INNĄ szafkę grupy aktywnej szafki (selection.activeId) nie odznacza grupy,
+// tylko dobiera tę szafkę do wspólnej edycji w prawym panelu (picks; ponowny klik ją zdejmuje) -
+// grupa i tak jest zaznaczona cała, więc inaczej nie dało się zmienić kilku jej szafek naraz.
 export function clickSelection(project, selection, kind, id, additive) {
   const g = groupMembers(project, kind, id);
-  if (!additive) return { moduleIds: new Set(g.moduleIds), panelIds: new Set(g.panelIds), removed: false };
+  if (!additive) return { moduleIds: new Set(g.moduleIds), panelIds: new Set(g.panelIds), picks: new Set(), removed: false };
   const moduleIds = new Set(selection.moduleIds || []);
   const panelIds = new Set(selection.panelIds || []);
+  const picks = new Set(selection.picks || []);
+  const activeId = selection.activeId;
+  if (kind === "module" && activeId && id !== activeId && g.moduleIds.includes(activeId)) {
+    const removed = picks.has(id);
+    if (removed) picks.delete(id); else picks.add(id);
+    g.moduleIds.forEach((m) => moduleIds.add(m));
+    g.panelIds.forEach((p) => panelIds.add(p));
+    return { moduleIds, panelIds, picks, removed, picked: true };
+  }
   const all = g.moduleIds.every((m) => moduleIds.has(m)) && g.panelIds.every((p) => panelIds.has(p));
   g.moduleIds.forEach((m) => (all ? moduleIds.delete(m) : moduleIds.add(m)));
   g.panelIds.forEach((p) => (all ? panelIds.delete(p) : panelIds.add(p)));
-  return { moduleIds, panelIds, removed: all };
+  return { moduleIds, panelIds, picks: all ? new Set() : picks, removed: all };
+}
+
+// Szafki dobrane Shift/Ctrl w grupie aktywnej szafki (bez niej samej) - Set id.
+export function activePicks(project, selection, activeId) {
+  const picks = selection && selection.picks;
+  if (!activeId || !picks || !picks.size) return new Set();
+  return new Set(groupMembers(project, "module", activeId).moduleIds.filter((id) => id !== activeId && picks.has(id)));
 }
 
 // Których szafek dotyczą zmiany w prawym panelu. Kliknięcie szafki z grupy zaznacza całą
 // grupę (żeby mebel przesuwał się razem), ale panel ma wtedy zmieniać tylko klikniętą szafkę -
 // inaczej luz albo wymiar wpisany w jednej trafiał do wszystkich szafek mebla. Kilka szafek
 // naraz zmienia się tylko po świadomym dobraniu ich Shift/Ctrl, czyli gdy zaznaczenie różni
-// się od samej grupy aktywnej szafki. Zwraca id szafek.
+// się od samej grupy aktywnej szafki, albo po dobraniu szafek wewnątrz grupy (activePicks).
+// Zwraca id szafek.
 export function editTargets(project, selection, activeId) {
   const selected = [...((selection && selection.moduleIds) || [])];
   if (!activeId) return selected;
@@ -50,7 +70,9 @@ export function editTargets(project, selection, activeId) {
   const panels = [...((selection && selection.panelIds) || [])];
   const onlyGroup = selected.length === g.moduleIds.length && selected.every((id) => g.moduleIds.includes(id))
     && panels.every((id) => g.panelIds.includes(id));
-  return onlyGroup ? [activeId] : selected;
+  if (!onlyGroup) return selected;
+  const picks = activePicks(project, selection, activeId);
+  return g.moduleIds.filter((id) => id === activeId || picks.has(id));
 }
 
 // Czy zaznaczenie można połączyć w grupę: co najmniej dwa elementy (szafki i/lub blendy, boki,

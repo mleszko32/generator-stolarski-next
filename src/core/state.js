@@ -218,6 +218,8 @@ export const state = {
   // boki dokładane / blendy zaznaczone razem z szafkami (Shift/Ctrl) - do łączenia w grupę i
   // wspólnego przesuwania (core/groupSelection.js); szafki są w state.selectedModules
   selectedSidePanels: new Set(),
+  // szafki dobrane Shift/Ctrl wewnątrz grupy aktywnej szafki (core/groupSelection.js: activePicks)
+  editPicks: new Set(),
   loadedProjectId: null,
   project: {
     name: "Zabudowa Wielomodułowa",

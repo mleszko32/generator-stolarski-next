@@ -7,6 +7,29 @@ const make = () => ({
 });
 const sel = (m, p) => ({ moduleIds: new Set(m), panelIds: new Set(p) });
 
+describe("dobieranie szafek Shiftem wewnątrz grupy", () => {
+  it("Shift+klik w inną szafkę grupy aktywnej dobiera ją do edycji, ponowny zdejmuje", () => {
+    const p = make();
+    const s = clickSelection(p, sel([], []), "module", "m1", false);
+    const a = clickSelection(p, { ...s, activeId: "m1" }, "module", "m2", true);
+    expect(a.picked).toBe(true);
+    expect([...a.moduleIds].sort()).toEqual(["m1", "m2"]);
+    expect(editTargets(p, a, "m1")).toEqual(["m1", "m2"]);
+    const b = clickSelection(p, { ...a, activeId: "m1" }, "module", "m2", true);
+    expect(b.removed).toBe(true);
+    expect(editTargets(p, b, "m1")).toEqual(["m1"]);
+  });
+
+  it("zwykłe kliknięcie czyści dobrane, a szafka spoza grupy dokłada się jak dotąd", () => {
+    const p = make();
+    const a = clickSelection(p, { ...sel(["m1", "m2"], ["p1"]), activeId: "m1" }, "module", "m2", true);
+    expect(clickSelection(p, { ...a, activeId: "m1" }, "module", "m1", false).picks.size).toBe(0);
+    const c = clickSelection(p, { ...sel(["m1", "m2"], ["p1"]), activeId: "m1" }, "module", "m3", true);
+    expect(c.picked).toBeUndefined();
+    expect(editTargets(p, c, "m3")).toEqual(["m1", "m2", "m3"]);
+  });
+});
+
 describe("editTargets - których szafek dotyczą zmiany w panelu", () => {
   it("grupa zaznaczona kliknięciem: tylko kliknięta szafka", () => {
     const s = clickSelection(make(), sel([], []), "module", "m1", false);

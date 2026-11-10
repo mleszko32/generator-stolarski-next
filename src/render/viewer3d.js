@@ -424,10 +424,11 @@ export function init3DViewer() {
 
               if (!wasSelectedOnDown) {
                   // cała grupa (szafki + jej blendy/boki); Shift/Ctrl dokłada do zaznaczenia
-                  const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels },
+                  const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels, picks: state.editPicks, activeId: state.activeModuleId },
                       'module', dragModule.id, e.shiftKey || e.ctrlKey || e.metaKey);
                   state.selectedModules = sel.moduleIds;
                   state.selectedSidePanels = sel.panelIds;
+                  state.editPicks = sel.picks;
                   state.activeModuleId = dragModule.id;
                   state.activeSidePanelId = null;
                   updateSidebar();
@@ -474,10 +475,11 @@ export function init3DViewer() {
                   const wasActive = state.activeSidePanelId === dragSidePanel.id;
                   if (!wasActive) {
                       // jak w lewym panelu: klik = grupa boku, Shift/Ctrl dokłada go do zaznaczenia szafek
-                      const sel = clickSelection(state.project, { moduleIds: state.selectedModules || new Set(), panelIds: state.selectedSidePanels },
+                      const sel = clickSelection(state.project, { moduleIds: state.selectedModules || new Set(), panelIds: state.selectedSidePanels, picks: state.editPicks, activeId: state.activeModuleId },
                           'panel', dragSidePanel.id, e.shiftKey || e.ctrlKey || e.metaKey);
                       state.selectedModules = sel.moduleIds;
                       state.selectedSidePanels = sel.panelIds;
+                  state.editPicks = sel.picks;
                       state.activeSidePanelId = dragSidePanel.id;
                       state.activeModuleId = null;
                       updateSidebar();
@@ -1175,6 +1177,7 @@ function handle3DClick(event) {
           state.activeSidePanelId = null;
           if (state.selectedModules) state.selectedModules.clear();
           state.selectedSidePanels = new Set();
+          state.editPicks = new Set();
           updateSidebar();
           initPropertiesPanel();
           update3D();
@@ -1245,19 +1248,22 @@ function handle3DClick(event) {
 
       if (wasSelectedOnDown) {
           if (additive) {
-              const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels }, 'module', data.moduleId, true);
+              const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels, picks: state.editPicks, activeId: state.activeModuleId }, 'module', data.moduleId, true);
               state.selectedModules = sel.moduleIds;
               state.selectedSidePanels = sel.panelIds;
-              if (state.activeModuleId === data.moduleId) state.activeModuleId = Array.from(state.selectedModules).pop() || null;
+                  state.editPicks = sel.picks;
+              // dobranie szafki w grupie aktywnej (sel.picked) nie rusza aktywnej szafki
+              if (!sel.picked && state.activeModuleId === data.moduleId) state.activeModuleId = Array.from(state.selectedModules).pop() || null;
               updateSidebar();
               initPropertiesPanel();
               update3D();
           // klik w szafkę już zaznaczonej grupy: ta szafka staje się aktywna (jej panel
           // właściwości), a zaznaczenie wraca do samej grupy
-          } else if (state.activeModuleId !== data.moduleId || state.activeSidePanelId
+          } else if (state.activeModuleId !== data.moduleId || state.activeSidePanelId || (state.editPicks && state.editPicks.size)
               || state.selectedModules.size + (state.selectedSidePanels?.size || 0) > group.moduleIds.length + group.panelIds.length) {
               state.selectedModules = new Set(group.moduleIds);
               state.selectedSidePanels = new Set(group.panelIds);
+              state.editPicks = new Set();
               state.activeModuleId = data.moduleId;
               state.activeSidePanelId = null;
               updateSidebar();

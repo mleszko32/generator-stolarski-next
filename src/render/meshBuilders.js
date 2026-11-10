@@ -6,6 +6,7 @@
 // "Przezroczysty / Realistyczny" w viewer3d.js), od którego zależą materiały.
 import * as THREE from 'three';
 import { state } from '../core/state.js';
+import { activePicks } from '../core/groupSelection.js';
 import { sideFloorExt } from '../engine/carcaseParts.js';
 import { partMaterial, isLightColor } from '../core/decorColors.js';
 
@@ -178,7 +179,8 @@ export function setHighlightKey(key) { highlightKey = key || null; }
 const tintCache = new Map();
 const COLORABLE = new Set(['corpus', 'shelf', 'front', 'plinth', 'drawerBox']);
 // active = bryła klikniętej (aktywnej) szafki: kolor płyty podbarwiony na niebiesko, żeby w
-// zaznaczonej grupie było widać, którą szafkę zmienia prawy panel. Pozostałe zaznaczone szafki
+// zaznaczonej grupie było widać, którą szafkę zmienia prawy panel (tak samo szafki dobrane
+// Shiftem w jej grupie - activePicks). Pozostałe zaznaczone szafki
 // (Shift/Ctrl, grupa) mają słabsze podbarwienie - sam jasny obrys krawędzi był niewidoczny.
 const ACTIVE_TINT = new THREE.Color(0x2563eb);
 const ACTIVE_TYPES = new Set(['corpus', 'shelf', 'front', 'plinth', 'hdf']);
@@ -190,6 +192,8 @@ function materialFor(type, userData, active = false) {
   if (ent) color = colorMode === 'materials' ? (materialPalette.get(ent.key) ?? null) : ent.color;
   if (color != null && colorMode === 'real' && isXrayMode && isLightColor(color)) color = null;
   const faded = highlightKey != null && (!ent || ent.key !== highlightKey);
+  if (!active && userData && userData.moduleId && state.editPicks && state.editPicks.size
+    && activePicks(state.project, { picks: state.editPicks }, state.activeModuleId).has(userData.moduleId)) active = true;
   const selected = !active && !!(userData && userData.moduleId && state.selectedModules && state.selectedModules.has(userData.moduleId));
   const tinted = (active || selected) && !faded && ACTIVE_TYPES.has(type);
   if (color == null && !faded && !tinted) return base;

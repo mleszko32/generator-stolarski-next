@@ -14,7 +14,7 @@ import { sanitizeAiModules, buildModulesFromAi } from "../core/aiSketchImport.js
 import { getIdToken } from "../core/storage.js";
 import { clampModuleToRoom } from "../core/layout.js";
 import { parseFurnitureJson, insertFurniture } from "../core/furnitureImport.js";
-import { clickSelection } from "../core/groupSelection.js";
+import { clickSelection, activePicks } from "../core/groupSelection.js";
 
 // Okno oczekiwania na wynik AI (wspólne openModal, bez zamykania w trakcie).
 let aiLoader = null;
@@ -73,6 +73,7 @@ const LOOSE_KEY = 'bez-grupy';
 let treeQuery = '';
 const collapsedGroups = new Set();
 let menuCloserBound = false;
+let pickedIds = new Set(); // szafki dobrane Shiftem w grupie aktywnej - na liście jak aktywna
 
 const refreshAll = () => { initPropertiesPanel(); update3D(); updateSidebar(); };
 
@@ -83,7 +84,7 @@ function isMarked(it) {
 
 function itemHtml(it) {
   const isModule = it.kind === 'module';
-  const isActive = it.id === (isModule ? state.activeModuleId : state.activeSidePanelId);
+  const isActive = it.id === (isModule ? state.activeModuleId : state.activeSidePanelId) || (isModule && pickedIds.has(it.id));
   const cls = isActive ? ' is-active' : (isMarked(it) ? ' is-selected' : '');
   const icon = isModule ? (MODULE_ICONS[it.type] || MODULE_ICONS.base_cabinet) : PANEL_ICONS[it.panelKind];
   const id = escapeHtml(it.id);
@@ -102,6 +103,7 @@ function itemHtml(it) {
 
 // Lista elementów projektu jako drzewo mebli (core/sidebarTree.js). Projekt bez grup = płaska lista.
 function treeHtml() {
+  pickedIds = activePicks(state.project, { picks: state.editPicks }, state.activeModuleId);
   const tree = buildSidebarTree(state.project, treeQuery);
   if (tree.total === 0) return `<div class="empty-note">Projekt jest pusty. Dodaj pierwszą szafkę z menu „Dodaj” albo zbuduj projekt ze zdjęcia (menu „Narzędzia”).</div>`;
   if (tree.shown === 0) return `<div class="empty-note">Nic nie pasuje do „${escapeHtml(treeQuery.trim())}”.</div>`;
@@ -162,10 +164,12 @@ function bindTree(root) {
       // Kliknięcie zaznacza całą grupę (szafki + jej blendy/boki); Shift/Ctrl dokłada albo zdejmuje.
       // Tylko JEDNA szafka jest „aktywna” (activeModuleId) - ma otwarty panel właściwości.
       const additive = e.shiftKey || e.ctrlKey || e.metaKey;
-      const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels }, 'module', id, additive);
+      const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels, picks: state.editPicks, activeId: state.activeModuleId }, 'module', id, additive);
       state.selectedModules = sel.moduleIds;
       state.selectedSidePanels = sel.panelIds;
-      state.activeModuleId = sel.removed
+      state.editPicks = sel.picks;
+      // dobranie szafki w grupie aktywnej (sel.picked) nie zmienia aktywnej szafki
+      if (!sel.picked) state.activeModuleId = sel.removed
           ? (state.activeModuleId === id ? Array.from(state.selectedModules).pop() || null : state.activeModuleId)
           : id;
       state.activeSidePanelId = null;
@@ -178,9 +182,10 @@ function bindTree(root) {
       const id = e.currentTarget.getAttribute('data-id');
       // jak przy szafkach: Shift/Ctrl dokłada blendę/bok do zaznaczenia (np. do „Połącz w grupę”)
       const additive = e.shiftKey || e.ctrlKey || e.metaKey;
-      const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels }, 'panel', id, additive);
+      const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels, picks: state.editPicks, activeId: state.activeModuleId }, 'panel', id, additive);
       state.selectedModules = sel.moduleIds;
       state.selectedSidePanels = sel.panelIds;
+      state.editPicks = sel.picks;
       if (sel.removed) {
         if (state.activeSidePanelId === id) state.activeSidePanelId = null;
         if (!state.activeSidePanelId) state.activeModuleId = Array.from(state.selectedModules).pop() || null;
@@ -279,6 +284,7 @@ export function updateSidebar() {
       state.activeSidePanelId = null;
       if (state.selectedModules) state.selectedModules.clear();
       state.selectedSidePanels = new Set();
+      state.editPicks = new Set();
       initPropertiesPanel(); update3D(); updateSidebar();
     });
   }

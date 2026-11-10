@@ -52,7 +52,7 @@ function plinthMaterialHtml(mod) {
 // Szafki, których dotyczą zmiany w panelu: kliknięta szafka, a kilka naraz tylko po dobraniu
 // ich Shift/Ctrl - sama grupa zaznaczona kliknięciem nie liczy się (core/groupSelection.js).
 function getSelectedMods() {
-    const ids = editTargets(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels }, state.activeModuleId);
+    const ids = editTargets(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels, picks: state.editPicks, activeId: state.activeModuleId }, state.activeModuleId);
     return ids.map(id => state.project.modules.find(m => m.id === id)).filter(Boolean);
 }
 
