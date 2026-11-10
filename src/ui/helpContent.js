@@ -140,15 +140,15 @@ export const HELP_SECTIONS = [
           szczeliny dwojga drzwi (4 mm zamiast 3) albo po 1 mm na dolne szuflady. Gdy mimo to front wychodzi z ułamkiem, pod luzami pojawia się podpowiedź, o ile zmienić który luz, żeby
           wyszedł w pełnych milimetrach. Panel pokazuje wynik z powodem; wyjątek wpisz w „Ręczne nadpisanie” (puste pole = Auto). Po odznaczeniu
           wracają cztery pola luzów wpisywane ręcznie - tak działają szafki ze starszych projektów.</li>
-        <li><b>Szuflady</b> - system szuflad (Blum, GTV, MOVENTO) i ustawienia ręczne
-        (wariant wysokości, długość prowadnicy NL, wymiary frontu, szuflada wewnętrzna). Przy każdej szufladzie wybór
+        <li><b>Szuflady</b> - system szuflad (Blum, GTV, MOVENTO) i ustawienia każdej szuflady
+        (wysokość boku, długość prowadnicy NL, szuflada wewnętrzna). Przy każdej szufladzie wybór
         <b>zewnętrzna</b> (front na korpusie) albo <b>wewnętrzna</b> (front w korpusie) - dla wewnętrznej luz z boków,
         luz góra/dół i odstęp między szufladami (MOVENTO: domyślnie 3 / 3 / 30 mm na chwyt); zmiana obejmuje wszystkie
         szuflady z tej samej wnęki. „Skrzynki szuflad z płyty korpusu” (MOVENTO) - skrzynki i fronty szuflad wewnętrznych
         w dekorze korpusu tej szafki.</li>
-        <li><b>Konstrukcja</b> - łączenie boków i wieńców, wieniec górny pełny albo trawersy, wieniec dolny cofnięty od przodu (np. szufladki pod blatem biurka z chwytem od spodu), plecy (nakładane / w nucie / wpuszczane - płyta np. 18 mm między bokami, za wieńcami, na całą wysokość, np. do części otwartych; „Cofnięcie od tyłu boków” zostawia szczelinę między plecami a ścianą, wieńce i półki są wtedy płytsze; grubość pleców wpuszczanych bierze się z dekoru korpusu, np. 19 mm). „Materiał pleców HDF” wybiera kolor HDF tej szafki (np. HU1506 kaszmir do U702) - osobna pozycja w kosztorysie i rozkroju. „Listwa usztywniająca pod długimi półkami” (domyślnie włączona, półki dłuższe niż 800 mm) dodaje pod półką stałą i ruchomą, przy tylnej krawędzi, listwę z płyty korpusu na sztorc (profil L, domyślnie 50 mm) - jest na liście formatek i w 3D; przyklej ją i przykręć co ok. 150 mm.</li>
+        <li><b>Konstrukcja</b> - dekor korpusu (grubość płyty bierze się z jego nazwy, np. „18mm”; pole grubości dla całego projektu pojawia się tylko przy szafce bez grubości w dekorze), łączenie boków i wieńców, wieniec górny pełny albo trawersy, wieniec dolny cofnięty od przodu (np. szufladki pod blatem biurka z chwytem od spodu), plecy (nakładane / w nucie / wpuszczane - płyta np. 18 mm między bokami, za wieńcami, na całą wysokość, np. do części otwartych; „Cofnięcie od tyłu boków” zostawia szczelinę między plecami a ścianą, wieńce i półki są wtedy płytsze; grubość pleców wpuszczanych bierze się z dekoru korpusu, np. 19 mm). „Materiał pleców HDF” wybiera kolor HDF tej szafki (np. HU1506 kaszmir do U702) - osobna pozycja w kosztorysie i rozkroju. „Listwa usztywniająca pod długimi półkami” (domyślnie włączona, półki dłuższe niż 800 mm) dodaje pod półką stałą i ruchomą, przy tylnej krawędzi, listwę z płyty korpusu na sztorc (profil L, domyślnie 50 mm) - jest na liście formatek i w 3D; przyklej ją i przykręć co ok. 150 mm.</li>
         <li><b>Nóżki</b> - wysokość nóżek i cokół; „Boki do podłogi” (lewy / prawy / oba) przedłuża bok o wysokość nóżek do samej podłogi (np. widoczny bok regału), cokół kończy się wtedy na boku.</li>
-        <li><b>Zawiasy</b> - odsunięcia, liczba zawiasów i ręczna pozycja każdego z nich.</li>
+        <li><b>Zawiasy</b> - położenie skrajnych zawiasów, ich liczba, a pod „Przesuń pojedyncze zawiasy” ręczna pozycja każdego z nich.</li>
         <li><b>Narożnik</b> - szafka ślepa i okucia narożne.</li>
       </ul>
       <p class="help-note">Kropka przy nazwie sekcji oznacza, że ta szafka ma własne ustawienia,

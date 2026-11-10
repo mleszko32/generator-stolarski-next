@@ -260,7 +260,6 @@ export function initPropertiesPanel() {
     ${moduleInfoHtml(activeModule)}
 
     ${tabContent("wymiary", `
-      <h3>Wymiary Modułu</h3>
       <div class="property-group"><label>Szerokość (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-width" value="${escapeHtml(activeModule.dimensions.width)}" /></div>
       <div class="property-group"><label>Wysokość korpusu (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-height" value="${escapeHtml(activeModule.dimensions.height)}" /></div>
       <div class="property-group"><label>Głębokość (mm):</label><input type="text" inputmode="decimal" title="Można wpisać działanie, np. 400+18" id="input-depth" value="${escapeHtml(activeModule.dimensions.depth)}" /></div>
@@ -284,11 +283,10 @@ export function initPropertiesPanel() {
     `)}
 
     ${tabContent("front", `
-      <h3>Ustawienia Frontów</h3>
       <div id="group-front-clearance">
         <div class="property-group"><label>Typ frontów:</label><select id="input-front-type"><option value="nakladane" ${(!f.type || f.type === 'nakladane') ? 'selected' : ''}>Nakładane</option><option value="wpuszczane" ${f.type === 'wpuszczane' ? 'selected' : ''}>Wpuszczane</option></select></div>
         <div class="property-group"><label>Przerwa między frontami (mm):</label><input type="number" id="input-front-gap" value="${f.gap ?? 3}" step="0.5" /></div>
-        <div class="property-group"><label title="Odstęp tyłu frontu nakładanego od czoła korpusu (miejsce na domknięcie drzwi). Wliczany do lica frontów przy rozmieszczaniu szafek i w narożnikach.">Odsunięcie frontu od korpusu (mm):</label><input type="number" id="input-front-body-gap" value="${frontBodyGap(f)}" step="0.5" min="0" /></div>
+        <div class="property-group"><label>Odsunięcie frontu od korpusu (mm):</label><input type="number" id="input-front-body-gap" value="${frontBodyGap(f)}" step="0.5" min="0" /><div class="hint">Szczelina między tyłem frontu a korpusem.</div></div>
       </div>
       ${clearanceBlockHtml(activeModule, f, fc)}
       ${roundingHintsHtml(activeModule, th, f, allFrontsList)}
@@ -302,8 +300,10 @@ export function initPropertiesPanel() {
           <div class="hint">Materiał z cennika frontów, lakier w kolorze RAL / NCS albo dekor z bazy płyt — nowy dopisze się do cennika (cenę ustawisz w Kosztorysie; lakier bierze cenę istniejącego lakieru).</div>
         </div>
 
-        <h3>Materiał frontu (per front)</h3>
-        <div class="hint" style="margin-bottom: 8px;">Ceny edytujesz w Kosztorysie (Produkcja i raporty) — pokazuje tam tylko materiały faktycznie użyte przez jakiś front. Bez wyboru liczy się pierwszy materiał z listy. "+ Nowy materiał…" dopisuje pozycję do listy i od razu ją przypisuje tu.</div>
+        <details class="prop-info" ${new Set(allFrontsList.map(({ front }) => front.materialId || '')).size > 1 ? 'open' : ''}>
+        <summary>Inny materiał dla wybranych frontów</summary>
+        <div class="info-body">
+        <div class="hint" style="margin-bottom: 8px;">Gdy fronty tej szafki mają być z różnych materiałów. Ceny ustawisz w Kosztorysie.</div>
         ${allFrontsList.map(({ front, label }) => `
           <div class="property-group mb-8">
             <label class="fs-xs">${escapeHtml(label)} — materiał:</label>
@@ -313,6 +313,8 @@ export function initPropertiesPanel() {
             </select>
           </div>
         `).join('')}
+        </div>
+        </details>
 
         <h3>Luz od osi wieńca (per front)</h3>
         <div class="hint" style="margin-bottom: 8px;">Tylko dla krawędzi stykającej się z WEWNĘTRZNYM wieńcem/półką (nie krawędzią korpusu ani innym frontem) — domyślnie taki front dzieli szczelinę "Przerwa między frontami" po połowie z obu stron osi wieńca. Wpisz tu wprost żądaną odległość krawędzi TEGO frontu od osi (środka grubości) wieńca, żeby to nadpisać niezależnie od "Przerwa między frontami".</div>
@@ -333,7 +335,6 @@ export function initPropertiesPanel() {
     `)}
 
     ${tabContent("szuflady", `
-      <h3>Ustawienia Szuflad</h3>
       <div class="property-group"><label>System szuflad:</label><select id="input-drawer-system"><option value="merivobox" ${f.drawerSystem === 'merivobox' ? 'selected' : ''}>Blum Merivobox</option><option value="legrabox" ${f.drawerSystem === 'legrabox' ? 'selected' : ''}>Blum Legrabox</option><option value="tandembox" ${f.drawerSystem === 'tandembox' ? 'selected' : ''}>Blum TANDEMBOX</option><option value="antaro" ${f.drawerSystem === 'antaro' ? 'selected' : ''}>Blum TANDEMBOX antaro</option><option value="gtv_axis_16" ${f.drawerSystem === 'gtv_axis_16' ? 'selected' : ''}>GTV Axis Pro (płyta 16mm)</option><option value="gtv_axis_18" ${f.drawerSystem === 'gtv_axis_18' ? 'selected' : ''}>GTV Axis Pro (płyta 18mm)</option><option value="movento_katalog" ${f.drawerSystem === 'movento_katalog' ? 'selected' : ''}>Blum MOVENTO — katalog (bok 16 mm)</option><option value="movento_forum" ${f.drawerSystem === 'movento_forum' ? 'selected' : ''}>Blum MOVENTO — forum (bok 18 mm)</option><option value="tandem_560f" ${f.drawerSystem === 'tandem_560f' ? 'selected' : ''}>Blum TANDEM 560F (bok 17-19 mm)</option></select></div>
       ${drawerSystems[f.drawerSystem || '']?.woodenBox ? `<div class="property-group"><label><input type="checkbox" id="input-drawerbox-korpus" ${f.drawerBoxFromKorpus ? 'checked' : ''} /> Skrzynki szuflad z płyty korpusu tej szafki (w jego dekorze)</label></div>` : ''}
 
@@ -353,14 +354,15 @@ export function initPropertiesPanel() {
     `)}
 
     ${tabContent("konstrukcja", `
-      <h3>Konstrukcja Korpusu</h3>
-      <div class="property-group"><label>Grubość płyty (mm):</label><input type="number" id="input-board-thick" value="${state.project.materials.boardThickness}" step="0.1" />${decorThickness(activeModule.materials?.korpusDecor) ? `<div class="hint">Ta szafka: ${decorThickness(activeModule.materials.korpusDecor)} mm z nazwy dekoru korpusu (pole niżej). Ta wartość dotyczy szafek bez grubości w dekorze.</div>` : ''}</div>
       <div class="property-group"><label>Dekor korpusu (puste = z projektu):</label><input type="text" id="input-korpus-decor" list="korpus-decor-catalog" value="${escapeHtml(activeModule.materials?.korpusDecor || '')}" placeholder="np. Egger U740 PM" title="Formatki z płyty korpusu tej szafki (i zaznaczonych) dostaną materiał „Korpus: dekor” - osobna pozycja w kosztorysie i osobne arkusze w rozkroju." /><datalist id="korpus-decor-catalog">${catalogLabels(state.project).map(l => `<option value="${escapeHtml(l)}"></option>`).join('')}</datalist></div>
+      ${decorThickness(activeModule.materials?.korpusDecor)
+        ? `<div class="property-group"><label>Grubość płyty:</label><div class="hint"><b>${decorThickness(activeModule.materials.korpusDecor)} mm</b> — z nazwy dekoru korpusu.</div></div>`
+        : `<div class="property-group"><label>Grubość płyty szafek bez dekoru — cały projekt (mm):</label><input type="number" id="input-board-thick" value="${state.project.materials.boardThickness}" step="0.1" /><div class="hint">Dotyczy wszystkich szafek, które nie mają grubości w nazwie dekoru (np. „18mm”).</div></div>`}
       <div class="property-group"><label>Sposób łączenia:</label><select id="input-join-type"><option value="boki_przelotowe" ${cons.joinType === 'boki_przelotowe' ? 'selected' : ''}>Boki do ziemi (wieńce wpuszczane)</option><option value="wience_przelotowe" ${cons.joinType === 'wience_przelotowe' ? 'selected' : ''}>Wieńce pełne (boki wpuszczane)</option></select></div>
       <div class="property-group"><label>Zamknięcie góry:</label><select id="input-top-type">${TOP_TYPES.map(([v, label]) => `<option value="${v}" ${cons.topType === v ? 'selected' : ''}>${label}</option>`).join('')}</select></div>
       <div class="prop-box" id="traverse-options" style="display: ${cons.topType.includes('trawersy') ? 'block' : 'none'};"><div class="property-group mb-0"><label class="fs-xs">Szerokość trawersu (mm):</label><input type="number" id="input-traverse-width" value="${cons.traverseWidth}" /></div></div>
       <div class="property-group"><label>Wieniec dolny cofnięty o (mm):</label><input type="number" id="input-bottom-setback" value="${cons.bottomSetback ?? 0}" min="0" step="1" title="Wieniec dolny płytszy i cofnięty od przodu - np. szufladki pod blatem biurka: front zachodzi niżej i daje chwyt od spodu. 0 = zwykły wieniec." /></div>
-      <div class="property-group"><label>Maks. rozstaw łączników kołek + wkręt (mm):</label><input type="number" id="input-joint-spacing" value="${cons.jointSpacing ?? 250}" min="64" step="1" title="Wieńce, półki stałe i przegrody: skrajne zestawy 37 mm od przodu i tyłu, środkowe dokładane, gdy odstęp przekracza ten rozstaw (w rastrze 32 mm)" /></div>
+      <div class="property-group"><label>Maks. odstęp między łącznikami kołek + wkręt (mm):</label><input type="number" id="input-joint-spacing" value="${cons.jointSpacing ?? 250}" min="64" step="1" title="Wieńce, półki stałe i przegrody: skrajne zestawy 37 mm od przodu i tyłu, środkowe dokładane, gdy odstęp przekracza ten rozstaw (w rastrze 32 mm)" /></div>
       ${(() => {
         const st = getStiffenerSettings(activeModule, state.project);
         return `<div class="property-group"><label><input type="checkbox" id="input-stiffener-active" ${st.active ? 'checked' : ''} /> Listwa usztywniająca pod długimi półkami</label></div>
@@ -371,8 +373,9 @@ export function initPropertiesPanel() {
           const trav = getTraverseConfig(cons);
           const travRaw = cons.traverses || {};
           return `
-          <h3>Trawersy — ustawienia ręczne</h3>
-          <div class="prop-box">
+          <details class="prop-info" ${['front', 'rear'].some(side => !trav[side].active || (travRaw[side] || {}).width > 0) ? 'open' : ''}>
+          <summary>Trawersy osobno (przedni / tylny)</summary>
+          <div class="info-body">
             ${['front', 'rear'].map(side => {
                 const raw = travRaw[side] || {};
                 const widthOverridden = raw.width !== undefined && raw.width !== null && raw.width !== '';
@@ -393,10 +396,11 @@ export function initPropertiesPanel() {
             }).join('')}
             <div style="font-size: 10px; color: var(--border-strong);">Odznaczenie obu naraz nie jest możliwe — korpus musi mieć choć jeden trawers.</div>
           </div>
+          </details>
         `;
       })() : ''}
 
-      <div class="property-group"><label>Plecy (Tylko dla szafki):</label><select id="input-back-type"><option value="nut" ${backP.type === 'nut' ? 'selected' : ''}>W nucie</option><option value="nakladane" ${backP.type === 'nakladane' ? 'selected' : ''}>Nakładane</option><option value="wpuszczane" ${backP.type === 'wpuszczane' ? 'selected' : ''}>Wpuszczane (płyta między bokami)</option></select></div>
+      <div class="property-group"><label>Plecy:</label><select id="input-back-type"><option value="nut" ${backP.type === 'nut' ? 'selected' : ''}>W nucie</option><option value="nakladane" ${backP.type === 'nakladane' ? 'selected' : ''}>Nakładane</option><option value="wpuszczane" ${backP.type === 'wpuszczane' ? 'selected' : ''}>Wpuszczane (płyta między bokami)</option></select></div>
       <div class="property-group" id="back-decor-group" style="display: ${backP.type === 'wpuszczane' ? 'none' : 'block'};"><label class="fs-xs">Materiał pleców HDF (puste = jak w projekcie):</label>
         <input type="text" class="input" id="input-back-decor" list="back-decor-catalog" value="${escapeHtml((backP && backP.decor) || '')}" placeholder="np. HDF Woodeco HU1506 Kaszmirowy Beż 3mm" />
         <datalist id="back-decor-catalog">${catalogLabels(state.project).filter(l => /hdf/i.test(l)).map(l => `<option value="${escapeHtml(l)}"></option>`).join('')}</datalist></div>
@@ -410,13 +414,12 @@ export function initPropertiesPanel() {
       </div>
       <div class="prop-box" id="nut-options" style="display: ${backP.type === 'nut' ? 'block' : 'none'};">
         <div class="property-group mb-8"><label style="font-size: 11px; font-weight: bold;">Konstrukcja nutu:</label><select id="input-nut-build"><option value="all" ${(!backP.nutBuild || backP.nutBuild === 'all') ? 'selected' : ''}>Boki i wieńce nutowane</option><option value="sides" ${backP.nutBuild === 'sides' ? 'selected' : ''}>Boki nutowane, wieńce skracane</option><option value="top_bottom" ${backP.nutBuild === 'top_bottom' ? 'selected' : ''}>Wieńce nutowane, boki skracane</option></select></div>
-        <div class="property-group mb-8"><label class="fs-xs">Odsunięcie nutu (mm):</label><input type="number" id="input-back-offset" value="${backP.offset !== undefined ? backP.offset : 16}" /></div>
+        <div class="property-group mb-8"><label class="fs-xs">Nut — odległość od tyłu boku (mm):</label><input type="number" id="input-back-offset" value="${backP.offset !== undefined ? backP.offset : 16}" /></div>
         <div class="property-group mb-0"><label class="fs-xs">Głębokość nutu (mm):</label><input type="number" id="input-back-groove" value="${backP.grooveDepth !== undefined ? backP.grooveDepth : 6}" /></div>
       </div>
     `)}
 
     ${tabContent("nogi", `
-      <h3>Nóżki i Cokół</h3>
       <div class="property-group row-center">
         <input type="checkbox" id="input-legs-active" ${activeModule.legs.active ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer;" />
         <label for="input-legs-active" style="cursor: pointer; margin: 0; font-weight: bold;">Szafka stoi na nóżkach</label>
@@ -429,8 +432,9 @@ export function initPropertiesPanel() {
         <div class="property-group mb-0"><label style="font-size: 11px;">Boki do podłogi:</label><select id="input-sides-to-floor">${[['none', 'Nie (boki na nóżkach)'], ['left', 'Lewy bok'], ['right', 'Prawy bok'], ['both', 'Oba boki']].map(([v, l]) => `<option value="${v}" ${(activeModule.legs.sidesToFloor || 'none') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
       </div>
 
-      ${activeModule.legs.active ? `
+      ${activeModule.legs.active && Object.values(activeModule.legs.heightOverrides || {}).some(v => v !== undefined && v !== null && v !== '') ? `
         <h3>Nóżki — wysokości ręczne</h3>
+        <div class="hint" style="margin-bottom: 6px;">Ustawione w starszym projekcie — ↺ przywraca wspólną wysokość.</div>
         <div class="prop-box">
           ${LEG_LABELS.map((label, i) => {
               const overrideVal = activeModule.legs.heightOverrides ? activeModule.legs.heightOverrides[i] : undefined;
@@ -457,14 +461,16 @@ export function initPropertiesPanel() {
 
     ${tabContent("zawiasy", `
       <div class="prop-box">
-        <h3>Wymiary Osi Zawiasów (Lokalne)</h3>
+        <h3>Położenie zawiasów</h3>
         <div class="property-group" style="margin-bottom: ${actualTopText ? '12px' : '8px'};"><label class="fs-xs">Od góry do środka puszki (mm):</label><input type="number" id="input-hinge-top" value="${fh.topOffset}" step="0.5" />${actualTopText}</div>
         <div class="property-group" style="margin-bottom: ${actualBottomText ? '12px' : '8px'};"><label class="fs-xs">Od dołu do środka puszki (mm):</label><input type="number" id="input-hinge-bottom" value="${fh.bottomOffset}" step="0.5" />${actualBottomText}</div>
-        <div class="property-group"><label class="fs-xs">Bezpieczny margines od półki (mm):</label><input type="number" id="input-hinge-margin" value="${fh.margin}" step="0.5" /></div>
-        <div class="property-group" style="margin-top: 8px; margin-bottom: 0;"><label style="font-size: 11px; font-weight: 600;">Wymuś ilość zawiasów (0 = Auto):</label><input type="number" id="input-hinge-count" value="${fh.forceCount || 0}" step="0.5" style="border-color: var(--tone-emerald); background-color: var(--tint-emerald);" /></div>
+        <div class="property-group"><label class="fs-xs">Minimalny odstęp zawiasu od półki (mm):</label><input type="number" id="input-hinge-margin" value="${fh.margin}" step="0.5" /></div>
+        <div class="property-group" style="margin-top: 8px; margin-bottom: 0;"><label style="font-size: 11px; font-weight: 600;">Liczba zawiasów na drzwiach (0 = dobierz sam):</label><input type="number" id="input-hinge-count" value="${fh.forceCount || 0}" step="0.5" style="border-color: var(--tone-emerald); background-color: var(--tint-emerald);" /></div>
       </div>
 
-      <h3>Zawiasy — pozycje ręczne</h3>
+      <details class="prop-info" ${doorHingeGroups.some(g => Object.values(g.front.hingeOverrides || {}).some(v => v !== undefined && v !== null)) ? 'open' : ''}>
+      <summary>Przesuń pojedyncze zawiasy</summary>
+      <div class="info-body">
       ${doorHingeGroups.length === 0 ? `
         <div class="hint">Ta szafka nie ma jeszcze żadnych drzwi.</div>
       ` : doorHingeGroups.map(group => `
@@ -489,6 +495,8 @@ export function initPropertiesPanel() {
           }).join('')}
         </div>
       `).join('')}
+      </div>
+      </details>
     `)}
   `;
 
@@ -510,10 +518,7 @@ function setupEventListeners() {
   const numberInputs = [
     'pos-x', 'pos-y', 'pos-z', 'traverse-width', 'joint-spacing', 'bottom-setback', 'board-thick', 'width', 'height', 'depth',
     'front-gap', 'front-body-gap', 'front-left', 'front-right', 'front-top', 'front-bottom', 'back-offset', 'back-groove', 'back-thickness', 'back-inset-offset', 'back-overlay-thickness',
-    'legs-height', 'plinth-offset', 'hinge-top', 'hinge-bottom', 'hinge-margin', 'hinge-count',
-    'filler-left-w', 'filler-left-h', 'filler-left-d', 'filler-left-y',
-    'filler-right-w', 'filler-right-h', 'filler-right-d', 'filler-right-y',
-    'filler-top-h', 'filler-top-w', 'filler-top-d', 'filler-top-y'
+    'legs-height', 'plinth-offset', 'hinge-top', 'hinge-bottom', 'hinge-margin', 'hinge-count'
   ];
 
   const updateAll = () => { update3D(); updateSidebar(); };
@@ -945,7 +950,7 @@ function setupEventListeners() {
       el.addEventListener('change', () => {
         // Ręczne wpisanie pozycji/wymiaru mogło wystawić szafkę poza pokój - dopiero
         // po skończeniu wpisywania (nie na każdy znak), żeby nie "walczyć" z użytkownikiem.
-        if (['pos-x', 'pos-z', 'width', 'depth', 'filler-left-w', 'filler-right-w'].includes(id)) {
+        if (['pos-x', 'pos-z', 'width', 'depth'].includes(id)) {
           getSelectedMods().forEach(mod => clampModuleToRoom(mod));
         }
         // Budowanie szafy z dwóch modułów jeden na drugim - wpisanie wysokości
