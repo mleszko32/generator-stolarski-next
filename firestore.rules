@@ -39,6 +39,11 @@ service cloud.firestore {
       allow read, write: if isOwner();
     }
 
+    // Zdjęcia próbek dekorów do podglądu 3D (core/decorTexture.js) - jeden dokument na dekor.
+    match /decorTextures/{docId} {
+      allow read, write: if isOwner();
+    }
+
     // Wszystko poza tym jest zamknięte na głucho.
     match /{document=**} {
       allow read, write: if false;

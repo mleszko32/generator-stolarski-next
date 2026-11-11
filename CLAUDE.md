@@ -508,7 +508,12 @@ czytaj `project.materials.boardThickness` tam, gdzie jest szafka. Zmiana dekoru 
 Bok dokładany / panel poziomy: dekor z grubością w nazwie ustawia ich grubość (pole Dekor z podpowiedziami z bazy).
 W 3D kolor płyty zależy od dekoru: `core/decorColors.js` (`partColor` z userData bryły — dekor szafki dla korpusu/półek,
 „Dekor” panelu, materiał frontu z cennika poza pierwszym; kod Egger W/H/F/U wybiera rodzinę barw), używane w
-`materialFor` w `meshBuilders.js` (jasne kolory w trybie przezroczystym pomijane). Legenda w lewym dolnym rogu widoku 3D
+`materialFor` w `meshBuilders.js` (jasne kolory w trybie przezroczystym pomijane). Struktura dekoru w widoku
+realistycznym: `core/decorTexture.js` (czyste, z testami: `decorTextureSpec` — drewno / kamień z kodu Egger H / F albo
+nazwy, `grainAxis` — kierunek słojów płyty) + `render/decorTextures.js` (tekstura z canvasa z cache, `grainBoxGeometry` —
+osobna geometria z UV w mm; zwykłej geometrii `addBox` nie ruszaj). Zdjęcie próbki dekoru zastępuje teksturę generowaną:
+kolekcja Firestore `decorTextures` (`saveDecorTextureToCloud` itd., rekord przez `normalizePhoto`), wgrywane pod
+podświetloną pozycją legendy; bryły z `ExtrudeGeometry` (narożna, skos) i blat są bez tekstur. Legenda w lewym dolnym rogu widoku 3D
 (`projectDecorLegend` → `renderDecorLegend` w `viewer3d.js`), ukryta, gdy nic nie ma własnego koloru. Kolor frontu
 liczy się z nazwy materiału (jak dekor blendy), więc ta sama nazwa = ten sam kolor; nietknięty „Standard” domyślny.
 `partMaterial` daje bryle pozycję legendy z kluczem (`key`); przycisk „Kolory: rzeczywiste / materiały” (`colorMode` w

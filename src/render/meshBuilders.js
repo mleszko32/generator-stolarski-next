@@ -9,6 +9,8 @@ import { state } from '../core/state.js';
 import { activePicks } from '../core/groupSelection.js';
 import { sideFloorExt } from '../engine/carcaseParts.js';
 import { partMaterial, isLightColor } from '../core/decorColors.js';
+import { grainAxis } from '../core/decorTexture.js';
+import { decorTextureFor, grainBoxGeometry } from './decorTextures.js';
 
 export let isXrayMode = true;
 export function setXrayMode(value) {
@@ -196,12 +198,16 @@ function materialFor(type, userData, active = false) {
     && activePicks(state.project, { picks: state.editPicks }, state.activeModuleId).has(userData.moduleId)) active = true;
   const selected = !active && !!(userData && userData.moduleId && state.selectedModules && state.selectedModules.has(userData.moduleId));
   const tinted = (active || selected) && !faded && ACTIVE_TYPES.has(type);
-  if (color == null && !faded && !tinted) return base;
-  const key = `${isXrayMode ? 'x' : 's'}|${type}|${color}|${faded ? 'f' : ''}|${tinted ? (active ? 'a' : 'z') : ''}`;
+  // struktura dekoru (słoje, kamień, wgrane zdjęcie) - tylko widok realistyczny w kolorach rzeczywistych
+  const tex = !isXrayMode && colorMode === 'real' && !faded && ent && !ent.key.startsWith('~') ? decorTextureFor(ent.label, color) : null;
+  if (color == null && !faded && !tinted && !tex) return base;
+  // id tekstury w kluczu: po wgraniu / usunięciu zdjęcia dekor dostaje nowy materiał
+  const key = `${isXrayMode ? 'x' : 's'}|${type}|${color}|${faded ? 'f' : ''}|${tinted ? (active ? 'a' : 'z') : ''}|${tex ? tex.id : ''}`;
   let m = tintCache.get(key);
   if (!m) {
     m = base.clone();
-    if (color != null) m.color.setHex(color);
+    if (tex) { m.map = tex; m.color.setHex(0xffffff); m.roughness = tex.userData.roughness; } // kolor jest już w teksturze
+    else if (color != null) m.color.setHex(color);
     if (faded) { m.transparent = true; m.opacity = 0.08; m.depthWrite = false; }
     else if (isXrayMode && color != null) m.opacity = Math.max(base.opacity, 0.35);
     if (tinted) {
@@ -216,8 +222,12 @@ function materialFor(type, userData, active = false) {
 
 export function addBox(w, h, d, x, y, z, type, isActiveModule, userData = null, parentGroup, rotationY = 0) {
   const dimKey = `${w}|${h}|${d}`;
-  const geo = cachedGeometry('box|' + dimKey, () => new THREE.BoxGeometry(w, h, d));
   const mat = materialFor(type, userData, isActiveModule);
+  // płyta z teksturą dekoru ma osobną geometrię z UV w mm wzdłuż usłojenia
+  const axis = mat.map ? grainAxis(type, w, h, d) : '';
+  const geo = axis
+    ? cachedGeometry(`boxuv|${dimKey}|${axis}`, () => grainBoxGeometry(w, h, d, axis))
+    : cachedGeometry('box|' + dimKey, () => new THREE.BoxGeometry(w, h, d));
 
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(x + w/2, y + h/2, z + d/2);

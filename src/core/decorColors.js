@@ -20,8 +20,11 @@ const FAMILIES = {
 // dekor bez rozpoznanego kodu - wyraźnie różne, stonowane barwy
 const OTHER = [0x7fa7c9, 0xc99a7f, 0x8fc19a, 0xc4a9d6, 0xd6c27f, 0x7fc4c2, 0xd68f8f, 0xa3a3d6];
 const WHITE = 0xf6f5f2;
+// nazwy gatunków drewna i kamienia w dekorze bez kodu Egger (też core/decorTexture.js)
+export const WOOD_WORDS = /d[ąa]b|orzech|jesion|buk(?![a-ząćęłńóśźż])|drewn|sosn|wi[ąa]z|klon|brzoz|olch|czere[śs]ni|fornir|oak|walnut/i;
+export const STONE_WORDS = /beton|kamie[ńn]|marmur|granit|[łl]upek|trawertyn|concrete/i;
 
-function hash(str) {
+export function hash(str) {
   let h = 2166136261;
   for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
   return h >>> 0;
@@ -35,7 +38,8 @@ export function decorColor(name) {
   if (lac != null) return lac;
   if (/\bbia[łl][yaeo]?\b|\bwhite\b/i.test(s)) return WHITE; // „Front lamelowy biały” - biały, nie losowa barwa
   const m = s.match(/(?:^|[\s:(])([WUHF])\s?\d{3,4}\b/i);
-  const pal = m ? FAMILIES[m[1].toUpperCase()] : OTHER;
+  // bez kodu: nazwa drewna / kamienia („Fornir dąb”, „Beton jasny”) wybiera rodzinę barw
+  const pal = m ? FAMILIES[m[1].toUpperCase()] : WOOD_WORDS.test(s) ? FAMILIES.H : STONE_WORDS.test(s) ? FAMILIES.F : OTHER;
   return pal[hash(s.toUpperCase()) % pal.length];
 }
 

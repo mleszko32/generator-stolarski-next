@@ -843,3 +843,7 @@ details.menu[open] > summary { border-color: var(--accent); color: var(--accent)
 .decor-legend-row.is-active { font-weight: 600; background: var(--surface-subtle); }
 .decor-legend-replace { margin: 2px 0 6px 20px; display: flex; flex-direction: column; gap: 2px; }
 .decor-legend-replace .input { font-size: var(--fs-sm); padding: 3px 6px; }
+.decor-legend-photo { margin: 2px 0 6px 20px; display: flex; flex-direction: column; gap: 4px; }
+.decor-legend-photo-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.decor-legend-photo .input { font-size: var(--fs-sm); padding: 3px 6px; width: auto; }
+.decor-legend-photo-width { max-width: 72px; }

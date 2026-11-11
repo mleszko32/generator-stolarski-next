@@ -42,6 +42,8 @@ import { initMeasureTool, isMeasureActive, setMeasureButton, toggleMeasureMode, 
 import { showAlert } from "../utils/modal.js";
 import { shelfStiffener } from '../core/shelfStiffener.js';
 import { projectDecorLegend, materialPaletteMap, horizontalPanelType } from '../core/decorColors.js';
+import { getDecorPhoto, setDecorPhoto, photoFileToDataUrl } from './decorTextures.js';
+import { saveDecorTextureToCloud, deleteDecorTextureFromCloud } from '../core/storage.js';
 import { replaceMaterial } from '../core/materialReplace.js';
 import { frontMaterialSuggestions } from '../core/materialCatalog.js';
 import { escapeHtml } from '../utils/dom.js';
@@ -1452,19 +1454,70 @@ function handle3DClick(event) {
 // frontu. W trybie „Kolory: materiały” wszystkie materiały w kontrastowej palecie. Kliknięcie
 // pozycji podświetla ten materiał (reszta półprzezroczysta), ponowne - pokazuje wszystko.
 let decorLegendEl = null;
+
+// Zdjęcie próbki dekoru pod podświetloną pozycją legendy: zastępuje generowaną teksturę w widoku
+// realistycznym, zapisane w chmurze (wspólne dla wszystkich projektów).
+function decorPhotoHtml(label) {
+  const photo = getDecorPhoto(label);
+  let html = `<div class="decor-legend-photo" data-label="${escapeHtml(label)}"><label class="fs-xs">Zdjęcie dekoru (widok realistyczny):</label>`;
+  if (photo) {
+    html += `<div class="decor-legend-photo-row"><input type="number" class="input decor-legend-photo-width" min="50" max="5000" step="10" value="${photo.widthMm}" title="Rzeczywista szerokość tego, co widać na zdjęciu"><span class="fs-xs">mm szer.</span>`
+      + `<select class="input decor-legend-photo-grain" title="Kierunek słojów na zdjęciu"><option value="v"${photo.grain === 'v' ? ' selected' : ''}>słoje pionowo</option><option value="h"${photo.grain === 'h' ? ' selected' : ''}>słoje poziomo</option></select></div>`;
+  }
+  html += `<div class="decor-legend-photo-row"><button type="button" class="btn btn-sm decor-legend-photo-pick">${photo ? 'Zmień zdjęcie' : 'Wgraj zdjęcie'}</button>`
+    + (photo ? `<button type="button" class="btn btn-sm decor-legend-photo-remove">Usuń zdjęcie</button>` : '')
+    + `<input type="file" class="decor-legend-photo-file" accept="image/*" hidden></div></div>`;
+  return html;
+}
+
+async function saveDecorPhoto(photo) {
+  if (!(await saveDecorTextureToCloud(photo))) return;
+  await setDecorPhoto(photo.name, photo);
+  update3D();
+}
+
+async function removeDecorPhoto(label) {
+  if (!(await deleteDecorTextureFromCloud(label))) return;
+  await setDecorPhoto(label, null);
+  update3D();
+}
+
 function renderDecorLegend() {
   if (!container) return;
   if (!decorLegendEl) {
     decorLegendEl = document.createElement('div');
     decorLegendEl.className = 'decor-legend';
     decorLegendEl.addEventListener('click', (e) => {
+      const photoBox = e.target.closest('.decor-legend-photo');
+      if (photoBox) {
+        if (e.target.closest('.decor-legend-photo-pick')) photoBox.querySelector('.decor-legend-photo-file').click();
+        else if (e.target.closest('.decor-legend-photo-remove')) removeDecorPhoto(photoBox.getAttribute('data-label'));
+        return;
+      }
       const row = e.target.closest('.decor-legend-row');
       if (!row) return;
       const key = row.getAttribute('data-key');
       setHighlightKey(highlightKey === key ? null : key);
       update3D();
     });
-    decorLegendEl.addEventListener('change', (e) => {
+    decorLegendEl.addEventListener('change', async (e) => {
+      const photoBox = e.target.closest('.decor-legend-photo');
+      if (photoBox) {
+        const label = photoBox.getAttribute('data-label');
+        const old = getDecorPhoto(label);
+        let dataUrl = old ? old.dataUrl : null;
+        if (e.target.classList.contains('decor-legend-photo-file')) {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          dataUrl = await photoFileToDataUrl(file);
+          if (!dataUrl) { showAlert('❌ Nie udało się wczytać tego zdjęcia.'); return; }
+        }
+        if (!dataUrl) return;
+        const width = photoBox.querySelector('.decor-legend-photo-width');
+        const grain = photoBox.querySelector('.decor-legend-photo-grain');
+        saveDecorPhoto({ name: label, dataUrl, widthMm: width ? width.value : (old ? old.widthMm : 600), grain: grain ? grain.value : (old ? old.grain : 'v') });
+        return;
+      }
       if (!e.target.classList.contains('decor-legend-replace-input') || !highlightKey) return;
       const name = e.target.value.trim();
       if (!name || !replaceMaterial(state.project, highlightKey, name)) return;
@@ -1498,6 +1551,7 @@ function renderDecorLegend() {
     const active = highlightKey === it.key ? ' is-active' : '';
     html += `<div class="decor-legend-row${active}" data-key="${escapeHtml(it.key)}" role="button" tabindex="0"><span class="decor-legend-swatch" style="background:${hex(color)}"></span>${escapeHtml(it.label)}</div>`;
     if (active) html += `<div class="decor-legend-replace"><label class="fs-xs">Zamień w całym projekcie na:</label><input type="text" class="input decor-legend-replace-input" list="decor-legend-catalog" placeholder="wpisz albo wybierz z listy" autocomplete="off"></div>`;
+    if (active && !it.key.startsWith('~')) html += decorPhotoHtml(it.label);
   });
   if (highlightKey) html += `<datalist id="decor-legend-catalog">${frontMaterialSuggestions(state.project).map(l => `<option value="${escapeHtml(l)}"></option>`).join('')}</datalist>`;
   decorLegendEl.innerHTML = html;

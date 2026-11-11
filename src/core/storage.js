@@ -16,6 +16,7 @@ import { validateProjectData } from "./projectSchema.js";
 import { sanitizeProjectData } from "./projectSanitize.js";
 import { projectListEntry } from "./projectStatus.js";
 import { isAllowedEmail, FIREBASE_PROJECT_ID } from "./access.js";
+import { normalizePhoto, photoDocId } from "./decorTexture.js";
 
 // Konfiguracja klienta Firebase jest z założenia publiczna (leci do przeglądarki)
 // i sama z siebie niczego nie chroni. Realną barierą są reguły Firestore w
@@ -493,6 +494,46 @@ export async function loadSasCatalogFromCloud() {
   } catch (error) {
     console.error("Błąd odczytu katalogu SAS:", error);
     return null;
+  }
+}
+
+// ZDJĘCIA DEKORÓW (core/decorTexture.js): kolekcja decorTextures, jeden dokument na dekor
+// { key, name, dataUrl, widthMm, grain } - wspólne dla wszystkich projektów.
+export async function saveDecorTextureToCloud(photo) {
+  if (!requireOwner()) return false;
+  const rec = normalizePhoto(photo);
+  if (!rec) { showAlert("❌ To zdjęcie jest za duże albo nie jest obrazem."); return false; }
+  try {
+    await setDoc(doc(db, "decorTextures", photoDocId(rec.key)), { ...rec, savedAt: new Date().toISOString() });
+    return true;
+  } catch (error) {
+    console.error("Błąd zapisu zdjęcia dekoru:", error);
+    showAlert("❌ Nie udało się zapisać zdjęcia dekoru w chmurze.");
+    return false;
+  }
+}
+
+export async function deleteDecorTextureFromCloud(key) {
+  if (!requireOwner()) return false;
+  try {
+    await deleteDoc(doc(db, "decorTextures", photoDocId(key)));
+    return true;
+  } catch (error) {
+    console.error("Błąd usuwania zdjęcia dekoru:", error);
+    showAlert("❌ Nie udało się usunąć zdjęcia dekoru z chmury.");
+    return false;
+  }
+}
+
+// Lista zdjęć dekorów (pusta, gdy niezalogowany albo brak dostępu - bez komunikatu).
+export async function loadDecorTexturesFromCloud() {
+  if (!isOwner()) return [];
+  try {
+    const snap = await getDocs(collection(db, "decorTextures"));
+    return snap.docs.map((d) => normalizePhoto(d.data())).filter(Boolean);
+  } catch (error) {
+    console.error("Błąd odczytu zdjęć dekorów:", error);
+    return [];
   }
 }
 

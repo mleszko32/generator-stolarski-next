@@ -20,7 +20,8 @@ import { undo, redo, onHistoryChange, resetHistory } from "./core/history.js";
 import { openVersionHistory } from "./ui/versionHistory.js";
 import { showAlert } from "./utils/modal.js";
 import { readLocalBackup, clearLocalBackup, startLocalBackup } from "./core/localBackup.js";
-import { applyProjectData } from "./core/storage.js";
+import { applyProjectData, loadDecorTexturesFromCloud } from "./core/storage.js";
+import { loadDecorPhotos } from "./render/decorTextures.js";
 import { openHelp } from "./ui/helpModal.js";
 import { initAssistantBridge } from "./ui/assistantBridge.js";
 
@@ -198,6 +199,8 @@ function reflectAuth(user) {
   if (btnAuth) btnAuth.innerHTML = signedIn ? navIcon('logout', 'Wyloguj') : navIcon('login', 'Zaloguj (Google)');
   cloudButtons.forEach(b => { b.disabled = !signedIn; }); // wygląd: .btn:disabled w global.css
   if (signedIn) startAutosave(); else stopAutosave();
+  // zdjęcia próbek dekorów do podglądu 3D (wspólne dla wszystkich projektów)
+  if (signedIn) loadDecorTexturesFromCloud().then(loadDecorPhotos).then((n) => { if (n) update3D(); });
 }
 
 if (btnAuth) {

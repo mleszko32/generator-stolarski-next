@@ -25,6 +25,9 @@ Reguły obejmują też podkolekcje `versions` i `versionData` w dokumencie proje
 przycisk „Historia" na górnym pasku). Po aktualizacji aplikacji do tej funkcji **opublikuj reguły ponownie**,
 inaczej historia nie będzie się zapisywać (aplikacja działa dalej, tylko bez wersji).
 
+To samo dotyczy kolekcji `decorTextures` (zdjęcia próbek dekorów do podglądu 3D, wgrywane w legendzie
+materiałów): bez ponownej publikacji reguł zdjęcia się nie zapiszą ani nie wczytają.
+
 Od tej chwili niezalogowany użytkownik (ani zalogowany innym kontem) nie odczyta
 ani nie zmieni żadnego projektu. Istniejące projekty w kolekcji `projects/`
 zostają na miejscu i stają się dostępne po zalogowaniu właściciela.
