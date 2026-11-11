@@ -15,6 +15,7 @@ import {
   assignFront, removeSplit, moveSplit,
 } from "./zoneTree.js";
 import { recalculateLayout } from "./layout.js";
+import { listSplitPoints, applySplit } from "./splitModule.js";
 import { validateProject } from "./validate.js";
 import { round1 } from "../utils/math.js";
 
@@ -167,6 +168,29 @@ export function setStructural(mod, path, structural) {
   if (node.type !== "split") throw new Error(`Wnęka „${path}” nie ma dzielnika.`);
   node.divider.isStructural = !!structural;
   recalculateLayout(mod);
+}
+
+// Miejsca podziału szafki na korpusy (półki / przegrody na całe wnętrze) z frontami, które je obejmują.
+export function splitPoints(mod) {
+  return listSplitPoints(mod);
+}
+
+// Dzieli szafkę na dwa korpusy. opts: { dividerId } albo { axis: 'h'|'v', at? } (bez at — jedyne
+// takie miejsce); fronty obejmujące cięcie: straddle ('both'|'first'|'second', domyślnie 'both')
+// i fronts { [idFrontu]: ... } dla pojedynczych. Zwraca nazwy obu korpusów.
+export function splitCabinet(mod, opts = {}) {
+  const points = listSplitPoints(mod);
+  if (!points.length) throw new Error("Ta szafka nie ma półki ani przegrody na całe wnętrze, na której można ją podzielić.");
+  let p = opts.dividerId ? points.find((x) => x.id === opts.dividerId) : null;
+  if (!p && !opts.dividerId) {
+    const cand = points.filter((x) => !opts.axis || x.axis === opts.axis);
+    if (opts.at != null) p = cand.sort((a, b) => Math.abs(a.pos - opts.at) - Math.abs(b.pos - opts.at))[0];
+    else if (cand.length === 1) p = cand[0];
+    else throw new Error(`Podaj, gdzie dzielić (axis i at albo dividerId): ${points.map((x) => `${x.axis} ${x.pos} mm`).join(", ")}.`);
+  }
+  if (!p) throw new Error("Nie ma takiego miejsca podziału — sprawdź splitPoints().");
+  const { first, second } = applySplit(mod, { dividerId: p.id, fronts: opts.fronts, straddle: opts.straddle });
+  return { first: first.name, second: second.name };
 }
 
 const isPlain = (v) => v && typeof v === "object" && !Array.isArray(v);

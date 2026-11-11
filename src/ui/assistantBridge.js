@@ -44,6 +44,9 @@ ZMIANY (każda odświeża aplikację; cofnięcie: undo())
   removeDivider(szafka, wnęka)  usuń dzielnik (scala wnękę)
   add(typ)                      nowa szafka: base_cabinet | upper_cabinet | tall_cabinet
   duplicate(szafka) / remove(szafka)
+  splitPoints(szafka)           gdzie można podzielić szafkę na korpusy (półki / przegrody na całe wnętrze) + fronty na cięciu
+  splitCabinet(szafka, opcje)   podziel na dwa korpusy: { axis: "h"|"v", at: mm } albo { dividerId };
+                                fronty na cięciu: straddle "both" | "first" | "second" (dół/lewy, góra/prawy), fronts: { idFrontu: ... }
   panel(rodzaj, pola)           nowy bok / blenda / panel poziomy / zmywarka: rodzaj bok | blenda | poziomy | zmywarka
                                 zmywarka: dimensions { width: 450 | 600, height: podłoga→spód blatu, depth }, topBoard, decor, materialId
                                 panel poziomy: dimensions { width: długość X, depth: głębokość Z, height: grubość },
@@ -123,6 +126,8 @@ export function initAssistantBridge() {
     removeDivider: change((ref, path) => { api.removeDivider(mod(ref), path); return zonesOf(ref); }),
     add: change((type) => addModule(type).name),
     duplicate: change((ref) => duplicateModule(mod(ref).id)?.name),
+    splitPoints: (ref) => api.splitPoints(mod(ref)),
+    splitCabinet: change((ref, opts) => api.splitCabinet(mod(ref), opts)),
     remove: change((ref) => { const m = mod(ref); deleteModule(m.id); return `Usunięto „${m.name}”`; }),
     align: change((refs, edge) => { const s = moveSel(refs); alignSelection(state.project, s.sel, s.refId, edge); return positions(s.mods); }),
     push: change((refs, dir) => { const s = moveSel(refs); pushSelection(state.project, s.sel, s.refId, dir); return positions(s.mods); }),

@@ -245,6 +245,13 @@ Wszystkie panele renderują się przez przypisanie szablonów tekstowych do `inn
   dane liczy czyste `core/moduleInfo.js` (`getModuleSummary`: wymiary korpusu/wnętrza, drzwi
   z zawiasami, szuflady z frontem i skrzynką, półki).
 
+**Podział szafki na korpusy**: `core/splitModule.js` (czyste, z testami) — `listSplitPoints` (półki / przegrody na całe
+wnętrze), `splitModule` / `applySplit` rozcinają szafkę na dzielniku: wnętrze przechodzi na swoją stronę (drugi korpus
+przesunięty o grubość płyty i dopasowany `refitInterior`, łączny wymiar zostaje; cięcie poziome — górny korpus bez nóżek,
+pionowe — tylko obrót 0°). Fronty obejmujące cięcie: `both` (własny front w każdym) / `first` / `second` (zostaje w jednym i
+zasłania oba przez ujemne `baseZone.offsetTop|Bottom|Left|Right`; `offsetLeft/Right` czyta `layout.js`). UI:
+`ui/splitModuleModal.js` (przycisk w sekcji Wymiary), pilot: `gsn.splitPoints` / `gsn.splitCabinet`.
+
 **Pilot dla Claude'a**: `window.gsn` (`ui/assistantBridge.js`, logika w czystym `core/assistantApi.js` z testami) —
 nazwane polecenia do zmian w projekcie z przeglądarki (spis szafek, wnęki po ścieżkach a/b z `zoneTree`, półki,
 przegrody, fronty, `set` przez głębokie scalenie, kontrola, otwórz/zapisz z chmury), każde przez standardowe

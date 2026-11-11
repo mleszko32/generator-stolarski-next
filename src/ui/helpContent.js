@@ -133,7 +133,10 @@ export const HELP_SECTIONS = [
       (wymiary korpusu i wnętrza, drzwi z zawiasami, szuflady, półki), niżej zwijane sekcje:</p>
       <ul>
         <li><b>Wymiary</b> - szerokość, wysokość, głębokość, pozycja i obrót. Tu też przyciski
-        <b>Zmień podział rzędu</b> i <b>Zmień podział kuchni L/U</b>.</li>
+        <b>Zmień podział rzędu</b> i <b>Zmień podział kuchni L/U</b>. Szafkę z półką stałą albo przegrodą
+        na całe wnętrze można rozciąć na dwa osobne korpusy przyciskiem <b>Podziel na korpusy…</b>:
+        wnętrze przechodzi na właściwą stronę, a dla każdych drzwi obejmujących cięcie wybierasz, czy każdy
+        korpus dostaje własne, czy zostają w jednym i zasłaniają oba.</li>
         <li><b>Front</b> - nakładane / wpuszczane, luzy, szczelina, materiał frontu.
           <b>Luzy automatyczne (wg sąsiadów)</b> - włączone w nowych szafkach: luz każdej krawędzi liczy się z tego,
           co przy niej stoi. Boki: szafka obok, ściana albo pusto 1,5 mm, blenda albo bok dokładany 3 mm, zmywarka

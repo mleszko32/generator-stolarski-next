@@ -31,6 +31,8 @@ import { editTargets } from "../core/groupSelection.js";
 import { getStiffenerSettings } from "../core/shelfStiffener.js";
 import { findKitchenRunAround } from "../core/kitchenRun.js";
 import { openWallFillModal } from "./wallFillModal.js";
+import { openSplitModuleModal } from "./splitModuleModal.js";
+import { listSplitPoints } from "../core/splitModule.js";
 import { BOARD_BACK_MIN, resolveBackPanel } from "../core/backPanel.js";
 import { catalogLabels, assignFrontMaterialByName, frontMaterialSuggestions, addCatalogDecor } from "../core/materialCatalog.js";
 import { moduleFrontMaterialId, PLINTH_KORPUS } from "../core/plinthMaterial.js";
@@ -246,6 +248,8 @@ export function initPropertiesPanel() {
   const wallRow = findRowAround(state.project, activeModule.id);
   // Kuchnia L/U (ściany połączone narożnikami) - przycisk "Zmień podział kuchni L/U".
   const kitchenRun = findKitchenRunAround(state.project, activeModule.id);
+  // Podział na dwa korpusy: tylko szafki z półką / przegrodą na całe wnętrze (core/splitModule.js).
+  const canSplit = listSplitPoints(activeModule).length > 0;
 
   rightSidebar.innerHTML = `
     ${propHeaderHtml({
@@ -271,6 +275,13 @@ export function initPropertiesPanel() {
         prefix: 'input-pos', position: activeModule.position, rotation: activeModule.rotation,
         rotClass: 'btn-rotate', hint: 'Skrót: klawisz R obraca aktywną szafkę o +90°.',
       })}
+
+      ${canSplit ? `
+        <h3>Podział na korpusy</h3>
+        <div class="property-group">
+          <button type="button" id="btn-split-module" class="btn btn-sm btn-block" title="Rozetnij szafkę na dwa osobne korpusy na półce stałej albo przegrodzie - wnętrze i fronty przechodzą na właściwą stronę"><i class="ti ti-layout-columns" aria-hidden="true"></i> Podziel na korpusy…</button>
+        </div>
+      ` : ''}
 
       ${wallRow || kitchenRun ? `
         <h3>Rząd przy ścianie</h3>
@@ -984,6 +995,10 @@ function setupEventListeners() {
   document.getElementById('btn-edit-wall-row')?.addEventListener('click', () => {
     const mod = getActiveModule();
     if (mod) openWallFillModal(() => { initPropertiesPanel(); updateAll(); }, { editModuleId: mod.id });
+  });
+  document.getElementById('btn-split-module')?.addEventListener('click', () => {
+    const mod = getActiveModule();
+    if (mod) openSplitModuleModal(mod, () => { initPropertiesPanel(); updateAll(); });
   });
   document.getElementById('btn-edit-kitchen-run')?.addEventListener('click', () => {
     const mod = getActiveModule();

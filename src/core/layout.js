@@ -326,8 +326,10 @@ export function recalculateLayout(mod) {
               el.baseZone.maxY = getBound(el.baseZone.boundTop, 'maxY', el.baseZone.maxY);
           }
 
-          const minX = parseFloat(el.baseZone.minX) || 0;
-          const maxX = parseFloat(el.baseZone.maxX) || width;
+          // offsetLeft / offsetRight: wnęka frontu wychodzi poza korpus (ujemne = na zewnątrz),
+          // np. drzwi stojące na kilku korpusach obok siebie (core/splitModule.js)
+          const minX = (parseFloat(el.baseZone.minX) || 0) + (parseFloat(el.baseZone.offsetLeft) || 0);
+          const maxX = (parseFloat(el.baseZone.maxX) || width) - (parseFloat(el.baseZone.offsetRight) || 0);
           const minY = (parseFloat(el.baseZone.minY) || 0) + (parseFloat(el.baseZone.offsetBottom) || 0);
           const maxY = (parseFloat(el.baseZone.maxY) || height) - (parseFloat(el.baseZone.offsetTop) || 0);
 
