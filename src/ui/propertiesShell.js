@@ -8,6 +8,7 @@
 // wyglądał i działał tak samo.
 import { escapeHtml } from "../utils/dom.js";
 import { clampModuleToRoom, restModuleOnNeighbors } from "../core/layout.js";
+import { mountMoveTools } from "./moveTools.js";
 
 // Nazwy i ikony sekcji - wspólne, żeby ta sama sekcja (np. "Front") wyglądała tak samo
 // w każdym rodzaju szafki i dzieliła stan otwarcia.
@@ -140,4 +141,6 @@ export function bindModulePosition(root, mod, { prefix, rotClass, onChange, rere
     onChange();
     rerender();
   }));
+  // Karta „Odstępy i wyrównanie” (ui/moveTools.js) tuż pod polami pozycji.
+  mountMoveTools(root, mod, prefix, { onChange, rerender });
 }

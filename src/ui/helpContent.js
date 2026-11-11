@@ -91,7 +91,12 @@ export const HELP_SECTIONS = [
           Szafka z grupy zaznacza się razem z całą grupą (mebel przesuwa się w całości), ale prawy panel zmienia
           wtedy tylko klikniętą szafkę - w widoku 3D jest ona podbarwiona na niebiesko, a reszta grupy ma jasnoniebieskie krawędzie. Kilka szafek naraz panel zmienia dopiero po dobraniu ich Shift + klik -
           pokazuje wtedy u góry, ilu szafek dotyczą zmiany.</li>
-        <li><b>Przesuwanie szafki</b> - przeciągnij ją. Przyciąga się do ścian i krawędzi sąsiadów (także do lica frontów) i zatrzymuje na sąsiadach, nie przepycha ich.</li>
+        <li><b>Przesuwanie szafki</b> - przeciągnij ją. Przyciąga się do sąsiadów (styk bok do boku ma pierwszeństwo przed zrównaniem krawędzi), do ścian, do szczeliny od ściany za plecami (dolne i słupki 50 mm) i do lica frontów - także ciągu z prostopadłej ściany w narożniku. Przy przeciąganiu grupy łapią krawędzie wszystkich jej szafek. Szafka zatrzymuje się na sąsiadach, nie przepycha ich.</li>
+        <li><b>Linie pomocnicze</b> - w trakcie ruchu widać, co złapało: zielona linia = styk z sąsiadem, niebieska = krawędzie równo, szara = ściana, pomarańczowa = szczelina od ściany, fioletowa = lico frontów. Pomarańczowe wymiary pokazują odstęp do najbliższego sąsiada albo ściany z każdej strony.</li>
+        <li>Im bliżej kamera, tym mniejszy zasięg przyciągania - z bliska da się postawić szafkę kilka milimetrów od sąsiada. <b>Ctrl</b> w trakcie przeciągania wyłącza przyciąganie całkiem.</li>
+        <li><b>Esc</b> w trakcie przeciągania - szafka wraca na miejsce sprzed ruchu.</li>
+        <li><b>Strzałki</b> - przesuwają zaznaczone szafki o 1 mm w kierunku widocznym na ekranie, z <b>Shift</b> o 10 mm; <b>PageUp / PageDown</b> w górę i w dół. Ruch zatrzymuje się na sąsiadach i ścianach.</li>
+        <li><b>Odstępy i wyrównanie</b> (prawy panel, pod polami pozycji) - wpisz odstęp od sąsiada albo ściany z lewej / z prawej, <b>dosuń</b> szafkę jednym kliknięciem do najbliższej szafki lub ściany (w tył zostaje szczelina rzędu), a przy kilku zaznaczonych szafkach <b>wyrównaj</b> ich krawędzie (lewa, prawa, tyły, fronty, góra, dół) do klikniętej szafki albo <b>zsuń rząd bez przerw</b>. Strony liczą się tak, jak widać szafkę od frontu.</li>
         <li><b>Shift</b> w trakcie przeciągania - ruch tylko wzdłuż jednej osi.</li>
         <li><b>Alt</b> przy chwyceniu - przesuwanie w górę / w dół.</li>
         <li><b>R</b> - obrót zaznaczonej szafki o 90°.</li>
@@ -99,6 +104,7 @@ export const HELP_SECTIONS = [
       </ul>
       <h4>Pasek widoku (prawy górny róg)</h4>
       <ul>
+        <li><b>Przód / Góra / Lewa / Prawa / 3D</b> - szybkie widoki kamery na cały projekt; <b>Zaznaczone</b> przybliża do zaznaczonych szafek.</li>
         <li><b>Przezroczysty / Realistyczny</b> - szkic z widocznymi wierceniami albo pełne bryły.</li>
         <li><b>Kolory: rzeczywiste / materiały</b> - kolor dekoru i lakieru (RAL / NCS) albo każdy materiał projektu w innym, wyraźnym kolorze. Legenda w lewym dolnym rogu pokazuje, który kolor to który materiał; kliknięcie pozycji podświetla elementy z tego materiału (ponowne pokazuje wszystko), a pole „Zamień w całym projekcie na” pod nią podmienia ten dekor / materiał wszędzie, gdzie występuje.</li>
         <li><b>Ukryj fronty zewn.</b>, <b>Ukryj boki</b>, <b>Ukryj blendy</b>, <b>Ukryj blaty</b> - osobne przełączniki widoczności.</li>
@@ -323,6 +329,10 @@ export const HELP_SECTIONS = [
         <tr><td><kbd>Shift</kbd> + klik</td><td>Zaznaczanie kilku szafek / kilku wnęk w Wnętrzu 2D</td></tr>
         <tr><td><kbd>Shift</kbd> przy przeciąganiu</td><td>Ruch tylko wzdłuż jednej osi</td></tr>
         <tr><td><kbd>Alt</kbd> przy chwyceniu</td><td>Przesuwanie szafki w górę / w dół</td></tr>
+        <tr><td><kbd>Ctrl</kbd> przy przeciąganiu</td><td>Bez przyciągania</td></tr>
+        <tr><td><kbd>Esc</kbd> przy przeciąganiu</td><td>Anuluj ruch</td></tr>
+        <tr><td>Strzałki / <kbd>Shift</kbd> + strzałki</td><td>Przesuń zaznaczone szafki o 1 mm / 10 mm</td></tr>
+        <tr><td><kbd>PageUp</kbd> / <kbd>PageDown</kbd></td><td>Zaznaczone szafki w górę / w dół</td></tr>
         <tr><td><kbd>Esc</kbd></td><td>Zamyka okno na wierzchu</td></tr>
         <tr><td><kbd>F1</kbd></td><td>Ta instrukcja</td></tr>
       </table>

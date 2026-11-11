@@ -196,8 +196,17 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
     łańcuchy szerokości wzdłuż ścian — rząd stojący i wiszący osobno, wymiar całkowity, wysokości przy końcu
     ściany — oraz wymiary i odstępy zaznaczonej szafki); przebudowa w `update3D()` (`rebuildDimensions`).
   - Przyciąganie i kolizje przy przeciąganiu szafek są w `core/moduleDrag.js` (czyste, z
-    testami): najbliższy kandydat (w tym fronty równo), a przeciągana szafka zatrzymuje się
-    na sąsiadach — sąsiedzi nigdy nie są odpychani. Shift w trakcie ruchu blokuje jedną oś.
+    testami): `snapModulePosition` wybiera kandydata wg rangi (`SNAP_WEIGHT`: styk > ściana / szczelina od ściany
+    `getWallGap` > lico frontów, też prostopadłego ciągu > krawędzie równo), liczy krawędzie całego zaznaczenia
+    (`opts.selection`) i zwraca `guides` — co złapało; przeciągana szafka zatrzymuje się na sąsiadach
+    (`sweepSelection`), sąsiedzi nigdy nie są odpychani. Próg przyciągania zależy od zoomu (`dragSnapDist`, ok. 12 px,
+    najwyżej 40 mm), Ctrl = bez przyciągania, Shift blokuje jedną oś, Esc cofa ruch. Linie pomocnicze i odstępy
+    (`dragGaps`) rysuje `render/snapGuides.js` tylko w trakcie ruchu.
+  - Ruch bez przeciągania: `core/alignCommands.js` (czyste, z testami) — `moveSelection` (strzałki 1 / 10 mm w
+    `main.js`, kierunek wg kamery z `getScreenMoveDirs`), `setSelectionGap`, `pushSelection`, `alignSelection`,
+    `packSelection`; strony left/right/back/front względem obrotu szafki (`worldDir`). Karta „Odstępy i wyrównanie”
+    pod polami pozycji: `ui/moveTools.js` (`mountMoveTools`); pilot: `gsn.align` / `push` / `pack`.
+  - `cameraViews.js` — szybkie widoki kamery (`setCameraView`: przód / góra / lewa / prawa / 3D / zaznaczone).
 - `src/render/viewer2d.js` — `generateSidePanelSVG(height, depth, mountingData)` buduje
   rysunek techniczny SVG boku z wierceniami (`opts.wholeGroup` = cała grupa, inaczej tylko szafki nad/pod; wieńce i półki
   stałe klikalne - rzut z góry z otworów `getCabinetPanels`, jak instrukcja montażu; okno `ui/technicalDrawing.js` z numerem

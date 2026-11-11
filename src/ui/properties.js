@@ -22,6 +22,7 @@ import { renderCornerModuleProperties } from "./cornerProperties.js";
 import { renderSlopeModuleProperties } from "./slopeProperties.js";
 import { drawerCardsHtml, bindDrawerCards } from "./drawerSettings.js";
 import { propHeaderHtml, sectionHtml, bindSections, setSectionDots, positionRotationHtml } from "./propertiesShell.js";
+import { mountMoveTools } from "./moveTools.js";
 import { blindCornerSectionHtml, bindBlindCornerSection } from "./blindCornerProperties.js";
 import { findRowAround } from "../core/wallFill.js";
 import { isAutoClearance, describeClearance, frontClearance } from "../core/autoClearance.js";
@@ -977,6 +978,8 @@ function setupEventListeners() {
       initPropertiesPanel();
     });
   });
+
+  mountMoveTools(document, getActiveModule(), 'input-pos', { onChange: updateAll, rerender: initPropertiesPanel });
 
   document.getElementById('btn-edit-wall-row')?.addEventListener('click', () => {
     const mod = getActiveModule();

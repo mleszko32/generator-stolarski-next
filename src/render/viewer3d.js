@@ -25,7 +25,11 @@ import { worktopBoxes } from '../core/worktops.js';
 import { getOpenings, openingBox } from '../core/openings.js';
 import { roomWalls } from '../core/roomShape.js';
 import { snapSidePanel } from '../core/sidePanelSnap.js';
-import { snapModulePosition, sweepSelection, boxesOverlap, getSidePanelBox } from '../core/moduleDrag.js';
+import { snapModulePosition, sweepSelection, boxesOverlap, getSidePanelBox, dragGaps } from '../core/moduleDrag.js';
+import { frontAllowance, getWallGap } from '../core/wallFill.js';
+import { buildSnapGuides } from './snapGuides.js';
+import { VIEW_DIRS, frameBox, flyCamera } from './cameraViews.js';
+import { moveSelectionOf } from '../core/alignCommands.js';
 import { clickSelection, groupMembers } from '../core/groupSelection.js';
 import { refreshModuleInfoCard } from '../ui/moduleInfoPanel.js';
 import { initPropertiesPanel } from '../ui/properties.js';
@@ -59,6 +63,81 @@ let labelsGroup;
 let dimsGroup;
 let showDims = false;
 try { showDims = localStorage.getItem('viewerShowDims') === '1'; } catch (e) {}
+
+// Linie pomocnicze przyciągania i odstępy - tylko w trakcie przeciągania (render/snapGuides.js).
+let guidesGroup;
+function clearSnapGuides() {
+  if (!guidesGroup) return;
+  while (guidesGroup.children.length > 0) {
+    const old = guidesGroup.children[0];
+    guidesGroup.remove(old);
+    disposeObject(old);
+  }
+}
+function showSnapGuides(guides, selBoxes, otherBoxes) {
+  clearSnapGuides();
+  if (!guidesGroup) return;
+  buildSnapGuides(guides, dragGaps(selBoxes, otherBoxes, getRoom()), selBoxes, guidesGroup);
+}
+
+// Próg przyciągania w mm: ok. 12 px ekranu przy bieżącym zbliżeniu (z bliska mały, żeby
+// dało się postawić szafkę tuż obok bez przyklejania), najwyżej SNAP_DIST. Ctrl = bez przyciągania.
+function dragSnapDist(e, point) {
+  if (e.ctrlKey || e.metaKey) return 0;
+  if (!camera || !camera.isPerspectiveCamera) return SNAP_DIST;
+  const h = renderer.domElement.clientHeight || 1;
+  const mmPerPx = 2 * camera.position.distanceTo(point) * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / h;
+  return Math.min(SNAP_DIST, Math.max(8, 12 * mmPerPx));
+}
+
+// Kierunki strzałek na klawiaturze wg kamery: oś pokoju najbliższa ekranowemu „w prawo”
+// i „w głąb” ({ axis: 'x' | 'z', sign }). null, gdy widok 3D jest schowany (Wnętrze 2D).
+export function getScreenMoveDirs() {
+  if (!camera || !container || container.clientWidth === 0) return null;
+  const pick = (v) => (Math.abs(v.x) >= Math.abs(v.z) ? { axis: 'x', sign: Math.sign(v.x) || 1 } : { axis: 'z', sign: Math.sign(v.z) || 1 });
+  const rightV = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+  let fwdV = camera.getWorldDirection(new THREE.Vector3());
+  fwdV.y = 0;
+  if (fwdV.lengthSq() < 0.01) fwdV = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);   // widok z góry
+  const right = pick(rightV);
+  let forward = pick(fwdV);
+  if (forward.axis === right.axis) {
+    const other = right.axis === 'x' ? 'z' : 'x';
+    forward = { axis: other, sign: Math.sign(fwdV[other]) || 1 };
+  }
+  return { right, forward };
+}
+
+// Obrys do kadrowania: zaznaczenie (onlySelection) albo wszystkie szafki i boki; pusty projekt = pokój.
+function sceneBounds(onlySelection) {
+  const sel = onlySelection ? moveSelectionOf(state) : null;
+  const boxes = [
+    ...state.project.modules.filter(m => !sel || sel.moduleIds.has(m.id)).map(getModuleBox),
+    ...(state.project.sidePanels || []).filter(p => !sel || sel.panelIds.has(p.id)).map(getSidePanelBox),
+  ];
+  if (!boxes.length) {
+    if (onlySelection) return sceneBounds(false);
+    const room = getRoom();
+    return { x0: 0, x1: parseFloat(room.width) || DEFAULT_ROOM.width, y0: 0, y1: parseFloat(room.height) || DEFAULT_ROOM.height, z0: 0, z1: parseFloat(room.depth) || DEFAULT_ROOM.depth };
+  }
+  return boxes.reduce((b, s) => ({
+    x0: Math.min(b.x0, s.x0), x1: Math.max(b.x1, s.x1),
+    y0: Math.min(b.y0, s.y0), y1: Math.max(b.y1, s.y1),
+    z0: Math.min(b.z0, s.z0), z1: Math.max(b.z1, s.z1),
+  }));
+}
+
+// Widok kamery: 'front' | 'top' | 'left' | 'right' | 'iso' (cały projekt) albo 'selection'
+// (zaznaczenie, bez zmiany kierunku patrzenia).
+export function setCameraView(name) {
+  if (!camera || !controls) return;
+  const dir = name === 'selection'
+    ? new THREE.Vector3().subVectors(camera.position, controls.target).toArray()
+    : VIEW_DIRS[name];
+  if (!dir) return;
+  const { position, target } = frameBox(sceneBounds(name === 'selection'), dir, camera.fov, camera.aspect);
+  flyCamera(camera, controls, position, target, () => requestRender(600));
+}
 
 function rebuildDimensions() {
   if (!dimsGroup) return;
@@ -366,6 +445,8 @@ export function init3DViewer() {
   // Wymiary - tak samo osobna grupa wprost w scenie (przełączanie bez przebudowy szafek).
   dimsGroup = new THREE.Group();
   scene.add(dimsGroup);
+  guidesGroup = new THREE.Group();
+  scene.add(guidesGroup);
 
   reframeCameraToRoom();
 
@@ -543,7 +624,7 @@ export function init3DViewer() {
                   modules: state.project.modules.filter(m => !dragFollowers.has('m:' + m.id)),
                   sidePanels: state.project.sidePanels.filter(p => !dragFollowers.has('p:' + p.id)) }
               : state.project;
-          const snapped = snapSidePanel(dragSidePanel, newGroupPos.x - worldW / 2, newGroupPos.z - worldD / 2, snapProject, SNAP_DIST);
+          const snapped = snapSidePanel(dragSidePanel, newGroupPos.x - worldW / 2, newGroupPos.z - worldD / 2, snapProject, dragSnapDist(e, dragSidePanelTarget.position));
           const snapX = snapped.x;
           const snapZ = snapped.z;
 
@@ -563,6 +644,15 @@ export function init3DViewer() {
               const obj = f.obj && cabinetGroup.children.find(g => g.userData && (f.kind === 'm' ? g.userData.moduleId === f.item.id : g.userData.sidePanelId === f.item.id));
               if (obj) obj.position.set(f.obj.x + dx, f.obj.y, f.obj.z + dz);
           });
+          {
+              const movingBoxes = [getSidePanelBox(dragSidePanel)];
+              dragFollowers.forEach((f) => movingBoxes.push(f.kind === 'm' ? getModuleBox(f.item) : getSidePanelBox(f.item)));
+              const restBoxes = [
+                  ...snapProject.modules.map(getModuleBox),
+                  ...snapProject.sidePanels.filter(p => p.id !== dragSidePanel.id).map(getSidePanelBox),
+              ];
+              showSnapGuides([], movingBoxes, restBoxes);
+          }
           return;
       }
 
@@ -621,6 +711,9 @@ export function init3DViewer() {
                   return {
                       x: parseFloat(o.position.x) || 0, y: parseFloat(o.position.y) || 0, z: parseFloat(o.position.z) || 0,
                       w: oW, d: oD, h: parseFloat(o.dimensions.height) || 720,
+                      // lico frontów (szafka narożna ma dwa ramiona - bez lica)
+                      rot: o.type === 'corner_cabinet' ? undefined : getWorldFootprint(o).rotation,
+                      front: frontAllowance(state.project, o),
                   };
               });
           // Boki dokładane i blendy też przyciągają (tylko X/Z).
@@ -628,7 +721,30 @@ export function init3DViewer() {
               const b = getSidePanelBox(p);
               others.push({ x: b.x0, y: b.y0, z: b.z0, w: b.x1 - b.x0, d: b.z1 - b.z0, h: b.y1 - b.y0, noY: true });
           });
-          const snapped = snapModulePosition({ x: snapX, y: snapY, z: snapZ }, { w: worldW, d: worldD, h: H }, others, room, SNAP_DIST, { lockX, lockZ });
+          // Reszta zaznaczenia (grupa) też przyciąga swoimi krawędziami.
+          const selection = [];
+          if (orig) {
+              state.selectedModules.forEach(id => {
+                  const m = id !== dragModule.id && state.project.modules.find(mod => mod.id === id);
+                  const mOrig = dragSelectionOrigins.get(id);
+                  if (!m || !mOrig) return;
+                  const { worldW: mW, worldD: mD } = getWorldFootprint(m);
+                  selection.push({ dx: mOrig.x - orig.x, dy: mOrig.y - orig.y, dz: mOrig.z - orig.z, w: mW, d: mD, h: parseFloat(m.dimensions.height) || 720 });
+              });
+              dragGroupPanels.forEach((o, id) => {
+                  const p = state.project.sidePanels.find(sp => sp.id === id);
+                  if (!p) return;
+                  const { worldW: pW, worldD: pD } = getWorldFootprint(p);
+                  selection.push({ dx: o.pos.x - orig.x, dy: 0, dz: o.pos.z - orig.z, w: pW, d: pD, h: parseFloat(p.dimensions.height) || 0 });
+              });
+          }
+          const isCorner = dragModule.type === 'corner_cabinet';
+          const snapped = snapModulePosition({ x: snapX, y: snapY, z: snapZ }, { w: worldW, d: worldD, h: H }, others, room, dragSnapDist(e, dragTarget.position), {
+              lockX, lockZ, selection,
+              rotation: isCorner ? null : getWorldFootprint(dragModule).rotation,
+              front: frontAllowance(state.project, dragModule),
+              wallGap: isCorner ? 0 : getWallGap(state.project, dragModule.type),
+          });
           snapX = snapped.x;
           snapY = snapped.y;
           snapZ = snapped.z;
@@ -720,6 +836,18 @@ export function init3DViewer() {
               });
           }
 
+          // Linie pomocnicze: tylko to, co faktycznie trzyma szafkę (kolizja / ściana mogły
+          // zatrzymać ją przed złapaną krawędzią) + odstępy do sąsiadów.
+          {
+              const px = parseFloat(dragModule.position.x) || 0, py = parseFloat(dragModule.position.y) || 0, pz = parseFloat(dragModule.position.z) || 0;
+              const held = (snapped.guides || []).filter(g => Math.abs((g.axis === 'x' ? px - snapped.x : g.axis === 'y' ? py - snapped.y : pz - snapped.z)) < 0.05);
+              const movingBoxes = [
+                  ...state.project.modules.filter(m => state.selectedModules.has(m.id)).map(getModuleBox),
+                  ...(state.project.sidePanels || []).filter(p => dragGroupPanels.has(p.id)).map(getSidePanelBox),
+              ];
+              showSnapGuides(held, movingBoxes, getDragObstacles().map(o => o.box));
+          }
+
           const inpX = document.getElementById('input-pos-x');
           const inpY = document.getElementById('input-pos-y');
           const inpZ = document.getElementById('input-pos-z');
@@ -735,6 +863,8 @@ export function init3DViewer() {
   const endPointerDrag = () => {
       const moved = dragMoved;
       dragMoved = false;
+      clearSnapGuides();
+      requestRender();
       dragGroupPanels = new Map();
       dragFollowers = new Map();
       if (isDragging && !moved) {
@@ -779,6 +909,27 @@ export function init3DViewer() {
       }
   };
   window.addEventListener('pointerup', endPointerDrag);
+  // Esc w trakcie przeciągania = wróć do pozycji sprzed ruchu.
+  window.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !(isDragging || isDraggingSidePanel)) return;
+      if (isDragging) {
+          dragSelectionOrigins.forEach((o, id) => {
+              const m = state.project.modules.find(mod => mod.id === id);
+              if (m) { m.position.x = o.x; m.position.y = o.y; m.position.z = o.z; }
+          });
+          dragGroupPanels.forEach((o, id) => {
+              const p = state.project.sidePanels.find(sp => sp.id === id);
+              if (p) { p.position.x = o.pos.x; p.position.y = o.pos.y; p.position.z = o.pos.z; }
+          });
+      } else {
+          dragSidePanel.position.x = dragPanelOrigin.x;
+          dragSidePanel.position.z = dragPanelOrigin.z;
+          dragFollowers.forEach((f) => { f.item.position.x = f.pos.x; f.item.position.z = f.pos.z; });
+      }
+      dragMoved = true;   // wymusza przebudowę sceny w endPointerDrag
+      e.preventDefault();
+      endPointerDrag();
+  });
   window.addEventListener('pointercancel', endPointerDrag);
 
   renderer.domElement.addEventListener('pointerup', (e) => {
@@ -904,6 +1055,21 @@ export function init3DViewer() {
       requestRender();
   };
 
+  // Szybkie widoki kamery (render/cameraViews.js).
+  const viewsBox = document.createElement('div');
+  viewsBox.className = 'seg';
+  [['front', 'Przód', 'Widok od frontu (na tylną ścianę)'], ['top', 'Góra', 'Widok z góry'],
+   ['left', 'Lewa', 'Widok od lewej ściany'], ['right', 'Prawa', 'Widok od prawej ściany'],
+   ['iso', '3D', 'Widok ukośny na cały projekt'], ['selection', 'Zaznaczone', 'Przybliż do zaznaczonych szafek']].forEach(([name, text, title]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'seg-btn';
+      b.title = title;
+      b.textContent = text;
+      b.onclick = () => setCameraView(name);
+      viewsBox.appendChild(b);
+  });
+  uiOverlay.appendChild(viewsBox);
   uiOverlay.appendChild(toggleBtn);
   uiOverlay.appendChild(colorModeBtn);
   uiOverlay.appendChild(toggleFrontsBtn);

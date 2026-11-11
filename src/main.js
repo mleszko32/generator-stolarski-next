@@ -4,7 +4,8 @@ import "./styles/global.css";
 import { initLayout } from "./ui/layout.js"; 
 import { initPropertiesPanel } from "./ui/properties.js";
 import { updateSidebar } from "./ui/sidebar.js";
-import { init3DViewer, update3D, updateRoom } from "./render/viewer3d.js";
+import { init3DViewer, update3D, updateRoom, getScreenMoveDirs } from "./render/viewer3d.js";
+import { moveSelectionOf, moveSelection } from "./core/alignCommands.js";
 import { openProductionHub, closeProductionHub } from "./ui/productionHub.js";
 import { state, ensureRoomDefaults, ensurePricingDefaults, ensureSidePanelsDefaults, getActiveModule } from "./core/state.js";
 import { openRoomSettingsModal } from "./ui/roomPanel.js";
@@ -102,6 +103,29 @@ window.addEventListener('keydown', (e) => {
   e.preventDefault();
   mod.rotation = ((mod.rotation || 0) + 90) % 360;
   clampModuleToRoom(mod);
+  update3D();
+  updateSidebar();
+  initPropertiesPanel();
+});
+
+// Strzałki — przesunięcie zaznaczonych szafek / boków o 1 mm (z Shift o 10 mm) w kierunku
+// widocznym na ekranie; PageUp / PageDown w górę i w dół. Ruch zatrzymuje się na sąsiadach
+// i ścianach (core/alignCommands.js).
+const MOVE_KEYS = { ArrowLeft: ['right', -1], ArrowRight: ['right', 1], ArrowUp: ['forward', 1], ArrowDown: ['forward', -1], PageUp: ['y', 1], PageDown: ['y', -1] };
+window.addEventListener('keydown', (e) => {
+  const key = MOVE_KEYS[e.key];
+  if (!key || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (isOverlayOpen()) return;
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement?.isContentEditable) return;
+  const dirs = getScreenMoveDirs();
+  const sel = moveSelectionOf(state);
+  if (!dirs || (!sel.moduleIds.size && !sel.panelIds.size)) return;
+  e.preventDefault();
+  const step = (e.shiftKey ? 10 : 1) * key[1];
+  const move = key[0] === 'y' ? { dy: step } : { ['d' + dirs[key[0]].axis]: step * dirs[key[0]].sign };
+  const r = moveSelection(state.project, sel, move);
+  if (!r.dx && !r.dy && !r.dz) return;
   update3D();
   updateSidebar();
   initPropertiesPanel();

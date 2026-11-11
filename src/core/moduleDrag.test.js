@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nearestSnap, snapModulePosition, sweepSelection, getSidePanelBox } from './moduleDrag.js';
+import { nearestSnap, snapModulePosition, sweepSelection, getSidePanelBox, pickSnap, dragGaps, nudgeSelection } from './moduleDrag.js';
 
 const room = { width: 4000, depth: 3000 };
 const box = (x, z, w = 600, d = 560, y = 0, h = 720) => ({ x0: x, x1: x + w, y0: y, y1: y + h, z0: z, z1: z + d });
@@ -27,7 +27,7 @@ describe('snapModulePosition', () => {
   it('wyrównuje tyły do sąsiada zamiast wyskakiwać przed linię', () => {
     const others = [{ x: 0, y: 0, z: 200, w: 600, d: 560, h: 720 }];
     const r = snapModulePosition({ x: 605, y: 0, z: 215 }, { w: 600, d: 560, h: 720 }, others, room, 40);
-    expect(r).toEqual({ x: 600, y: 0, z: 200 });
+    expect(r).toMatchObject({ x: 600, y: 0, z: 200 });
   });
 
   it('nie przyciąga krawędzi X od szafki z innej linii (po drugiej stronie pokoju)', () => {
@@ -38,7 +38,82 @@ describe('snapModulePosition', () => {
 
   it('zablokowana oś nie przyciąga się', () => {
     const r = snapModulePosition({ x: 20, y: 0, z: 20 }, size, [], room, 40, { lockX: true });
-    expect(r).toEqual({ x: 20, y: 0, z: 0 });
+    expect(r).toMatchObject({ x: 20, y: 0, z: 0 });
+  });
+});
+
+describe('przyciąganie - rangi, zaznaczenie, lico frontów, szczelina', () => {
+  const size = { w: 600, d: 560, h: 720 };
+
+  it('styk wygrywa ze zrównaniem krawędzi, chyba że to drugie jest wyraźnie bliżej', () => {
+    expect(pickSnap(100, [{ v: 110, kind: 'touch' }, { v: 94, kind: 'align' }], 40).kind).toBe('touch');
+    expect(pickSnap(100, [{ v: 130, kind: 'touch' }, { v: 98, kind: 'align' }], 40).kind).toBe('align');
+    expect(pickSnap(100, [{ v: 150, kind: 'touch' }], 40)).toBe(null);
+  });
+
+  it('zwraca, co złapało (linia styku z sąsiadem)', () => {
+    const o = { x: 0, y: 0, z: 0, w: 600, d: 560, h: 720 };
+    const r = snapModulePosition({ x: 612, y: 0, z: 300 }, size, [o], room, 40);
+    expect(r.x).toBe(600);
+    expect(r.guides).toEqual([{ axis: 'x', kind: 'touch', line: 600, other: o }, { axis: 'y', kind: 'wall', line: 0, other: null }]);
+  });
+
+  it('przyciąga skrajna krawędź przeciąganej grupy, nie tylko kliknięta szafka', () => {
+    // razem z klikniętą szafką jedzie szafka po jej lewej (dx = -600); sąsiad kończy się na 600
+    const o = { x: 0, y: 0, z: 0, w: 600, d: 560, h: 720 };
+    const sel = [{ dx: -600, dy: 0, dz: 0, w: 600, d: 560, h: 720 }];
+    const r = snapModulePosition({ x: 1215, y: 0, z: 0 }, size, [o], room, 40, { selection: sel });
+    expect(r.x).toBe(1200);
+  });
+
+  it('szczelina od ściany za plecami szafki', () => {
+    const r = snapModulePosition({ x: 1000, y: 0, z: 42 }, size, [], room, 40, { rotation: 0, wallGap: 50 });
+    expect(r.z).toBe(50);
+    const r90 = snapModulePosition({ x: 3395, y: 0, z: 1000 }, { w: 560, d: 600, h: 720 }, [], room, 40, { rotation: 90, wallGap: 50 });
+    expect(r90.x).toBe(4000 - 560 - 50);
+  });
+
+  it('krawędź szafki staje na licu frontów prostopadłego ciągu', () => {
+    // ciąg przy tylnej ścianie: korpus do z = 560, fronty do 580; szafka przy prawej ścianie (rot 90)
+    const o = { x: 2800, y: 0, z: 0, w: 600, d: 560, h: 720, rot: 0, front: 20 };
+    const r = snapModulePosition({ x: 3440, y: 0, z: 590 }, { w: 560, d: 600, h: 720 }, [o], room, 40, { rotation: 90, front: 20 });
+    expect(r.z).toBe(580);
+    expect(r.guides.find((g) => g.axis === 'z').kind).toBe('front');
+  });
+
+  it('w pionie zrównuje góry z sąsiadem stojącym obok', () => {
+    const o = { x: 0, y: 1400, z: 0, w: 600, d: 320, h: 720 };
+    const r = snapModulePosition({ x: 600, y: 1210, z: 0 }, { w: 600, d: 320, h: 900 }, [o], room, 40);
+    expect(r.y).toBe(1220); // góra 2120 = góra sąsiada
+  });
+
+  it('próg 0 (Ctrl) niczego nie przyciąga', () => {
+    const o = { x: 0, y: 0, z: 0, w: 600, d: 560, h: 720 };
+    const r = snapModulePosition({ x: 603, y: 2, z: 3 }, size, [o], room, 0);
+    expect(r).toMatchObject({ x: 603, y: 2, z: 3, guides: [] });
+  });
+});
+
+describe('dragGaps', () => {
+  it('odstęp do sąsiada z lewej i do ściany z prawej', () => {
+    const g = dragGaps([box(900, 0)], [box(0, 0)], room);
+    expect(g.xMin).toMatchObject({ gap: 300, wall: false });
+    expect(g.xMax).toMatchObject({ gap: 2500, wall: true });
+    expect(g.zMin).toMatchObject({ gap: 0, wall: true });
+    expect(g.xMin.a.x).toBe(900);
+    expect(g.xMin.b.x).toBe(600);
+  });
+  it('szafka z innej wysokości nie jest sąsiadem', () => {
+    const g = dragGaps([box(900, 0)], [box(0, 0, 600, 320, 1400, 720)], room);
+    expect(g.xMin).toMatchObject({ gap: 900, wall: true });
+  });
+});
+
+describe('nudgeSelection', () => {
+  it('zatrzymuje się na sąsiedzie i na ścianie', () => {
+    expect(nudgeSelection([box(605, 0)], { dx: -10 }, [box(0, 0)], room).dx).toBe(-5);
+    expect(nudgeSelection([box(3395, 0)], { dx: 10 }, [], room).dx).toBe(5);
+    expect(nudgeSelection([box(1000, 0)], { dz: -10 }, [], room).dz).toBe(0);
   });
 });
 

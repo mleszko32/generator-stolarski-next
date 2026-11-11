@@ -6,6 +6,7 @@
 // Instrukcja dla Claude'a: .claude/skills/pilot-aplikacji/SKILL.md.
 import { state, addModule, deleteModule, duplicateModule } from "../core/state.js";
 import * as api from "../core/assistantApi.js";
+import { alignSelection, pushSelection, packSelection } from "../core/alignCommands.js";
 import { getModuleSummary } from "../core/moduleInfo.js";
 import { calculateModuleParts } from "../engine/cabinet.js";
 import { undo, redo } from "../core/history.js";
@@ -49,6 +50,9 @@ ZMIANY (każda odświeża aplikację; cofnięcie: undo())
                                 position { x, z, y: spód płyty }, decor; np. panel("poziomy", { name: "Półka",
                                 dimensions: { width: 2102, depth: 300 }, position: { x: 1688, y: 819, z: 0 } })
   setPanel(nazwa, zmiana) / removePanel(nazwa)
+  align([szafki], krawędź)      zrównaj z pierwszą szafką: left | right | back | front | top | bottom
+  push(szafka | [szafki], kier) dosuń do sąsiada / ściany: left | right | back | front (strony jak od frontu szafki)
+  pack([szafki])                zsuń w rząd bez przerw (pierwsza zostaje na miejscu)
   undo() / redo()               szybka seria poleceń to jeden krok historii`;
 
 function refresh() {
@@ -66,6 +70,12 @@ const change = (fn) => (...args) => {
 
 const mod = (ref) => api.findModule(ref);
 const zonesOf = (ref) => api.listZones(mod(ref));
+// Zaznaczenie do poleceń ruchu: lista szafek, pierwsza jest odniesieniem.
+const moveSel = (refs) => {
+  const mods = (Array.isArray(refs) ? refs : [refs]).map(mod);
+  return { sel: { moduleIds: new Set(mods.map((m) => m.id)), panelIds: new Set() }, refId: mods[0].id, mods };
+};
+const positions = (mods) => mods.map((m) => ({ name: m.name, ...m.position }));
 
 export function initAssistantBridge() {
   window.gsn = {
@@ -114,6 +124,9 @@ export function initAssistantBridge() {
     add: change((type) => addModule(type).name),
     duplicate: change((ref) => duplicateModule(mod(ref).id)?.name),
     remove: change((ref) => { const m = mod(ref); deleteModule(m.id); return `Usunięto „${m.name}”`; }),
+    align: change((refs, edge) => { const s = moveSel(refs); alignSelection(state.project, s.sel, s.refId, edge); return positions(s.mods); }),
+    push: change((refs, dir) => { const s = moveSel(refs); pushSelection(state.project, s.sel, s.refId, dir); return positions(s.mods); }),
+    pack: change((refs) => { const s = moveSel(refs); packSelection(state.project, s.sel, s.refId); return positions(s.mods); }),
     panel: change((kind, props) => JSON.parse(JSON.stringify(api.addPanel(kind, props)))),
     setPanel: change((ref, patch) => JSON.parse(JSON.stringify(api.patchPanel(api.findPanel(ref), patch)))),
     removePanel: change((ref) => {
