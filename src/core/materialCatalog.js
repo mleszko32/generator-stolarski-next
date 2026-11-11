@@ -6,6 +6,7 @@
 // Własne pozycje katalogu: project.materialCatalog = [{ producer, code, name }].
 
 import { EGGER_SAS_DECORS } from "./data/eggerSasDecors.js";
+import { SWISS_KRONO_DECORS } from "./data/swissKronoDecors.js";
 import { lacquerCode, lacquerSuggestions } from "./lacquerColors.js";
 
 // Płyty HDF 3 mm z cennika SAS (10.2026) - plecy w kolorze korpusu (HU1506 kaszmir do U702).
@@ -22,9 +23,11 @@ const HDF_SAS_DECORS = [
   "HDF Woodeco HU1506 Kaszmirowy Beż 3mm",
 ];
 
-// Wbudowany katalog: płyty Egger z cennika SAS + HDF; inne dekory dopisuje się jako własne pozycje.
+// Wbudowany katalog: płyty Egger z cennika SAS, płyty laminowane Swiss Krono (lista producenta)
+// + HDF; inne dekory dopisuje się jako własne pozycje.
 export const BUILTIN_DECORS = Object.freeze([
   ...EGGER_SAS_DECORS.map((d) => ({ producer: "Egger", code: "", name: d.name })),
+  ...SWISS_KRONO_DECORS.map((d) => ({ producer: "Swiss Krono", code: `${d.code} ${d.surface}`, name: d.name })),
   { producer: "", code: "", name: "HDF biały 3 mm" },
   ...HDF_SAS_DECORS.map((name) => ({ producer: "", code: "", name })),
 ]);

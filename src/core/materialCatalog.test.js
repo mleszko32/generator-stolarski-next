@@ -18,6 +18,15 @@ describe("katalog materiałów", () => {
     expect(labels).toContain("Egger F186 ST9 18mm Beton Chicago Jasnoszary");
   });
 
+  it("ma płyty laminowane Swiss Krono (kod, struktura, nazwa)", () => {
+    const labels = catalogLabels({});
+    expect(labels).toContain("Swiss Krono D3025 OW Dąb Sonoma");
+    // dekor w kilku strukturach - osobne pozycje
+    expect(labels).toContain("Swiss Krono U190 VL Czarny");
+    expect(labels).toContain("Swiss Krono U190 PE Czarny");
+    expect(labels.filter((l) => l.startsWith("Swiss Krono ")).length).toBeGreaterThan(150);
+  });
+
   it("dopisuje własną pozycję bez powtórzeń", () => {
     const p = project();
     expect(addCatalogDecor(p, { producer: "Kronospan", code: "K001", name: "Test" })).toBe(true);

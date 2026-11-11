@@ -515,7 +515,10 @@ osobna geometria z UV w mm; zwykłej geometrii `addBox` nie ruszaj). Zdjęcie pr
 kolekcja Firestore `decorTextures` (`saveDecorTextureToCloud` itd., rekord przez `normalizePhoto`), wgrywane pod
 podświetloną pozycją legendy. Klucz zdjęcia (`textureKey`) dla dekoru z kodem Egger to sam kod („H1180”) — jedno zdjęcie
 na wszystkie grubości i struktury; zdjęcia doczytują się z chmury pojedynczo, gdy dekor pojawi się w scenie
-(`setDecorPhotoLoader` w `main.js`). W bazie są zdjęcia płyt Egger z katalogu SAS (cała płyta, 2800 mm, słoje poziomo). Wieńce L szafki narożnej i bryły skosu (`ExtrudeGeometry`) mają UV w mm z samej
+(`setDecorPhotoLoader` w `main.js`). W bazie są zdjęcia płyt Egger z katalogu SAS (cała płyta, 2800 mm, słoje poziomo).
+Swiss Krono: lista dekorów producenta z kolorem próbki w `core/data/swissKronoDecors.js` (w podpowiedziach jako
+„Swiss Krono D3025 OW Dąb Sonoma”), rozpoznanie w `core/swissKrono.js` (tylko z nazwą producenta — kody U pokrywają się
+z Egger; klucz zdjęcia „SK-<kod>”), zdjęcia raportów ze strony producenta wgrywa `scripts/swisskrono/zdjecia.js`. Wieńce L szafki narożnej i bryły skosu (`ExtrudeGeometry`) mają UV w mm z samej
 ekstruzji, więc dostają teksturę bez osobnej geometrii. Blat: dekor „Blat” w pasku materiałów Produkcji
 (`DECOR_CATEGORIES`), bryła typu `worktop` przez `addBox` (`partMaterial` z `userData.worktop`, klucz legendy „B:…”);
 bez dekoru domyślnie drewniany. Legenda w lewym dolnym rogu widoku 3D

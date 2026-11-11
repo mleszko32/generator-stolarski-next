@@ -10,6 +10,7 @@ import { plinthMaterial, moduleFrontMaterialId } from "./plinthMaterial.js";
 import { dishwasherPlinthModule } from "./dishwasher.js";
 import { lacquerColor, lacquerCode } from "./lacquerColors.js";
 import { drawerSystems } from "./drawerSystems.js";
+import { swissKronoDecor } from "./swissKrono.js";
 
 const FAMILIES = {
   W: [0xfaf9f6, 0xf3efe6, 0xeceae4, 0xf6f1e7],
@@ -36,6 +37,8 @@ export function decorColor(name) {
   if (!s) return null;
   const lac = lacquerColor(s); // „Lakier RAL 9016” / „NCS S 0502-Y” - odcień z palety
   if (lac != null) return lac;
+  const sk = swissKronoDecor(s); // dekor Swiss Krono - kolor próbki producenta
+  if (sk) return sk.color;
   if (/\bbia[łl][yaeo]?\b|\bwhite\b/i.test(s)) return WHITE; // „Front lamelowy biały” - biały, nie losowa barwa
   const m = s.match(/(?:^|[\s:(])([WUHF])\s?\d{3,4}\b/i);
   // bez kodu: nazwa drewna / kamienia („Fornir dąb”, „Beton jasny”) wybiera rodzinę barw

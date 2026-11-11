@@ -5,13 +5,16 @@
 // powstaje w render/decorTextures.js - tu tylko czysty opis (bez Three.js i canvasu).
 import { hash, WOOD_WORDS, STONE_WORDS } from "./decorColors.js";
 import { lacquerColor } from "./lacquerColors.js";
+import { swissKronoDecor } from "./swissKrono.js";
 
 // Wspólny klucz tekstury dla nazwy dekoru (generowanej i wgranej ze zdjęcia). Dekor z kodem
 // Egger ma klucz = sam kod („H1180”), więc jedno zdjęcie obsługuje wszystkie grubości i
 // struktury tej płyty („H1180 ST37 18mm”, „Egger H1180 ST37 Dąb Halifax 19mm”).
 export function textureKey(label) {
   const s = String(label || "").trim().toUpperCase().replace(/^[SB]:/, "");
-  const m = s.match(/(?:^|[\s:(])([WUHF])\s?(\d{3,4})\b/);
+  const sk = swissKronoDecor(s); // Swiss Krono: „SK-D3025” - jedno zdjęcie na wszystkie struktury
+  if (sk) return "SK-" + sk.code;
+  const m =s.match(/(?:^|[\s:(])([WUHF])\s?(\d{3,4})\b/);
   return m ? m[1] + m[2] : s;
 }
 
@@ -25,7 +28,9 @@ export function decorTextureSpec(label, color) {
   const m = s.match(/(?:^|[\s:(])([WUHF])\s?\d{3,4}\b/i);
   const code = m ? m[1].toUpperCase() : "";
   let kind = null;
-  if (code === "H") kind = "wood";
+  const sk = swissKronoDecor(s); // typ z listy producenta: D drewno, F kamień / beton (po nazwie), U gładki
+  if (sk) kind = sk.type === "D" ? "wood" : sk.type === "F" && STONE_WORDS.test(s) ? "stone" : null;
+  else if (code === "H") kind = "wood";
   else if (code === "F") kind = "stone";
   else if (!code && WOOD_WORDS.test(s)) kind = "wood";
   else if (!code && STONE_WORDS.test(s)) kind = "stone";
