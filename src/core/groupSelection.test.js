@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { groupMembers, clickSelection, canCombine, combineIntoGroup, splitGroup, editTargets } from "./groupSelection.js";
+import { groupMembers, clickSelection, canCombine, combineIntoGroup, splitGroup, editTargets, pickedSelection } from "./groupSelection.js";
 
 const make = () => ({
   modules: [{ id: "m1", groupId: "g" }, { id: "m2", groupId: "g" }, { id: "m3" }],
@@ -29,10 +29,20 @@ describe("dobieranie szafek Shiftem wewnątrz grupy", () => {
     expect(editTargets(p, c, "m3")).toEqual(["m1", "m2", "m3"]);
   });
 
-  it("Shift+klik w blendę z grupy aktywnej szafki nie odznacza mebla", () => {
+  it("Shift+klik w blendę z grupy aktywnej szafki dobiera ją razem z szafkami, ponowny zdejmuje", () => {
     const p = make();
-    const a = clickSelection(p, { ...sel(["m1", "m2"], ["p1"]), activeId: "m1" }, "panel", "p1", true);
+    const m = clickSelection(p, { ...sel(["m1", "m2"], ["p1"]), activeId: "m1" }, "module", "m2", true);
+    const a = clickSelection(p, { ...m, activeId: "m1" }, "panel", "p1", true);
+    expect(a.picked).toBe(true);
     expect(a.removed).toBe(false);
+    const ps = pickedSelection(p, a, "m1");
+    expect([...ps.moduleIds].sort()).toEqual(["m1", "m2"]);
+    expect([...ps.panelIds]).toEqual(["p1"]);
+    expect(editTargets(p, a, "m1")).toEqual(["m1", "m2"]);
+    const b = clickSelection(p, { ...a, activeId: "m1" }, "panel", "p1", true);
+    expect(b.removed).toBe(true);
+    expect([...pickedSelection(p, b, "m1").panelIds]).toEqual([]);
+    expect(pickedSelection(p, sel(["m1", "m2"], ["p1"]), "m1")).toBe(null);
     expect([...a.moduleIds].sort()).toEqual(["m1", "m2"]);
     expect([...a.panelIds]).toEqual(["p1"]);
   });

@@ -15,7 +15,7 @@ import { getIdToken } from "../core/storage.js";
 import { clampModuleToRoom } from "../core/layout.js";
 import { parseFurnitureJson, insertFurniture } from "../core/furnitureImport.js";
 import { bindHoverExpand, refitPanel } from "./panelHover.js";
-import { clickSelection, activePicks } from "../core/groupSelection.js";
+import { clickSelection, activePicks, pickedSelection } from "../core/groupSelection.js";
 
 // Okno oczekiwania na wynik AI (wspólne openModal, bez zamykania w trakcie).
 let aiLoader = null;
@@ -85,7 +85,7 @@ function isMarked(it) {
 
 function itemHtml(it) {
   const isModule = it.kind === 'module';
-  const isActive = it.id === (isModule ? state.activeModuleId : state.activeSidePanelId) || (isModule && pickedIds.has(it.id));
+  const isActive = it.id === (isModule ? state.activeModuleId : state.activeSidePanelId) || pickedIds.has(it.id);
   const cls = isActive ? ' is-active' : (isMarked(it) ? ' is-selected' : '');
   const icon = isModule ? (MODULE_ICONS[it.type] || MODULE_ICONS.base_cabinet) : PANEL_ICONS[it.panelKind];
   const id = escapeHtml(it.id);
@@ -105,6 +105,9 @@ function itemHtml(it) {
 // Lista elementów projektu jako drzewo mebli (core/sidebarTree.js). Projekt bez grup = płaska lista.
 function treeHtml() {
   pickedIds = activePicks(state.project, { picks: state.editPicks }, state.activeModuleId);
+  // dobrane blendy / boki z grupy aktywnej szafki też jak aktywne
+  const pickedSel = pickedSelection(state.project, { picks: state.editPicks }, state.activeModuleId);
+  if (pickedSel) pickedSel.panelIds.forEach((id) => pickedIds.add(id));
   const tree = buildSidebarTree(state.project, treeQuery);
   if (tree.total === 0) return `<div class="empty-note">Projekt jest pusty. Dodaj pierwszą szafkę z menu „Dodaj” albo zbuduj projekt ze zdjęcia (menu „Narzędzia”).</div>`;
   if (tree.shown === 0) return `<div class="empty-note">Nic nie pasuje do „${escapeHtml(treeQuery.trim())}”.</div>`;
@@ -188,7 +191,9 @@ function bindTree(root) {
       state.selectedModules = sel.moduleIds;
       state.selectedSidePanels = sel.panelIds;
       state.editPicks = sel.picks;
-      if (sel.removed) {
+      if (sel.picked) {
+        // blenda / bok dobrany do aktywnej szafki tej samej grupy - aktywna szafka zostaje
+      } else if (sel.removed) {
         if (state.activeSidePanelId === id) state.activeSidePanelId = null;
         if (!state.activeSidePanelId) state.activeModuleId = Array.from(state.selectedModules).pop() || null;
       } else {

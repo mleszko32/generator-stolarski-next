@@ -30,7 +30,7 @@ import { frontAllowance, getWallGap } from '../core/wallFill.js';
 import { buildSnapGuides } from './snapGuides.js';
 import { VIEW_DIRS, frameBox, flyCamera } from './cameraViews.js';
 import { moveSelectionOf } from '../core/alignCommands.js';
-import { clickSelection, groupMembers } from '../core/groupSelection.js';
+import { clickSelection, groupMembers, pickedSelection } from '../core/groupSelection.js';
 import { refreshModuleInfoCard } from '../ui/moduleInfoPanel.js';
 import { initPropertiesPanel } from '../ui/properties.js';
 import { mats, worktopMat, disposeObject, createLabelSprite, addBox, addHole, addHardware, addLegsAndPlinth, isXrayMode, setXrayMode, colorMode, setColorMode, setMaterialPalette, highlightKey, setHighlightKey } from './meshBuilders.js';
@@ -175,6 +175,7 @@ let dragGroupPanels = new Map();
 let dragFollowers = new Map();
 let dragPanelOrigin = { x: 0, z: 0 };
 let wasSelectedOnDown = false;
+let panelPickedOnDown = false; // Shift + klik dobrał blendę / bok do aktywnej szafki - klik nie robi go aktywnym
 // Przeciąganie boku dokładanego (core/state.js: addSidePanel) - osobny,
 // prostszy tor niż moduły (bez grup, bez blend, bez trybu pionowego Alt),
 // bo to pojedynczy, samodzielny obiekt. Współdzieli dragOffset/dragPlane
@@ -554,15 +555,19 @@ export function init3DViewer() {
                   dragPlane.setFromNormalAndCoplanarPoint(normal, new THREE.Vector3(0, parseFloat(dragSidePanel.position.y) || 0, 0));
 
                   const wasActive = state.activeSidePanelId === dragSidePanel.id;
+                  panelPickedOnDown = false;
                   if (!wasActive) {
                       // jak w lewym panelu: klik = grupa boku, Shift/Ctrl dokłada go do zaznaczenia szafek
                       const sel = clickSelection(state.project, { moduleIds: state.selectedModules || new Set(), panelIds: state.selectedSidePanels, picks: state.editPicks, activeId: state.activeModuleId, activePanelId: state.activeSidePanelId },
                           'panel', dragSidePanel.id, e.shiftKey || e.ctrlKey || e.metaKey);
                       state.selectedModules = sel.moduleIds;
                       state.selectedSidePanels = sel.panelIds;
-                  state.editPicks = sel.picks;
-                      state.activeSidePanelId = dragSidePanel.id;
-                      state.activeModuleId = null;
+                      state.editPicks = sel.picks;
+                      panelPickedOnDown = !!sel.picked;
+                      if (!sel.picked) {
+                          state.activeSidePanelId = dragSidePanel.id;
+                          state.activeModuleId = null;
+                      }
                       updateSidebar();
                       initPropertiesPanel();
                       update3D();
@@ -1356,6 +1361,7 @@ function handle3DClick(event) {
   // przeciągania czy menu kontekstowego, jak przy module.
   if (data.sidePanelId && !data.moduleId) {
       // zaznaczenie (z grupą / Shift) ustawił już pointerdown
+      if (panelPickedOnDown) { panelPickedOnDown = false; return; }
       state.activeSidePanelId = data.sidePanelId;
       state.activeModuleId = null;
       updateSidebar();
@@ -1987,9 +1993,12 @@ export function update3D() {
           mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), new THREE.LineBasicMaterial({ color: 0x1f2937 })));
           cabinetGroup.add(mesh);
       });
+      // Przy dobranych Shiftem elementach grupy aktywnej szafki podświetlone są tylko dobrane blendy / boki.
+      const pickedSel = pickedSelection(state.project, { picks: state.editPicks }, state.activeModuleId);
       (state.project.sidePanels || []).forEach(panel => {
           if (panel.kind === 'blenda' ? !isBlendsVisible : panel.kind === 'zmywarka' ? false : !isSidePanelsVisible) return;
-          const isActiveSide = panel.id === state.activeSidePanelId || !!(state.selectedSidePanels && state.selectedSidePanels.has(panel.id));
+          const dimmedByPicks = pickedSel && pickedSel.groupPanelIds.has(panel.id) && !pickedSel.panelIds.has(panel.id);
+          const isActiveSide = panel.id === state.activeSidePanelId || (!dimmedByPicks && !!(state.selectedSidePanels && state.selectedSidePanels.has(panel.id)));
           const { worldW, worldD } = getWorldFootprint(panel);
           const x = parseFloat(panel.position?.x) || 0;
           const y = parseFloat(panel.position?.y) || 0;

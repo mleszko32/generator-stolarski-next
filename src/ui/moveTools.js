@@ -5,10 +5,14 @@
 // zaznaczonych szafek i zsuwanie rzędu. Logika w czystym core/alignCommands.js.
 import { state } from "../core/state.js";
 import { moveSelectionOf, selectionGaps, setSelectionGap, pushSelection, alignSelection, packSelection } from "../core/alignCommands.js";
+import { pickedSelection } from "../core/groupSelection.js";
 import { fmtMm } from "../utils/math.js";
 
 // Zaznaczenie, którego dotyczą polecenia: bieżące (z grupą), o ile zawiera tę szafkę.
 function selectionFor(mod) {
+  // szafki i blendy dobrane Shiftem w grupie tej szafki mają pierwszeństwo przed całym meblem
+  const picked = mod.id === state.activeModuleId && pickedSelection(state.project, { picks: state.editPicks }, mod.id);
+  if (picked) return { moduleIds: picked.moduleIds, panelIds: picked.panelIds };
   const sel = moveSelectionOf(state);
   return sel.moduleIds.has(mod.id) ? sel : { moduleIds: new Set([mod.id]), panelIds: new Set() };
 }

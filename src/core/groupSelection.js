@@ -43,7 +43,16 @@ export function clickSelection(project, selection, kind, id, additive) {
     g.panelIds.forEach((p) => panelIds.add(p));
     return { moduleIds, panelIds, picks, removed, picked: true };
   }
-  // Shift/Ctrl + klik w blendę / bok z grupy aktywnej szafki albo w szafkę z grupy aktywnej blendy:
+  // Shift/Ctrl + klik w blendę / bok z grupy aktywnej szafki dobiera ją tak samo jak szafkę
+  // (ponowny klik zdejmuje); aktywna szafka i dobrane szafki zostają podświetlone.
+  if (kind === "panel" && activeId && g.moduleIds.includes(activeId)) {
+    const removed = picks.has(id);
+    if (removed) picks.delete(id); else picks.add(id);
+    g.moduleIds.forEach((m) => moduleIds.add(m));
+    g.panelIds.forEach((p) => panelIds.add(p));
+    return { moduleIds, panelIds, picks, removed, picked: true };
+  }
+  // Shift/Ctrl + klik w element z grupy aktywnej blendy / boku:
   // grupa zostaje zaznaczona (wcześniej taki klik odznaczał cały mebel, więc nie dało się mieć
   // zaznaczonych razem szafki i blendy z jednej grupy).
   const activePanelId = selection.activePanelId;
@@ -66,6 +75,19 @@ export function activePicks(project, selection, activeId) {
   const picks = selection && selection.picks;
   if (!activeId || !picks || !picks.size) return new Set();
   return new Set(groupMembers(project, "module", activeId).moduleIds.filter((id) => id !== activeId && picks.has(id)));
+}
+
+// Aktywna szafka + szafki i blendy / boki dobrane Shift/Ctrl w jej grupie: { moduleIds, panelIds,
+// groupPanelIds } (Sety; groupPanelIds = wszystkie boki tej grupy). null, gdy nic nie dobrano.
+// Na tym działają polecenia „Odstępy i wyrównanie” zamiast na całym meblu.
+export function pickedSelection(project, selection, activeId) {
+  const picks = selection && selection.picks;
+  if (!activeId || !picks || !picks.size) return null;
+  const g = groupMembers(project, "module", activeId);
+  const moduleIds = new Set(g.moduleIds.filter((id) => id === activeId || picks.has(id)));
+  const panelIds = new Set(g.panelIds.filter((id) => picks.has(id)));
+  if (moduleIds.size + panelIds.size < 2) return null;
+  return { moduleIds, panelIds, groupPanelIds: new Set(g.panelIds) };
 }
 
 // Których szafek dotyczą zmiany w prawym panelu. Kliknięcie szafki z grupy zaznacza całą
