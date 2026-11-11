@@ -33,7 +33,7 @@ import { moveSelectionOf } from '../core/alignCommands.js';
 import { clickSelection, groupMembers, pickedSelection } from '../core/groupSelection.js';
 import { refreshModuleInfoCard } from '../ui/moduleInfoPanel.js';
 import { initPropertiesPanel } from '../ui/properties.js';
-import { mats, worktopMat, disposeObject, createLabelSprite, addBox, addHole, addHardware, addLegsAndPlinth, isXrayMode, setXrayMode, colorMode, setColorMode, setMaterialPalette, highlightKey, setHighlightKey } from './meshBuilders.js';
+import { mats, disposeObject, createLabelSprite, addBox, addHole, addHardware, addLegsAndPlinth, isXrayMode, setXrayMode, colorMode, setColorMode, setMaterialPalette, highlightKey, setHighlightKey } from './meshBuilders.js';
 import { renderCornerCabinet } from './cornerCabinet3d.js';
 import { renderSlopeCabinet } from './slopeCabinet3d.js';
 import { getBlindPanel, getBlindStile, blindGeometry, PARALLEL_PLATE_INSET } from '../core/blindCorner.js';
@@ -1542,8 +1542,8 @@ function renderDecorLegend() {
   if (!items.length) { decorLegendEl.innerHTML = ''; return; }
   const hex = (c) => '#' + c.toString(16).padStart(6, '0');
   const palette = materialPaletteMap(items);
-  const defaults = { Korpus: mats.solid.corpus.color.getHex(), Front: mats.solid.front.color.getHex(), Szuflada: mats.solid.drawerBox.color.getHex() };
-  const groupNames = { Korpus: 'Płyta korpusu', Front: 'Fronty', Szuflada: 'Szuflady' };
+  const defaults = { Korpus: mats.solid.corpus.color.getHex(), Front: mats.solid.front.color.getHex(), Szuflada: mats.solid.drawerBox.color.getHex(), Blat: mats.solid.worktop.color.getHex() };
+  const groupNames = { Korpus: 'Płyta korpusu', Front: 'Fronty', Szuflada: 'Szuflady', Blat: 'Blat' };
   let html = `<div class="decor-legend-hint">${highlightKey ? 'Kliknij ponownie, aby pokazać wszystko' : 'Kliknij materiał, aby go podświetlić'}</div>`, group = '';
   items.forEach((it) => {
     if (it.group !== group) { group = it.group; html += `<div class="decor-legend-group">${groupNames[group] || group}</div>`; }
@@ -2040,12 +2040,8 @@ export function update3D() {
       }));
       if (isWorktopsVisible) worktopBoxes(state.project).forEach(b => {
           const w = b.x1 - b.x0, d = b.z1 - b.z0, h = b.y1 - b.y0;
-          const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), isXrayMode ? mats.xray.shelf : worktopMat);
-          mesh.position.set(b.x0 + w / 2, b.y0 + h / 2, b.z0 + d / 2);
-          mesh.userData = { worktop: true };
-          mesh.castShadow = !isXrayMode; mesh.receiveShadow = !isXrayMode;
-          mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), new THREE.LineBasicMaterial({ color: 0x1f2937 })));
-          cabinetGroup.add(mesh);
+          // dekor „Blat” projektu daje kolor i strukturę (core/decorColors.js: partMaterial)
+          addBox(w, h, d, b.x0, b.y0, b.z0, 'worktop', false, { worktop: true }, cabinetGroup);
       });
       // Przy dobranych Shiftem elementach grupy aktywnej szafki podświetlone są tylko dobrane blendy / boki.
       const pickedSel = pickedSelection(state.project, { picks: state.editPicks }, state.activeModuleId);

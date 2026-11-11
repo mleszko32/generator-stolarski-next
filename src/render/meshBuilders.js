@@ -28,7 +28,8 @@ export const mats = {
       drawerBox: new THREE.MeshStandardMaterial({ color: 0xd8c39a, roughness: 0.78, metalness: 0.0 }), // ciemniejsza, drewniana skrzynka - odcina się od białego korpusu po ukryciu frontów
       hdf: new THREE.MeshStandardMaterial({ color: 0xf4f2ed, roughness: 0.9, metalness: 0.0 }),
       plinth: new THREE.MeshStandardMaterial({ color: 0x3a3532, roughness: 0.8, metalness: 0.0 }),
-      appliance: new THREE.MeshStandardMaterial({ color: 0xb8bec6, roughness: 0.35, metalness: 0.6 }) // urządzenie AGD (zmywarka)
+      appliance: new THREE.MeshStandardMaterial({ color: 0xb8bec6, roughness: 0.35, metalness: 0.6 }), // urządzenie AGD (zmywarka)
+      worktop: new THREE.MeshStandardMaterial({ color: 0x8a6a4a, roughness: 0.55, metalness: 0.0 }) // blat
   },
   xray: {
       corpus: new THREE.MeshStandardMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.15, depthWrite: false }),
@@ -37,10 +38,10 @@ export const mats = {
       drawerBox: new THREE.MeshStandardMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.6, depthWrite: false }),
       hdf: new THREE.MeshStandardMaterial({ color: 0x475569, transparent: true, opacity: 0.3, depthWrite: false }),
       plinth: new THREE.MeshStandardMaterial({ color: 0x1c1917, transparent: true, opacity: 0.7, depthWrite: true }),
-      appliance: new THREE.MeshStandardMaterial({ color: 0x64748b, transparent: true, opacity: 0.25, depthWrite: false })
+      appliance: new THREE.MeshStandardMaterial({ color: 0x64748b, transparent: true, opacity: 0.25, depthWrite: false }),
+      worktop: new THREE.MeshStandardMaterial({ color: 0x64748b, transparent: true, opacity: 0.3, depthWrite: false })
   }
 };
-export const worktopMat = new THREE.MeshStandardMaterial({ color: 0x8a6a4a, roughness: 0.55, metalness: 0.0 });
 const holeMat = new THREE.MeshBasicMaterial({ color: 0xdc2626 });
 // Otwory prowadników zawiasów innym kolorem - od razu widać, czy nie wchodzą na
 // rząd podpórek półek (ta sama linia 37 mm od przodu).
@@ -48,7 +49,7 @@ const plateHoleMat = new THREE.MeshBasicMaterial({ color: 0x2563eb });
 
 // Materiały współdzielone między klatkami przebudowy (nie wolno ich zwalniać
 // razem z siatką, bo używa ich następna wersja sceny).
-[...Object.values(mats.xray), ...Object.values(mats.solid), worktopMat, holeMat, plateHoleMat].forEach(m => { m.userData.shared = true; });
+[...Object.values(mats.xray), ...Object.values(mats.solid), holeMat, plateHoleMat].forEach(m => { m.userData.shared = true; });
 
 // Kolory krawędzi mają po jednym wspólnym materiale (wcześniej każdy prostopadłościan
 // tworzył własny, co przy kilkunastu szafkach dawało tysiące materiałów).
@@ -179,7 +180,7 @@ export function setHighlightKey(key) { highlightKey = key || null; }
 // dekoru albo palety materiałów (core/decorColors.js), przy podświetleniu innego materiału
 // półprzezroczysta; z cache po kolorze.
 const tintCache = new Map();
-const COLORABLE = new Set(['corpus', 'shelf', 'front', 'plinth', 'drawerBox']);
+const COLORABLE = new Set(['corpus', 'shelf', 'front', 'plinth', 'drawerBox', 'worktop']);
 // active = bryła klikniętej (aktywnej) szafki: kolor płyty podbarwiony na niebiesko, żeby w
 // zaznaczonej grupie było widać, którą szafkę zmienia prawy panel (tak samo szafki dobrane
 // Shiftem w jej grupie - activePicks). Pozostałe zaznaczone szafki
@@ -199,7 +200,11 @@ function materialFor(type, userData, active = false) {
   const selected = !active && !!(userData && userData.moduleId && state.selectedModules && state.selectedModules.has(userData.moduleId));
   const tinted = (active || selected) && !faded && ACTIVE_TYPES.has(type);
   // struktura dekoru (słoje, kamień, wgrane zdjęcie) - tylko widok realistyczny w kolorach rzeczywistych
-  const tex = !isXrayMode && colorMode === 'real' && !faded && ent && !ent.key.startsWith('~') ? decorTextureFor(ent.label, color) : null;
+  // blat bez wpisanego dekoru - domyślnie drewniany
+  const plain = !ent || ent.key.startsWith('~');
+  const tex = isXrayMode || colorMode !== 'real' || faded || !ent ? null
+    : !plain ? decorTextureFor(ent.label, color)
+    : type === 'worktop' ? decorTextureFor('Blat drewniany', base.color.getHex()) : null;
   if (color == null && !faded && !tinted && !tex) return base;
   // id tekstury w kluczu: po wgraniu / usunięciu zdjęcia dekor dostaje nowy materiał
   const key = `${isXrayMode ? 'x' : 's'}|${type}|${color}|${faded ? 'f' : ''}|${tinted ? (active ? 'a' : 'z') : ''}|${tex ? tex.id : ''}`;

@@ -30,7 +30,7 @@ export const BUILTIN_DECORS = Object.freeze([
 ]);
 
 
-export const DECOR_CATEGORIES = ["Korpus", "Plecy", "Szuflada"];
+export const DECOR_CATEGORIES = ["Korpus", "Plecy", "Szuflada", "Blat"];
 
 // Napis pozycji katalogu: „Egger W1000 ST9 Biały premium”.
 export function decorLabel(d) {

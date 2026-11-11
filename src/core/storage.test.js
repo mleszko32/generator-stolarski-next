@@ -200,14 +200,14 @@ describe("zdjęcia dekorów", () => {
   const dataUrl = "data:image/jpeg;base64,AAAA";
   it("zapis, odczyt i usunięcie zdjęcia dekoru", async () => {
     expect(await storage.saveDecorTextureToCloud({ name: "H1180 ST37 0.8", dataUrl, widthMm: 700, grain: "h" })).toBe(true);
-    expect(h.store.has("decorTextures/H1180%20ST37%200%2E8")).toBe(true);
-    expect(await storage.loadDecorTexturesFromCloud()).toEqual([{ key: "H1180 ST37 0.8", name: "H1180 ST37 0.8", dataUrl, widthMm: 700, grain: "h" }]);
+    expect(h.store.has("decorTextures/H1180")).toBe(true);
+    expect(await storage.loadDecorTextureFromCloud("Egger H1180 ST37 19mm")).toEqual({ key: "H1180", name: "H1180 ST37 0.8", dataUrl, widthMm: 700, grain: "h" });
     expect(await storage.deleteDecorTextureFromCloud("h1180 st37 0.8")).toBe(true);
-    expect(await storage.loadDecorTexturesFromCloud()).toEqual([]);
+    expect(await storage.loadDecorTextureFromCloud("H1180")).toBeNull();
   });
   it("nie zapisuje czegoś, co nie jest obrazem, i pomija takie wpisy przy odczycie", async () => {
     expect(await storage.saveDecorTextureToCloud({ name: "X", dataUrl: "data:text/html;base64,AAAA" })).toBe(false);
     h.store.set("decorTextures/Z", { key: "Z", dataUrl: "javascript:alert(1)" });
-    expect(await storage.loadDecorTexturesFromCloud()).toEqual([]);
+    expect(await storage.loadDecorTextureFromCloud("Z")).toBeNull();
   });
 });

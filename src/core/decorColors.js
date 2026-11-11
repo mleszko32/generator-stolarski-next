@@ -84,15 +84,18 @@ function frontMaterialName(materialId, project) {
 // Materiał bryły 3D jako pozycja legendy: { key, group: 'Korpus'|'Front'|'Szuflada', label, color }
 // (color null = kolor domyślny). Ta sama nazwa = ten sam klucz (np. materiał frontów i dekor
 // blendy), szuflady osobno. Klucz łączy legendę z bryłami (tryb „materiały”, podświetlanie).
-const PLAIN_LABEL = { Korpus: "bez dekoru (z projektu)", Front: "standard", Szuflada: "bez dekoru" };
+const PLAIN_LABEL = { Korpus: "bez dekoru (z projektu)", Front: "standard", Szuflada: "bez dekoru", Blat: "bez dekoru" };
+const KEY_PREFIX = { Szuflada: "S:", Blat: "B:" };
 function entry(group, label, color) {
   const l = String(label || "").trim();
   if (!l) return { key: "~" + group.toUpperCase(), group, label: PLAIN_LABEL[group], color: null };
-  return { key: (group === "Szuflada" ? "S:" : "") + l.toUpperCase(), group, label: l, color: color == null ? null : color };
+  return { key: (KEY_PREFIX[group] || "") + l.toUpperCase(), group, label: l, color: color == null ? null : color };
 }
 const frontEntry = (materialId, project) => entry("Front", frontMaterialName(materialId, project), frontMaterialColor(materialId, project));
 const korpusEntry = (decor) => entry("Korpus", decor, decorColor(decor));
 const drawerEntry = (project) => { const d = projectDecor(project, "Szuflada"); return entry("Szuflada", d, decorColor(d)); };
+// Blat: dekor „Blat” projektu (pasek materiałów w Produkcji).
+const worktopEntry = (project) => { const d = projectDecor(project, "Blat"); return entry("Blat", d, decorColor(d)); };
 
 function plinthEntry(mod, project) {
   const pm = plinthMaterial(mod, project);
@@ -129,6 +132,7 @@ function boxFromKorpus(mod, project) {
 // 'front', 'plinth', 'drawerBox'); null = bryła bez materiału z legendy (nóżki, plecy HDF…).
 export function partMaterial(type, userData, project) {
   if (!userData || !project) return null;
+  if (userData.worktop) return type === "worktop" ? worktopEntry(project) : null;
   if (userData.sidePanelId) {
     const panel = (project.sidePanels || []).find((p) => p.id === userData.sidePanelId);
     return panel ? panelEntry(panel, type, project) : null;
@@ -177,8 +181,9 @@ export function projectDecorLegend(project, opts = {}) {
     add(panelEntry(p, p.kind === "poziomy" ? horizontalPanelType(p) : "front", project));
     if (p.kind === "zmywarka" && p.topBoard !== false) add(panelEntry(p, "corpus", project));
   });
+  if (projectDecor(project, "Blat")) add(worktopEntry(project)); // blat bez dekoru nie ma pozycji w legendzie
   const out = [];
-  ["Korpus", "Front", "Szuflada"].forEach((g) => {
+  ["Korpus", "Front", "Szuflada", "Blat"].forEach((g) => {
     const items = [...entries.values()].filter((e) => e.group === g);
     if (!opts.all && !items.some((e) => e.color != null)) return;
     items.sort((a, b) => (a.key.startsWith("~") ? -1 : b.key.startsWith("~") ? 1 : a.label.localeCompare(b.label, "pl")));

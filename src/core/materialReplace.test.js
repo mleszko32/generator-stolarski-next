@@ -50,3 +50,12 @@ describe("podmiana materiału z legendy", () => {
     expect(replaceMaterial(pr, "S:U702", "  ")).toBe(0);
   });
 });
+
+describe("blat", () => {
+  it("podmienia dekor „Blat” projektu", async () => {
+    const { replaceMaterial } = await import("./materialReplace.js");
+    const project = { modules: [], sidePanels: [], materials: { decors: { Blat: "F186 ST9" } } };
+    expect(replaceMaterial(project, "B:F186 ST9", "H1180 ST37")).toBe(1);
+    expect(project.materials.decors.Blat).toBe("H1180 ST37");
+  });
+});

@@ -139,10 +139,23 @@ export async function setDecorPhoto(key, rec) {
   return true;
 }
 
-// Wczytuje listę zdjęć z chmury; zwraca liczbę przyjętych.
-export async function loadDecorPhotos(list) {
-  const ok = await Promise.all((list || []).map((rec) => setDecorPhoto(rec && (rec.key || rec.name), rec)));
-  return ok.filter(Boolean).length;
+// Zdjęcia doczytują się z chmury pojedynczo, dopiero gdy dekor pojawi się w scenie (w bazie
+// może ich być kilkaset). loader(key) -> rekord albo null; onLoaded - przebudowa sceny.
+let photoLoader = null;
+let onPhotoLoaded = null;
+const requested = new Set();
+export function setDecorPhotoLoader(loader, onLoaded) {
+  photoLoader = loader || null;
+  onPhotoLoaded = onLoaded || null;
+  requested.clear();
+}
+function requestPhoto(key) {
+  if (!photoLoader || requested.has(key)) return;
+  requested.add(key);
+  Promise.resolve(photoLoader(key))
+    .then((rec) => (rec ? setDecorPhoto(key, rec) : false))
+    .then((ok) => { if (ok && onPhotoLoaded) onPhotoLoaded(); })
+    .catch(() => {});
 }
 
 // Plik obrazu -> JPEG jako data URL, zmniejszony tak, żeby zmieścił się w dokumencie Firestore.
@@ -169,13 +182,15 @@ export async function photoFileToDataUrl(file) {
 
 // Tekstura dekoru o danej nazwie i kolorze albo null, gdy dekor jest gładki i nie ma zdjęcia.
 export function decorTextureFor(label, color) {
-  const photo = photos.get(textureKey(label));
+  const key = textureKey(label);
+  const photo = photos.get(key);
   if (photo) return photo.texture;
+  requestPhoto(key);
   const spec = decorTextureSpec(label, color);
   if (!spec) return null;
-  const key = spec.key + '|' + spec.color;
-  let tex = cache.get(key);
-  if (!tex) { tex = buildTexture(spec); cache.set(key, tex); }
+  const cacheKey = spec.key + '|' + spec.color;
+  let tex = cache.get(cacheKey);
+  if (!tex) { tex = buildTexture(spec); cache.set(cacheKey, tex); }
   return tex;
 }
 

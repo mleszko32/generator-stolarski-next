@@ -25,6 +25,8 @@ describe("decorTextureSpec", () => {
     expect(a.key).toBe(b.key);
     expect(a.seed).toBe(b.seed);
     expect(textureKey("S:dąb")).toBe("DĄB");
+    expect(textureKey("Egger H1180 ST37 Dąb Halifax naturalny 19mm")).toBe("H1180");
+    expect(textureKey("F128 PA / U999 ST9 19mm Granit")).toBe("F128");
   });
 });
 
@@ -32,7 +34,7 @@ describe("zdjęcia dekorów", () => {
   const dataUrl = "data:image/jpeg;base64,AAAA";
   it("normalizePhoto przepuszcza obraz i porządkuje pola", () => {
     expect(normalizePhoto({ name: " h1180 st37 ", dataUrl, widthMm: "800", grain: "h" }))
-      .toEqual({ key: "H1180 ST37", name: " h1180 st37 ", dataUrl, widthMm: 800, grain: "h" });
+      .toEqual({ key: "H1180", name: " h1180 st37 ", dataUrl, widthMm: 800, grain: "h" });
     expect(normalizePhoto({ key: "X", dataUrl, widthMm: 5 }).widthMm).toBe(50);
     expect(normalizePhoto({ key: "X", dataUrl }).grain).toBe("v");
   });
@@ -47,7 +49,8 @@ describe("zdjęcia dekorów", () => {
     expect(photoTile(600, 1000, 500, "v")).toEqual({ tileU: 300, tileV: 600 });
   });
   it("photoDocId nie zawiera ukośnika ani kropki", () => {
-    expect(photoDocId("W1000 PM/ST9 0.8")).toBe("W1000%20PM%2FST9%200%2E8");
+    expect(photoDocId("Fornir dąb 0.8/A")).toBe("FORNIR%20D%C4%84B%200%2E8%2FA");
+    expect(photoDocId("W1000 PM/ST9 0.8")).toBe("W1000");
   });
 });
 

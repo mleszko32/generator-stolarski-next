@@ -6,7 +6,7 @@
 //              dekor boków dokładanych i paneli poziomych (z grubością z nazwy), cokół „Dekor płyty”.
 //   Front    - fronty, czoła blend i boki w materiale frontów, cokół „materiał z cennika”:
 //              materiał z cennika frontów o tej nazwie albo nowy (assignFrontMaterialByName).
-//   Szuflada - dekor „Szuflada” projektu.
+//   Szuflada / Blat - dekor „Szuflada” / „Blat” projektu.
 // Zwraca liczbę zmienionych elementów. Czyste (mutuje przekazany projekt).
 import { partMaterial } from "./decorColors.js";
 import { setModuleKorpusDecor } from "./korpusDecorChange.js";
@@ -16,13 +16,13 @@ import { applyPanelDecorThickness } from "./boardThickness.js";
 export function replaceMaterial(project, key, newName) {
   const name = String(newName || "").trim();
   if (!project || !key || !name) return 0;
-  const group = key.startsWith("S:") || key === "~SZUFLADA" ? "Szuflada" : null;
+  const group = key.startsWith("S:") || key === "~SZUFLADA" ? "Szuflada" : key.startsWith("B:") ? "Blat" : null;
   let changed = 0;
   const is = (e) => e && e.key === key;
 
-  if (group === "Szuflada") {
+  if (group) {
     project.materials = { ...(project.materials || {}) };
-    project.materials.decors = { ...(project.materials.decors || {}), Szuflada: name };
+    project.materials.decors = { ...(project.materials.decors || {}), [group]: name };
     return 1;
   }
 

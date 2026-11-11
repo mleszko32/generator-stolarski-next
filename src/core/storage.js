@@ -525,15 +525,15 @@ export async function deleteDecorTextureFromCloud(key) {
   }
 }
 
-// Lista zdjęć dekorów (pusta, gdy niezalogowany albo brak dostępu - bez komunikatu).
-export async function loadDecorTexturesFromCloud() {
-  if (!isOwner()) return [];
+// Zdjęcie jednego dekoru albo null (brak zdjęcia, niezalogowany, brak dostępu - bez komunikatu).
+export async function loadDecorTextureFromCloud(key) {
+  if (!isOwner()) return null;
   try {
-    const snap = await getDocs(collection(db, "decorTextures"));
-    return snap.docs.map((d) => normalizePhoto(d.data())).filter(Boolean);
+    const snap = await getDoc(doc(db, "decorTextures", photoDocId(key)));
+    return snap.exists() ? normalizePhoto(snap.data()) : null;
   } catch (error) {
-    console.error("Błąd odczytu zdjęć dekorów:", error);
-    return [];
+    console.error("Błąd odczytu zdjęcia dekoru:", error);
+    return null;
   }
 }
 

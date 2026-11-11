@@ -94,3 +94,15 @@ describe("legenda materiałów: tryb wszystkich materiałów i klucze brył", as
     expect(pal.get(leg[0].key)).toBe(MATERIAL_PALETTE[0]);
   });
 });
+
+describe("blat", () => {
+  const project = (decor) => ({ modules: [], sidePanels: [], materials: { decors: decor ? { Blat: decor } : {} } });
+  it("bryła blatu bierze dekor „Blat” projektu, z osobnym kluczem", async () => {
+    const { partMaterial, projectDecorLegend } = await import("./decorColors.js");
+    const e = partMaterial("worktop", { worktop: true }, project("F186 ST9 beton"));
+    expect(e).toMatchObject({ key: "B:F186 ST9 BETON", group: "Blat", label: "F186 ST9 beton" });
+    expect(partMaterial("worktop", { worktop: true }, project("")).key).toBe("~BLAT");
+    expect(projectDecorLegend(project("F186 ST9 beton")).map((x) => x.key)).toEqual(["B:F186 ST9 BETON"]);
+    expect(projectDecorLegend(project(""))).toEqual([]);
+  });
+});

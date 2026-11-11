@@ -513,7 +513,12 @@ realistycznym: `core/decorTexture.js` (czyste, z testami: `decorTextureSpec` —
 nazwy, `grainAxis` — kierunek słojów płyty) + `render/decorTextures.js` (tekstura z canvasa z cache, `grainBoxGeometry` —
 osobna geometria z UV w mm; zwykłej geometrii `addBox` nie ruszaj). Zdjęcie próbki dekoru zastępuje teksturę generowaną:
 kolekcja Firestore `decorTextures` (`saveDecorTextureToCloud` itd., rekord przez `normalizePhoto`), wgrywane pod
-podświetloną pozycją legendy; bryły z `ExtrudeGeometry` (narożna, skos) i blat są bez tekstur. Legenda w lewym dolnym rogu widoku 3D
+podświetloną pozycją legendy. Klucz zdjęcia (`textureKey`) dla dekoru z kodem Egger to sam kod („H1180”) — jedno zdjęcie
+na wszystkie grubości i struktury; zdjęcia doczytują się z chmury pojedynczo, gdy dekor pojawi się w scenie
+(`setDecorPhotoLoader` w `main.js`). W bazie są zdjęcia płyt Egger z katalogu SAS (cała płyta, 2800 mm, słoje poziomo). Wieńce L szafki narożnej i bryły skosu (`ExtrudeGeometry`) mają UV w mm z samej
+ekstruzji, więc dostają teksturę bez osobnej geometrii. Blat: dekor „Blat” w pasku materiałów Produkcji
+(`DECOR_CATEGORIES`), bryła typu `worktop` przez `addBox` (`partMaterial` z `userData.worktop`, klucz legendy „B:…”);
+bez dekoru domyślnie drewniany. Legenda w lewym dolnym rogu widoku 3D
 (`projectDecorLegend` → `renderDecorLegend` w `viewer3d.js`), ukryta, gdy nic nie ma własnego koloru. Kolor frontu
 liczy się z nazwy materiału (jak dekor blendy), więc ta sama nazwa = ten sam kolor; nietknięty „Standard” domyślny.
 `partMaterial` daje bryle pozycję legendy z kluczem (`key`); przycisk „Kolory: rzeczywiste / materiały” (`colorMode` w

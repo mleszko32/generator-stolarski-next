@@ -6,9 +6,13 @@
 import { hash, WOOD_WORDS, STONE_WORDS } from "./decorColors.js";
 import { lacquerColor } from "./lacquerColors.js";
 
-// Wspólny klucz tekstury dla nazwy dekoru (generowanej i wgranej ze zdjęcia).
+// Wspólny klucz tekstury dla nazwy dekoru (generowanej i wgranej ze zdjęcia). Dekor z kodem
+// Egger ma klucz = sam kod („H1180”), więc jedno zdjęcie obsługuje wszystkie grubości i
+// struktury tej płyty („H1180 ST37 18mm”, „Egger H1180 ST37 Dąb Halifax 19mm”).
 export function textureKey(label) {
-  return String(label || "").trim().toUpperCase().replace(/^S:/, "");
+  const s = String(label || "").trim().toUpperCase().replace(/^[SB]:/, "");
+  const m = s.match(/(?:^|[\s:(])([WUHF])\s?(\d{3,4})\b/);
+  return m ? m[1] + m[2] : s;
 }
 
 // Opis tekstury dekoru albo null, gdy płyta zostaje gładka (sam kolor):
