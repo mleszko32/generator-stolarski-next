@@ -28,6 +28,31 @@ describe("dobieranie szafek Shiftem wewnątrz grupy", () => {
     expect(c.picked).toBeUndefined();
     expect(editTargets(p, c, "m3")).toEqual(["m1", "m2", "m3"]);
   });
+
+  it("Shift+klik w blendę z grupy aktywnej szafki nie odznacza mebla", () => {
+    const p = make();
+    const a = clickSelection(p, { ...sel(["m1", "m2"], ["p1"]), activeId: "m1" }, "panel", "p1", true);
+    expect(a.removed).toBe(false);
+    expect([...a.moduleIds].sort()).toEqual(["m1", "m2"]);
+    expect([...a.panelIds]).toEqual(["p1"]);
+  });
+
+  it("Shift+klik w szafkę z grupy aktywnej blendy nie odznacza mebla", () => {
+    const p = make();
+    const a = clickSelection(p, { ...sel(["m1", "m2"], ["p1"]), activeId: null, activePanelId: "p1" }, "module", "m2", true);
+    expect(a.removed).toBe(false);
+    expect([...a.moduleIds].sort()).toEqual(["m1", "m2"]);
+    expect([...a.panelIds]).toEqual(["p1"]);
+  });
+
+  it("Shift+klik w blendę spoza grupy dokłada ją, a ponowny zdejmuje", () => {
+    const p = make();
+    const a = clickSelection(p, { ...sel(["m1", "m2"], ["p1"]), activeId: "m1" }, "panel", "p2", true);
+    expect([...a.panelIds].sort()).toEqual(["p1", "p2"]);
+    const b = clickSelection(p, { ...a, activeId: null, activePanelId: "p2" }, "panel", "p2", true);
+    expect(b.removed).toBe(true);
+    expect([...b.panelIds]).toEqual(["p1"]);
+  });
 });
 
 describe("editTargets - których szafek dotyczą zmiany w panelu", () => {

@@ -166,7 +166,7 @@ function bindTree(root) {
       // Kliknięcie zaznacza całą grupę (szafki + jej blendy/boki); Shift/Ctrl dokłada albo zdejmuje.
       // Tylko JEDNA szafka jest „aktywna” (activeModuleId) - ma otwarty panel właściwości.
       const additive = e.shiftKey || e.ctrlKey || e.metaKey;
-      const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels, picks: state.editPicks, activeId: state.activeModuleId }, 'module', id, additive);
+      const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels, picks: state.editPicks, activeId: state.activeModuleId, activePanelId: state.activeSidePanelId }, 'module', id, additive);
       state.selectedModules = sel.moduleIds;
       state.selectedSidePanels = sel.panelIds;
       state.editPicks = sel.picks;
@@ -184,7 +184,7 @@ function bindTree(root) {
       const id = e.currentTarget.getAttribute('data-id');
       // jak przy szafkach: Shift/Ctrl dokłada blendę/bok do zaznaczenia (np. do „Połącz w grupę”)
       const additive = e.shiftKey || e.ctrlKey || e.metaKey;
-      const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels, picks: state.editPicks, activeId: state.activeModuleId }, 'panel', id, additive);
+      const sel = clickSelection(state.project, { moduleIds: state.selectedModules, panelIds: state.selectedSidePanels, picks: state.editPicks, activeId: state.activeModuleId, activePanelId: state.activeSidePanelId }, 'panel', id, additive);
       state.selectedModules = sel.moduleIds;
       state.selectedSidePanels = sel.panelIds;
       state.editPicks = sel.picks;

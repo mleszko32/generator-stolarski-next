@@ -43,6 +43,18 @@ export function clickSelection(project, selection, kind, id, additive) {
     g.panelIds.forEach((p) => panelIds.add(p));
     return { moduleIds, panelIds, picks, removed, picked: true };
   }
+  // Shift/Ctrl + klik w blendę / bok z grupy aktywnej szafki albo w szafkę z grupy aktywnej blendy:
+  // grupa zostaje zaznaczona (wcześniej taki klik odznaczał cały mebel, więc nie dało się mieć
+  // zaznaczonych razem szafki i blendy z jednej grupy).
+  const activePanelId = selection.activePanelId;
+  const sameGroupAsActive = g.moduleIds.length + g.panelIds.length > 1
+    && ((activeId && g.moduleIds.includes(activeId) && !(kind === "module" && id === activeId))
+      || (activePanelId && g.panelIds.includes(activePanelId) && !(kind === "panel" && id === activePanelId)));
+  if (sameGroupAsActive) {
+    g.moduleIds.forEach((m) => moduleIds.add(m));
+    g.panelIds.forEach((p) => panelIds.add(p));
+    return { moduleIds, panelIds, picks, removed: false };   // kliknięty element staje się aktywny
+  }
   const all = g.moduleIds.every((m) => moduleIds.has(m)) && g.panelIds.every((p) => panelIds.has(p));
   g.moduleIds.forEach((m) => (all ? moduleIds.delete(m) : moduleIds.add(m)));
   g.panelIds.forEach((p) => (all ? panelIds.delete(p) : panelIds.add(p)));
