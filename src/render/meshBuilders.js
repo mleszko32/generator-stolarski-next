@@ -180,7 +180,7 @@ export function setHighlightKey(key) { highlightKey = key || null; }
 // dekoru albo palety materiałów (core/decorColors.js), przy podświetleniu innego materiału
 // półprzezroczysta; z cache po kolorze.
 const tintCache = new Map();
-const COLORABLE = new Set(['corpus', 'shelf', 'front', 'plinth', 'drawerBox', 'worktop']);
+const COLORABLE = new Set(['corpus', 'shelf', 'front', 'plinth', 'drawerBox', 'worktop', 'hdf']);
 // active = bryła klikniętej (aktywnej) szafki: kolor płyty podbarwiony na niebiesko, żeby w
 // zaznaczonej grupie było widać, którą szafkę zmienia prawy panel (tak samo szafki dobrane
 // Shiftem w jej grupie - activePicks). Pozostałe zaznaczone szafki

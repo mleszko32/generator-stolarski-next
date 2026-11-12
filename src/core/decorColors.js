@@ -84,11 +84,19 @@ function frontMaterialName(materialId, project) {
   return code && lacquerCode(mat.name) !== code ? `${mat.name} ${code}` : mat.name;
 }
 
+// Czoło szuflady wewnętrznej MERIVOBOX to gotowy element Blum z listy okuć (core/drawerAssembly.js:
+// innerFrontSpec), nie płyta - nie ma dekoru ani pozycji w legendzie.
+function isSystemInnerFront(el, mod, project) {
+  if (!el || el.subtype !== "szuflada-wewnetrzna") return false;
+  const f = { ...(project.front || {}), ...(mod.front || {}) };
+  return String(f.drawerSystem || "merivobox").toLowerCase() === "merivobox";
+}
+
 // Materiał bryły 3D jako pozycja legendy: { key, group: 'Korpus'|'Front'|'Szuflada', label, color }
 // (color null = kolor domyślny). Ta sama nazwa = ten sam klucz (np. materiał frontów i dekor
 // blendy), szuflady osobno. Klucz łączy legendę z bryłami (tryb „materiały”, podświetlanie).
-const PLAIN_LABEL = { Korpus: "bez dekoru (z projektu)", Front: "standard", Szuflada: "bez dekoru", Blat: "bez dekoru" };
-const KEY_PREFIX = { Szuflada: "S:", Blat: "B:" };
+const PLAIN_LABEL = { Korpus: "bez dekoru (z projektu)", Plecy: "HDF biały (domyślne)", Front: "standard", Szuflada: "bez dekoru", Blat: "bez dekoru" };
+const KEY_PREFIX = { Plecy: "P:", Szuflada: "S:", Blat: "B:" };
 function entry(group, label, color) {
   const l = String(label || "").trim();
   if (!l) return { key: "~" + group.toUpperCase(), group, label: PLAIN_LABEL[group], color: null };
@@ -96,6 +104,25 @@ function entry(group, label, color) {
 }
 const frontEntry = (materialId, project) => entry("Front", frontMaterialName(materialId, project), frontMaterialColor(materialId, project));
 const korpusEntry = (decor) => entry("Korpus", decor, decorColor(decor));
+
+// Kolor płyty HDF pleców z nazwy z cennika SAS („HDF Woodeco HU1506 Kaszmirowy Beż 3mm”): kody HU/HD
+// producenta nie są kodami Egger, więc najpierw rozpoznajemy odcień po nazwie, potem jak dekor.
+export function hdfColor(name) {
+  const s = String(name || "").trim();
+  if (!s) return null;
+  if (/kaszmir|be[żz]/i.test(s)) return 0xd8c8ae;
+  if (/czarn/i.test(s)) return 0x2a2c2e;
+  if (/antracyt/i.test(s)) return 0x44484d;
+  if (/ciemn/i.test(s)) return 0x6b6e72;
+  if (/jasn\w*\s+szar|szary jasny/i.test(s)) return 0xc9c9c6;
+  return decorColor(s);
+}
+// Plecy HDF szafki: dekor z mod.backPanel.decor, bez niego - dekor „Plecy” projektu; szafka bez pleców - null.
+function plecyEntry(mod, project) {
+  if (mod.backPanel && mod.backPanel.type === "brak") return null;
+  const d = String((mod.backPanel && mod.backPanel.decor) || projectDecor(project, "Plecy") || "").trim();
+  return entry("Plecy", d, hdfColor(d));
+}
 const drawerEntry = (project) => { const d = projectDecor(project, "Szuflada"); return entry("Szuflada", d, decorColor(d)); };
 // Blat: dekor „Blat” projektu (pasek materiałów w Produkcji).
 const worktopEntry = (project) => { const d = projectDecor(project, "Blat"); return entry("Blat", d, decorColor(d)); };
@@ -147,9 +174,11 @@ export function partMaterial(type, userData, project) {
     const el = userData.elementId && (mod.elements || []).find((e) => e.id === userData.elementId);
     // front szuflady wewn. MOVENTO ze skrzynką z płyty korpusu - w dekorze korpusu (jak na liście formatek)
     if (el && el.subtype === "szuflada-wewnetrzna" && boxFromKorpus(mod, project)) return korpusEntry(korpusDecorOf(mod, project));
+    if (isSystemInnerFront(el, mod, project)) return null; // czoło systemowe Blum - bez materiału z legendy
     return frontEntry(el ? el.materialId : moduleFrontMaterialId(mod, project), project);
   }
   if (type === "corpus" || type === "shelf") return korpusEntry(korpusDecorOf(mod, project));
+  if (type === "hdf") return plecyEntry(mod, project);
   if (type === "drawerBox") return boxFromKorpus(mod, project) ? korpusEntry(korpusDecorOf(mod, project)) : drawerEntry(project);
   return null;
 }
@@ -172,9 +201,12 @@ export function projectDecorLegend(project, opts = {}) {
   };
   (project.modules || []).forEach((mod) => {
     add(korpusEntry(korpusDecorOf(mod, project)));
+    const plecy = plecyEntry(mod, project);
+    if (plecy) add(plecy);
     (mod.elements || []).forEach((el) => {
       if (el.typ !== "front") return;
       if (el.subtype === "szuflada-wewnetrzna" && boxFromKorpus(mod, project)) return; // w dekorze korpusu (już w legendzie)
+      if (isSystemInnerFront(el, mod, project)) { add(drawerEntry(project)); return; } // czoło MERIVOBOX (Blum) - tylko skrzynka szuflady
       add(frontEntry(el.materialId, project));
       if (/szuflada/.test(el.subtype || "")) add(drawerEntry(project));
     });
@@ -186,7 +218,7 @@ export function projectDecorLegend(project, opts = {}) {
   });
   if (projectDecor(project, "Blat")) add(worktopEntry(project)); // blat bez dekoru nie ma pozycji w legendzie
   const out = [];
-  ["Korpus", "Front", "Szuflada", "Blat"].forEach((g) => {
+  ["Korpus", "Plecy", "Front", "Szuflada", "Blat"].forEach((g) => {
     const items = [...entries.values()].filter((e) => e.group === g);
     if (!opts.all && !items.some((e) => e.color != null)) return;
     items.sort((a, b) => (a.key.startsWith("~") ? -1 : b.key.startsWith("~") ? 1 : a.label.localeCompare(b.label, "pl")));

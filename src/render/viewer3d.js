@@ -1542,8 +1542,8 @@ function renderDecorLegend() {
   if (!items.length) { decorLegendEl.innerHTML = ''; return; }
   const hex = (c) => '#' + c.toString(16).padStart(6, '0');
   const palette = materialPaletteMap(items);
-  const defaults = { Korpus: mats.solid.corpus.color.getHex(), Front: mats.solid.front.color.getHex(), Szuflada: mats.solid.drawerBox.color.getHex(), Blat: mats.solid.worktop.color.getHex() };
-  const groupNames = { Korpus: 'Płyta korpusu', Front: 'Fronty', Szuflada: 'Szuflady', Blat: 'Blat' };
+  const defaults = { Korpus: mats.solid.corpus.color.getHex(), Plecy: mats.solid.hdf.color.getHex(), Front: mats.solid.front.color.getHex(), Szuflada: mats.solid.drawerBox.color.getHex(), Blat: mats.solid.worktop.color.getHex() };
+  const groupNames = { Korpus: 'Płyta korpusu', Plecy: 'Plecy HDF', Front: 'Fronty', Szuflada: 'Szuflady', Blat: 'Blat' };
   let html = `<div class="decor-legend-hint">${highlightKey ? 'Kliknij ponownie, aby pokazać wszystko' : 'Kliknij materiał, aby go podświetlić'}</div>`, group = '';
   items.forEach((it) => {
     if (it.group !== group) { group = it.group; html += `<div class="decor-legend-group">${groupNames[group] || group}</div>`; }

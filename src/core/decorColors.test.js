@@ -95,6 +95,44 @@ describe("legenda materiałów: tryb wszystkich materiałów i klucze brył", as
   });
 });
 
+describe("plecy HDF", () => {
+  const mod = (id, backPanel) => ({ id, type: "base_cabinet", dimensions: { width: 600, height: 720, depth: 500 }, elements: [], backPanel });
+  const project = (modules) => ({ modules, sidePanels: [], materials: { decors: {} } });
+
+  it("bryła pleców (typ hdf) bierze dekor HDF szafki, z kluczem w grupie Plecy", async () => {
+    const { partMaterial, hdfColor } = await import("./decorColors.js");
+    const p = project([mod("a", { type: "nut", decor: "HDF Woodeco HU1506 Kaszmirowy Beż 3mm" })]);
+    expect(partMaterial("hdf", { moduleId: "a", type: "corpus", part: "back" }, p))
+      .toMatchObject({ group: "Plecy", key: "P:HDF WOODECO HU1506 KASZMIROWY BEŻ 3MM", color: hdfColor("HDF Woodeco HU1506 Kaszmirowy Beż 3mm") });
+  });
+
+  it("legenda ma grupę Plecy; szafka bez pleców (brak) nie dodaje pozycji", async () => {
+    const { projectDecorLegend, partMaterial } = await import("./decorColors.js");
+    const p = project([mod("a", { decor: "HDF Woodeco HD3037 Dąb olejowany II 3mm" }), mod("b", { type: "brak", decor: "HDF Woodeco HU1506 Kaszmirowy Beż 3mm" })]);
+    const plecy = projectDecorLegend(p).filter((e) => e.group === "Plecy");
+    expect(plecy.map((e) => e.label)).toEqual(["HDF Woodeco HD3037 Dąb olejowany II 3mm"]);
+    expect(partMaterial("hdf", { moduleId: "b", type: "corpus", part: "back" }, p)).toBeNull();
+  });
+});
+
+describe("czoło szuflady wewnętrznej MERIVOBOX", () => {
+  const mod = (system) => ({ id: "a", type: "base_cabinet", dimensions: { width: 600, height: 720, depth: 500 }, front: system ? { drawerSystem: system } : {},
+    elements: [{ id: "f1", typ: "front", subtype: "szuflada-wewnetrzna" }] });
+  const project = (m) => ({ modules: [m], sidePanels: [], materials: { decors: {} }, pricing: { frontMaterials: [{ id: "default", name: "Standard" }] } });
+
+  it("nie trafia do legendy jako „Standard” ani nie ma materiału bryły", async () => {
+    const { partMaterial, projectDecorLegend } = await import("./decorColors.js");
+    const p = project(mod("merivobox"));
+    expect(partMaterial("front", { moduleId: "a", elementId: "f1" }, p)).toBeNull();
+    expect(projectDecorLegend(p, { all: true }).some((e) => e.group === "Front")).toBe(false);
+  });
+
+  it("czoło innego systemu (np. LEGRABOX) zostaje frontem z cennika", async () => {
+    const { partMaterial } = await import("./decorColors.js");
+    expect(partMaterial("front", { moduleId: "a", elementId: "f1" }, project(mod("legrabox")))).toMatchObject({ group: "Front" });
+  });
+});
+
 describe("blat", () => {
   const project = (decor) => ({ modules: [], sidePanels: [], materials: { decors: decor ? { Blat: decor } : {} } });
   it("bryła blatu bierze dekor „Blat” projektu, z osobnym kluczem", async () => {
