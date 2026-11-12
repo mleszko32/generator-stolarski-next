@@ -139,8 +139,9 @@ Formatki są deduplikowane/sumowane po kluczu `category_name_length_width`.
   czoło wewn. (`getDrawerComponents` zwraca wtedy też `sides`/`innerFront`); na liście formatek
   tył i czoło wewn. to jedna formatka „Tył/Przód szuflady …” × 2 (ten sam wymiar). Nazwy formatek
   szuflad nie zawierają szerokości szafki, żeby jednakowe formatki z różnych szafek się sumowały. Czoło szuflady
-  wewnętrznej w systemach metalowych (MERIVOBOX itd.) to gotowy element Blum — bez formatki (`innerFrontIsSystem` w
-  `engine/cabinet.js`); formatka „Front szuflady wewn.” tylko przy skrzynce drewnianej. Wiercenie
+  wewnętrznej MERIVOBOX to gotowy element Blum z listy okuć — bez formatki (`innerFrontIsSystem` w
+  `engine/cabinet.js`, wg `innerFrontSpec`); każdy inny system (GTV, antaro, TANDEMBOX, LEGRABOX, skrzynki drewniane)
+  ma formatkę „Front szuflady wewn.”. Wiercenie
   prowadnic MOVENTO wg karty Blum: wkręty 38 mm nad wieńcem/półką pod szufladą
   (`calculateDrawerHoles(..., nl, zoneBottom)`), w poziomie `moventoRunnerHoles(system, nl)`.
 - `drawerMath.js` — dobór długości nominalnej, dobór wariantu wysokości do dostępnego miejsca,

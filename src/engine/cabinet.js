@@ -2,7 +2,7 @@
 import { state } from "../core/state.js";
 import { calculateDrawerHoles, drawerComponentsToParts } from "../core/drawerMath.js";
 import { drawerSpec, drawerBaseY, isBottomOverlayFront } from "../core/drawerSpec.js";
-import { drawerSystems } from "../core/drawerSystems.js";
+import { innerFrontSpec } from "../core/drawerAssembly.js";
 import { corpusInnerDepth } from "../core/backPanel.js";
 import { calculateHinges, stackedHingeObstacles } from "../core/hingeMath.js";
 import { fmtMm } from "../utils/math.js";
@@ -324,10 +324,10 @@ function getFrontsAndDrawers(mod, config) {
       partName = 'Drzwi';
     }
 
-    // Czoło szuflady wewnętrznej w systemie metalowym Blum (MERIVOBOX, TANDEMBOX, LEGRABOX…) to
-    // gotowy element systemu, nie formatka; z płyty tylko przy skrzynce drewnianej (MOVENTO).
+    // Czoło szuflady wewnętrznej MERIVOBOX to gotowy element systemu z listy okuć, nie formatka;
+    // w pozostałych systemach (metalowych i drewnianych) czoło jest z płyty.
     if (!(front.subtype === 'szuflada-wewnetrzna' && innerFrontIsSystem(mod, config))) {
-      // front szuflady wewn. przy skrzynce drewnianej siedzi w korpusie - z płyty korpusu, gdy skrzynki są z korpusu
+      // front szuflady wewn. siedzi w korpusie - z płyty korpusu, gdy skrzynki są z korpusu (drawerBoxFromKorpus)
       const ofBox = front.subtype === 'szuflada-wewnetrzna' ? { woodenBox: true } : {};
       parts.push({ name: partName, length: parseFloat((front.h || 0).toFixed(1)), width: parseFloat((front.w || 0).toFixed(1)), qty: 1, category: "Front", materialId: front.materialId, ...ofBox });
     }
@@ -416,10 +416,13 @@ function getBlendaParts(panel, config) {
 // Kategoria "Front", bo to zwykle ten sam, droższy dekor co fronty (lakier/
 // fornir/okleina) - w Kosztorysie (calculateProjectCost) liczy się razem
 // z frontami, dając realną sumę m² tego dekoru do wyceny.
-// Czoło szuflady wewnętrznej systemowe (gotowy element Blum) - każdy system poza skrzynką drewnianą.
+// Czoło szuflady wewnętrznej systemowe - tylko tam, gdzie program kupuje je na liście okuć
+// (innerFrontSpec w core/drawerAssembly.js: MERIVOBOX, profil ZV4.1042M + mocowania). Każdy inny
+// system (GTV Axis Pro, antaro, TANDEMBOX, LEGRABOX, skrzynki drewniane) dostaje czoło z płyty -
+// inaczej czoła nie było ani w formatkach, ani w okuciach.
 function innerFrontIsSystem(mod, config) {
   const sys = String({ ...(config.front || {}), ...(mod.front || {}) }.drawerSystem || "merivobox").toLowerCase();
-  return !(drawerSystems[sys] && drawerSystems[sys].woodenBox);
+  return !!innerFrontSpec(sys, "M", 500);
 }
 
 function getSidePanelParts(panel, config) {

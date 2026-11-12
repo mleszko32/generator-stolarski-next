@@ -15,6 +15,15 @@ describe("czoło szuflady wewnętrznej", () => {
     expect(calculateModuleParts(mod).parts.some((p) => p.name.startsWith("Front szuflady wewn."))).toBe(false);
   });
 
+  it("pozostałe systemy metalowe (GTV Axis Pro, antaro, TANDEMBOX, LEGRABOX): czoło z płyty", () => {
+    ["gtv_axis_18", "gtv_axis_16", "antaro", "tandembox", "legrabox"].forEach((sys) => {
+      setProject(freshProject({ modules: [baseModule({ id: "a", front: { drawerSystem: sys }, elements: [{ ...inner }] })] }));
+      const mod = state.project.modules[0];
+      recalculateLayout(mod);
+      expect(calculateModuleParts(mod).parts.filter((p) => p.name.startsWith("Front szuflady wewn.")), sys).toHaveLength(1);
+    });
+  });
+
   it("MOVENTO (skrzynka drewniana): czoło z płyty jak dotąd", () => {
     setProject(freshProject({ modules: [baseModule({ id: "a", front: { drawerSystem: "movento_katalog" }, elements: [{ ...inner }] })] }));
     const mod = state.project.modules[0];
