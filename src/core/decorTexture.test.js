@@ -30,6 +30,17 @@ describe("decorTextureSpec", () => {
   });
 });
 
+describe("płyta ryflowana", () => {
+  it("lakierowana płyta ryflowana ma teksturę rowków (nie jest gładka jak lakier), kolor z materiału", () => {
+    const spec = decorTextureSpec("Płyta ryflowana lakier NCS S 0500-N", 0xf2f2f2);
+    expect(spec).toMatchObject({ kind: "ribbed", color: 0xf2f2f2, tileV: 40, ribs: 2 });
+  });
+  it("panel ryflowany też, zwykły lakier zostaje gładki", () => {
+    expect(decorTextureSpec("Panel ryflowany MDF Montero biały", 0xf6f5f2)).toMatchObject({ kind: "ribbed" });
+    expect(decorTextureSpec("Lakier NCS S 1005-Y50R", 0xf1e3d9)).toBeNull();
+  });
+});
+
 describe("zdjęcia dekorów", () => {
   const dataUrl = "data:image/jpeg;base64,AAAA";
   it("normalizePhoto przepuszcza obraz i porządkuje pola", () => {

@@ -72,7 +72,10 @@ function buildTexture(spec) {
   const ctx = canvas.getContext('2d');
   const img = ctx.createImageData(SIZE, SIZE);
   const rand = rng(spec.seed);
-  const shade = spec.kind === 'wood' ? woodShade(rand) : stoneShade(rand);
+  // ryflowana: poprzecznie do słojów (oś y tekstury) na przemian wypukłe żebra i ciemne rowki
+  const ribs = spec.ribs || 2;
+  const ribbedShade = (x, y) => 0.7 + 0.36 * Math.pow(Math.abs(Math.sin(Math.PI * ribs * y / SIZE)), 0.55);
+  const shade = spec.kind === 'ribbed' ? ribbedShade : spec.kind === 'wood' ? woodShade(rand) : stoneShade(rand);
   const r = (spec.color >> 16) & 255, g = (spec.color >> 8) & 255, b = spec.color & 255;
   for (let y = 0, i = 0; y < SIZE; y++) {
     for (let x = 0; x < SIZE; x++, i += 4) {

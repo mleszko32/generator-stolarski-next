@@ -7,6 +7,9 @@ import { hash, WOOD_WORDS, STONE_WORDS } from "./decorColors.js";
 import { lacquerColor } from "./lacquerColors.js";
 import { swissKronoDecor } from "./swissKrono.js";
 
+// nazwy frontów i płyt z rowkami (frez ryflowany); „lamelowy” zostaje wg drewna / koloru z nazwy
+export const RIBBED_WORDS = /ryfl|rowkowan/i;
+
 // Wspólny klucz tekstury dla nazwy dekoru (generowanej i wgranej ze zdjęcia). Dekor z kodem
 // Egger ma klucz = sam kod („H1180”), więc jedno zdjęcie obsługuje wszystkie grubości i
 // struktury tej płyty („H1180 ST37 18mm”, „Egger H1180 ST37 Dąb Halifax 19mm”).
@@ -24,6 +27,8 @@ export function textureKey(label) {
 export function decorTextureSpec(label, color) {
   const s = String(label || "").trim();
   if (!s || color == null) return null;
+  // płyta ryflowana / lamelowa (też lakierowana): pionowe rowki co 20 mm, kolor z materiału
+  if (RIBBED_WORDS.test(s)) return { kind: "ribbed", key: textureKey(s), seed: hash(s), color, roughness: 0.5, tileU: 200, tileV: 40, ribs: 2 };
   if (lacquerColor(s) != null) return null; // lakier RAL / NCS - gładki
   const m = s.match(/(?:^|[\s:(])([WUHF])\s?\d{3,4}\b/i);
   const code = m ? m[1].toUpperCase() : "";
