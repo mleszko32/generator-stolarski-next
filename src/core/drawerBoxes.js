@@ -6,7 +6,7 @@
 // (engine/cabinet.js): dno i tył z core/drawerSpec.js, boki po 16 mm. Używane
 // przez edytor wnętrza 2D, gdy fronty są ukryte. Wymaga aktualnego layoutu
 // (el.y/el.h po recalculateLayout).
-import { drawerSpec, drawerBaseY } from "./drawerSpec.js";
+import { drawerSpec, drawerBaseY, isBottomOverlayFront } from "./drawerSpec.js";
 import { num } from "../utils/math.js";
 import { getSlopeFronts, getSlopeGeometry } from "./slopeCabinet.js";
 import { moduleBoardThickness } from "./boardThickness.js";
@@ -27,9 +27,7 @@ export function getDrawerBoxInfo(mod, el, project) {
 
   const dw = comps.bottom.width;
   const dh = comps.back.height;
-  const isBottomInZone = el.frontIndex === 0;
-  const isBottomOuter = !!el.baseZone && num(el.baseZone.minY) <= th + 0.5;
-  const y0 = y + (isBottomInZone && isBottomOuter && !isInset ? th : 0);
+  const y0 = y + (isBottomOverlayFront(el, th, isInset) ? th : 0);
   if (comps.woodenBox) {
     // MOVENTO / TANDEM: boki z płyty, skrzynka zaczyna się luz nad dołem wnęki.
     const t = comps.sideThickness;

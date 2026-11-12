@@ -11,7 +11,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { state, DEFAULT_ROOM, frontBodyGap } from '../core/state.js';
 
 import { calculateDrawerHoles } from '../core/drawerMath.js';
-import { drawerSpec, drawerBaseY } from '../core/drawerSpec.js';
+import { drawerSpec, drawerBaseY, isBottomOverlayFront } from '../core/drawerSpec.js';
 import { calculateHinges, stackedHingeObstacles, SHELF_PIN_DROP, SHELF_PIN_OFFSETS } from '../core/hingeMath.js';
 import { isFlap, flapHinges } from '../core/liftFlap.js';
 import { dishwasherGeometry } from '../core/dishwasher.js';
@@ -1842,8 +1842,6 @@ export function update3D() {
 
                   if (el.subtype.includes('szuflada')) {
                       if (isXrayMode || !isFrontsVisible) {
-                          const isBottomInZone = el.frontIndex === 0;
-                          
                           // Wnęka, głębokość (NL) i skrzynka - wspólne z listą formatek i okuć
                           // (core/drawerSpec.js); skrzynka wyśrodkowana we wnęce w świetle.
                           const spec = drawerSpec(mod, el, state.project);
@@ -1854,12 +1852,13 @@ export function update3D() {
                           // poprawne el.y liczone od wnętrza (core/layout.js). Sprawdzamy geometrię
                           // (baseZone.minY ~ th), nie tag "boundBottom" - starsze projekty (import AI)
                           // budują baseZone bez tego taga wcale.
-                          const isBottomOuter = el.baseZone && parseFloat(el.baseZone.minY) <= th + 0.5;
+                          // Czoło szuflady wewnętrznej też stoi w świetle korpusu (isBottomOverlayFront).
+                          const isBottomOverlay = isBottomOverlayFront(el, th, isInsetFront);
                           const fcMerged = frontClearance(mod, state.project);
                           // NL z doboru szuflady - MOVENTO ma tylne otwory prowadnicy zależne od długości.
                           // Szuflada wewnętrzna drewniana: prowadnica od dołu szczeliny czoła (drawerBaseY).
                           const holeY = drawerComps?.woodenBox && isInternal ? drawerBaseY(el, th, isInsetFront) : el.y;
-                          const dHoles = calculateDrawerHoles(sysName, holeY, simulatedSpace, th, el.frontIndex, isBottomInZone && isBottomOuter && !isInsetFront, spec.nl, el.baseZone ? (parseFloat(el.baseZone.minY) || 0) + (parseFloat(el.baseZone.offsetBottom) || 0) : null, fcMerged);
+                          const dHoles = calculateDrawerHoles(sysName, holeY, simulatedSpace, th, el.frontIndex, isBottomOverlay, spec.nl, el.baseZone ? (parseFloat(el.baseZone.minY) || 0) + (parseFloat(el.baseZone.offsetBottom) || 0) : null, fcMerged);
 
                           if (drawerComps && drawerComps.woodenBox) {
                               // MOVENTO: skrzynka z płyty (core/drawerMath.js) - boki na całą
@@ -1910,7 +1909,7 @@ export function update3D() {
                               // widoczne w 3D jako "unosząca się" szuflada przy zmianie frontu na
                               // wpuszczany, mimo że wymiary formatek (cutlist) się nie zmieniały.
                               // (isBottomOuter policzone wyżej, przy dHoles - ten sam front/wnęka)
-                              const dY = posY + el.y + (isBottomInZone && isBottomOuter && !isInsetFront ? th : 0);
+                              const dY = posY + el.y + (isBottomOverlay ? th : 0);
 
                               const boxStartZ = zForFront - NL;
 

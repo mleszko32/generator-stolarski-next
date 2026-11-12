@@ -1,11 +1,31 @@
 import { describe, it, expect } from "vitest";
-import { drawerSpec } from "./drawerSpec.js";
+import { drawerSpec, isBottomOverlayFront } from "./drawerSpec.js";
+import { getDrawerBoxInfo } from "./drawerBoxes.js";
 import { freshProject, baseModule } from "../test/fixtures.js";
 
 const zone = { minX: 18, maxX: 582, minY: 18, maxY: 702, offsetBottom: 0, offsetTop: 0 };
 const drawer = (extra = {}) => ({
   id: "f0", typ: "front", subtype: "szuflada", frontIndex: 0, gap: 3,
   x: 1.5, y: 0, w: 597, h: 715, baseZone: { ...zone }, ...extra,
+});
+
+describe("isBottomOverlayFront", () => {
+  it("dolny front nakładany zjeżdża na wieniec; wpuszczany, wyższy i czoło szuflady wewn. - nie", () => {
+    expect(isBottomOverlayFront(drawer(), 18, false)).toBe(true);
+    expect(isBottomOverlayFront(drawer(), 18, true)).toBe(false);
+    expect(isBottomOverlayFront(drawer({ frontIndex: 1 }), 18, false)).toBe(false);
+    expect(isBottomOverlayFront(drawer({ baseZone: { ...zone, minY: 300 } }), 18, false)).toBe(false);
+    expect(isBottomOverlayFront(drawer({ subtype: "szuflada-wewnetrzna", y: 21 }), 18, false)).toBe(false);
+  });
+
+  it("dolna szuflada wewnętrzna w systemie metalowym: boki skrzynki nie wychodzą ponad czoło", () => {
+    // Szafa z drzwiami i dwiema szufladami wewn. GTV Axis Pro D: czoło 230 mm od y = 21.
+    const mod = baseModule({ front: { drawerSystem: "gtv_axis_18" } });
+    const el = drawer({ subtype: "szuflada-wewnetrzna", y: 21, h: 230, x: 21, w: 558, intGapY: 3, baseZone: { ...zone, maxY: 524 } });
+    const { rect } = getDrawerBoxInfo(mod, el, freshProject());
+    expect(rect.y0).toBe(21);
+    expect(rect.y1).toBeLessThanOrEqual(21 + 230);
+  });
 });
 
 describe("drawerSpec", () => {

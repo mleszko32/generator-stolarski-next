@@ -32,6 +32,7 @@ import { getDrawerComponents, getWoodenDrawerHeights, drawerComponentsToParts, d
 import { calculateHinges } from './hingeMath.js';
 import { LAMELLO, lamelloGrooveLen, lamelloPositions, LAMELLO_EDGE, lamelloDiscSetting } from './lamello.js';
 import { moduleBoardThickness } from "./boardThickness.js";
+import { isBottomOverlayFront } from "./drawerSpec.js";
 
 const MIN_PIECE = 50;   // krótsze kawałki pomijamy (nie da się ich zrobić)
 const r1 = (v) => Math.round(v * 10) / 10;
@@ -756,8 +757,7 @@ export function getSlopeDrillings(mod, config, opts = {}) {
   getSlopeFronts(mod, config).forEach((fr) => {
     const el = fr.el, bz = el.baseZone || {};
     if (fr.type === 'szuflada') {
-      const isBottomOuter = (parseFloat(bz.minY) || 0) <= th + 0.5;
-      const holes = calculateDrawerHoles(sys, el.y, el.h, th, el.frontIndex, el.frontIndex === 0 && isBottomOuter && !isInset, fr.drawer && fr.drawer.comps.nominalLength, (parseFloat(bz.minY) || 0) + (parseFloat(bz.offsetBottom) || 0));
+      const holes = calculateDrawerHoles(sys, el.y, el.h, th, el.frontIndex, isBottomOverlayFront(el, th, isInset),fr.drawer && fr.drawer.comps.nominalLength, (parseFloat(bz.minY) || 0) + (parseFloat(bz.offsetBottom) || 0));
       const shift = el.subtype === 'szuflada-wewnetrzna' ? parseFloat(el.innerFrontThickness ?? 18) + parseFloat(el.innerSetback ?? 2) : 0;
       [['R', parseFloat(bz.minX)], ['L', parseFloat(bz.maxX)]].forEach(([dir, x]) => {
         const fc = faceAt(x, dir);

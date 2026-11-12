@@ -1,7 +1,7 @@
 // src/engine/cabinet.js
 import { state } from "../core/state.js";
 import { calculateDrawerHoles, drawerComponentsToParts } from "../core/drawerMath.js";
-import { drawerSpec, drawerBaseY } from "../core/drawerSpec.js";
+import { drawerSpec, drawerBaseY, isBottomOverlayFront } from "../core/drawerSpec.js";
 import { drawerSystems } from "../core/drawerSystems.js";
 import { corpusInnerDepth } from "../core/backPanel.js";
 import { calculateHinges, stackedHingeObstacles } from "../core/hingeMath.js";
@@ -333,7 +333,6 @@ function getFrontsAndDrawers(mod, config) {
     }
 
     if (front.subtype.includes('szuflada')) {
-      const isBottomInZone = front.frontIndex === 0;
       // Wnęka, głębokość, NL i skrzynka - wspólne z listą okuć i 3D (core/drawerSpec.js).
       const spec = drawerSpec(mod, front, config);
       const { system: sysName, isInset, innerThick, innerSetback, simulatedSpace, nl: drawerNL } = spec;
@@ -347,11 +346,12 @@ function getFrontsAndDrawers(mod, config) {
       // projekty (import AI w sidebar.js) budują baseZone bez tego taga wcale, więc
       // poleganie tylko na nim wyłączyłoby korektę też dla zwykłych, nakładanych
       // frontów w tych projektach.
-      const isBottomOuter = front.baseZone && parseFloat(front.baseZone.minY) <= board + 0.5;
+      // Czoło szuflady wewnętrznej też stoi w świetle korpusu - warunek w isBottomOverlayFront.
+      const isBottomOverlay = isBottomOverlayFront(front, board, isInset);
       const zoneBottom = front.baseZone ? (parseFloat(front.baseZone.minY) || 0) + (parseFloat(front.baseZone.offsetBottom) || 0) : null;
       // Szuflada wewnętrzna drewniana: prowadnica od dołu szczeliny czoła (drawerBaseY).
       const holeY = spec.comps?.woodenBox && front.subtype === 'szuflada-wewnetrzna' ? drawerBaseY(front, board, isInset) : front.y;
-      const drawerHoles = calculateDrawerHoles(sysName, holeY, simulatedSpace, board, front.frontIndex, isBottomInZone && isBottomOuter && !isInset, drawerNL, zoneBottom, fc);
+      const drawerHoles = calculateDrawerHoles(sysName, holeY, simulatedSpace, board, front.frontIndex, isBottomOverlay, drawerNL, zoneBottom, fc);
       if (drawerHoles) { 
         const adjustedHoles = JSON.parse(JSON.stringify(drawerHoles));
         

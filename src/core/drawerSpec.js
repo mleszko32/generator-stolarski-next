@@ -26,8 +26,17 @@ const NL_SAFETY = 5;
 export function drawerBaseY(el, th, isInset) {
   const y = num(el.y);
   if (el.subtype === "szuflada-wewnetrzna") return y - num(el.intGapY, 5);
-  const isBottomOuter = !!el.baseZone && num(el.baseZone.minY) <= th + 0.5;
-  return y + (el.frontIndex === 0 && isBottomOuter && !isInset ? th : 0);
+  return y + (isBottomOverlayFront(el, th, isInset) ? th : 0);
+}
+
+// Czy to dolny front NAKŁADANY, który zjeżdża na wieniec dolny (el.y poniżej wnętrza o
+// grubość płyty minus luz) - wtedy skrzynka i prowadnica liczą się od wieńca (+ th).
+// JEDYNE miejsce tego warunku (formatki, wiercenia, obrys skrzynki, 3D, skos). Front
+// wpuszczany i czoło szuflady wewnętrznej stoją już w świetle korpusu - bez korekty
+// (dolna szuflada wewnętrzna liczona z + th wychodziła bokami ponad czoło).
+export function isBottomOverlayFront(el, th, isInset) {
+  if (!el || el.subtype === "szuflada-wewnetrzna" || isInset) return false;
+  return el.frontIndex === 0 && !!el.baseZone && num(el.baseZone.minY) <= th + 0.5;
 }
 
 export function drawerSpec(mod, el, project) {
