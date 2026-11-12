@@ -1689,7 +1689,8 @@ export function update3D() {
       }
 
       // Plecy wpuszczane: płyta korpusu między bokami, za wieńcami - na całą wysokość.
-      if (backP.type === 'wpuszczane') addBox(W - 2*th, H, backThick, posX + th, posY, backZ, 'corpus', isActive, udBack, innerGroup);
+      if (backP.type === 'brak') { /* bez pleców */ }
+      else if (backP.type === 'wpuszczane') addBox(W - 2*th, H, backThick, posX + th, posY, backZ, 'corpus', isActive, udBack, innerGroup);
       else if (boardOverlayBack) addBox(W, H, backThick, posX, posY, backZ, 'corpus', isActive, udBack, innerGroup);
       else addBox(W - 4, H - 4, backThick, posX + 2, posY + 2, backZ, 'hdf', isActive, udBack, innerGroup);
 

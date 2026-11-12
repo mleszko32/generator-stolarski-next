@@ -53,6 +53,18 @@ describe("plecy w nucie bez głębokości nutu (np. szafka z importu szkicu AI)"
   });
 });
 
+describe("brak pleców", () => {
+  const mod = () => baseModule({ dimensions: { width: 800, height: 780, depth: 660 }, backPanel: { type: "brak" } });
+
+  it("bok i wieńce na całą głębokość, bez formatki pleców", () => {
+    const project = freshProject();
+    expect(sideDepthOf(mod(), project)).toBe(660);
+    expect(corpusInnerDepth(mod(), project)).toBe(660);
+    expect(getBackPanelParts(mod(), project)).toEqual([]);
+    expect(getCorpusParts(mod(), project).find((p) => p.name === "Bok (L/P)").width).toBe(660);
+  });
+});
+
 describe("plecy wpuszczane", () => {
   const mod = () => baseModule({ dimensions: { width: 550, height: 694, depth: 500 }, backPanel: { type: "wpuszczane", thickness: 18 } });
 

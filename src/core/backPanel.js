@@ -20,7 +20,9 @@ export const BACK_PANEL_DEFAULTS = Object.freeze({
   overlayThickness: 0, // grubość pleców nakładanych tej szafki; 0 = z projektu (materials.backThickness)
 });
 
-const BACK_TYPES = ["nakladane", "nut", "wpuszczane"];
+// "brak" = szafka bez pleców (np. wyspa, której tył zamyka osobny panel ryflowany): bez formatki
+// pleców, boki i wieńce na całą głębokość.
+const BACK_TYPES = ["nakladane", "nut", "wpuszczane", "brak"];
 
 // Scalone ustawienia pleców: domyślne < project.backPanel < mod.backPanel, liczby jako liczby.
 export function resolveBackPanel(mod, project) {
@@ -54,6 +56,7 @@ export const BOARD_BACK_MIN = 8;
 // podana (overlayThickness), inaczej jak w nucie - HDF z ustawień projektu.
 export function backThicknessOf(mod, project) {
   const bp = resolveBackPanel(mod, project);
+  if (bp.type === "brak") return 0;
   if (bp.type === "wpuszczane") return bp.thickness;
   if (bp.type === "nakladane" && bp.overlayThickness > 0) return bp.overlayThickness;
   return num(project && project.materials && project.materials.backThickness, 3) || 3;

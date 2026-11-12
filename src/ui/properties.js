@@ -412,7 +412,7 @@ export function initPropertiesPanel() {
         `;
       })() : ''}
 
-      <div class="property-group"><label>Plecy:</label><select id="input-back-type"><option value="nut" ${backP.type === 'nut' ? 'selected' : ''}>W nucie</option><option value="nakladane" ${backP.type === 'nakladane' ? 'selected' : ''}>Nakładane</option><option value="wpuszczane" ${backP.type === 'wpuszczane' ? 'selected' : ''}>Wpuszczane (płyta między bokami)</option></select></div>
+      <div class="property-group"><label>Plecy:</label><select id="input-back-type"><option value="nut" ${backP.type === 'nut' ? 'selected' : ''}>W nucie</option><option value="nakladane" ${backP.type === 'nakladane' ? 'selected' : ''}>Nakładane</option><option value="wpuszczane" ${backP.type === 'wpuszczane' ? 'selected' : ''}>Wpuszczane (płyta między bokami)</option><option value="brak" ${backP.type === 'brak' ? 'selected' : ''}>Brak (bez pleców)</option></select></div>
       <div class="property-group" id="back-decor-group" style="display: ${backP.type === 'wpuszczane' ? 'none' : 'block'};"><label class="fs-xs">Materiał pleców HDF (puste = jak w projekcie):</label>
         <input type="text" class="input" id="input-back-decor" list="back-decor-catalog" value="${escapeHtml((backP && backP.decor) || '')}" placeholder="np. HDF Woodeco HU1506 Kaszmirowy Beż 3mm" />
         <datalist id="back-decor-catalog">${catalogLabels(state.project).filter(l => /hdf/i.test(l)).map(l => `<option value="${escapeHtml(l)}"></option>`).join('')}</datalist></div>

@@ -254,6 +254,7 @@ export function getBackPanelParts(mod, config) {
   const { width, height } = mod.dimensions;
   const board = moduleBoardThickness(mod, config);
   const backP = resolveBackPanel(mod, config);
+  if (backP.type === 'brak') return [];   // szafka bez pleców (np. wyspa z osobnym panelem ryflowanym)
 
   let hdfWidth, hdfHeight;
   const totalClearance = backP.clearance * 2;
