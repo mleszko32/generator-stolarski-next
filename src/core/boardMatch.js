@@ -16,7 +16,7 @@ const SPECIAL = ["II GAT", "GAT. II", "GAT II", "GATUNEK", "BACKSPLASH", "LAMINA
   "KOMÓRK", "KOMURK", "WZORNIK", "PRÓBK", "STOP FIRE", "STOP FORE", "OGNIO", "FLAMMEX", "TRUDNOPAL", "WILGOCI",
   "PERFECTSENSE", "PERFECT SENSE", "DF/", "AKRYL", "POŁYSK"];
 
-const upper = (s) => String(s || "").toUpperCase().replace(/ /g, " ");
+const upper = (s) => String(s || "").toUpperCase().replace(/\u00a0/g, " ");
 const word = (s) => new RegExp(`(^|[^A-Z0-9])${s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^A-Z0-9]|$)`);
 
 // Dekor -> { code, structure, thickness, kind: "hdf" | "mdf" | "board", producer, text } albo null bez kodu.
