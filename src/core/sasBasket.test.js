@@ -16,7 +16,8 @@ const rows = [
   R("M1", "Prowadnica MOVENTO z BLUMOTION S, 70 kg, dł.=600 mm, BLUM 766H6000S", 138, "109", "kpl"),
   R("S1", "Sprzęgło, z regulacją boczną, lewe do prowadnicy MOVENTO, BLUM T51.7601 V100", 5, "110"),
   R("S2", "Sprzęgło, z regulacją boczną, prawe do prowadnicy MOVENTO, BLUM T51.7601 V100", 5, "111"),
-  R("N1", "Nóżka do mebli Czarna H-100 mm Plastik, PREMIUM, 2 elementowa", 0.84, "112", "kpl"),
+  R("N1", "Słupek nogi ze stopą do przykręcania Axilo 100, Regulacja 90-120 mm, HAFELE 637.76.353", 2.56, "112"),
+  R("N2", "Podstawa nogi do przykręcania Axilo HAFELE 637.76.333 V100", 1.71, "114"),
   R("F1", "Zawias uzupełniający 60°, BLUM 79T8500 V100", 20, "113"),
 ];
 
@@ -54,7 +55,8 @@ describe("dobór okuć z katalogu SAS", () => {
 
   it("MOVENTO = prowadnice + sprzęgło lewe i prawe; nóżki; kod Blum w nazwie", () => {
     expect(sasSuggest(rows, "Prowadnice Blum MOVENTO 766H (60 kg) NL-600 + sprzęgła T51.7601").map((r) => r[0])).toEqual(["M1", "S1", "S2"]);
-    expect(sasSuggest(rows, "Nóżka regulowana H-100")[0][0]).toBe("N1");
+    expect(sasSuggest(rows, "Nóżka regulowana H-100").map((r) => r[0])).toEqual(["N1", "N2"]);
+    expect(sasSuggest(rows, "Nóżka regulowana H-120")).toBeNull();
     expect(sasSuggest(rows, "Zawias uzupełniający 60° do drzwi składanych (Blum 79T8500)")[0][0]).toBe("F1");
     expect(sasSuggest(rows, "Okleina krawędziowa (mb)")).toBeNull();
   });
@@ -79,7 +81,7 @@ describe("koszyk SAS", () => {
 
   it("pozycje do koszyka z ilościami; powiązanie z Kosztorysu wygrywa z doborem", () => {
     const { items, missing } = basketItems(hw, rows, { "Zawias meblowy + prowadnik krzyżakowy (puszka 35mm)": "Z2+P1" });
-    expect(items.map((i) => [i.pid, i.qty])).toEqual([["102", 4], ["103", 4], ["113", 2], ["112", 5]]);
+    expect(items.map((i) => [i.pid, i.qty])).toEqual([["102", 4], ["103", 4], ["113", 2], ["112", 5], ["114", 5]]);
     expect(missing).toEqual(["Okleina krawędziowa (mb)"]);
   });
 

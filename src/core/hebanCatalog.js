@@ -9,6 +9,7 @@
 // Heban sprzedaje na m² (jednostka „m2”) - w zamówieniu wpisuje się powierzchnię, nie liczbę arkuszy.
 // Czyste funkcje (poza loadHebanCatalog / resetHebanCatalog).
 
+import { axiloCodes } from "./axilo.js";
 import { BLUM_DRAWER_DEFAULTS, parseDrawerKit, merivoboxRecipe } from "./blumDrawer.js";
 
 let cache = null;
@@ -190,12 +191,13 @@ export function hebanSuggest(rows, hwName, opts = BLUM_DRAWER_DEFAULTS) {
   if (name === "Zawias meblowy + prowadnik krzyżakowy (puszka 35mm)") {
     return withQty([{ qty: 1, rows: one(pickBlum(rows, "71B3550")) }, { qty: 1, rows: one(pickBlum(rows, "173L6100")) }]);
   }
-  // Nóżka kuchenna H-100 / H-150 (bez klipa cokołu), czarna, najtańsza.
+  // Nóżka = Häfele Axilo: stopka regulacji cokołu + główka stopki (cena = suma obu).
   m = name.match(/^Nóżka regulowana H-(\d+)/);
   if (m) {
-    const re = new RegExp(`N[ÓO][ŻZ]KA (KUCHENNA )?(BEZ KLIPA )?H-?${m[1]}\\b`, "i");
-    const r = rows.filter((x) => re.test(x[1]) && !/BIA[ŁL]/i.test(x[1]) && !/BIA[ŁL]/i.test(x[0])).sort((a, b) => a[3] - b[3])[0];
-    return withQty([{ qty: 1, rows: one(r) }]);
+    const ax = axiloCodes(m[1]);
+    if (!ax) return null;
+    const byCode = (code) => one(rows.filter((x) => String(x[0]).trim() === code || String(x[0]).startsWith(code + " ")).sort((p, q) => p[3] - q[3])[0]);
+    return withQty([{ qty: 1, rows: byCode(ax.stalk) }, { qty: 1, rows: byCode(ax.base) }]);
   }
   // Części czoła szuflady wewn. MERIVOBOX (core/drawerAssembly.js): kod po „MERIVOBOX”, w kolorze szuflady.
   m = name.match(/MERIVOBOX (Z[A-Z]\d\.[0-9A-Z]+)/);

@@ -97,11 +97,10 @@ describe("dobór okuć z katalogu Heban", () => {
     const mv = hebanSuggest(parts, "Prowadnice Blum MOVENTO 766H (60 kg) NL-500 + sprzęgła T51.7601");
     expect(mv.map((r) => r[5])).toEqual(["5", "6", "7"]);
     const legs = [
-      ["NÓZKA KUCHENNA H-100 BIAŁA", "JAR.NÓŻKA KUCHENNA BEZ KLIPA H-100 (Biała)", "szt.", 0.5, "VBH", "8"],
-      ["NÓŻKA H100 BEZ KLIPA JAR", "NÓŻKA KUCHENNA bez klipa H-100 3-częściowa", "szt.", 0.77, "VBH", "9"],
-      ["NÓŻKA H150 BEZ KLIPA", "JAR.NÓŻKA KUCHENNA BEZ KLIPA H-150 trzyczęściowa", "szt.", 0.84, "VBH", "10"],
+      ["637.76.353", "Stopka regulacji cokołu AXILO 100", "szt.", 2.82, "HAF", "21"],
+      ["637.76.333", "GŁÓWKA STOPKI AXILO", "szt.", 1.97, "HAF", "22"],
     ];
-    expect(hebanSuggest(legs, "Nóżka regulowana H-100")[0][5]).toBe("9");
+    expect(hebanSuggest(legs, "Nóżka regulowana H-100").map((r) => r[5])).toEqual(["21", "22"]);
     expect(hebanSuggest(legs, "Nóżka regulowana H-120")).toBeNull();
   });
 

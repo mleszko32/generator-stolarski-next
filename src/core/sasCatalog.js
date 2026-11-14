@@ -9,6 +9,7 @@
 // materials: { kategoria płyty: indeks } } - cena przepisana do pola, powiązanie tylko do podpowiedzi.
 // Czyste funkcje (poza loadSasCatalog / resetSasCatalog).
 
+import { axiloCodes } from "./axilo.js";
 import { BLUM_DRAWER_DEFAULTS, drawerOptions, parseDrawerKit, merivoboxRecipe } from "./blumDrawer.js";
 
 let cache = null;
@@ -158,10 +159,12 @@ export function sasSuggest(rows, hwName, opts = BLUM_DRAWER_DEFAULTS) {
   if (name === HINGE_STD) {
     return all([pickRow(rows, (r) => r[1].includes("71B3550")), pickRow(rows, (r) => r[1].includes("173L6100"))]);
   }
+  // Nóżka = Häfele Axilo: słupek ze stopą + podstawa nogi (cena = suma obu)
   m = name.match(/^Nóżka regulowana H-(\d+)/);
   if (m) {
-    const r = pickRow(rows, (x) => /^N[óo]żka do mebli/i.test(x[1]) && x[1].includes(`H-${m[1]} `));
-    return r ? [r] : null;
+    const ax = axiloCodes(m[1]);
+    if (!ax) return null;
+    return all([pickRow(rows, (r) => r[1].includes(ax.stalk)), pickRow(rows, (r) => r[1].includes(ax.base))]);
   }
   // Siłownik AVENTOS HK-XS: zakres współczynnika mocy obejmujący LF (inaczej najbliższy), TIP-ON jak w nazwie
   m = name.match(/^AVENTOS HK-XS( TIP-ON)? - siłownik.*LF ok\. (\d+)/);
