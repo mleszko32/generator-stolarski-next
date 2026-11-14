@@ -10,11 +10,15 @@ import { updateSidebar } from "./sidebar.js";
 import { showCustomDialog } from "../core/storage.js";
 import { loadPriceDefaults, savePriceDefaults, applyPriceDefaults, exportPriceDefaultsJson, importPriceDefaultsJson } from "../core/priceLibrary.js";
 import { showAlert } from "../utils/modal.js";
-import { baseCategory, catalogLabels } from "../core/materialCatalog.js";
+import { baseCategory, catalogLabels, frontMaterialBoard } from "../core/materialCatalog.js";
 import { lacquerColor, lacquerSuggestions, lacquerWarning } from "../core/lacquerColors.js";
-import { loadSasCatalog, resetSasCatalog, parseSasCatalog, sasLabel, sasFromText, sasPricePerM2, SAS_BOARD_GROUPS, rowsFromLink, linkLabel, linkPrice, linkFromRows } from "../core/sasCatalog.js";
+import { loadSasCatalog, resetSasCatalog, parseSasCatalog, sasLabel, sasFromText, sasPricePerM2, SAS_BOARD_GROUPS, rowsFromLink, linkLabel, linkPrice, linkFromRows, sasSuggest, sasByIndex } from "../core/sasCatalog.js";
 import { hardwareSasRows } from "../core/sasBasket.js";
-import { saveSasCatalogToCloud } from "../core/storage.js";
+import { saveSasCatalogToCloud, saveHebanCatalogToCloud } from "../core/storage.js";
+import { loadHebanCatalog, resetHebanCatalog, parseHebanCatalog, hebanLabel, hebanFromText, hebanByCode, hebanPricePerM2, hebanIsBoard, hebanSuggest, hebanLinkFromRows, hebanRowsFromLink, hebanLinkPrice, hebanLinkLabel, hardwareHebanRows } from "../core/hebanCatalog.js";
+import { BLUM_COLORS, drawerOptions, parseDrawerKit } from "../core/blumDrawer.js";
+import { pickBoard, categoryDecor, boardOffers } from "../core/boardMatch.js";
+import { groupHardware } from "../core/costGroups.js";
 
 // "Zastosuj do wszystkich dolnych/górnych" (zgłoszona potrzeba: w kuchni
 // fronty szafek dolnych i wiszących często mają inny materiał/kolor, ale
@@ -64,56 +68,87 @@ const numField = (id, value, unit, extra = '') =>
 export function mountKosztorys(root) {
     const pricing = state.project.pricing;
 
+    const drawerOpts = drawerOptions(pricing);
     const foot = (label, id, extra = '') => `<div class="cost-line${extra}"><span>${label}</span><span id="kosztorys-foot-${id}">—</span></div>`;
 
+    const sel = (opt, cur, list) => `<select class="input input-sm" data-opt="${opt}">${list.map(([v, l]) => `<option value="${v}" ${String(cur) === String(v) ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+    // Sekcja zwijana (<details>) z sumą w nagłówku; stan otwarcia zapamiętany w przeglądarce (kz-open-<id>).
+    const sec = (id, title, body, openByDefault) => {
+        let open = openByDefault;
+        try { const v = localStorage.getItem('kz-open-' + id); if (v !== null) open = v === '1'; } catch (e) { /* bez pamięci */ }
+        return `<details class="kz-sec" data-sec="${id}" ${open ? 'open' : ''}><summary><span class="kz-sec-title">${title}</span><span class="kz-sec-sum" id="kosztorys-sum-${id}">—</span></summary><div class="kz-sec-body">${body}</div></details>`;
+    };
+
     root.innerHTML = `
-            <section class="cost-section">
-                <div class="btn-row" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
-                    <button id="kosztorys-price-save" type="button" class="btn btn-sm"><i class="ti ti-device-floppy" aria-hidden="true"></i> Zapisz jako domyślne ceny</button>
-                    <button id="kosztorys-price-load" type="button" class="btn btn-sm"><i class="ti ti-download" aria-hidden="true"></i> Wczytaj z bazy cen</button>
-                    <button id="kosztorys-price-export" type="button" class="btn btn-sm"><i class="ti ti-file-export" aria-hidden="true"></i> Eksport (plik JSON)</button>
-                    <button id="kosztorys-price-import" type="button" class="btn btn-sm"><i class="ti ti-upload" aria-hidden="true"></i> Import z pliku</button>
-                    <input id="kosztorys-price-file" type="file" accept="application/json,.json" style="display:none">
-                    <button id="kosztorys-sas-upload" type="button" class="btn btn-sm"><i class="ti ti-cloud-upload" aria-hidden="true"></i> Wgraj katalog SAS</button>
-                    <input id="kosztorys-sas-file" type="file" accept="application/json,.json" style="display:none">
-                    <span id="kosztorys-sas-status" class="hint"></span>
-                </div>
-                <datalist id="kosztorys-sas-all"></datalist><datalist id="kosztorys-sas-boards"></datalist>
-                <div class="hint" style="margin-bottom:14px;">Pole „Szukaj w bazie SAS” przy płytach i okuciach wstawia cenę po rabacie (brutto) z cennika SAS - wpisz indeks albo fragment nazwy. Baza cen to jeden zapamiętany cennik w tej przeglądarce (materiały, fronty, okucia) - "Zapisz" zapamiętuje ceny z TEGO projektu, "Wczytaj" nakłada je na aktywny projekt bez kasowania pozycji, których baza nie zna. Eksport/import JSON przenosi bazę na inny komputer.</div>
-                <h3>Materiały płytowe</h3>
-                <table class="cost-table">
-                    <thead><tr><th>Materiał</th><th class="num">Powierzchnia</th><th class="num">Cena / m²</th><th class="num">Koszt</th><th></th></tr></thead>
+            <div class="kz-sticky">
+                <div class="kz-total"><span>Koszty</span><b id="kosztorys-top-subtotal">—</b></div>
+                <div class="kz-total"><span>Netto</span><b id="kosztorys-top-net">—</b></div>
+                <div class="kz-total kz-total-main"><span>Brutto</span><b id="kosztorys-top-total">—</b></div>
+            </div>
+            <div class="kz-toolbar">
+                <button id="kosztorys-auto" type="button" class="btn btn-primary" title="Płyty z hurtowni, która ma dany dekor (Egger / Woodeco - SAS, Swiss Krono - Heban), okucia z wybranej hurtowni. Czego nie ma - zostaje bez zmian.">Dobierz ceny z hurtowni</button>
+                <label class="kz-inline">okucia: <select class="input input-sm" id="kosztorys-hw-source"><option value="sas" ${pricing.hardwareSource !== 'heban' ? 'selected' : ''}>wszystkie z SAS</option><option value="heban" ${pricing.hardwareSource === 'heban' ? 'selected' : ''}>wszystkie z Hebanu</option></select></label>
+                <details class="kz-tools">
+                    <summary>Cenniki i katalogi</summary>
+                    <div class="kz-tools-body">
+                        <div class="kz-tools-row"><b>Katalogi hurtowni</b>
+                            <button id="kosztorys-sas-upload" type="button" class="btn btn-sm"><i class="ti ti-cloud-upload" aria-hidden="true"></i> Wgraj katalog SAS</button>
+                            <input id="kosztorys-sas-file" type="file" accept="application/json,.json" style="display:none">
+                            <span id="kosztorys-sas-status" class="hint"></span>
+                        </div>
+                        <div class="kz-tools-row"><b></b>
+                            <button id="kosztorys-heban-upload" type="button" class="btn btn-sm"><i class="ti ti-cloud-upload" aria-hidden="true"></i> Wgraj katalog Heban</button>
+                            <input id="kosztorys-heban-file" type="file" accept="application/json,.json" style="display:none">
+                            <span id="kosztorys-heban-status" class="hint"></span>
+                        </div>
+                        <div class="kz-tools-row"><b>Baza cen</b>
+                            <button id="kosztorys-price-save" type="button" class="btn btn-sm"><i class="ti ti-device-floppy" aria-hidden="true"></i> Zapisz jako domyślne ceny</button>
+                            <button id="kosztorys-price-load" type="button" class="btn btn-sm"><i class="ti ti-download" aria-hidden="true"></i> Wczytaj z bazy cen</button>
+                            <button id="kosztorys-price-export" type="button" class="btn btn-sm"><i class="ti ti-file-export" aria-hidden="true"></i> Eksport (plik JSON)</button>
+                            <button id="kosztorys-price-import" type="button" class="btn btn-sm"><i class="ti ti-upload" aria-hidden="true"></i> Import z pliku</button>
+                            <input id="kosztorys-price-file" type="file" accept="application/json,.json" style="display:none">
+                        </div>
+                        <div class="hint">Baza cen to jeden zapamiętany cennik w tej przeglądarce (materiały, fronty, okucia) - „Zapisz” zapamiętuje ceny z TEGO projektu, „Wczytaj” nakłada je na aktywny projekt bez kasowania pozycji, których baza nie zna. Eksport/import JSON przenosi bazę na inny komputer.</div>
+                    </div>
+                </details>
+            </div>
+            <datalist id="kosztorys-sas-all"></datalist><datalist id="kosztorys-sas-boards"></datalist>
+            <datalist id="kosztorys-heban-all"></datalist><datalist id="kosztorys-heban-boards"></datalist>
+            ${sec('plyty', 'Płyty i cięcie', `
+                <table class="cost-table kz-table">
+                    <thead><tr><th>Materiał</th><th>Źródło</th><th class="num">Ilość</th><th class="num">Cena</th><th class="num">Koszt</th><th></th></tr></thead>
                     <tbody id="kosztorys-materials-tbody"></tbody>
-                    <tbody><tr><td>Cięcie formatek (hurtownia)</td><td class="num" id="kosztorys-cut-count">—</td><td class="num">${numField('cutting', pricing.cuttingPerPart, 'zł/szt.')}</td><td class="num" id="kosztorys-cut-cost">—</td><td></td></tr></tbody>
-                </table>
-            </section>
-            <section class="cost-section">
-                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><h3>Okucia</h3><button id="kosztorys-sas-auto" type="button" class="btn btn-sm" title="Wpisuje ceny po rabacie z katalogu SAS przy okuciach bez ceny (zawiasy, prowadniki, zestawy szuflad Blum, MOVENTO, nóżki)">Dobierz ceny okuć z SAS</button></div>
-                <table class="cost-table">
-                    <thead><tr><th>Pozycja</th><th class="num">Ilość</th><th class="num">Cena jedn.</th><th class="num">Koszt</th></tr></thead>
+                    <tbody><tr><td>Cięcie formatek (hurtownia)</td><td></td><td class="num" id="kosztorys-cut-count">—</td><td class="num">${numField('cutting', pricing.cuttingPerPart, 'zł/szt.')}</td><td class="num" id="kosztorys-cut-cost">—</td><td></td></tr></tbody>
+                </table>`, true)}
+            ${sec('okucia', 'Okucia i akcesoria', `
+                <div class="kz-opts" id="kosztorys-blum-opts">
+                    <span class="kz-opts-label">Szuflady Blum:</span>
+                    ${sel('color', drawerOpts.color, Object.entries(BLUM_COLORS))}
+                    ${sel('kg', drawerOpts.kg, [[40, '40 kg'], [70, '70 kg']])}
+                    <span class="hint">wys. E</span>${sel('eVariant', drawerOpts.eVariant, [['reling', 'z relingiem'], ['boxcap', 'z Boxcap']])}
+                    <span class="hint">front</span>${sel('fix', drawerOpts.fix, [['W', 'na wkręty'], ['I', 'Inserta']])}
+                </div>
+                <table class="cost-table kz-table">
+                    <thead><tr><th>Pozycja</th><th>Źródło</th><th class="num">Ilość</th><th class="num">Cena jedn.</th><th class="num">Koszt</th><th></th></tr></thead>
                     <tbody id="kosztorys-hardware-tbody"></tbody>
-                </table>
-            </section>
-            <section class="cost-section">
-                <h3>Robocizna, lakiernia, montaż, transport</h3>
+                </table>`, true)}
+            ${sec('praca', 'Robocizna, lakiernia, montaż, transport', `
                 <table class="cost-table">
+                    <thead><tr><th></th><th class="num">Czas</th><th class="num">Stawka</th><th class="num">Koszt</th></tr></thead>
                     <tbody>
                         <tr><td>Robocizna (warsztat)</td><td class="num">${numField('labor-hours', pricing.labor.hours, 'h')}</td><td class="num">${numField('labor-rate', pricing.labor.rate, 'zł/h')}</td><td class="num" id="kosztorys-labor-cost">—</td></tr>
                         <tr><td>Lakiernia</td><td class="num">${numField('lacquer-hours', pricing.lacquer.hours, 'h')}</td><td class="num">${numField('lacquer-rate', pricing.lacquer.rate, 'zł/h')}</td><td class="num" id="kosztorys-lacquer-cost">—</td></tr>
                         <tr><td>Montaż</td><td class="num">${numField('assembly-hours', pricing.assembly.hours, 'h')}</td><td class="num">${numField('assembly-rate', pricing.assembly.rate, 'zł/h')}</td><td class="num" id="kosztorys-assembly-cost">—</td></tr>
                         <tr><td>Transport</td><td></td><td class="num">${numField('transport', pricing.transport, 'zł')}</td><td></td></tr>
                     </tbody>
-                </table>
-            </section>
-            <section class="cost-section">
-                <h3>Marża, rabat, VAT</h3>
+                </table>`, true)}
+            ${sec('marza', 'Marża, rabat, VAT', `
                 <div class="field-row">
                     <div class="field"><label>Narzut na materiały i okucia (%)</label><input type="number" class="input" id="kosztorys-margin" value="${pricing.marginPercent}" step="1" min="0"></div>
                     <div class="field"><label>Marża na robociznę, montaż, transport (%)</label><input type="number" class="input" id="kosztorys-labor-margin" value="${pricing.laborMarginPercent ?? pricing.marginPercent}" step="1" min="0"></div>
                     <div class="field"><label>Rabat (%)</label><input type="number" class="input" id="kosztorys-discount" value="${pricing.discountPercent}" step="any" min="0" max="100"></div>
                     <div class="field"><label>VAT (%)</label><input type="number" class="input" id="kosztorys-vat" value="${pricing.vatPercent}" step="any" min="0"></div>
-                </div>
-            </section>
+                </div>`, true)}
             <section class="cost-summary">
                 ${foot('Materiały', 'plyty')}
                 ${foot('Cięcie formatek', 'cutting')}
@@ -130,6 +165,9 @@ export function mountKosztorys(root) {
                 <div class="cost-line"><span>VAT (<span id="kosztorys-foot-vatpct">23</span>%)</span><span id="kosztorys-foot-vat">—</span></div>
                 <div class="cost-line cost-total"><span>Cena brutto</span><span id="kosztorys-foot-total">—</span></div>
             </section>`;
+    root.querySelectorAll('.kz-sec').forEach(d => d.addEventListener('toggle', () => {
+        try { localStorage.setItem('kz-open-' + d.dataset.sec, d.open ? '1' : '0'); } catch (e) { /* bez pamięci */ }
+    }));
     const modal = root;
 
     const materialsTbody = modal.querySelector('#kosztorys-materials-tbody');
@@ -139,9 +177,12 @@ export function mountKosztorys(root) {
     // otwarcie kosztorysu nie może oznaczać projektu jako zmienionego). Każde inne wywołanie
     // (zmiana pola, przycisk) zapisuje ceny i robi punkt cofania.
     const INIT = Symbol('init');
+    let badgeTimer = null;
     function recalc(arg) {
         if (arg !== INIT) readInputs();
         renderTotals();
+        clearTimeout(badgeTimer);
+        badgeTimer = setTimeout(() => renderCompare(), 300); // źródło ceny (SAS / Heban / ręcznie) po zmianie pola
     }
     function readInputs() {
         modal.querySelectorAll('.kosztorys-mat-price').forEach(input => {
@@ -222,6 +263,18 @@ export function mountKosztorys(root) {
         });
 
         const set = (id, v) => { modal.querySelector(id).textContent = v; };
+        // pasek z sumą i sumy w nagłówkach sekcji / grup okuć
+        set('#kosztorys-top-subtotal', formatPLN(cost.subtotal));
+        set('#kosztorys-top-net', formatPLN(cost.net));
+        set('#kosztorys-top-total', formatPLN(cost.gross));
+        set('#kosztorys-sum-plyty', formatPLN(cost.materialsSubtotal + cost.cuttingCost));
+        set('#kosztorys-sum-okucia', formatPLN(cost.hardwareSubtotal));
+        set('#kosztorys-sum-praca', formatPLN(cost.laborCost + cost.lacquerCost + cost.assemblyCost + cost.transportCost));
+        set('#kosztorys-sum-marza', `narzut ${cost.marginPercent}% · marża ${cost.laborMarginPercent}% · rabat ${cost.discountPercent}% · VAT ${cost.vatPercent}%`);
+        modal.querySelectorAll('.kz-group-sum').forEach(cell => {
+            const names = new Set(groupHardware(cost.hardware).find(g => g.id === cell.dataset.group)?.items.map(h => h.name) || []);
+            cell.textContent = formatPLN(cost.hardware.filter(h => names.has(h.name)).reduce((t, h) => t + h.cost, 0));
+        });
         set('#kosztorys-foot-plyty', formatPLN(cost.materialsSubtotal));
         set('#kosztorys-foot-okucia', formatPLN(cost.hardwareSubtotal));
         set('#kosztorys-foot-margin', formatPLN(cost.goodsMarginAmount));
@@ -261,18 +314,23 @@ export function mountKosztorys(root) {
         const frontHtml = cost.materials.filter(m => m.category === 'Front').map(frontRowHtml).join('');
         const restHtml = cost.materials.filter(m => !isKorpus(m) && m.category !== 'Front').map(otherRowHtml).join('');
 
-        materialsTbody.innerHTML = ((korpusHtml + frontHtml + restHtml) || `<tr><td colspan="5" class="empty-note">Projekt jest pusty</td></tr>`)
+        materialsTbody.innerHTML = ((korpusHtml + frontHtml + restHtml) || `<tr><td colspan="6" class="empty-note">Projekt jest pusty</td></tr>`)
             + `<tr hidden><td><datalist id="kosztorys-color-catalog">${lacquerSuggestions().map(l => `<option value="${escapeHtml(l)}">`).join('')}</datalist><datalist id="kosztorys-board-catalog">${catalogLabels(state.project).map(l => `<option value="${escapeHtml(l)}">`).join('')}</datalist></td></tr>`;
 
         materialsTbody.querySelectorAll('.kosztorys-mat-price, .kosztorys-front-mat-price, .kosztorys-mat-name, .kosztorys-mat-board, .kosztorys-mat-color').forEach(input => {
             input.addEventListener('input', recalc);
         });
         bindSasFields(materialsTbody);
+        bindHebanFields(materialsTbody);
         // Nazwa materiału: odśwież listę per front (ui/properties.js) dopiero po
         // skończeniu wpisywania (change, nie input) - żeby nie przerywać pisania
         // pełnym przebudowaniem panelu na każdą literę.
         materialsTbody.querySelectorAll('.kosztorys-mat-name').forEach(input => {
-            input.addEventListener('change', () => { initPropertiesPanel(); update3D(); }); // nazwa i kolor lakieru = kolor frontów w 3D
+            input.addEventListener('change', () => {
+                const label = [...materialsTbody.querySelectorAll('.kz-front-name')].find(b => b.dataset.materialId === input.dataset.materialId);
+                if (label) label.textContent = input.value.trim() || 'Bez nazwy';
+                initPropertiesPanel(); update3D(); // nazwa i kolor lakieru = kolor frontów w 3D
+            });
         });
         materialsTbody.querySelectorAll('.kosztorys-mat-color').forEach(input => {
             input.addEventListener('change', () => update3D());
@@ -302,12 +360,14 @@ export function mountKosztorys(root) {
     function otherRowHtml(m) {
         return `
             <tr>
-                <td>${escapeHtml(MATERIAL_LABELS[m.category] || m.category)}${sasFieldHtml('materials', m.category)}</td>
+                <td>${escapeHtml(MATERIAL_LABELS[m.category] || m.category)}</td>
+                <td>${srcBadgeHtml('materials', m.category)}</td>
                 <td class="num kosztorys-mat-area" data-cat="${escapeHtml(m.category)}">${m.areaM2.toFixed(2)}&nbsp;m²</td>
-                <td class="num"><span class="cost-input"><input type="number" class="input kosztorys-mat-price" data-cat="${escapeHtml(m.category)}" value="${m.pricePerM2}" step="1" min="0"> zł</span></td>
+                <td class="num"><span class="cost-input"><input type="number" class="input kosztorys-mat-price" data-cat="${escapeHtml(m.category)}" value="${m.pricePerM2}" step="1" min="0"> zł/m²</span></td>
                 <td class="num kosztorys-mat-cost" data-cat="${escapeHtml(m.category)}"><b>${formatPLN(m.cost)}</b></td>
-                <td></td>
-            </tr>`;
+                <td>${editBtnHtml()}</td>
+            </tr>
+            ${priceEditRowHtml('materials', m.category)}`;
     }
 
     // Pole koloru lakieru z podpowiedziami RAL / NCS i próbką koloru.
@@ -323,36 +383,79 @@ export function mountKosztorys(root) {
         const bulkBtns = BULK_ZONES.map(z =>
             `<button type="button" class="kosztorys-mat-bulk" data-material-id="${escapeHtml(m.materialId)}" data-zone-type="${escapeHtml(z.type)}">wszystkich ${escapeHtml(z.label)}</button>`
         ).join(' · ');
+        const mat = pricing.frontMaterials.find(x => x.id === m.materialId) || {};
+        const board = frontMaterialBoard(mat);
+        const lacquer = /lakier/i.test(String(mat.name || ''));
+        const note = board ? `płyta: ${board}${lacquer ? ' · lakierowanie liczysz w „Lakierni” (sekcja Robocizna)' : ''}` : '';
         return `
             <tr>
-                <td><input type="text" class="input kosztorys-mat-name" data-material-id="${escapeHtml(m.materialId)}" value="${escapeHtml(m.materialName)}" placeholder="Nazwa materiału frontu"></td>
+                <td>Front: <b class="kz-front-name" data-material-id="${escapeHtml(m.materialId)}">${escapeHtml(m.materialName)}</b>${note ? `<div class="hint">${escapeHtml(note)}</div>` : ''}</td>
+                <td>${srcBadgeHtml('materials', 'Front:' + m.materialId)}</td>
                 <td class="num kosztorys-front-mat-area" data-material-id="${escapeHtml(m.materialId)}">${m.areaM2.toFixed(2)}&nbsp;m²</td>
-                <td class="num"><span class="cost-input"><input type="number" class="input kosztorys-front-mat-price" data-material-id="${escapeHtml(m.materialId)}" value="${m.pricePerM2}" step="1" min="0"> zł</span></td>
+                <td class="num"><span class="cost-input"><input type="number" class="input kosztorys-front-mat-price" data-material-id="${escapeHtml(m.materialId)}" value="${m.pricePerM2}" step="1" min="0"> zł/m²</span></td>
                 <td class="num kosztorys-front-mat-cost" data-material-id="${escapeHtml(m.materialId)}"><b>${formatPLN(m.cost)}</b></td>
-                <td>${canDelete ? `<button type="button" class="icon-btn kosztorys-mat-del" data-material-id="${escapeHtml(m.materialId)}" title="Usuń materiał"><i class="ti ti-trash" aria-hidden="true"></i></button>` : ''}</td>
+                <td class="kz-actions">${editBtnHtml()}<button type="button" class="icon-btn kz-edit" data-edit="front" title="Nazwa, kolor RAL / NCS, płyta formatek, przypisanie do frontów"><i class="ti ti-settings" aria-hidden="true"></i></button>${canDelete ? `<button type="button" class="icon-btn kosztorys-mat-del" data-material-id="${escapeHtml(m.materialId)}" title="Usuń materiał"><i class="ti ti-trash" aria-hidden="true"></i></button>` : ''}</td>
             </tr>
-            <tr class="kosztorys-mat-bulk-row"><td colspan="5">${colorFieldHtml(m.materialId)} · <label class="kosztorys-mat-board-label">Płyta formatek: <input type="text" class="input kosztorys-mat-board" list="kosztorys-board-catalog" data-material-id="${escapeHtml(m.materialId)}" value="${escapeHtml((pricing.frontMaterials.find(x => x.id === m.materialId) || {}).board || '')}" placeholder="np. MDF dwustronny z bazy SAS"></label> · Zastosuj do: ${bulkBtns}</td></tr>`;
+            ${priceEditRowHtml('materials', 'Front:' + m.materialId)}
+            <tr class="kosztorys-mat-bulk-row kz-edit-row" data-edit="front" hidden><td colspan="6"><label>Nazwa materiału: <input type="text" class="input kosztorys-mat-name" data-material-id="${escapeHtml(m.materialId)}" value="${escapeHtml(m.materialName)}" placeholder="Nazwa materiału frontu"></label> · ${colorFieldHtml(m.materialId)} · <label class="kosztorys-mat-board-label">Płyta formatek: <input type="text" class="input kosztorys-mat-board" list="kosztorys-board-catalog" data-material-id="${escapeHtml(m.materialId)}" value="${escapeHtml((pricing.frontMaterials.find(x => x.id === m.materialId) || {}).board || '')}" placeholder="np. MDF dwustronny z bazy SAS"></label> · Zastosuj do: ${bulkBtns}</td></tr>`;
     }
 
     function renderHardwareRows() {
         const cost = calculateProjectCost();
         if (cost.hardware.length === 0) {
-            hardwareTbody.innerHTML = `<tr><td colspan="4" class="empty-note">Brak okuć w projekcie</td></tr>`;
+            hardwareTbody.innerHTML = `<tr><td colspan="6" class="empty-note">Brak okuć w projekcie</td></tr>`;
             return;
         }
-        hardwareTbody.innerHTML = cost.hardware.map(hw => `
+        const rowHtml = (hw) => `
             <tr>
-                <td>${escapeHtml(hw.name)}${sasFieldHtml('hardware', hw.name)}</td>
+                <td>${escapeHtml(hw.name)}</td>
+                <td>${srcBadgeHtml('hardware', hw.name)}</td>
                 <td class="num">${hw.qty} ${escapeHtml(hw.unit)}</td>
                 <td class="num"><span class="cost-input"><input type="number" class="input kosztorys-hw-price" data-name="${escapeHtml(hw.name)}" value="${hw.price}" step="0.1" min="0"> zł</span></td>
                 <td class="num kosztorys-hw-cost" data-name="${escapeHtml(hw.name)}"><b>${formatPLN(hw.cost)}</b></td>
+                <td>${editBtnHtml()}</td>
             </tr>
-        `).join('');
+            ${priceEditRowHtml('hardware', hw.name)}`;
+        hardwareTbody.innerHTML = groupHardware(cost.hardware).map(g => `
+            <tr class="kz-group"><td colspan="4">${escapeHtml(g.label)} <span class="hint">(${g.items.length})</span></td><td class="num kz-group-sum" data-group="${g.id}"></td><td></td></tr>
+            ${g.items.map(rowHtml).join('')}`).join('');
         hardwareTbody.querySelectorAll('.kosztorys-hw-price').forEach(input => {
             input.addEventListener('input', recalc);
         });
         bindSasFields(hardwareTbody);
+        bindHebanFields(hardwareTbody);
+        renderTotals();
+        renderCompare();
     }
+
+    // Pole ceny wiersza: płyta („kategoria”), materiał frontu („Front:<id>”), okucie (nazwa).
+    function priceInputFor(kind, key) {
+        if (kind === 'hardware') return [...modal.querySelectorAll('.kosztorys-hw-price')].find(el => el.getAttribute('data-name') === key) || null;
+        if (key.startsWith('Front:')) return [...modal.querySelectorAll('.kosztorys-front-mat-price')].find(el => el.getAttribute('data-material-id') === key.slice(6)) || null;
+        return [...modal.querySelectorAll('.kosztorys-mat-price')].find(el => el.getAttribute('data-cat') === key) || null;
+    }
+    // Wiersz pod pozycją, ten sam dla płyt, frontów i okuć: wyszukiwarka SAS, wyszukiwarka Heban, ceny w obu hurtowniach.
+    function priceEditRowHtml(kind, key) {
+        return `<tr class="kz-edit-row" data-edit="price" hidden><td colspan="6">${sasFieldHtml(kind, key)}${hebanFieldHtml(kind, key)}<div class="hint kz-compare" data-kind="${kind}" data-key="${escapeHtml(key)}"></div></td></tr>`;
+    }
+
+    // Źródło ceny wiersza (uzupełniane w renderCompare) i przycisk rozwijający wybór pozycji z cennika pod wierszem.
+    function srcBadgeHtml(kind, key) {
+        return `<span class="badge kz-src" data-kind="${kind}" data-key="${escapeHtml(key)}">…</span>`;
+    }
+    function editBtnHtml(title = 'Wybierz pozycję z cennika SAS / Heban') {
+        return `<button type="button" class="icon-btn kz-edit" data-edit="price" title="${escapeHtml(title)}"><i class="ti ti-pencil" aria-hidden="true"></i></button>`;
+    }
+    modal.addEventListener('click', (e) => {
+        const btn = e.target.closest('.kz-edit');
+        if (!btn) return;
+        // wiersze rozwijane leżą zaraz pod pozycją; przycisk otwiera ten o swoim data-edit
+        for (let row = btn.closest('tr').nextElementSibling; row && row.classList.contains('kz-edit-row'); row = row.nextElementSibling) {
+            if (row.dataset.edit !== btn.dataset.edit) continue;
+            row.hidden = !row.hidden;
+            btn.classList.toggle('active', !row.hidden);
+        }
+    });
 
     // Pole wyszukiwania w katalogu SAS (core/sasCatalog.js) przy płycie / okuciu. Powiązanie w pricing.sas.
     function sasFieldHtml(kind, key) {
@@ -382,25 +485,25 @@ export function mountKosztorys(root) {
         showSasStatus(cat);
         showAlert(`✅ Wgrano katalog SAS: ${cat.rows.length} pozycji.`);
     });
-    modal.querySelector('#kosztorys-sas-auto').addEventListener('click', async () => {
-        const cat = await ensureSasLists();
-        if (!cat.rows.length) { showAlert('Brak katalogu SAS w chmurze - zaloguj się albo wgraj plik sasCatalog.json.'); return; }
-        const links = (pricing.sas = pricing.sas || {});
-        links.hardware = links.hardware || {};
-        let n = 0;
-        modal.querySelectorAll('.kosztorys-hw-price').forEach(input => {
-            if (parseFloat(input.value) > 0) return; // cena wpisana ręcznie zostaje
-            const name = input.getAttribute('data-name');
-            const list = hardwareSasRows(cat.rows, links.hardware, name);
-            if (!list) return;
-            links.hardware[name] = linkFromRows(list);
-            input.value = String(linkPrice(list));
-            const field = [...modal.querySelectorAll('.kosztorys-sas[data-kind=hardware]')].find(x => x.dataset.key === name);
-            if (field) { field.value = linkLabel(list); field.dataset.linked = links.hardware[name]; }
-            n++;
-        });
-        recalc();
-        showAlert(n ? `Wpisano ceny SAS dla ${n} pozycji okuć (bez ceny). Pozostałe uzupełnij polem „Szukaj w bazie SAS”.` : 'Brak okuć bez ceny, które dałoby się dobrać z katalogu SAS.');
+    // Katalog Heban (core/hebanCatalog.js) - na razie tylko wgrywanie do chmury i stan; ceny w kosztorysie w kolejnym etapie.
+    function showHebanStatus(cat) {
+        const el = modal.querySelector('#kosztorys-heban-status');
+        if (el) el.textContent = cat.rows.length
+            ? `Katalog Heban: ${cat.rows.length} pozycji, z ${cat.date.split('-').reverse().join('.')}`
+            : 'Katalog Heban: brak w chmurze (zaloguj się albo wgraj plik hebanCatalog.json)';
+    }
+    loadHebanCatalog().then(showHebanStatus);
+    modal.querySelector('#kosztorys-heban-upload').addEventListener('click', () => modal.querySelector('#kosztorys-heban-file').click());
+    modal.querySelector('#kosztorys-heban-file').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        e.target.value = '';
+        if (!file) return;
+        const cat = parseHebanCatalog(await file.text());
+        if (!cat) { showAlert('To nie jest plik katalogu Heban (hebanCatalog.json ze skryptu scripts/heban/buduj.js).'); return; }
+        if (!(await saveHebanCatalogToCloud(cat))) return;
+        resetHebanCatalog();
+        showHebanStatus(cat);
+        showAlert(`✅ Wgrano katalog Heban: ${cat.rows.length} pozycji.`);
     });
     function ensureSasLists() {
         if (!sasReady) sasReady = loadSasCatalog().then(cat => {
@@ -436,14 +539,224 @@ export function mountKosztorys(root) {
                 if (price == null) return;
                 links[kind][key] = row[0];
                 input.value = sasLabel(row);
-                const sel = kind === 'materials' ? '.kosztorys-mat-price' : '.kosztorys-hw-price';
-                const attr = kind === 'materials' ? 'data-cat' : 'data-name';
-                const priceInput = [...modal.querySelectorAll(sel)].find(el => el.getAttribute(attr) === key);
+                const priceInput = priceInputFor(kind, key);
                 if (priceInput) priceInput.value = String(price);
                 recalc();
+                if (kind === 'hardware') renderCompare();
             });
         });
     }
+
+    // --- Heban: pola wyszukiwania przy płytach i okuciach, dobór okuć, porównanie z SAS ---
+    // Powiązanie w pricing.heban = { materials: { kategoria: kod }, hardware: { nazwa: „kod×ilość|kod×ilość” } }.
+    function hebanFieldHtml(kind, key) {
+        const list = kind === 'materials' ? 'kosztorys-heban-boards' : 'kosztorys-heban-all';
+        const linked = ((pricing.heban || {})[kind] || {})[key] || '';
+        return `<div><input type="text" class="input kosztorys-heban" list="${list}" data-kind="${kind}" data-key="${escapeHtml(key)}" data-linked="${escapeHtml(linked)}" value="${escapeHtml(linked)}" placeholder="Szukaj w bazie Heban…"></div>`;
+    }
+
+    let hebanReady = null;
+    function ensureHebanLists() {
+        if (!hebanReady) hebanReady = loadHebanCatalog().then(cat => {
+            if (!cat.rows.length) hebanReady = null; // spróbuj ponownie po zalogowaniu / wgraniu
+            const opts = (rows) => rows.map(r => `<option value="${escapeHtml(hebanLabel(r))}">`).join('');
+            modal.querySelector('#kosztorys-heban-all').innerHTML = opts(cat.rows);
+            modal.querySelector('#kosztorys-heban-boards').innerHTML = opts(cat.rows.filter(hebanIsBoard));
+            return cat;
+        });
+        return hebanReady;
+    }
+
+    function hebanLinks(kind) {
+        const links = (pricing.heban = pricing.heban || {});
+        return (links[kind] = links[kind] || {});
+    }
+
+    function bindHebanFields(container) {
+        const fields = [...container.querySelectorAll('.kosztorys-heban')];
+        if (fields.some(f => f.dataset.linked)) ensureHebanLists().then(cat => fields.forEach(f => {
+            if (!f.dataset.linked) return;
+            if (f.dataset.kind === 'materials') { const r = hebanByCode(cat.rows, f.dataset.linked); if (r) f.value = hebanLabel(r); return; }
+            const list = hebanRowsFromLink(cat.rows, f.dataset.linked);
+            if (list) f.value = hebanLinkLabel(list);
+        }));
+        fields.forEach(input => {
+            input.addEventListener('focus', ensureHebanLists, { once: true });
+            input.addEventListener('change', async () => {
+                const cat = await ensureHebanLists();
+                const { kind, key } = input.dataset;
+                const links = hebanLinks(kind);
+                if (!input.value.trim()) { delete links[key]; recalc(); if (kind === 'hardware') renderCompare(); return; }
+                const row = hebanFromText(cat.rows, input.value);
+                if (!row) return;
+                const price = kind === 'materials' ? hebanPricePerM2(row) : row[3];
+                if (price == null) return;
+                links[key] = kind === 'materials' ? row[0] : hebanLinkFromRows([row]);
+                input.value = hebanLabel(row);
+                const priceInput = priceInputFor(kind, key);
+                if (priceInput) priceInput.value = String(price);
+                recalc();
+                if (kind === 'hardware') renderCompare();
+            });
+        });
+    }
+
+    // „Dobierz ceny z hurtowni”: płyty z hurtowni, która ma dany dekor (core/boardMatch.js: Egger / Woodeco - SAS,
+    // Swiss Krono - Heban, brak w obu - cena zostaje), okucia wszystkie z wybranej hurtowni (pricing.hardwareSource).
+    // Pozycja wybrana wcześniej polem wyszukiwania (powiązanie) ma pierwszeństwo - dostaje tylko aktualną cenę.
+    const hwSourceSel = modal.querySelector('#kosztorys-hw-source');
+    hwSourceSel.addEventListener('change', () => { pricing.hardwareSource = hwSourceSel.value; scheduleCheckpoint(); });
+    modal.querySelector('#kosztorys-auto').addEventListener('click', async () => {
+        const [sas, heb] = await Promise.all([ensureSasLists(), ensureHebanLists()]);
+        if (!sas.rows.length && !heb.rows.length) { showAlert('Brak katalogów SAS i Heban w chmurze - zaloguj się albo wgraj pliki katalogów.'); return; }
+        const cp = state.project.cutPlan || {};
+        const sheetArea = ((+cp.sheetW || 2800) * (+cp.sheetH || 2070)) / 1e6;
+        const sasMat = ((pricing.sas = pricing.sas || {}).materials = pricing.sas.materials || {});
+        const hebMat = hebanLinks('materials');
+        const boards = { sas: 0, heban: 0, missing: [] };
+        // key = klucz powiązania (kategoria albo „Front:<id>”), label = dekor / płyta do dopasowania
+        const priceBoard = (input, key, label, shownName) => {
+            let pick;
+            const sasRow = sasByIndex(sas.rows, sasMat[key]), hebRow = hebanByCode(heb.rows, hebMat[key]);
+            if (sasRow) pick = { src: 'sas', row: sasRow, pricePerM2: sasPricePerM2(sasRow, sheetArea) };
+            else if (hebRow) pick = { src: 'heban', row: hebRow, pricePerM2: hebanPricePerM2(hebRow) };
+            else pick = pickBoard(sas.rows, heb.rows, label, { sheetArea });
+            if (!pick || pick.pricePerM2 == null) { boards.missing.push(shownName); return; }
+            if (pick.src === 'sas') { sasMat[key] = pick.row[0]; delete hebMat[key]; } else { hebMat[key] = pick.row[0]; delete sasMat[key]; }
+            input.value = String(pick.pricePerM2);
+            boards[pick.src]++;
+        };
+        modal.querySelectorAll('.kosztorys-mat-price').forEach(input => {
+            const cat = input.getAttribute('data-cat');
+            priceBoard(input, cat, categoryDecor(cat, state.project), cat);
+        });
+        // Fronty: płyta z nazwy materiału (np. „H1386 ST40 18mm”) albo „Płyta formatek” (lakier = MDF W908) - sama płyta,
+        // lakierowanie jest w Lakierni.
+        modal.querySelectorAll('.kosztorys-front-mat-price').forEach(input => {
+            const mat = pricing.frontMaterials.find(m => m.id === input.getAttribute('data-material-id'));
+            if (mat) priceBoard(input, 'Front:' + mat.id, frontMaterialBoard(mat) || mat.name, `Front: ${mat.name}`);
+        });
+        const src = hwSourceSel.value === 'heban' ? 'heban' : 'sas';
+        pricing.hardwareSource = src;
+        const cat = src === 'sas' ? sas : heb;
+        const opts = drawerOptions(pricing);
+        const hwLinks = src === 'sas' ? ((pricing.sas.hardware = pricing.sas.hardware || {})) : hebanLinks('hardware');
+        let hwFound = 0;
+        const hwMissing = [];
+        modal.querySelectorAll('.kosztorys-hw-price').forEach(input => {
+            const name = input.getAttribute('data-name');
+            const list = !cat.rows.length ? null : src === 'sas' ? hardwareSasRows(cat.rows, hwLinks, name, opts) : hardwareHebanRows(cat.rows, hwLinks, name, opts);
+            if (!list) { hwMissing.push(name); return; }
+            hwLinks[name] = src === 'sas' ? linkFromRows(list) : hebanLinkFromRows(list);
+            input.value = String(src === 'sas' ? linkPrice(list) : hebanLinkPrice(list));
+            hwFound++;
+        });
+        recalc();
+        renderMaterialRows();
+        renderHardwareRows();
+        const srcName = src === 'sas' ? 'SAS' : 'Heban';
+        const list = (names) => names.map(n => `• ${n}`).join('\n');
+        showAlert(`Płyty: ${boards.sas + boards.heban} z ${boards.sas + boards.heban + boards.missing.length} (SAS ${boards.sas}, Heban ${boards.heban}).`
+            + (boards.missing.length ? `\nBez ceny (brak w obu hurtowniach albo brak dekoru):\n${list(boards.missing)}` : '')
+            + `\n\nOkucia z ${srcName}: ${hwFound} z ${hwFound + hwMissing.length}.`
+            + (hwMissing.length ? `\nNie ma w ${srcName} (cena bez zmian - wpisz albo wybierz polem wyszukiwania):\n${list(hwMissing)}` : ''));
+    });
+
+    // Pod każdym okuciem: cena z SAS i z Hebanu (powiązanie albo automatyczny dobór), tańsza wyróżniona; kliknięcie
+    // wpisuje cenę do pola.
+    let compareRun = 0;
+    async function renderCompare() {
+        const run = ++compareRun;
+        const [sas, heb] = await Promise.all([loadSasCatalog(), loadHebanCatalog()]);
+        if (run !== compareRun) return;
+        const opts = drawerOptions(pricing);
+        const cp = state.project.cutPlan || {};
+        const sheetArea = ((+cp.sheetW || 2800) * (+cp.sheetH || 2070)) / 1e6;
+        const near = (x, y) => x != null && Math.abs(x - y) < 0.005;
+        const links = (src, kind) => ((pricing[src] || {})[kind]) || {}; // tylko odczyt - samo otwarcie nie zmienia projektu
+        // Oferty obu hurtowni dla wiersza - ta sama zasada dla płyt, frontów i okuć: pozycja wybrana polem wyszukiwania,
+        // inaczej automatyczny dobór. { sas, heban } z { price, link } albo null.
+        const offersFor = (kind, key) => {
+            if (kind === 'hardware') {
+                const sl = sas.rows.length ? hardwareSasRows(sas.rows, links('sas', 'hardware'), key, opts) : null;
+                const hl = heb.rows.length ? hardwareHebanRows(heb.rows, links('heban', 'hardware'), key, opts) : null;
+                return { sas: sl && { price: linkPrice(sl), link: linkFromRows(sl) }, heban: hl && { price: hebanLinkPrice(hl), link: hebanLinkFromRows(hl) } };
+            }
+            const sRow = sasByIndex(sas.rows, links('sas', 'materials')[key]);
+            const hRow = hebanByCode(heb.rows, links('heban', 'materials')[key]);
+            const mat = key.startsWith('Front:') ? pricing.frontMaterials.find(m => m.id === key.slice(6)) : null;
+            const label = mat ? (frontMaterialBoard(mat) || mat.name) : categoryDecor(key, state.project);
+            const auto = (!sRow || !hRow) ? boardOffers(sas.rows, heb.rows, label, { sheetArea }) : { sas: null, heban: null };
+            const so = sRow ? { row: sRow, pricePerM2: sasPricePerM2(sRow, sheetArea) } : auto.sas;
+            const ho = hRow ? { row: hRow, pricePerM2: hebanPricePerM2(hRow) } : auto.heban;
+            return { sas: so && so.pricePerM2 != null && { price: so.pricePerM2, link: so.row[0] }, heban: ho && ho.pricePerM2 != null && { price: ho.pricePerM2, link: ho.row[0] } };
+        };
+        modal.querySelectorAll('.kz-compare').forEach(cell => {
+            const { kind, key } = cell.dataset;
+            const input = priceInputFor(kind, key);
+            const o = offersFor(kind, key);
+            const price = input ? parseFloat(input.value) || 0 : 0;
+            // źródło ceny w wierszu: hurtownia, której cena = cena w polu; inaczej „ręcznie” / „brak ceny”
+            const badge = [...modal.querySelectorAll(`.kz-src[data-kind="${kind}"]`)].find(x => x.dataset.key === key);
+            if (badge) {
+                const [text, cls] = !(price > 0) ? ['brak ceny', 'badge-warn'] : near(o.sas && o.sas.price, price) ? ['SAS', 'badge-info']
+                    : near(o.heban && o.heban.price, price) ? ['Heban', 'badge-success'] : ['ręcznie', ''];
+                badge.textContent = text;
+                badge.className = `badge kz-src ${cls}`;
+            }
+            const offers = [o.sas && { src: 'sas', name: 'SAS', ...o.sas }, o.heban && { src: 'heban', name: 'Heban', ...o.heban }].filter(Boolean);
+            if (!offers.length) { cell.textContent = 'Brak w katalogach SAS i Heban - wybierz pozycję polem wyszukiwania albo wpisz cenę.'; return; }
+            const min = Math.min(...offers.map(x => x.price));
+            const unit = kind === 'materials' ? ' / m²' : '';
+            const btns = offers.map((x, i) => `<button type="button" class="kosztorys-pick" data-i="${i}" title="Wpisz tę cenę">${x.name}: ${x.price === min && offers.length > 1 ? `<b>${formatPLN(x.price)}</b>` : formatPLN(x.price)}${unit}</button>`).join(' · ');
+            const diff = offers.length > 1 && offers[0].price !== offers[1].price
+                ? ` · taniej ${offers.find(x => x.price === min).name} o ${formatPLN(Math.abs(offers[0].price - offers[1].price))}` : '';
+            cell.innerHTML = 'Ceny w hurtowniach: ' + btns + diff;
+            cell.querySelectorAll('.kosztorys-pick').forEach(btn => btn.addEventListener('click', () => {
+                const x = offers[+btn.dataset.i];
+                if (!input) return;
+                ((pricing[x.src] = pricing[x.src] || {})[kind] = pricing[x.src][kind] || {})[key] = x.link; // wybór zapamiętany jak z pola wyszukiwania
+                input.value = String(x.price);
+                const field = [...modal.querySelectorAll(`.kosztorys-${x.src}[data-kind="${kind}"]`)].find(f => f.dataset.key === key);
+                if (field) { field.value = x.link; field.dataset.linked = x.link; }
+                recalc();
+            }));
+        });
+    }
+
+    // Opcje szuflad Blum (pricing.blumDrawer, core/blumDrawer.js). Przy zmianie komplety szuflad z ceną dobraną
+    // automatycznie z SAS / Hebanu dostają cenę dla nowych opcji (cena wpisana ręcznie zostaje).
+    modal.querySelectorAll('#kosztorys-blum-opts select').forEach(sel => sel.addEventListener('change', async () => {
+        const before = drawerOptions(pricing);
+        const next = { ...before };
+        modal.querySelectorAll('#kosztorys-blum-opts select').forEach(x => { next[x.dataset.opt] = x.dataset.opt === 'kg' ? Number(x.value) : x.value; });
+        pricing.blumDrawer = drawerOptions({ blumDrawer: next });
+        const after = pricing.blumDrawer;
+        const [sas, heb] = await Promise.all([loadSasCatalog(), loadHebanCatalog()]);
+        const sources = [
+            { cat: sas, links: ((pricing.sas = pricing.sas || {}).hardware = pricing.sas.hardware || {}), suggest: sasSuggest, toLink: linkFromRows, price: linkPrice },
+            { cat: heb, links: hebanLinks('hardware'), suggest: hebanSuggest, toLink: hebanLinkFromRows, price: hebanLinkPrice },
+        ];
+        modal.querySelectorAll('.kosztorys-hw-price').forEach(input => {
+            const name = input.getAttribute('data-name');
+            if (!parseDrawerKit(name)) return;
+            const cur = parseFloat(input.value) || 0;
+            let newPrice = null;
+            sources.forEach(src => {
+                if (!src.cat.rows.length) return;
+                const old = src.suggest(src.cat.rows, name, before);
+                if (!old) return;
+                const autoLinked = src.links[name] === src.toLink(old);
+                if (src.links[name] && !autoLinked) return; // pozycja wybrana ręcznie w polu wyszukiwania
+                const nw = src.suggest(src.cat.rows, name, after);
+                if (autoLinked) { if (nw) src.links[name] = src.toLink(nw); else delete src.links[name]; }
+                if (newPrice == null && nw && Math.abs(src.price(old) - cur) < 0.005) newPrice = src.price(nw);
+            });
+            if (newPrice != null) input.value = String(newPrice);
+        });
+        recalc();
+        renderHardwareRows();
+    }));
 
     modal.querySelector('#kosztorys-price-save').addEventListener('click', async () => {
         const ok = await showCustomDialog('confirm', 'Zapisz jako domyślne ceny', 'Nadpisać zapisaną bazę cen aktualnym cennikiem tego projektu?', '', 'Zapisz', 'Anuluj');

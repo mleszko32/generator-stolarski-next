@@ -298,9 +298,34 @@ export const HELP_SECTIONS = [
       <p>Przy materiale frontu pole <b>Kolor (RAL / NCS)</b> podpowiada całą paletę RAL Classic (nazwy po polsku
       i angielsku) i cały wzornik NCS 1950. Kod NCS spoza wzornika albo nieistniejący dostaje ostrzeżenie -
       lakiernia może nie mieć na niego receptury.</p>
-      <p>Pole <b>Szukaj w bazie SAS</b> pod każdą płytą i okuciem przeszukuje cały asortyment SAS (indeks albo
-      fragment nazwy) i wstawia cenę po Twoim rabacie, brutto. Przy płytach liczy cenę za m² z ceny arkusza. <b>Dobierz ceny okuć
-      z SAS</b> wpisuje ceny okuć bez ceny (zawiasy z prowadnikami, zestawy szuflad Blum, MOVENTO, nóżki).</p>
+      <p>Układ: na górze pasek z sumą (koszty, netto, brutto) - zostaje widoczny przy przewijaniu. Pod nim przycisk
+      <b>Dobierz ceny z hurtowni</b> i <b>Cenniki i katalogi</b> (wgrywanie katalogów SAS / Heban i baza cen). Dalej zwijane
+      sekcje z sumą w nagłówku: Płyty i cięcie, Okucia i akcesoria (w grupach: szuflady, zawiasy i podnośniki, nóżki / złącza /
+      drążki, okleina, inne), Robocizna, Marża i VAT. Kolumna <b>Źródło</b> mówi, skąd jest cena: SAS, Heban, ręcznie albo
+      „brak ceny”. Ołówek na końcu każdego wiersza - płyty, frontu i okucia - działa tak samo: rozwija
+      „Szukaj w bazie SAS”, „Szukaj w bazie Heban” i ceny tej pozycji w obu hurtowniach (kliknięcie wpisuje cenę). Wiersze
+      „Front: …” to materiały frontów z cennika frontów; dodatkowy przycisk ⚙ przy nich pokazuje nazwę materiału, kolor
+      RAL / NCS, płytę formatek i przypisanie do frontów dolnych / górnych. Dobór cen wycenia front płytą z nazwy (np. „H1386 ST40 18mm”) albo z pola „Płyta formatek”; front
+      lakierowany to sama płyta MDF (W908), a lakierowanie liczysz w „Lakierni”.</p>
+      <p>Pole <b>Szukaj w bazie SAS</b> (pod ołówkiem przy płycie i okuciu) przeszukuje cały asortyment SAS (indeks albo
+      fragment nazwy) i wstawia cenę po Twoim rabacie, brutto. Przy płytach liczy cenę za m² z ceny arkusza.</p>
+      <p><b>Dobierz ceny z hurtowni</b> (nad tabelą płyt) wpisuje ceny za jednym kliknięciem. Płyty bierze z hurtowni, która ma
+      dany dekor: Egger, Woodeco i Kronospan z SAS, Swiss Krono z Hebanu (gdy tam go nie ma - z drugiej hurtowni; dekor bez
+      producenta - z tańszej). Dopasowuje kod dekoru, grubość, strukturę i rodzaj płyty (HDF / MDF), pomija II gatunek, płyty
+      trudnopalne i wilgocioodporne, PerfectSense (chyba że dekor je ma w nazwie), blaty i laminaty. Płyta, której nie ma w
+      żadnej hurtowni, zostaje bez zmian. Okucia i akcesoria bierze wszystkie z jednej hurtowni - wybierz „wszystkie z SAS” albo
+      „wszystkie z Hebanu”. Na koniec pokazuje, czego nie znalazł. Pozycja wybrana wcześniej polem wyszukiwania zostaje
+      (dostaje tylko aktualną cenę).</p>
+      <p><b>Wgraj katalog Heban</b> zapisuje w chmurze cennik hurtowni Heban (plik hebanCatalog.json ze skryptu
+      scripts/heban) - ceny kontrahenta brutto, płyty w zł/m². Obok przycisku widać, ile pozycji ma katalog i z jakiego dnia.
+      Pole <b>Szukaj w bazie Heban</b> pod płytą i okuciem działa jak pole SAS (płyty Hebanu mają cenę wprost za m²).
+      Szufladę MERIVOBOX z Hebanu program liczy z części (boki, prowadnica,
+      mocowania frontu, zaślepki, uchwyt ścianki tylnej, przy wysokości E reling albo Boxcap), bo Heban nie ma gotowych zestawów.
+      Pod każdym okuciem widać cenę z SAS i z Hebanu - tańsza jest pogrubiona, kliknięcie wpisuje ją do pola.</p>
+      <p><b>Szuflady Blum</b> (wiersz nad tabelą okuć): kolor (jedwabiście biały / szary indium / antracyt), udźwig prowadnic
+      40 lub 70 kg, wysokość E z relingiem albo z Boxcap i mocowanie frontu na wkręty albo Inserta. Domyślnie: biały, 40 kg,
+      reling, wkręty. Dotyczy doboru z obu hurtowni i koszyka SAS; przy zmianie komplety z ceną dobraną automatycznie
+      dostają cenę dla nowych opcji, cena wpisana ręcznie zostaje.</p>
       <p><b>Baza cen</b> (przyciski na górze kosztorysu) zapamiętuje ceny z jednego projektu, żeby
       nałożyć je na kolejny bez przepisywania.</p>
       <p>Karta <b>Oferta dla klienta</b> drukuje ofertę z zakresem, ceną i (opcjonalnie) zdjęciem

@@ -9,6 +9,8 @@
 // materials: { kategoria płyty: indeks } } - cena przepisana do pola, powiązanie tylko do podpowiedzi.
 // Czyste funkcje (poza loadSasCatalog / resetSasCatalog).
 
+import { BLUM_DRAWER_DEFAULTS, drawerOptions, parseDrawerKit } from "./blumDrawer.js";
+
 let cache = null;
 
 // { date, rows } z chmury (raz pobrane - z pamięci); rows puste, gdy katalogu brak albo brak dostępu.
@@ -95,30 +97,41 @@ function withPer(list, per) {
 const PACK_SIZE = (r) => Number((r[1].match(/Opakowanie\s+(\d+)\s*szt/i) || [])[1]) || 1;
 
 const DRAWER_SET_NAMES = { ANTARO: "TANDEMBOX ANTARO", MERIVOBOX: "MERIVOBOX", LEGRABOX: "LEGRABOX" };
+const COLOR_WORDS = { B: /bia[łl]/i, S: /indium/i, A: /antracyt|orion/i };
 const HINGE_STD = "Zawias meblowy + prowadnik krzyżakowy (puszka 35mm)";
 
 // Pozycje SAS na JEDNĄ sztukę / komplet okucia z listy: [wiersz, ...] (każdy × 1) albo null, gdy brak reguły
-// lub czegoś w katalogu. Nazwy okuć: engine/hardware.js, drawerHardwareKey, moventoRunnerName.
-export function sasSuggest(rows, hwName) {
+// lub czegoś w katalogu. opts = opcje szuflad Blum (pricing.blumDrawer). Nazwy okuć: engine/hardware.js, drawerHardwareKey, moventoRunnerName.
+export function sasSuggest(rows, hwName, opts = BLUM_DRAWER_DEFAULTS) {
   const name = String(hwName);
   const all = (list) => (list.every(Boolean) ? list : null);
   const word = (s) => new RegExp(`(^|[\\s(])${s}([\\s,)]|$)`);
 
-  // Komplet szuflady metalowej -> gotowy zestaw SAS „Szuflada Blum <system> <kolor> <NL> <wys.> …”
-  let m = name.match(/^Komplet szuflady \(([A-Z_0-9]+) - H:([A-Z]) L-(\d+)\)/);
-  if (m) {
-    const sys = DRAWER_SET_NAMES[m[1]];
+  // Komplet szuflady metalowej -> gotowy zestaw SAS „Szuflada Blum <system> <kolor> <NL> <wys.> …” wg opcji szuflad
+  // (core/blumDrawer.js: kolor, 40 / 70 kg, wys. E z relingiem albo Boxcap, wkręty / Inserta).
+  const kit = parseDrawerKit(name);
+  if (kit) {
+    const sys = DRAWER_SET_NAMES[kit.system];
     if (!sys) return null;
-    // domyślnie: zwykła (nie wewnętrzna), bez TIP-ON, na wkręty, 40 kg; wysokość E w MERIVOBOX z relingiem
-    const penalty = (r) => [/Wewn[eę]trzn/i, /TIP-ON/i, /Inserta/i, /70\s?kg/i, /Boxcap/i, /Boxcover/i, /szk[łl]/i]
-      .reduce((s, re) => s + (re.test(r[1]) ? 1 : 0), 0);
+    const o = drawerOptions({ blumDrawer: opts });
+    const has = (re) => (r) => re.test(r[1]);
+    const miss = (test, want) => (r) => (test(r) === want ? 0 : 1);
+    const isBoxcap = has(/Boxcap/i);
+    const penalties = [
+      (r) => [/Wewn[eę]trzn/i, /TIP-ON/i, /Boxcover/i, /szk[łl]/i].reduce((s, re) => s + (re.test(r[1]) ? 10 : 0), 0),
+      miss(has(/Inserta/i), o.fix === "I"),
+      miss(has(/70\s?kg/i), o.kg === 70),
+      (r) => (kit.height === "E" ? miss(isBoxcap, o.eVariant === "boxcap")(r) : (isBoxcap(r) ? 1 : 0)),
+      miss(has(COLOR_WORDS[o.color]), true),
+    ];
+    const penalty = (r) => penalties.reduce((s, f) => s + f(r), 0);
     const cand = rows.filter((r) => /^Szuflada Blum /i.test(r[1]) && r[1].toUpperCase().includes(sys)
-      && (sys !== "TANDEMBOX" || !/ANTARO/i.test(r[1])) && word(m[3]).test(r[1]) && word(m[2]).test(r[1]));
-    const best = cand.sort((a, b) => penalty(a) - penalty(b) || ((/bia[łl]/i.test(a[1]) ? 0 : 1) - (/bia[łl]/i.test(b[1]) ? 0 : 1)) || a[3] - b[3])[0];
+      && (sys !== "TANDEMBOX" || !/ANTARO/i.test(r[1])) && word(String(kit.nl)).test(r[1]) && word(kit.height).test(r[1]));
+    const best = cand.sort((a, b) => penalty(a) - penalty(b) || a[3] - b[3])[0];
     return best ? [best] : null;
   }
   // Prowadnice MOVENTO (para) + sprzęgła lewe i prawe
-  m = name.match(/^Prowadnice Blum MOVENTO (76\dH) .*NL-(\d+)/);
+  let m = name.match(/^Prowadnice Blum MOVENTO (76\dH) .*NL-(\d+)/);
   if (m) {
     const code = `${m[1]}${Number(m[2]) * 10}`;
     return all([

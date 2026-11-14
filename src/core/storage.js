@@ -456,46 +456,52 @@ export async function deleteProjectFromCloud(projectId) {
   }
 }
 
-// KATALOG SAS (core/sasCatalog.js): kolekcja sasCatalog - dokument "meta" { date, count, parts } i części
-// "part-0".. z wierszami jako JSON (tablica tablic, której Firestore nie przyjmuje wprost; limit 1 MB na dokument).
-const SAS_PART_ROWS = 1500;
+// KATALOGI HURTOWNI (core/sasCatalog.js, core/hebanCatalog.js): kolekcja sasCatalog / hebanCatalog - dokument "meta"
+// { date, count, parts } i części "part-0".. z wierszami jako JSON (tablica tablic, której Firestore nie przyjmuje
+// wprost; limit 1 MB na dokument).
+const CATALOG_PART_ROWS = 1500;
 
-export async function saveSasCatalogToCloud(catalog) {
+async function saveCatalogToCloud(coll, label, catalog) {
   if (!requireOwner()) return false;
   try {
-    const parts = Math.ceil(catalog.rows.length / SAS_PART_ROWS);
-    const old = await getDoc(doc(db, "sasCatalog", "meta"));
+    const parts = Math.ceil(catalog.rows.length / CATALOG_PART_ROWS);
+    const old = await getDoc(doc(db, coll, "meta"));
     const oldParts = old.exists() ? old.data().parts || 0 : 0;
     const batch = writeBatch(db);
     for (let i = 0; i < parts; i++) {
-      batch.set(doc(db, "sasCatalog", "part-" + i), { rows: JSON.stringify(catalog.rows.slice(i * SAS_PART_ROWS, (i + 1) * SAS_PART_ROWS)) });
+      batch.set(doc(db, coll, "part-" + i), { rows: JSON.stringify(catalog.rows.slice(i * CATALOG_PART_ROWS, (i + 1) * CATALOG_PART_ROWS)) });
     }
-    for (let i = parts; i < oldParts; i++) batch.delete(doc(db, "sasCatalog", "part-" + i));
-    batch.set(doc(db, "sasCatalog", "meta"), { date: catalog.date, count: catalog.rows.length, parts, uploadedAt: new Date().toISOString() });
+    for (let i = parts; i < oldParts; i++) batch.delete(doc(db, coll, "part-" + i));
+    batch.set(doc(db, coll, "meta"), { date: catalog.date, count: catalog.rows.length, parts, uploadedAt: new Date().toISOString() });
     await batch.commit();
     return true;
   } catch (error) {
-    console.error("Błąd zapisu katalogu SAS:", error);
-    showAlert("❌ Nie udało się zapisać katalogu SAS w chmurze.");
+    console.error(`Błąd zapisu katalogu ${label}:`, error);
+    showAlert(`❌ Nie udało się zapisać katalogu ${label} w chmurze.`);
     return false;
   }
 }
 
 // { date, rows } albo null (brak katalogu w chmurze / brak dostępu - bez komunikatu, gdy niezalogowany).
-export async function loadSasCatalogFromCloud() {
+async function loadCatalogFromCloud(coll, label) {
   if (!isOwner()) return null;
   try {
-    const meta = await getDoc(doc(db, "sasCatalog", "meta"));
+    const meta = await getDoc(doc(db, coll, "meta"));
     if (!meta.exists()) return null;
     const { date, parts } = meta.data();
-    const snaps = await Promise.all(Array.from({ length: parts }, (_, i) => getDoc(doc(db, "sasCatalog", "part-" + i))));
+    const snaps = await Promise.all(Array.from({ length: parts }, (_, i) => getDoc(doc(db, coll, "part-" + i))));
     const rows = snaps.flatMap((sn) => (sn.exists() ? JSON.parse(sn.data().rows) : []));
     return { date, rows };
   } catch (error) {
-    console.error("Błąd odczytu katalogu SAS:", error);
+    console.error(`Błąd odczytu katalogu ${label}:`, error);
     return null;
   }
 }
+
+export const saveSasCatalogToCloud = (catalog) => saveCatalogToCloud("sasCatalog", "SAS", catalog);
+export const loadSasCatalogFromCloud = () => loadCatalogFromCloud("sasCatalog", "SAS");
+export const saveHebanCatalogToCloud = (catalog) => saveCatalogToCloud("hebanCatalog", "Heban", catalog);
+export const loadHebanCatalogFromCloud = () => loadCatalogFromCloud("hebanCatalog", "Heban");
 
 // ZDJĘCIA DEKORÓW (core/decorTexture.js): kolekcja decorTextures, jeden dokument na dekor
 // { key, name, dataUrl, widthMm, grain } - wspólne dla wszystkich projektów.

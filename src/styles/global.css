@@ -612,10 +612,44 @@ details.menu[open] > summary { border-color: var(--accent); color: var(--accent)
 .cost-table th.num { text-align: right; }
 .cost-input { display: inline-flex; align-items: center; gap: 4px; }
 .cost-input .input { width: 76px; text-align: right; padding: 4px 6px; }
-.kosztorys-sas { width: 100%; max-width: 440px; margin-top: 4px; padding: 3px 6px; font-size: var(--fs-xs); }
+.kosztorys-sas, .kosztorys-heban { width: 100%; max-width: 440px; margin-top: 4px; padding: 3px 6px; font-size: var(--fs-xs); }
 .kosztorys-mat-bulk-row td { padding: 0 8px 8px 0; font-size: var(--fs-xs); color: var(--text-secondary); border-bottom: 1px solid #f1f5f9; }
-.kosztorys-mat-bulk { background: none; border: none; padding: 0; font-size: var(--fs-xs); color: var(--accent); cursor: pointer; text-decoration: underline; }
-.kosztorys-mat-bulk:hover { color: var(--accent-hover); }
+.kosztorys-mat-bulk, .kosztorys-pick { background: none; border: none; padding: 0; font-size: var(--fs-xs); color: var(--accent); cursor: pointer; text-decoration: underline; }
+.kosztorys-mat-bulk:hover, .kosztorys-pick:hover { color: var(--accent-hover); }
+/* Kosztorys - układ: pasek sum, pasek narzędzi, zwijane sekcje, grupy okuć, wybór z cennika pod wierszem (✎) */
+.kz-sticky {
+  position: sticky; top: -16px; z-index: 5; display: flex; gap: 20px; justify-content: flex-end; align-items: baseline;
+  margin-bottom: 12px; padding: 10px 14px; background: var(--surface-panel); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg); box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+}
+.kz-total { display: flex; gap: 6px; align-items: baseline; font-size: var(--fs-md); color: var(--text-secondary); }
+.kz-total b { color: var(--text-primary); font-size: var(--fs-lg); }
+.kz-total-main b { color: var(--color-success); font-size: var(--fs-xl); font-weight: 800; }
+.kz-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+.kz-inline { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); color: var(--text-secondary); }
+.input.input-sm { width: auto; padding: 3px 6px; font-size: var(--fs-sm); }
+.kz-tools { margin-left: auto; font-size: var(--fs-md); }
+.kz-tools > summary { cursor: pointer; color: var(--accent); list-style: none; }
+.kz-tools > summary::before { content: "⚙ "; }
+.kz-tools[open] { flex-basis: 100%; margin-left: 0; }
+.kz-tools-body { margin-top: 8px; padding: 10px 12px; background: var(--surface-faint); border: 1px solid var(--border-soft); border-radius: var(--radius-lg); display: flex; flex-direction: column; gap: 8px; }
+.kz-tools-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.kz-tools-row > b { min-width: 120px; font-size: var(--fs-sm); color: var(--text-secondary); }
+.kz-sec { border: 1px solid var(--border-soft); border-radius: var(--radius-lg); margin-bottom: 12px; background: var(--surface-panel); }
+.kz-sec > summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; cursor: pointer; list-style: none; }
+.kz-sec > summary::-webkit-details-marker { display: none; }
+.kz-sec-title { font-size: var(--fs-sm); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-strong); }
+.kz-sec-title::before { content: "▸ "; color: var(--text-secondary); }
+.kz-sec[open] .kz-sec-title::before { content: "▾ "; }
+.kz-sec-sum { font-weight: 700; color: var(--text-primary); font-size: var(--fs-md); }
+.kz-sec-body { padding: 0 14px 12px; }
+.kz-table td:nth-child(2) { width: 1%; white-space: nowrap; }
+.kz-table td:last-child { width: 1%; white-space: nowrap; }
+.kz-group td { padding-top: 14px; font-weight: 700; font-size: var(--fs-sm); color: var(--text-muted-strong); border-bottom: 1px solid var(--border); }
+.kz-edit-row td { background: var(--surface-faint); padding: 6px 10px 10px; }
+.kz-edit.active { color: var(--accent); }
+.kz-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; padding: 6px 10px; background: var(--surface-faint); border-radius: var(--radius); }
+.kz-opts-label { font-size: var(--fs-sm); font-weight: 600; color: var(--text-strong); margin-right: 4px; }
 .cost-summary { background: var(--surface-subtle); border-radius: var(--radius-lg); padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; }
 .cost-line { display: flex; justify-content: space-between; font-size: var(--fs-md); color: var(--text-secondary); }
 .cost-line span:last-child { color: var(--text-primary); }

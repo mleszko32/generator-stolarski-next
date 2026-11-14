@@ -5,21 +5,27 @@
 // a zakładka (bookmarklet) kliknięta na stronie sklepu dodaje pozycje przez ten sam adres co przycisk
 // „Do koszyka” (POST /pl/web/basket/add, id = nr produktu w sklepie, quantity). Zamówienie składa użytkownik.
 // Czyste funkcje.
-import { sasSuggest, rowsFromLink } from "./sasCatalog.js";
+import { sasSuggest, rowsFromLink, linkFromRows } from "./sasCatalog.js";
 
 export const BASKET_PREFIX = "GSN-SAS-KOSZYK ";
 
-// Pozycje SAS dla okucia: powiązanie z Kosztorysu (pricing.sas.hardware), inaczej automatyczny dobór.
-export function hardwareSasRows(rows, links, hwName) {
-  return rowsFromLink(rows, (links || {})[hwName]) || sasSuggest(rows, hwName);
+// Pozycje SAS dla okucia: powiązanie z Kosztorysu (pricing.sas.hardware), inaczej automatyczny dobór
+// (opts = opcje szuflad Blum, pricing.blumDrawer).
+// Powiązanie zgodne z doborem (np. zapisane przyciskiem „Dobierz ceny okuć z SAS”) zwraca dobór, bo tylko on zna
+// `per` pozycji w opakowaniach / odcinkach (konfirmaty 1/1000) - bez tego cena i ilość do koszyka byłyby za całe opakowanie.
+export function hardwareSasRows(rows, links, hwName, opts) {
+  const link = (links || {})[hwName];
+  const auto = sasSuggest(rows, hwName, opts);
+  if (link && auto && linkFromRows(auto) === link) return auto;
+  return rowsFromLink(rows, link) || auto;
 }
 
 // hardware: [{ name, qty }] z calculateProjectHardware(). Zwraca { items: [{ pid, idx, name, qty }], missing: [nazwy] }
 // - pozycje z tym samym produktem SAS są sumowane, ilość zaokrąglona w górę do całych sztuk.
-export function basketItems(hardware, rows, links) {
+export function basketItems(hardware, rows, links, opts) {
   const byPid = new Map(), missing = [];
   for (const hw of hardware) {
-    const list = hardwareSasRows(rows, links, hw.name);
+    const list = hardwareSasRows(rows, links, hw.name, opts);
     if (!list || list.some((r) => !r[5])) { missing.push(hw.name); continue; }
     const hwQty = Number(hw.qty) || 0;
     if (!hwQty) continue;

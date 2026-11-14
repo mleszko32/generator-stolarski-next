@@ -30,6 +30,7 @@ import { openCsvExport } from "./csvEditor.js";
 import { printHardwareList } from "./hardwareList.js";
 import { loadSasCatalog, linkLabel, linkPrice, stockLabel } from "../core/sasCatalog.js";
 import { hardwareSasRows, basketItems, basketText, BASKET_BOOKMARKLET } from "../core/sasBasket.js";
+import { drawerOptions } from "../core/blumDrawer.js";
 import { showAlert } from "../utils/modal.js";
 import { openTechnicalDrawing } from "./technicalDrawing.js";
 import { openDrillSheetsDialog } from "./drillSheetsPrint.js";
@@ -637,7 +638,7 @@ function renderOkucia(el) {
       const cell = el.querySelector(`[data-sas-row="${i}"]`);
       if (!cell) return;
       if (!cat.rows.length) { cell.textContent = 'brak katalogu SAS'; return; }
-      const list = hardwareSasRows(cat.rows, links, h.name);
+      const list = hardwareSasRows(cat.rows, links, h.name, drawerOptions(state.project.pricing));
       cell.textContent = list
         ? `${linkLabel(list)} · razem ${(linkPrice(list) * Math.ceil(h.qty)).toFixed(2).replace('.', ',')} zł${list.length === 1 && stockLabel(list[0]) ? ' · ' + stockLabel(list[0]) : ''}`
         : '— wybierz w Kosztorysie';
@@ -646,7 +647,7 @@ function renderOkucia(el) {
     if (!btn || !cat.rows.length) return;
     btn.disabled = false;
     btn.addEventListener('click', async () => {
-      const { items, missing } = basketItems(hw, cat.rows, links);
+      const { items, missing } = basketItems(hw, cat.rows, links, drawerOptions(state.project.pricing));
       if (!items.length) { showAlert('Żadna pozycja nie ma odpowiednika w SAS z numerem do koszyka (wgraj nowy katalog SAS).'); return; }
       try { await navigator.clipboard.writeText(basketText(items)); } catch (e) { showAlert('Nie udało się skopiować do schowka.'); return; }
       showAlert(`Skopiowano ${items.length} pozycji do koszyka SAS. Otwórz panel SAS i kliknij zakładkę „Do koszyka SAS”.`

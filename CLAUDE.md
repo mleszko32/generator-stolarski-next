@@ -588,9 +588,45 @@ Dobór okuć: `sasSuggest` (zawias = 71B3550 + 173L6100, komplet szuflady → ze
 na wkręty, 40 kg, biały, MOVENTO = prowadnice + sprzęgła T51.7601 L/P, nóżki, siłownik HK-XS wg LF, drążek fi 25 + rozety, konfirmaty + kołki,
 kody Blum w nazwie, też bez słowa „Blum”; pozycje w opakowaniach/odcinkach mają `list.per` — ułamek na sztukę okucia, z niego ilość
 do koszyka i cena); powiązanie z Kosztorysu
-(„indeks+indeks”) ma pierwszeństwo, przycisk „Dobierz ceny okuć z SAS” wpisuje ceny pozycji bez ceny. Koszyk: `core/sasBasket.js` —
+(„indeks+indeks”) ma pierwszeństwo (gdy równe doborowi, `hardwareSasRows` zwraca dobór — tylko on zna `per`), Koszyk: `core/sasBasket.js` —
 hub „Okucia i okleina” pokazuje pozycję SAS, cenę i stan, „Do koszyka SAS” kopiuje `GSN-SAS-KOSZYK [[nr produktu, ilość]]`, a zakładka
 `BASKET_BOOKMARKLET` na stronie sklepu dodaje je przez `POST /pl/web/basket/add` (zamówienie składa użytkownik).
+
+**Katalog Heban**: `core/hebanCatalog.js` (czyste, z testami) — drugi hurtownik obok SAS, ten sam wzorzec: poza gitem, w Firestore
+(kolekcja `hebanCatalog`, wspólne `saveCatalogToCloud`/`loadCatalogFromCloud` w `storage.js` dla obu katalogów, reguła w
+`firestore.rules`), wgrywany w Kosztorysie przyciskiem „Wgraj katalog Heban” z pliku `hebanCatalog.json`. Wiersz: [kod towaru,
+nazwa, jednostka, cena brutto, grupa, id artykułu]. Ceny w panelu Hebanu to już ceny kontrahenta (bez tabeli rabatów). Płyty
+Heban sprzedaje na m² — `hebanSheetsToM2(row, arkusze)` (2 × 5,796 = 11,592); `hebanBlumCode` czyta kod Blum, kolor (SW = biały,
+IG = szary indium, OG = antracyt) i stronę (LI / RE / R+L) z kodu towaru. Kody Hebanu mają w środku po kilka spacji — trzymaj je
+bez zmian (import CSV koszyka Hebanu: `Code;Quantity;Unit`), porównuj po ściśnięciu (`hebanFromText`). Nowy cennik: `scripts/heban/`
+— `odbierz.js` (serwer 127.0.0.1:8765) + `pobierz.js` wklejony w konsolę zalogowanego panelu Heban (Comarch B2B, API
+`/api/items/treeXl`, `articleListXl`, `articleFromListXl`; ok. 25 tys. pozycji, 30–40 min) + `buduj.js <katalog> <data>` →
+`hebanCatalog.json` i „Cennik Heban <data>.xlsx” (na Dysk: Meble Leszko/00 Baza, nigdy do repo). `buduj.js` pomija pozycje bez ceny
+i podmienia błędne nazwy z panelu (ta sama nazwa z obcym kodem Blum przy wielu towarach, np. „378M4502SA TANDEMBOX…” przy częściach
+Merivobox) na kod + grupę.
+Kosztorys: pole „Szukaj w bazie Heban” przy płytach (cena/m² wprost) i okuciach, powiązanie w `pricing.heban = { materials: { kategoria:
+kod }, hardware: { nazwa: "kod×ilość|kod×ilość" } }` (separator `|`, bo kody mają spacje i „+”); `hebanSuggest` (zawias 71B3550 + 173L6100,
+MOVENTO prowadnice B + sprzęgła T51.7601 L/R, kody Blum w nazwie, kod z przyrostkiem „70T3550.TLMB”, bez pozycji promocyjnych/zestawów)
+nóżka kuchenna H-xx bez klipa); pod każdym okuciem ceny z obu hurtowni (tańsza pogrubiona, klik wpisuje cenę).
+**Dobierz ceny z hurtowni** (jeden przycisk nad tabelą płyt w Kosztorysie): płyty — `core/boardMatch.js` (czyste, z testami):
+`pickBoard(sasRows, hebanRows, dekor)` dopasowuje kod dekoru (U702, HD3037, D3025, przy HDF numer „110”), grubość, rodzaj (HDF/MDF)
+i strukturę, pomija II gatunek / trudnopalne / wilgocioodporne / PerfectSense / blaty / laminaty / obrzeża (chyba że dekor je ma); hurtownia
+wg producenta (Egger, Woodeco, Kronospan - SAS; Swiss Krono - Heban; brak - druga; producent nieznany - tańsza), dekor wiersza z
+`categoryDecor` (`Korpus: …`, `Plecy: …` albo `project.materials.decors`); brak w obu = cena bez zmian. Okucia wszystkie z jednej
+hurtowni: `pricing.hardwareSource` = `sas` | `heban` (select obok przycisku). Istniejące powiązanie (pole wyszukiwania) ma pierwszeństwo.
+Układ Kosztorysu: przyklejony pasek sum (`.kz-sticky`), pasek narzędzi (dobór cen + zwijane „Cenniki i katalogi”), sekcje `<details
+class="kz-sec">` z sumą w nagłówku (stan otwarcia w localStorage `kz-open-<id>`), kolumna „Źródło” (`.kz-src`, liczona w `renderCompare`: cena
+= cena SAS / Heban / ręcznie / brak), pola wyszukiwania SAS/Heban i porównanie w wierszu `.kz-edit-row` rozwijanym ołówkiem; okucia w grupach
+z `core/costGroups.js` (`groupHardware`, czyste, z testami). Wiersz materiału frontu: „Front: <nazwa>” + płyta formatek pod spodem,
+ołówek (`data-edit="price"`) jak w każdym wierszu, nazwa / kolor / płyta / przypisanie pod ⚙ (`data-edit="front"`). Wiersz ceny jest
+wspólny dla płyt, frontów i okuć (`priceEditRowHtml`, `priceInputFor`, porównanie `.kz-compare` z `boardOffers` / `hardware*Rows`); dobór cen wycenia front płytą (`frontMaterialBoard(mat) || mat.name` przez `pickBoard`), powiązanie pod
+kluczem `Front:<id>` w `pricing.sas.materials` / `pricing.heban.materials`.
+**Szuflady Blum w wycenie**: `core/blumDrawer.js` (czyste, z testami) — opcje `pricing.blumDrawer = { color: B|S|A, kg: 40|70,
+eVariant: reling|boxcap, fix: W|I }` (`drawerOptions`, domyślnie biały, 40 kg, reling, wkręty; wiersz selektów nad tabelą okuć) i
+`merivoboxRecipe(wys., NL, opcje)` — części kompletu MERIVOBOX (boki 470{M dla E}{NL}2S para, prowadnica 450/453.{NL}1B, mocowanie frontu
+ZF4.1002 / ZF4.10I2 ×2, przy E górne ZF4.5002 / ZF4.50I2 ×2, zaślepki ZA4.5400 ×2 i ABD.1000 ×2, uchwyt ZB4{wys.}000S, E: Boxcap
+ZL4.{NL}S.E albo reling ZR4.{NL}RS.ERE + ZB4E00AK ×2; sprawdzone na rozbiciu zestawu SAS T00000-999). Heban liczy komplet z części,
+SAS wybiera gotowy zestaw „Szuflada Blum …” wg opcji (`sasSuggest(rows, nazwa, opcje)`, też koszyk SAS w hubie).
 
 **Lokalna kopia zapasowa**: `core/localBackup.js` trzyma w `localStorage` kopię
 *niezapisanej* pracy (co 20 s i przy ukryciu karty; czyszczona, gdy projekt zgadza się z kopią

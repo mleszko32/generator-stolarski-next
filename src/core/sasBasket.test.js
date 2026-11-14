@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { sasSuggest, linkFromRows, rowsFromLink, linkPrice, linkLabel, stockLabel } from "./sasCatalog.js";
-import { basketItems, basketText, parseBasketText, BASKET_BOOKMARKLET, BASKET_PREFIX } from "./sasBasket.js";
+import { hardwareSasRows, basketItems, basketText, parseBasketText, BASKET_BOOKMARKLET, BASKET_PREFIX } from "./sasBasket.js";
 
 // Wiersze w układzie katalogu: [indeks, nazwa, jedn., cena, grupa, nr w sklepie, stan Waw, stan Stę]
 const R = (idx, name, price, pid = "1", unit = "szt") => [idx, name, unit, price, "Akcesoria meblowe", pid, 5, 10];
@@ -33,7 +33,23 @@ describe("dobór okuć z katalogu SAS", () => {
     expect(sasSuggest(rows, "Komplet szuflady (MERIVOBOX - H:M L-450)")[0][0]).toBe("T4");
     expect(sasSuggest(rows, "Komplet szuflady (ANTARO - H:M L-500)")[0][0]).toBe("T5");
     expect(sasSuggest(rows, "Komplet szuflady (MERIVOBOX - H:K L-500)")).toBeNull();
+    // opcje szuflad Blum z Kosztorysu (pricing.blumDrawer)
+    expect(sasSuggest(rows, "Komplet szuflady (MERIVOBOX - H:M L-500)", { color: "A" })[0][0]).toBe("T3");
+    expect(sasSuggest(rows, "Komplet szuflady (MERIVOBOX - H:M L-500)", { fix: "I" })[0][0]).toBe("T2");
     expect(sasSuggest(rows, "Komplet szuflady (GTV_AXIS_16 - H:A L-500)")).toBeNull();
+  });
+
+  it("wysokość E: domyślnie z relingiem, opcja Boxcap; 70 kg z opcji", () => {
+    const e = [
+      R("E1", "Szuflada Blum MERIVOBOX Jedwabiście biały mat 500 E 40kg Boxcap Wkręt", 209, "201", "kpl"),
+      R("E2", "Szuflada Blum MERIVOBOX Jedwabiście biały mat 500 E 40kg z relingiem Wkręt", 188, "202", "kpl"),
+      R("E3", "Szuflada Blum MERIVOBOX Jedwabiście biały mat 500 E 70kg Boxcap Wkręt", 231, "203", "kpl"),
+      R("E4", "Szuflada Blum MERIVOBOX Jedwabiście biały mat 500 E 40kg Wewnętrzna Boxcap Front z relingiem", 370, "204", "kpl"),
+    ];
+    const kit = "Komplet szuflady (MERIVOBOX - H:E L-500)";
+    expect(sasSuggest(e, kit)[0][0]).toBe("E2");
+    expect(sasSuggest(e, kit, { eVariant: "boxcap" })[0][0]).toBe("E1");
+    expect(sasSuggest(e, kit, { eVariant: "boxcap", kg: 70 })[0][0]).toBe("E3");
   });
 
   it("MOVENTO = prowadnice + sprzęgło lewe i prawe; nóżki; kod Blum w nazwie", () => {
@@ -127,5 +143,9 @@ describe("dobór okuć spoza Blum i w opakowaniach", () => {
     const { items, missing } = basketItems(hw, all, {});
     expect(missing).toEqual([]);
     expect(items.map((i) => [i.idx, i.qty])).toEqual([["K1", 1], ["K2", 1], ["R1", 2], ["R2", 4]]);
+    // powiązanie zapisane przyciskiem „Dobierz” (takie samo jak dobór) zachowuje ułamki opakowań
+    const links = { "Złącze korpusowe (Kołek 8x30 + Konfirmat)": linkFromRows(join) };
+    expect(linkPrice(hardwareSasRows(all, links, "Złącze korpusowe (Kołek 8x30 + Konfirmat)"))).toBe(0.14);
+    expect(basketItems(hw.slice(0, 1), all, links).items.map((i) => [i.idx, i.qty])).toEqual([["K1", 1], ["K2", 1]]);
   });
 });
