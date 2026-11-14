@@ -112,7 +112,7 @@ describe("dobór okuć spoza Blum i w opakowaniach", () => {
     R("D2", "TIP-ON do drzwi (zestaw), Wersja standardowa, z magnesem, biała, BLUM 956.1004 V50", 13.5, "206"),
     R("D3", "Adapter TIP-ON do drzwi, Wersja standardowa, prosty, Wkręty, Biała, BLUM 956.1201 V250", 3, "207"),
     R("H1", "CLIP top zawias standard. 110°, Drzwi nakładane, bez sprężyny, puszka: na wkręty, niklowany, BLUM 70T3550", 5.5, "208"),
-    R("K1", "Konfirmaty 7.0 x 50mm, Galv. HAFELE 264.45.922, Opakowanie 1000 szt.", 76, "209"),
+    R("K1", "Wkręty do drewna WURTH Assy-Plus 4.0x50mm srebrne 017810450 Opakowanie 500 szt.", 95.6, "209"),
     R("K2", "Kołki drewniane (1kg) 8x35mm cięte", 30, "210"),
     R("R1", "Drążek / Rura chrom FI 25 dł. 3000mm, Grubościenna, grubość ścianki 1mm", 11, "211"),
     R("R2", "Uchwyt / mocowanie / rozeta rury / drążka fi 25 chrom / stal stopka 500", 0.5, "212"),
@@ -132,12 +132,12 @@ describe("dobór okuć spoza Blum i w opakowaniach", () => {
     expect(ids("Zawias CLIP top 110° bez sprężyny 70T3550 + prowadnik 173L6100")).toEqual(["H1", "P1"]);
   });
 
-  it("konfirmaty i kołki w opakowaniach, drążek w odcinkach 3 m - ilości i cena na sztukę", () => {
-    const join = sasSuggest(all, "Złącze korpusowe (Kołek 8x30 + Konfirmat)");
+  it("wkręty i kołki w opakowaniach, drążek w odcinkach 3 m - ilości i cena na sztukę", () => {
+    const join = sasSuggest(all, "Złącze korpusowe (Kołek 8x30 + wkręt 4x50)");
     expect(join.map((r) => r[0])).toEqual(["K1", "K2"]);
-    expect(linkPrice(join)).toBe(0.14); // 76/1000 + 30/500
+    expect(linkPrice(join)).toBe(0.25); // 95,6/500 + 30/500
     const hw = [
-      { name: "Złącze korpusowe (Kołek 8x30 + Konfirmat)", qty: 301 },
+      { name: "Złącze korpusowe (Kołek 8x30 + wkręt 4x50)", qty: 301 },
       { name: "Drążek garderobowy L=998 mm", qty: 1 },
       { name: "Drążek garderobowy L=2400 mm", qty: 1 },
       { name: "Wspornik drążka", qty: 4 },
@@ -146,8 +146,8 @@ describe("dobór okuć spoza Blum i w opakowaniach", () => {
     expect(missing).toEqual([]);
     expect(items.map((i) => [i.idx, i.qty])).toEqual([["K1", 1], ["K2", 1], ["R1", 2], ["R2", 4]]);
     // powiązanie zapisane przyciskiem „Dobierz” (takie samo jak dobór) zachowuje ułamki opakowań
-    const links = { "Złącze korpusowe (Kołek 8x30 + Konfirmat)": linkFromRows(join) };
-    expect(linkPrice(hardwareSasRows(all, links, "Złącze korpusowe (Kołek 8x30 + Konfirmat)"))).toBe(0.14);
+    const links = { "Złącze korpusowe (Kołek 8x30 + wkręt 4x50)": linkFromRows(join) };
+    expect(linkPrice(hardwareSasRows(all, links, "Złącze korpusowe (Kołek 8x30 + wkręt 4x50)"))).toBe(0.25);
     expect(basketItems(hw.slice(0, 1), all, links).items.map((i) => [i.idx, i.qty])).toEqual([["K1", 1], ["K2", 1]]);
   });
 });

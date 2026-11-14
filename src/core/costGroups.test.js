@@ -9,7 +9,7 @@ describe("grupy okuć w kosztorysie", () => {
     expect(hardwareGroup("Zawias meblowy + prowadnik krzyżakowy (puszka 35mm)")).toBe("zawiasy");
     expect(hardwareGroup("AVENTOS HK-XS - siłownik, LF ok. 500")).toBe("zawiasy");
     expect(hardwareGroup("Nóżka regulowana H-100")).toBe("nozki");
-    expect(hardwareGroup("Złącze korpusowe (Kołek 8x30 + Konfirmat)")).toBe("nozki");
+    expect(hardwareGroup("Złącze korpusowe (Kołek 8x30 + wkręt 4x50)")).toBe("nozki");
     expect(hardwareGroup("Okleina krawędziowa (mb, formatki dookoła + 10% zapasu)")).toBe("okleina");
     expect(hardwareGroup("Okucie narożne Magic Corner (kpl. koszy) - strona ślepa lewa")).toBe("inne");
   });

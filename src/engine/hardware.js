@@ -57,7 +57,7 @@ export function calculateProjectHardware() {
       hardwareList['Wspornik drążka'].qty += 2;
     }
 
-    const joinKey = `Złącze korpusowe (Kołek 8x30 + Konfirmat)`;
+    const joinKey = `Złącze korpusowe (Kołek 8x30 + wkręt 4x50)`;
     // Faktyczna liczba zestawów z otworów korpusu (engine/cabinetDrillings.js - wieńce, trawersy,
     // półki stałe, mocowanie przegród; rozstaw wg engine/carcaseParts.js: jointSetPositions).
     // Każdy zestaw ma jeden wkręt, liczony raz - w formatce poziomej (czoło / lico) albo trawersie

@@ -188,7 +188,7 @@ Lista okuć liczy **faktyczną liczbę wkrętów** z tych otworów (nie ryczałt
 | Pozycja | Jak liczona |
 |---|---|
 | Nóżki | 4 na szafkę (narożna 5), wysokość osobno dla każdej |
-| Złącze korpusowe (kołek + konfirmat) | liczba wkrętów z wierceń wieńców/półek stałych |
+| Złącze korpusowe (kołek + wkręt 4x50) | liczba wkrętów z wierceń wieńców/półek stałych |
 | Łącznik Lamello (skos) | liczba rowków |
 | Komplet szuflady | 1 na szufladę, z systemem, wariantem i NL |
 | Zawias + prowadnik | liczba zawiasów z pkt 6 (szafka ślepa: zawias równoległy) |

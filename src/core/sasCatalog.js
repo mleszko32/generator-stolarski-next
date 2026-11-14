@@ -185,9 +185,9 @@ export function sasSuggest(rows, hwName, opts = BLUM_DRAWER_DEFAULTS) {
     const r = pickRow(rows, (x) => /^Uchwyt .*drążka fi 25/i.test(x[1]));
     return r ? [r] : null;
   }
-  // Złącze korpusowe: konfirmat 7x50 (opakowanie) + kołki 8x35 na wagę (1 kg ≈ 500 szt.)
+  // Złącze korpusowe: wkręt Würth Assy-Plus 4x50 (opakowanie) + kołki 8x35 na wagę (1 kg ≈ 500 szt.)
   if (/^Złącze korpusowe/.test(name)) {
-    const k = pickRow(rows, (x) => /^Konfirmaty 7\.0 x 50/i.test(x[1]));
+    const k = pickRow(rows, (x) => /^Wkręty do drewna WURTH Assy-Plus 4\.0x50/i.test(x[1]));
     const d = pickRow(rows, (x) => /^Kołki drewniane \(1kg\) 8x35/i.test(x[1]));
     return k && d ? withPer([k, d], [1 / PACK_SIZE(k), 1 / 500]) : null;
   }
