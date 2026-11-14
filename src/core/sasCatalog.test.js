@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sasLabel, sasFromText, sasByIndex, sheetAreaM2, sasPricePerM2, parseSasCatalog } from "./sasCatalog.js";
+import { sasLabel, sasSuggest, sasFromText, sasByIndex, sheetAreaM2, sasPricePerM2, parseSasCatalog } from "./sasCatalog.js";
 
 const rows = [
   ["B09048-274", "86° Ogranicznik kąta otwarcia do zawiasu 110°, czarny, BLUM 70T3553 V250", "szt", 1.5, "Akcesoria meblowe"],
@@ -32,5 +32,19 @@ describe("katalog SAS", () => {
     expect(parseSasCatalog("{")).toBeNull();
     expect(parseSasCatalog(JSON.stringify({ ...file, format: "gsn-furniture" }))).toBeNull();
     expect(parseSasCatalog(JSON.stringify({ ...file, rows: [] }))).toBeNull();
+  });
+});
+
+describe("sasSuggest - komplet MERIVOBOX z części, gdy SAS nie ma zestawu", () => {
+  it("składa komplet z pozycji po kodach Blum", () => {
+    const mk = (i, n, p) => [String(i), n, "szt", p];
+    const rows = [
+      mk(1, "Boki szuflady Blum 470M5002S jedwabiście biały", 100), mk(2, "Prowadnica 450.5001B", 50),
+      mk(3, "Mocowanie frontu ZF4.1002", 10), mk(4, "Zaślepka ZA4.5400 biała", 5), mk(5, "Zaślepka ABD.1000 biała", 5),
+      mk(6, "Uchwyt ścianki ZB4M000S biały", 20),
+    ];
+    const r = sasSuggest(rows, "Komplet szuflady (MERIVOBOX - H:M L-500)");
+    expect(r.map((x) => x[0])).toEqual(["1", "2", "3", "4", "5", "6"]);
+    expect(r.per).toEqual([1, 1, 2, 2, 2, 1]);
   });
 });

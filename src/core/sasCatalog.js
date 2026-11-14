@@ -9,7 +9,7 @@
 // materials: { kategoria płyty: indeks } } - cena przepisana do pola, powiązanie tylko do podpowiedzi.
 // Czyste funkcje (poza loadSasCatalog / resetSasCatalog).
 
-import { BLUM_DRAWER_DEFAULTS, drawerOptions, parseDrawerKit } from "./blumDrawer.js";
+import { BLUM_DRAWER_DEFAULTS, drawerOptions, parseDrawerKit, merivoboxRecipe } from "./blumDrawer.js";
 
 let cache = null;
 
@@ -128,7 +128,22 @@ export function sasSuggest(rows, hwName, opts = BLUM_DRAWER_DEFAULTS) {
     const cand = rows.filter((r) => /^Szuflada Blum /i.test(r[1]) && r[1].toUpperCase().includes(sys)
       && (sys !== "TANDEMBOX" || !/ANTARO/i.test(r[1])) && word(String(kit.nl)).test(r[1]) && word(kit.height).test(r[1]));
     const best = cand.sort((a, b) => penalty(a) - penalty(b) || a[3] - b[3])[0];
-    return best ? [best] : null;
+    if (best) return [best];
+    // Brak gotowego zestawu w SAS - komplet MERIVOBOX z części (kody Blum w nazwach), jak w Hebanie
+    if (kit.system !== "MERIVOBOX") return null;
+    const list = [], per = [];
+    for (const it of merivoboxRecipe(kit.height, kit.nl, o)) {
+      let c = rows.filter((r) => r[1].includes(it.code));
+      if (it.colored && c.some((r) => COLOR_WORDS[o.color].test(r[1]))) c = c.filter((r) => COLOR_WORDS[o.color].test(r[1]));
+      const side = (re) => c.filter((r) => re.test(r[1])).sort((a, b) => a[3] - b[3])[0];
+      const picks = it.pair && side(/\blewe?\b/i) && side(/\bprawe?\b/i)
+        ? [side(/\blewe?\b/i), side(/\bprawe?\b/i)]
+        : [c.sort((a, b) => a[3] - b[3])[0]];
+      if (!picks.every(Boolean)) return null;
+      for (const r of picks) { list.push(r); per.push(it.qty); }
+    }
+    list.per = per;
+    return list;
   }
   // Prowadnice MOVENTO (para) + sprzęgła lewe i prawe
   let m = name.match(/^Prowadnice Blum MOVENTO (76\dH) .*NL-(\d+)/);
