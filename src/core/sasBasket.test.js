@@ -151,3 +151,9 @@ describe("dobór okuć spoza Blum i w opakowaniach", () => {
     expect(basketItems(hw.slice(0, 1), all, links).items.map((i) => [i.idx, i.qty])).toEqual([["K1", 1], ["K2", 1]]);
   });
 });
+
+describe("nóżka - zawsze Axilo", () => {
+  it("stare powiązanie z plastikową nóżką nie wygrywa z doborem", () => {
+    expect(hardwareSasRows(rows, { "Nóżka regulowana H-100": "N1x" }, "Nóżka regulowana H-100").map((r) => r[0])).toEqual(["N1", "N2"]);
+  });
+});

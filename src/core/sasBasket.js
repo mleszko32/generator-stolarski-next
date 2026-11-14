@@ -16,6 +16,7 @@ export const BASKET_PREFIX = "GSN-SAS-KOSZYK ";
 export function hardwareSasRows(rows, links, hwName, opts) {
   const link = (links || {})[hwName];
   const auto = sasSuggest(rows, hwName, opts);
+  if (auto && /^Nóżka regulowana/.test(hwName)) return auto; // nóżka to zawsze Axilo (core/axilo.js), stare powiązanie nie wygrywa
   if (link && auto && linkFromRows(auto) === link) return auto;
   return rowsFromLink(rows, link) || auto;
 }

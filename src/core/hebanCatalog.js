@@ -246,5 +246,6 @@ export function hebanLinkLabel(list) {
 
 // Pozycje Hebanu dla okucia: powiązanie z Kosztorysu ma pierwszeństwo, inaczej automatyczny dobór.
 export function hardwareHebanRows(rows, links, hwName, opts) {
+  if (/^Nóżka regulowana/.test(hwName)) { const ax = hebanSuggest(rows, hwName, opts); if (ax) return ax; } // zawsze Axilo
   return hebanRowsFromLink(rows, (links || {})[hwName]) || hebanSuggest(rows, hwName, opts);
 }
