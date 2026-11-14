@@ -623,12 +623,22 @@ function renderOkucia(el) {
       <div class="hub-strong" style="margin-bottom:4px">Zakupy w sklepie SAS</div>
       <div class="hub-sub">Pozycje SAS dobierają się same (zawiasy, prowadniki, zestawy szuflad Blum, MOVENTO, nóżki); inną wybierzesz polem „Szukaj w bazie SAS” w Kosztorysie.
       „Do koszyka SAS” kopiuje listę - potem na stronie panelu SAS (esklep.sassc.com.pl) kliknij zakładkę „Do koszyka SAS” i sprawdź koszyk przed zamówieniem.
-      Zakładkę dodasz raz: przeciągnij ten przycisk na pasek zakładek → <a class="btn btn-sm" id="hub-sas-bookmarklet" href="#">Do koszyka SAS</a></div>
+      Zakładkę dodasz raz: przeciągnij ten przycisk na pasek zakładek → <a class="btn btn-sm" id="hub-sas-bookmarklet" href="#" draggable="true">Do koszyka SAS</a>
+      · gdy przeciąganie nie działa: <button type="button" class="btn btn-sm" id="hub-sas-bookmarklet-copy">Kopiuj kod zakładki</button> i wklej go jako adres nowej zakładki (Ctrl+Shift+O → Dodaj nową zakładkę, nazwa „Do koszyka SAS”).</div>
     </div>`}`;
   el.querySelector('#hub-hw-print').addEventListener('click', () => printHardwareList());
   const bm = el.querySelector('#hub-sas-bookmarklet');
   if (bm) {
     bm.setAttribute('href', BASKET_BOOKMARKLET);
+    bm.style.userSelect = 'auto'; // .btn ma user-select: none, co w Chrome potrafi blokować przeciąganie linku
+    bm.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/uri-list', BASKET_BOOKMARKLET);
+      e.dataTransfer.setData('text/plain', BASKET_BOOKMARKLET);
+      e.dataTransfer.setData('text/x-moz-url', BASKET_BOOKMARKLET + '\nDo koszyka SAS');
+    });
+    el.querySelector('#hub-sas-bookmarklet-copy').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(BASKET_BOOKMARKLET); showAlert('Skopiowano kod zakładki. Utwórz nową zakładkę (Ctrl+Shift+O → Dodaj nową zakładkę), nazwij ją „Do koszyka SAS” i wklej kod w polu adresu URL.'); } catch (e) { showAlert('Nie udało się skopiować do schowka.'); }
+    });
     bm.addEventListener('click', (e) => { e.preventDefault(); showAlert('Przeciągnij ten przycisk na pasek zakładek przeglądarki, a potem kliknij zakładkę na stronie panelu SAS.'); });
   }
   if (!hw.length) return;
