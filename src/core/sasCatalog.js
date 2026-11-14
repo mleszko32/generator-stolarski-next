@@ -188,6 +188,16 @@ export function sasSuggest(rows, hwName, opts = BLUM_DRAWER_DEFAULTS) {
     const d = pickRow(rows, (x) => /^Kołki drewniane \(1kg\) 8x35/i.test(x[1]));
     return k && d ? withPer([k, d], [1 / PACK_SIZE(k), 1 / 500]) : null;
   }
+  // Części czoła szuflady wewn. MERIVOBOX (core/drawerAssembly.js): kod po „MERIVOBOX” (ZI4.2ES1, ZV4.1042M, ZR4.1059U),
+  // w kolorze szuflady, gdy SAS ma kilka kolorów (nazwa SAS: „… BLUM ZI4.2ES1 V1”)
+  m = name.match(/MERIVOBOX (Z[A-Z]\d\.[0-9A-Z]+)/);
+  if (m) {
+    const col = COLOR_WORDS[drawerOptions({ blumDrawer: opts }).color];
+    let c = rows.filter((x) => x[1].toUpperCase().includes(m[1]));
+    if (c.some((x) => col.test(x[1]))) c = c.filter((x) => col.test(x[1]));
+    const r = pickRow(c, () => true);
+    return r ? [r] : null;
+  }
   // Kody Blum w nazwie bez słowa „Blum”: „20K5101”, „70T3550 + prowadnik 173L6100”, „956.1004 + adapter 956.1201”
   const codes = name.match(/\b(\d{2,3}[A-Z]\d{4}|\d{3}\.\d{4})\b/g);
   if (codes && !/\bBlum\b/i.test(name)) {

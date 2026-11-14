@@ -48,3 +48,14 @@ describe("sasSuggest - komplet MERIVOBOX z części, gdy SAS nie ma zestawu", ()
     expect(r.per).toEqual([1, 1, 2, 2, 2, 1]);
   });
 });
+
+describe("sasSuggest - części czoła szuflady wewn. MERIVOBOX", () => {
+  it("znajduje mocowanie po kodzie ZI4 w kolorze szuflady", () => {
+    const rows = [
+      ["1", "Mocowanie frontu MERIVOBOX, wys.E, z relingiem, lewe/prawe, jedwabiście biały mat, BLUM ZI4.2ES1 V1", "szt", 58.22],
+      ["2", "Mocowanie frontu MERIVOBOX, wys.E, z relingiem, lewe/prawe, czarny orion, BLUM ZI4.2ES1 V2", "szt", 58.22],
+    ];
+    const r = sasSuggest(rows, "Mocowanie czoła szuflady wewn. MERIVOBOX ZI4.2ES1 (wys. E, z relingiem)");
+    expect(r.map((x) => x[0])).toEqual(["1"]);
+  });
+});
