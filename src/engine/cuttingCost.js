@@ -18,6 +18,7 @@ export const CUT_RATES = {
 };
 
 export const CUT_MODES = ["manual", "sas", "heban"];
+export const HDF_SHEET = { sheetW: 2850, sheetH: 2070 };
 export const CUT_PLAN_DEFAULTS = { sheetW: 2800, sheetH: 2070, kerf: 3, trim: 10 };
 
 // Kategorie cięte w hurtowni (blat docina się na miejscu).
@@ -29,13 +30,21 @@ const round2 = (v) => Math.round(v * 100) / 100;
 
 // parts: zagregowana lista formatek (calculateAllProjectParts). Zwraca grupy po kategorii (osobne arkusze dla dekorów)
 // z liczbą arkuszy, szacunkowym mb cięcia i metrami okleiny.
-export function cutGroups(parts, cutPlan = {}, edgeRules = null) {
+// Klucz grupy arkuszy formatki: fronty z różnych materiałów układają się na osobnych arkuszach, ale materiały na tej
+// samej płycie (np. lakier na MDF W908) razem - `frontKey(materialId)` podaje płytę materiału (cost.js).
+// null = formatka nie jest cięta w hurtowni (np. blat).
+export function cutGroupKey(p, frontKey) {
+  if (!CUT_CATEGORIES.includes(baseCategory(p.category))) return null;
+  if (p.category === "Front" && p.materialId) return `Front::${frontKey ? frontKey(p.materialId) : p.materialId}`;
+  return p.category || "Inne";
+}
+
+export function cutGroups(parts, cutPlan = {}, edgeRules = null, frontKey = null) {
   const s = { ...CUT_PLAN_DEFAULTS, ...(cutPlan || {}) };
   const byCat = new Map();
   for (const p of parts || []) {
-    if (!CUT_CATEGORIES.includes(baseCategory(p.category))) continue;
-    // fronty z różnych materiałów (osobne płyty / MDF lakierowany) układają się na osobnych arkuszach
-    const cat = p.category === "Front" && p.materialId ? `Front::${p.materialId}` : (p.category || "Inne");
+    const cat = cutGroupKey(p, frontKey);
+    if (cat === null) continue;
     if (!byCat.has(cat)) byCat.set(cat, []);
     byCat.get(cat).push(p);
   }
@@ -54,9 +63,11 @@ export function cutGroups(parts, cutPlan = {}, edgeRules = null) {
       edgeMm += edge * qty;
       count += qty;
     });
-    const result = pieces.length ? nestParts(pieces, { sheetW: s.sheetW, sheetH: s.sheetH, kerf: s.kerf, trim: s.trim }) : { sheets: [], sheetCount: 0 };
+    // HDF (plecy) sprzedaje się w arkuszach 2850×2070, reszta wg ustawień rozkroju
+    const sh = category.startsWith("Plecy") ? { sheetW: HDF_SHEET.sheetW, sheetH: HDF_SHEET.sheetH } : { sheetW: s.sheetW, sheetH: s.sheetH };
+    const result = pieces.length ? nestParts(pieces, { ...sh, kerf: s.kerf, trim: s.trim }) : { sheets: [], sheetCount: 0 };
     const halfPerimeterMm = result.sheets.reduce((sum, sh) => sum + sh.placements.reduce((a, pl) => a + pl.w + pl.h, 0), 0);
-    return { category, premium: isPremiumBoard(category), pieces: count, sheets: result.sheetCount, cutMb: halfPerimeterMm / 1000, edgeM: edgeMm / 1000 };
+    return { key, category, premium: isPremiumBoard(category), pieces: count, sheets: result.sheetCount, sheetAreaM2: (sh.sheetW * sh.sheetH) / 1e6, usedMm2: pieces.reduce((a, q) => a + q.w * q.h, 0), cutMb: halfPerimeterMm / 1000, edgeM: edgeMm / 1000 };
   });
 }
 
@@ -81,8 +92,8 @@ export function cuttingQuote(groups, opts = {}) {
 }
 
 // Koszt cięcia do kosztorysu: mode 'sas' | 'heban' (manual obsługuje cost.js, zł/szt. ręcznie).
-export function cuttingCostFor(mode, parts, pricing, cutPlan, edgeRules) {
+export function cuttingCostFor(mode, parts, pricing, cutPlan, edgeRules, frontKey = null) {
   const cfg = (pricing && pricing.cutting) || {};
-  const quote = cuttingQuote(cutGroups(parts, cutPlan, edgeRules), { express: !!cfg.express, pallet: !!cfg.pallet });
+  const quote = cuttingQuote(cutGroups(parts, cutPlan, edgeRules, frontKey), { express: !!cfg.express, pallet: !!cfg.pallet });
   return mode === "sas" ? quote.sas.total : quote.heban.total;
 }

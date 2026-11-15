@@ -305,7 +305,7 @@ export const HELP_SECTIONS = [
       drążki, okleina, inne), Robocizna, Marża i VAT. Kolumna <b>Źródło</b> mówi, skąd jest cena: SAS, Heban, ręcznie albo
       „brak ceny”. Wiersz <b>Cięcie formatek</b>: stawka ręczna (zł/szt.) albo wg hurtowni - SAS za metr bieżący z rozkroju
       (PREMIUM, czyli PerfectSense / „PM/”, drożej, z okleinowaniem; opcjonalnie paleta) albo Heban za formatkę; <b>express</b> ×1,5.
-      Pod wierszem jest porównanie obu hurtowni. Ołówek na końcu każdego wiersza - płyty, frontu i okucia - działa tak samo: rozwija
+      Przy SAS / Heban płyty liczą się w <b>pełnych arkuszach</b> z rozkroju (jak w hurtowni, razem z odpadem), a nie po powierzchni formatek. Pod wierszem jest porównanie obu hurtowni. Ołówek na końcu każdego wiersza - płyty, frontu i okucia - działa tak samo: rozwija
       „Szukaj w bazie SAS”, „Szukaj w bazie Heban” i ceny tej pozycji w obu hurtowniach (kliknięcie wpisuje cenę). Wiersze
       „Front: …” to materiały frontów z cennika frontów; dodatkowy przycisk ⚙ przy nich pokazuje nazwę materiału, kolor
       RAL / NCS, płytę formatek i przypisanie do frontów dolnych / górnych. Dobór cen wycenia front płytą z nazwy (np. „H1386 ST40 18mm”) albo z pola „Płyta formatek”; front

@@ -5,8 +5,8 @@
 import { state, migratePricingExtras } from "../core/state.js";
 import { calculateAllProjectParts } from "./cabinet.js";
 import { calculateProjectHardware } from "./hardware.js";
-import { baseCategory } from "../core/materialCatalog.js";
-import { cuttingCostFor } from "./cuttingCost.js";
+import { baseCategory, frontMaterialBoard } from "../core/materialCatalog.js";
+import { cuttingCostFor, cutGroups, cutGroupKey } from "./cuttingCost.js";
 
 // Szacunkowy kosztorys materiałowy - liczy powierzchnię formatek Z OSOBNA dla
 // każdej kategorii (Korpus/Front/Szuflada/Plecy, patrz PRICING_MATERIAL_
@@ -43,13 +43,35 @@ export function calculateProjectCost() {
   const frontMaterialById = Object.fromEntries(frontCatalog.map(m => [m.id, m]));
   const resolveFrontMaterial = (materialId) => (materialId && frontMaterialById[materialId]) || frontCatalog[0];
 
+  // Cięcie wg hurtowni (SAS / Heban) = rachunek jak w hurtowni: płyty liczone w PEŁNYCH ARKUSZACH z rozkroju
+  // (odpad też się płaci), nie po powierzchni formatek. Tryb ręczny zostaje po powierzchni (stare projekty).
+  const cuttingMode = pricing.cutting.mode;
+  const bySheets = cuttingMode !== 'manual';
+  const frontKey = (materialId) => { const m = resolveFrontMaterial(materialId); return frontMaterialBoard(m) || m.name; };
+  const sheetGroups = bySheets ? cutGroups(parts, state.project.cutPlan, state.project.edgeBanding, frontKey) : [];
+  const groupByKey = Object.fromEntries(sheetGroups.map(g => [g.key, g]));
+  const groupOfMaterial = {}; // klucz materiału -> klucz grupy arkuszy
+
   const areaMm2ByKey = {}; // klucz = kategoria, albo "Front::<materialId>" dla frontów
   parts.forEach(p => {
     const areaMm2 = (parseFloat(p.length) || 0) * (parseFloat(p.width) || 0) * (parseFloat(p.qty) || 0);
     const cat = p.category || 'Inne';
     const key = cat === 'Front' ? `Front::${resolveFrontMaterial(p.materialId).id}` : cat;
     areaMm2ByKey[key] = (areaMm2ByKey[key] || 0) + areaMm2;
+    if (bySheets) {
+      const gk = cutGroupKey({ ...p, materialId: cat === 'Front' ? resolveFrontMaterial(p.materialId).id : p.materialId }, frontKey);
+      if (gk) groupOfMaterial[key] = gk;
+    }
   });
+  // Powierzchnia do zapłaty dla materiału: arkusze grupy × powierzchnia arkusza, rozdzielone na materiały grupy
+  // proporcjonalnie do ich formatek.
+  const billedArea = (key) => {
+    const area = areaMm2ByKey[key] / 1e6;
+    const g = groupByKey[groupOfMaterial[key]];
+    if (!g || !g.usedMm2) return { area, sheets: null };
+    const share = areaMm2ByKey[key] / g.usedMm2;
+    return { area: g.sheets * g.sheetAreaM2 * share, sheets: g.sheets * share };
+  };
 
   const frontOrderIndex = (id) => { const i = frontCatalog.findIndex(m => m.id === id); return i === -1 ? 99 : i; };
   const keys = Object.keys(areaMm2ByKey).sort((a, b) => {
@@ -64,16 +86,18 @@ export function calculateProjectCost() {
   });
 
   const materials = keys.map(key => {
-    const areaM2 = areaMm2ByKey[key] / 1e6;
+    const usedAreaM2 = areaMm2ByKey[key] / 1e6;
+    const billed = billedArea(key);
+    const areaM2 = billed.area, sheets = billed.sheets;
     if (key.startsWith('Front::')) {
       const mat = frontMaterialById[key.slice(7)] || frontCatalog[0];
       const pricePerM2 = parseFloat(mat.pricePerM2) || 0;
-      return { category: 'Front', materialId: mat.id, materialName: mat.name, areaM2, pricePerM2, cost: areaM2 * pricePerM2 };
+      return { category: 'Front', materialId: mat.id, materialName: mat.name, areaM2, usedAreaM2, sheets, pricePerM2, cost: areaM2 * pricePerM2 };
     }
     // „Korpus: <dekor>” ma własną cenę w pricing.materials; dopóki jej nie wpisano - cena „Korpus”.
     const own = (pricing.materials || {})[key];
     const pricePerM2 = parseFloat(own !== undefined ? own : (pricing.materials || {})[baseCategory(key)]) || 0;
-    return { category: key, areaM2, pricePerM2, cost: areaM2 * pricePerM2 };
+    return { category: key, areaM2, usedAreaM2, sheets, pricePerM2, cost: areaM2 * pricePerM2 };
   });
 
   const hardwareLines = hardware.map(hw => {
@@ -86,10 +110,9 @@ export function calculateProjectCost() {
   const cutPartsCount = parts
     .filter(p => CUT_CATEGORIES.includes(baseCategory(p.category)))
     .reduce((sum, p) => sum + (parseFloat(p.qty) || 0), 0);
-  const cuttingMode = pricing.cutting.mode;
   const cuttingCost = cuttingMode === 'manual'
     ? cutPartsCount * pricing.cuttingPerPart
-    : cuttingCostFor(cuttingMode, parts, pricing, state.project.cutPlan, state.project.edgeBanding);
+    : cuttingCostFor(cuttingMode, parts, pricing, state.project.cutPlan, state.project.edgeBanding, frontKey);
   const laborCost = pricing.labor.hours * pricing.labor.rate;
   const lacquerCost = pricing.lacquer.hours * pricing.lacquer.rate;
   const assemblyCost = pricing.assembly.hours * pricing.assembly.rate;

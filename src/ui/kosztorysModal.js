@@ -56,6 +56,10 @@ const MATERIAL_LABELS = {
     Plecy: 'Plecy (HDF)'
 };
 
+// Ilość płyty: przy cięciu wg hurtowni płacimy za pełne arkusze (powierzchnia arkuszy, nie formatek)
+const areaText = (line) => line
+    ? `${line.areaM2.toFixed(2)} m²${line.sheets != null ? ` (${Number.isInteger(line.sheets) ? line.sheets : line.sheets.toFixed(1)} ark.)` : ''}`
+    : '0.00 m²';
 const numField = (id, value, unit, extra = '') =>
     `<span class="cost-input"><input type="number" class="input" id="kosztorys-${id}" value="${value}" step="any" min="0" ${extra}> ${unit}</span>`;
 
@@ -248,7 +252,7 @@ export function mountKosztorys(root) {
         modal.querySelectorAll('.kosztorys-mat-area').forEach(cell => {
             const cat = cell.getAttribute('data-cat');
             const line = cost.materials.find(m => m.category === cat && !m.materialId);
-            cell.textContent = (line ? line.areaM2 : 0).toFixed(2) + ' m²';
+            cell.textContent = areaText(line);
         });
         modal.querySelectorAll('.kosztorys-mat-cost').forEach(cell => {
             const cat = cell.getAttribute('data-cat');
@@ -258,7 +262,7 @@ export function mountKosztorys(root) {
         modal.querySelectorAll('.kosztorys-front-mat-area').forEach(cell => {
             const id = cell.getAttribute('data-material-id');
             const line = cost.materials.find(m => m.materialId === id);
-            cell.textContent = (line ? line.areaM2 : 0).toFixed(2) + ' m²';
+            cell.textContent = areaText(line);
         });
         modal.querySelectorAll('.kosztorys-front-mat-cost').forEach(cell => {
             const id = cell.getAttribute('data-material-id');
@@ -379,7 +383,7 @@ export function mountKosztorys(root) {
             <tr>
                 <td>${escapeHtml(MATERIAL_LABELS[m.category] || m.category)}</td>
                 <td>${srcBadgeHtml('materials', m.category)}</td>
-                <td class="num kosztorys-mat-area" data-cat="${escapeHtml(m.category)}">${m.areaM2.toFixed(2)}&nbsp;m²</td>
+                <td class="num kosztorys-mat-area" data-cat="${escapeHtml(m.category)}">${areaText(m)}</td>
                 <td class="num"><span class="cost-input"><input type="number" class="input kosztorys-mat-price" data-cat="${escapeHtml(m.category)}" value="${m.pricePerM2}" step="1" min="0"> zł/m²</span></td>
                 <td class="num kosztorys-mat-cost" data-cat="${escapeHtml(m.category)}"><b>${formatPLN(m.cost)}</b></td>
                 <td>${editBtnHtml()}</td>
@@ -408,7 +412,7 @@ export function mountKosztorys(root) {
             <tr>
                 <td>Front: <b class="kz-front-name" data-material-id="${escapeHtml(m.materialId)}">${escapeHtml(m.materialName)}</b>${note ? `<div class="hint">${escapeHtml(note)}</div>` : ''}</td>
                 <td>${srcBadgeHtml('materials', 'Front:' + m.materialId)}</td>
-                <td class="num kosztorys-front-mat-area" data-material-id="${escapeHtml(m.materialId)}">${m.areaM2.toFixed(2)}&nbsp;m²</td>
+                <td class="num kosztorys-front-mat-area" data-material-id="${escapeHtml(m.materialId)}">${areaText(m)}</td>
                 <td class="num"><span class="cost-input"><input type="number" class="input kosztorys-front-mat-price" data-material-id="${escapeHtml(m.materialId)}" value="${m.pricePerM2}" step="1" min="0"> zł/m²</span></td>
                 <td class="num kosztorys-front-mat-cost" data-material-id="${escapeHtml(m.materialId)}"><b>${formatPLN(m.cost)}</b></td>
                 <td class="kz-actions">${editBtnHtml()}<button type="button" class="icon-btn kz-edit" data-edit="front" title="Nazwa, kolor RAL / NCS, płyta formatek, przypisanie do frontów"><i class="ti ti-settings" aria-hidden="true"></i></button>${canDelete ? `<button type="button" class="icon-btn kosztorys-mat-del" data-material-id="${escapeHtml(m.materialId)}" title="Usuń materiał"><i class="ti ti-trash" aria-hidden="true"></i></button>` : ''}</td>
