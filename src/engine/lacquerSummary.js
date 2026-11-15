@@ -7,6 +7,15 @@
 // Materiał frontu jest lakierowany, gdy ma „lakier” w nazwie (ta sama zasada co w Kosztorysie).
 export const isLacquerMaterial = (mat) => /lakier/i.test(String((mat && mat.name) || ""));
 
+// Ten sam kolor zapisany różnie („2005-Y40R”, „S 2005-Y40R”, „ncs s 2005-y40r”) to jedna pozycja zestawienia: kod NCS
+// sprowadzamy do „NCS S 2005-Y40R”, resztę (RAL itd.) tylko porządkujemy (spacje, wielkość liter kodu).
+export function canonicalColor(color) {
+  const t = String(color || "").trim().replace(/\s+/g, " ");
+  if (!t) return "";
+  const m = /^(?:NCS\s*)?(?:S\s*)?(\d{4})\s*-\s*([A-Z]\d{2}[A-Z]?|N)$/i.exec(t);
+  return m ? `NCS S ${m[1]}-${m[2].toUpperCase()}` : t;
+}
+
 // parts: formatki projektu (kategoria „Front” z materialId), frontMaterials: pricing.frontMaterials.
 // Zwraca [{ color, areaM2, pieces, materials: [nazwy] }] od największej powierzchni; „bez koloru”, gdy materiał go nie ma.
 export function lacquerByColor(parts, frontMaterials) {
@@ -16,8 +25,8 @@ export function lacquerByColor(parts, frontMaterials) {
     if (p.category !== "Front") continue;
     const mat = byId[p.materialId];
     if (!isLacquerMaterial(mat)) continue;
-    const color = String(mat.color || "").trim() || "bez koloru";
-    const key = color.toUpperCase().replace(/\s+/g, " ");
+    const color = canonicalColor(mat.color) || "bez koloru";
+    const key = color.toUpperCase();
     const g = groups.get(key) || { color, areaMm2: 0, pieces: 0, materials: new Set() };
     const qty = parseFloat(p.qty) || 0;
     g.areaMm2 += (parseFloat(p.length) || 0) * (parseFloat(p.width) || 0) * qty;

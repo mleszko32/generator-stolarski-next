@@ -3,7 +3,7 @@
 import { calculateProjectCost } from "../engine/cost.js";
 import { calculateAllProjectParts, collectProjectParts } from "../engine/cabinet.js";
 import { cuttingQuote, cutGroups } from "../engine/cuttingCost.js";
-import { lacquerByColor } from "../engine/lacquerSummary.js";
+import { lacquerByColor, isLacquerMaterial, canonicalColor } from "../engine/lacquerSummary.js";
 import { state } from "../core/state.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { escapeHtml, downloadFile } from "../utils/dom.js";
@@ -204,8 +204,8 @@ export function mountKosztorys(root) {
             pricing.materials[cat] = parseFloat(input.value) || 0;
         });
         modal.querySelectorAll('.kosztorys-front-mat-price').forEach(input => {
-            const mat = pricing.frontMaterials.find(m => m.id === input.getAttribute('data-material-id'));
-            if (mat) mat.pricePerM2 = parseFloat(input.value) || 0;
+            const id = input.getAttribute('data-material-id');
+            mergedIds(id).forEach(mid => { const mat = pricing.frontMaterials.find(m => m.id === mid); if (mat) mat.pricePerM2 = parseFloat(input.value) || 0; });
         });
         modal.querySelectorAll('.kosztorys-mat-name').forEach(input => {
             const mat = pricing.frontMaterials.find(m => m.id === input.getAttribute('data-material-id'));
@@ -277,13 +277,10 @@ export function mountKosztorys(root) {
             cell.textContent = formatPLN(line ? line.cost : 0);
         });
         modal.querySelectorAll('.kosztorys-front-mat-area').forEach(cell => {
-            const id = cell.getAttribute('data-material-id');
-            const line = cost.materials.find(m => m.materialId === id);
-            cell.textContent = areaText(line);
+            cell.textContent = areaText(mergedFrontLine(cost, cell.getAttribute('data-material-id')));
         });
         modal.querySelectorAll('.kosztorys-front-mat-cost').forEach(cell => {
-            const id = cell.getAttribute('data-material-id');
-            const line = cost.materials.find(m => m.materialId === id);
+            const line = mergedFrontLine(cost, cell.getAttribute('data-material-id'));
             cell.textContent = formatPLN(line ? line.cost : 0);
         });
         modal.querySelectorAll('.kz-board-sum').forEach(cell => {
@@ -352,6 +349,24 @@ export function mountKosztorys(root) {
     // froncie (ui/properties.js: "+ Nowy materiał…" w wyborze per front) -
     // dopiero gdy jest przypisany, ma tu sens pokazać mu wiersz do wyceny.
     let frontUsage = new Map(); // materialId -> nazwy szafek / elementów (renderMaterialRows)
+    // Materiały lakierowane z tym samym kolorem na tej samej płycie to w Kosztorysie jeden wiersz (suma powierzchni i
+    // kosztu); cena z wiersza dotyczy wszystkich. Pozostałe materiały - każdy osobno.
+    const frontBoard = (mat) => frontMaterialBoard(mat) || '';
+    function frontMergeKey(id) {
+        const mat = pricing.frontMaterials.find(m => m.id === id);
+        const color = isLacquerMaterial(mat) ? canonicalColor(mat.color) : '';
+        return color ? 'c:' + frontBoard(mat) + '|' + color.toUpperCase() : 'id:' + id;
+    }
+    function mergedIds(id) {
+        const key = frontMergeKey(id);
+        return pricing.frontMaterials.map(m => m.id).filter(mid => mid === id || frontMergeKey(mid) === key);
+    }
+    function mergedFrontLine(cost, id) {
+        const lines = cost.materials.filter(m => m.category === 'Front' && mergedIds(id).includes(m.materialId));
+        if (!lines.length) return null;
+        const sheets = lines.some(l => l.sheets != null) ? lines.reduce((t, l) => t + (l.sheets || 0), 0) : null;
+        return { areaM2: lines.reduce((t, l) => t + l.areaM2, 0), sheets: sheets == null ? null : Math.round(sheets * 100) / 100, cost: lines.reduce((t, l) => t + l.cost, 0) };
+    }
     function renderMaterialRows() {
         const cost = calculateProjectCost();
         // „Korpus” i „Korpus: <dekor>” (dekor korpusu szafki) - każdy dekor osobny wiersz z własną ceną.
@@ -365,7 +380,16 @@ export function mountKosztorys(root) {
             if (!frontUsage.has(p.materialId)) frontUsage.set(p.materialId, new Set());
             if (p.moduleName) frontUsage.get(p.materialId).add(p.moduleName);
         });
-        const frontLines = cost.materials.filter(m => m.category === 'Front');
+        const frontLines = [];
+        const seenMerge = new Set();
+        cost.materials.filter(m => m.category === 'Front').forEach(m => {
+            const key = frontMergeKey(m.materialId);
+            if (seenMerge.has(key)) return;
+            seenMerge.add(key);
+            const group = cost.materials.filter(x => x.category === 'Front' && frontMergeKey(x.materialId) === key);
+            const merged = mergedFrontLine(cost, m.materialId);
+            frontLines.push(group.length > 1 ? { ...m, ...merged, mergedCount: group.length, mergedIds: group.map(x => x.materialId) } : m);
+        });
         const boardOf = (m) => frontMaterialBoard(pricing.frontMaterials.find(x => x.id === m.materialId)) || '';
         const frontHtml = [...new Set(frontLines.map(boardOf))].map(board => {
             const lines = frontLines.filter(m => boardOf(m) === board);
@@ -399,7 +423,7 @@ export function mountKosztorys(root) {
                 const label = [...materialsTbody.querySelectorAll('.kz-front-color')].find(b => b.dataset.materialId === input.dataset.materialId);
                 if (label) label.textContent = input.value.trim() ? ' · ' + input.value.trim() : '';
             });
-            input.addEventListener('change', () => update3D());
+            input.addEventListener('change', () => { update3D(); renderMaterialRows(); recalc(); }); // zmiana koloru może scalić / rozdzielić wiersze
         });
         materialsTbody.querySelectorAll('.kosztorys-mat-del').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -445,7 +469,7 @@ export function mountKosztorys(root) {
     }
 
     function frontRowHtml(m) {
-        const canDelete = pricing.frontMaterials.length > 1;
+        const canDelete = pricing.frontMaterials.length > 1 && !(m.mergedCount > 1); // scalony wiersz = kilka materiałów, usuwa się je osobno (po rozdzieleniu)
         const bulkBtns = BULK_ZONES.map(z =>
             `<button type="button" class="kosztorys-mat-bulk" data-material-id="${escapeHtml(m.materialId)}" data-zone-type="${escapeHtml(z.type)}">wszystkich ${escapeHtml(z.label)}</button>`
         ).join(' · ');
@@ -454,11 +478,11 @@ export function mountKosztorys(root) {
         const lacquer = /lakier/i.test(String(mat.name || ''));
         const note = board ? `płyta: ${board}${lacquer ? ' · lakierowanie liczysz w „Lakierni” (sekcja Robocizna)' : ''}` : '';
         // gdzie użyty: do 4 nazw w wierszu, pełna lista w ⚙
-        const used = [...(frontUsage.get(m.materialId) || [])].sort((a, b) => a.localeCompare(b, 'pl'));
+        const used = [...new Set((m.mergedIds || [m.materialId]).flatMap(id => [...(frontUsage.get(id) || [])]))].sort((a, b) => a.localeCompare(b, 'pl'));
         const usedShort = used.length <= 4 ? used.join(', ') : `${used.slice(0, 4).join(', ')} i ${used.length - 4} więcej`;
         return `
             <tr>
-                <td>Front: <b class="kz-front-name" data-material-id="${escapeHtml(m.materialId)}">${escapeHtml(m.materialName)}</b><b class="kz-front-color" data-material-id="${escapeHtml(m.materialId)}">${mat.color ? ' · ' + escapeHtml(mat.color) : ''}</b>${used.length ? `<div class="hint"><b>Użyte w:</b> ${escapeHtml(usedShort)}</div>` : ''}${note ? `<div class="hint">${escapeHtml(note)}</div>` : ''}</td>
+                <td>Front: <b class="kz-front-name" data-material-id="${escapeHtml(m.materialId)}">${escapeHtml(m.materialName)}</b><b class="kz-front-color" data-material-id="${escapeHtml(m.materialId)}">${mat.color ? ' · ' + escapeHtml(mat.color) : ''}</b>${m.mergedCount > 1 ? `<div class="hint">Scalone: ${m.mergedCount} materiały o tym samym kolorze i płycie (cena z tego wiersza dotyczy wszystkich).</div>` : ''}${used.length ? `<div class="hint"><b>Użyte w:</b> ${escapeHtml(usedShort)}</div>` : ''}${note ? `<div class="hint">${escapeHtml(note)}</div>` : ''}</td>
                 <td>${srcBadgeHtml('materials', 'Front:' + m.materialId)}</td>
                 <td class="num kosztorys-front-mat-area" data-material-id="${escapeHtml(m.materialId)}">${areaText(m)}</td>
                 <td class="num"><span class="cost-input"><input type="number" class="input kosztorys-front-mat-price" data-material-id="${escapeHtml(m.materialId)}" value="${m.pricePerM2}" step="1" min="0"> zł/m²</span></td>
