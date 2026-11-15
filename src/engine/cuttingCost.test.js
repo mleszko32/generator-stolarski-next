@@ -21,10 +21,16 @@ describe("koszt cięcia w hurtowni", () => {
     expect(g[1].edgeM).toBe(0); // plecy bez okleiny
   });
 
-  it("SAS: mb × 0,91 × stawka, express ×1,5; Heban: za formatkę", () => {
+  it("fronty z różnych materiałów to osobne grupy (osobne arkusze)", () => {
+    const f = (materialId) => ({ category: "Front", name: "F", length: 700, width: 500, qty: 1, materialId });
+    const g = cutGroups([f("a"), f("b"), f("a")]);
+    expect(g.map((x) => [x.category, x.pieces, x.sheets])).toEqual([["Front", 2, 1], ["Front", 1, 1]]);
+  });
+
+  it("SAS: mb × 1,5 × stawka (kalibracja z zamówienia SAS), express ×1,5; Heban: za formatkę", () => {
     const groups = cutGroups([part("Korpus", 1000, 500, 2)]);
     const q = cuttingQuote(groups);
-    expect(q.sas.cut).toBeCloseTo(3 * 0.91 * CUT_RATES.sas.perMbStandard, 1);
+    expect(q.sas.cut).toBeCloseTo(3 * 1.5 * CUT_RATES.sas.perMbStandard, 1);
     expect(q.heban.total).toBeCloseTo(2 * 4.92, 5);
     const e = cuttingQuote(groups, { express: true });
     expect(e.sas.cut).toBeCloseTo(q.sas.cut * 1.5, 1);
@@ -34,7 +40,7 @@ describe("koszt cięcia w hurtowni", () => {
   it("PREMIUM: wyższa stawka i okleinowanie; paleta opcjonalnie", () => {
     const groups = cutGroups([part("Korpus: F128 PerfectSense", 1000, 500, 1)]);
     const q = cuttingQuote(groups, { pallet: true });
-    expect(q.sas.cut).toBeCloseTo(1.5 * 0.91 * 5.42, 1);
+    expect(q.sas.cut).toBeCloseTo(1.5 * 1.5 * 5.42, 1);
     expect(q.sas.edging).toBeCloseTo(3 * 8.34, 1);
     expect(q.sas.pallet).toBe(64.58);
     expect(q.sas.total).toBeCloseTo(q.sas.cut + q.sas.edging + 64.58, 1);

@@ -1,7 +1,8 @@
 // src/engine/cuttingCost.js
 //
 // Koszt cięcia płyt w hurtowni (etap 2b cennika). Czyste funkcje, bez DOM.
-// - SAS liczy cięcie za metr bieżący: mb z rozkroju (engine/nesting.js) × 0,91 × stawka; płyty PREMIUM
+// - SAS liczy cięcie za metr bieżący: mb z rozkroju (engine/nesting.js) × 1,5 × stawka (współczynnik z zamówienia
+//   SAS 55246: 397 mb zafakturowane przy 264,6 mb sumy półobwodów formatek w rozkroju = 1,50; jedna próba); płyty PREMIUM
 //   (PerfectSense, „PM/” w nazwie dekoru) mają wyższą stawkę i okleinowanie PREMIUM za metr. Express ×1,5.
 // - Heban liczy za formatkę; express ×1,5 (7,38 zł zamiast 4,92 zł).
 // Ceny brutto, jak w pozostałych katalogach. Mb cięcia to oszacowanie: suma półobwodów formatek na arkuszach
@@ -11,7 +12,7 @@ import { getPartEdges } from "./edgeBanding.js";
 import { baseCategory } from "../core/materialCatalog.js";
 
 export const CUT_RATES = {
-  sas: { perMbStandard: 2.84, perMbPremium: 5.42, edgingPremiumPerM: 8.34, palletFee: 64.58, mbFactor: 0.91 },
+  sas: { perMbStandard: 2.84, perMbPremium: 5.42, edgingPremiumPerM: 8.34, palletFee: 64.58, mbFactor: 1.5 },
   heban: { perPiece: 4.92, perPieceExpress: 7.38 },
   expressFactor: 1.5,
 };
@@ -33,11 +34,13 @@ export function cutGroups(parts, cutPlan = {}, edgeRules = null) {
   const byCat = new Map();
   for (const p of parts || []) {
     if (!CUT_CATEGORIES.includes(baseCategory(p.category))) continue;
-    const cat = p.category || "Inne";
+    // fronty z różnych materiałów (osobne płyty / MDF lakierowany) układają się na osobnych arkuszach
+    const cat = p.category === "Front" && p.materialId ? `Front::${p.materialId}` : (p.category || "Inne");
     if (!byCat.has(cat)) byCat.set(cat, []);
     byCat.get(cat).push(p);
   }
-  return [...byCat.entries()].map(([category, list]) => {
+  return [...byCat.entries()].map(([key, list]) => {
+    const category = key.startsWith("Front::") ? "Front" : key;
     const pieces = [];
     let edgeMm = 0, count = 0;
     list.forEach((p) => {
