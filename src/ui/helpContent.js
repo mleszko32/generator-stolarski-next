@@ -280,7 +280,8 @@ export const HELP_SECTIONS = [
         <li><b>Blaty</b> - odcinki blatów i łączenia w narożnikach.</li>
         <li><b>Okucia i okleina</b> - lista zakupów (nóżki, łączniki, komplety szuflad, zawiasy, okleina w mb) z odpowiednikiem
         w sklepie SAS, ceną i stanem magazynu. <b>Do koszyka SAS</b> kopiuje listę; na stronie panelu SAS kliknij zakładkę
-        „Do koszyka SAS” (przeciągnij ją raz na pasek zakładek z tej sekcji) - pozycje trafią do koszyka, zamówienie składasz sam.</li>
+        „Do koszyka SAS” (przeciągnij ją raz na pasek zakładek z tej sekcji) - pozycje trafią do koszyka, zamówienie składasz sam.
+        Obok jest odpowiednik w Hebanie z ceną, a <b>CSV do koszyka Heban</b> zapisuje plik do importu w panelu Hebanu.</li>
         <li><b>Kontrola projektu</b> - kolizje, szafki poza pokojem, za szerokie drzwi i półki,
         za długie prowadnice, formatki większe niż płyta, problemy w narożnikach, kolor lakieru NCS spoza wzornika, nierówna szczelina między frontami
         szafek postawionych na sobie (np. 5 mm luzu u góry zamiast 3 mm szczeliny).</li>

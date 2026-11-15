@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseHebanCatalog, hebanLabel, hebanFromText, hebanByCode, hebanSheetSize, hebanPricePerM2, hebanSheetsToM2, hebanBlumCode,
-  hebanSuggest, hebanLinkFromRows, hebanRowsFromLink, hebanLinkPrice, hebanLinkLabel, hebanIsBoard, hardwareHebanRows } from "./hebanCatalog.js";
+  hebanSuggest, hebanLinkFromRows, hebanRowsFromLink, hebanLinkPrice, hebanLinkLabel, hebanIsBoard, hardwareHebanRows, hebanBasketItems, hebanBasketCsv } from "./hebanCatalog.js";
 
 const rows = [
   ["18.U8685/SM-2800X2070", "D.P.Biel Alpejska gr.18 mm U8685/SM. 2800x2070 (pal. 27 szt.) 5.796 m2", "m2", 28.98, "Płyty laminowane", "29999"],
@@ -115,5 +115,23 @@ describe("dobór okuć z katalogu Heban", () => {
     expect(hardwareHebanRows(parts, links, "Zawias meblowy + prowadnik krzyżakowy (puszka 35mm)")[0][3]).toBe(12.18);
     expect(hebanIsBoard(rows[0])).toBe(true);
     expect(hebanIsBoard(rows[2])).toBe(false);
+  });
+});
+
+describe("koszyk Hebanu z listy okuć", () => {
+  it("sumuje kody, mnoży przez ilości części, zaokrągla w górę; brak odpowiednika trafia do missing", () => {
+    const hw = [
+      { name: "Komplet szuflady (MERIVOBOX - H:E L-500)", qty: 2 },
+      { name: "Zawias 70T3550 + prowadnik 173L6100", qty: 4 },
+      { name: "Coś bez odpowiednika", qty: 1 },
+    ];
+    const { items, missing } = hebanBasketItems(hw, parts, {});
+    expect(missing).toEqual(["Coś bez odpowiednika"]);
+    expect(items.find((i) => i.code.startsWith("ZF4.1002")).qty).toBe(4); // ×2 na szufladę, 2 szuflady
+    expect(items.find((i) => /^470M5002S\s+Z\s+LI/.test(i.code)).qty).toBe(2);
+    expect(items.find((i) => i.code.startsWith("173L6100")).qty).toBe(4);
+    const csv = hebanBasketCsv(items);
+    expect(csv.startsWith("Code;Quantity;Unit\r\n")).toBe(true);
+    expect(csv).toMatch(/470M5002S\s+Z\s+LI\s+V20SW-M;2;szt\./);
   });
 });

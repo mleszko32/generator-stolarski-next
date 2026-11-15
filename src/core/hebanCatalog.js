@@ -249,3 +249,28 @@ export function hardwareHebanRows(rows, links, hwName, opts) {
   if (/^Nóżka regulowana/.test(hwName)) { const ax = hebanSuggest(rows, hwName, opts); if (ax) return ax; } // zawsze Axilo
   return hebanRowsFromLink(rows, (links || {})[hwName]) || hebanSuggest(rows, hwName, opts);
 }
+
+// Lista zakupów -> koszyk Hebanu. hardware: [{ name, qty }] z calculateProjectHardware().
+// Zwraca { items: [{ code, unit, qty }], missing: [nazwy] } - te same pozycje Hebanu sumowane (z ułamkami `per`
+// dla opakowań / odcinków), ilość zaokrąglona w górę do całych sztuk. Kody bez zmian (spacje w środku).
+export function hebanBasketItems(hardware, rows, links, opts) {
+  const byCode = new Map(), missing = [];
+  for (const hw of hardware) {
+    const list = hardwareHebanRows(rows, links, hw.name, opts);
+    if (!list) { missing.push(hw.name); continue; }
+    const hwQty = Number(hw.qty) || 0;
+    if (!hwQty) continue;
+    list.forEach((r, i) => {
+      const it = byCode.get(r[0]) || { code: r[0], unit: r[2], raw: 0, qty: 0 };
+      it.raw += hwQty * ((list.per && list.per[i]) || 1);
+      it.qty = Math.max(1, Math.ceil(it.raw - 1e-9));
+      byCode.set(r[0], it);
+    });
+  }
+  return { items: [...byCode.values()].map(({ raw, ...it }) => it), missing };
+}
+
+// CSV importu koszyka Hebanu: „Code;Quantity;Unit” z nagłówkiem.
+export function hebanBasketCsv(items) {
+  return "Code;Quantity;Unit\r\n" + items.map((l) => `${l.code};${Math.max(1, Math.ceil(l.qty - 1e-9))};${l.unit}`).join("\r\n") + "\r\n";
+}

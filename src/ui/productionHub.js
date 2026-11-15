@@ -29,6 +29,7 @@ import { updateSidebar } from "./sidebar.js";
 import { openCsvExport } from "./csvEditor.js";
 import { printHardwareList } from "./hardwareList.js";
 import { loadSasCatalog, linkLabel, linkPrice, stockLabel } from "../core/sasCatalog.js";
+import { loadHebanCatalog, hardwareHebanRows, hebanLinkLabel, hebanLinkPrice, hebanBasketItems, hebanBasketCsv } from "../core/hebanCatalog.js";
 import { hardwareSasRows, basketItems, basketText, BASKET_BOOKMARKLET } from "../core/sasBasket.js";
 import { drawerOptions } from "../core/blumDrawer.js";
 import { showAlert } from "../utils/modal.js";
@@ -612,12 +613,13 @@ function renderOkucia(el) {
     <div class="hub-bar">
       <div><h3>Okucia i okleina</h3><div class="hub-sub">Lista zakupów z całego projektu. Okleina wg wyboru krawędzi z listy formatek (domyślnie dookoła, bez pleców HDF), ${edge.toFixed(1)} mb netto, z ${Math.round(EDGE_BANDING_RESERVE * 100)}% zapasu ${(edge * (1 + EDGE_BANDING_RESERVE)).toFixed(1)} mb.</div></div>
       <div class="hub-actions"><button type="button" id="hub-hw-print" class="btn btn-sm">Drukuj listę zakupów</button>
-        <button type="button" id="hub-hw-basket" class="btn btn-sm btn-primary" disabled>Do koszyka SAS</button></div>
+        <button type="button" id="hub-hw-basket" class="btn btn-sm btn-primary" disabled>Do koszyka SAS</button>
+        <button type="button" id="hub-hw-heban-csv" class="btn btn-sm" disabled>CSV do koszyka Heban</button></div>
     </div>
     ${hw.length === 0 ? `<p class="hub-empty">Lista zakupów jest pusta.</p>` : `
     <table class="hub-table">
-      <thead><tr><th>Pozycja</th><th class="num">Ilość</th><th>J.m.</th><th>W SAS (cena po rabacie, stan)</th></tr></thead>
-      <tbody>${hw.map((h, i) => `<tr><td>${escapeHtml(h.name)}</td><td class="num">${h.qty}</td><td>${escapeHtml(h.unit || '')}</td><td class="hub-sub" data-sas-row="${i}">…</td></tr>`).join('')}</tbody>
+      <thead><tr><th>Pozycja</th><th class="num">Ilość</th><th>J.m.</th><th>W SAS (cena po rabacie, stan)</th><th>W Heban (cena, razem)</th></tr></thead>
+      <tbody>${hw.map((h, i) => `<tr><td>${escapeHtml(h.name)}</td><td class="num">${h.qty}</td><td>${escapeHtml(h.unit || '')}</td><td class="hub-sub" data-sas-row="${i}">…</td><td class="hub-sub" data-heban-row="${i}">…</td></tr>`).join('')}</tbody>
     </table>
     <div class="hub-card" style="margin-top:14px">
       <div class="hub-strong" style="margin-bottom:4px">Zakupy w sklepie SAS</div>
@@ -662,6 +664,33 @@ function renderOkucia(el) {
       try { await navigator.clipboard.writeText(basketText(items)); } catch (e) { showAlert('Nie udało się skopiować do schowka.'); return; }
       showAlert(`Skopiowano ${items.length} pozycji do koszyka SAS. Otwórz panel SAS i kliknij zakładkę „Do koszyka SAS”.`
         + (missing.length ? ` Bez odpowiednika w SAS (kup osobno): ${missing.join(', ')}.` : ''));
+    });
+  });
+  loadHebanCatalog().then((cat) => {
+    const links = (state.project.pricing && state.project.pricing.heban && state.project.pricing.heban.hardware) || {};
+    const opts = drawerOptions(state.project.pricing);
+    hw.forEach((h, i) => {
+      const cell = el.querySelector(`[data-heban-row="${i}"]`);
+      if (!cell) return;
+      if (!cat.rows.length) { cell.textContent = 'brak katalogu Heban'; return; }
+      const list = hardwareHebanRows(cat.rows, links, h.name, opts);
+      cell.textContent = list
+        ? `${hebanLinkLabel(list)} · razem ${(hebanLinkPrice(list) * Math.ceil(h.qty)).toFixed(2).replace('.', ',')} zł`
+        : '— wybierz w Kosztorysie';
+    });
+    const btn = el.querySelector('#hub-hw-heban-csv');
+    if (!btn || !cat.rows.length) return;
+    btn.disabled = false;
+    btn.addEventListener('click', () => {
+      const { items, missing } = hebanBasketItems(hw, cat.rows, links, opts);
+      if (!items.length) { showAlert('Żadna pozycja nie ma odpowiednika w Hebanie (wgraj nowy katalog Heban).'); return; }
+      const name = `Heban_okucia_${String(state.project.name || 'projekt').replace(/[^\p{L}\p{N}_-]+/gu, '_')}.csv`;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([hebanBasketCsv(items)], { type: 'text/csv;charset=utf-8' }));
+      a.download = name; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      showAlert(`Zapisano ${name} (${items.length} pozycji). W panelu Hebanu zaimportuj plik CSV do koszyka i sprawdź go przed zamówieniem.`
+        + (missing.length ? ` Bez odpowiednika w Hebanie (kup osobno): ${missing.join(', ')}.` : ''));
     });
   });
 }

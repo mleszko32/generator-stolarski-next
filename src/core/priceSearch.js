@@ -8,7 +8,7 @@
 // Heban [kod, nazwa, jedn., cena, grupa, id artykułu].
 
 import { sasPricePerM2, sheetAreaM2, sasSuggest } from "./sasCatalog.js";
-import { hebanPricePerM2, hebanSheetSize, hebanIsBoard, hebanSuggest } from "./hebanCatalog.js";
+import { hebanPricePerM2, hebanSheetSize, hebanIsBoard, hebanSuggest, hebanBasketCsv } from "./hebanCatalog.js";
 import { drawerOptions } from "./blumDrawer.js";
 
 export const PRICE_TYPES = { P: "Płyta", O: "Obrzeże", B: "Blat", A: "Okucia i akcesoria" };
@@ -139,7 +139,7 @@ export function csvSas(quote) {
   return quote.lines.map((l) => `${l.code};${wholeQty(l.qty)}`).join("\r\n") + "\r\n";
 }
 export function csvHeban(quote) {
-  return "Code;Quantity;Unit\r\n" + quote.lines.map((l) => `${l.code};${wholeQty(l.qty)};${l.unit}`).join("\r\n") + "\r\n";
+  return hebanBasketCsv(quote.lines);
 }
 
 // Przeliczenie arkuszy na m² płyty Hebanu (Heban liczy płyty w m², nie w arkuszach): 2 × 5,796 = 11,592.
