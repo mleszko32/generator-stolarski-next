@@ -1,7 +1,7 @@
 // src/ui/kosztorysModal.js
 // Okno kosztorysu projektu (ceny materiałów i okuć, robocizna, montaż, marża, rabat, VAT).
 import { calculateProjectCost } from "../engine/cost.js";
-import { calculateAllProjectParts } from "../engine/cabinet.js";
+import { calculateAllProjectParts, collectProjectParts } from "../engine/cabinet.js";
 import { cuttingQuote, cutGroups } from "../engine/cuttingCost.js";
 import { lacquerByColor } from "../engine/lacquerSummary.js";
 import { state } from "../core/state.js";
@@ -351,6 +351,7 @@ export function mountKosztorys(root) {
     // Szuflada/Plecy. Nowy materiał powstaje więc NIE tutaj, tylko przy
     // froncie (ui/properties.js: "+ Nowy materiał…" w wyborze per front) -
     // dopiero gdy jest przypisany, ma tu sens pokazać mu wiersz do wyceny.
+    let frontUsage = new Map(); // materialId -> nazwy szafek / elementów (renderMaterialRows)
     function renderMaterialRows() {
         const cost = calculateProjectCost();
         // „Korpus” i „Korpus: <dekor>” (dekor korpusu szafki) - każdy dekor osobny wiersz z własną ceną.
@@ -358,6 +359,12 @@ export function mountKosztorys(root) {
         const korpusHtml = cost.materials.filter(isKorpus).map(otherRowHtml).join('');
         // Materiały frontów na tej samej płycie (np. wszystkie lakiery na MDF W908) pod wspólnym nagłówkiem płyty -
         // arkusze liczą się razem, a rozróżnia je kolor w nazwie wiersza.
+        // Gdzie użyty materiał: nazwy szafek / elementów z formatkami frontu w tym materiale (do namierzenia w projekcie)
+        frontUsage = new Map();
+        collectProjectParts().filter(p => p.category === 'Front' && p.materialId).forEach(p => {
+            if (!frontUsage.has(p.materialId)) frontUsage.set(p.materialId, new Set());
+            if (p.moduleName) frontUsage.get(p.materialId).add(p.moduleName);
+        });
         const frontLines = cost.materials.filter(m => m.category === 'Front');
         const boardOf = (m) => frontMaterialBoard(pricing.frontMaterials.find(x => x.id === m.materialId)) || '';
         const frontHtml = [...new Set(frontLines.map(boardOf))].map(board => {
@@ -446,9 +453,12 @@ export function mountKosztorys(root) {
         const board = frontMaterialBoard(mat);
         const lacquer = /lakier/i.test(String(mat.name || ''));
         const note = board ? `płyta: ${board}${lacquer ? ' · lakierowanie liczysz w „Lakierni” (sekcja Robocizna)' : ''}` : '';
+        // gdzie użyty: do 4 nazw w wierszu, pełna lista w ⚙
+        const used = [...(frontUsage.get(m.materialId) || [])].sort((a, b) => a.localeCompare(b, 'pl'));
+        const usedShort = used.length <= 4 ? used.join(', ') : `${used.slice(0, 4).join(', ')} i ${used.length - 4} więcej`;
         return `
             <tr>
-                <td>Front: <b class="kz-front-name" data-material-id="${escapeHtml(m.materialId)}">${escapeHtml(m.materialName)}</b><b class="kz-front-color" data-material-id="${escapeHtml(m.materialId)}">${mat.color ? ' · ' + escapeHtml(mat.color) : ''}</b>${note ? `<div class="hint">${escapeHtml(note)}</div>` : ''}</td>
+                <td>Front: <b class="kz-front-name" data-material-id="${escapeHtml(m.materialId)}">${escapeHtml(m.materialName)}</b><b class="kz-front-color" data-material-id="${escapeHtml(m.materialId)}">${mat.color ? ' · ' + escapeHtml(mat.color) : ''}</b>${used.length ? `<div class="hint"><b>Użyte w:</b> ${escapeHtml(usedShort)}</div>` : ''}${note ? `<div class="hint">${escapeHtml(note)}</div>` : ''}</td>
                 <td>${srcBadgeHtml('materials', 'Front:' + m.materialId)}</td>
                 <td class="num kosztorys-front-mat-area" data-material-id="${escapeHtml(m.materialId)}">${areaText(m)}</td>
                 <td class="num"><span class="cost-input"><input type="number" class="input kosztorys-front-mat-price" data-material-id="${escapeHtml(m.materialId)}" value="${m.pricePerM2}" step="1" min="0"> zł/m²</span></td>
@@ -456,7 +466,7 @@ export function mountKosztorys(root) {
                 <td class="kz-actions">${editBtnHtml()}<button type="button" class="icon-btn kz-edit" data-edit="front" title="Nazwa, kolor RAL / NCS, płyta formatek, przypisanie do frontów"><i class="ti ti-settings" aria-hidden="true"></i></button>${canDelete ? `<button type="button" class="icon-btn kosztorys-mat-del" data-material-id="${escapeHtml(m.materialId)}" title="Usuń materiał"><i class="ti ti-trash" aria-hidden="true"></i></button>` : ''}</td>
             </tr>
             ${priceEditRowHtml('materials', 'Front:' + m.materialId)}
-            <tr class="kosztorys-mat-bulk-row kz-edit-row" data-edit="front" hidden><td colspan="6"><label>Nazwa materiału: <input type="text" class="input kosztorys-mat-name" data-material-id="${escapeHtml(m.materialId)}" value="${escapeHtml(m.materialName)}" placeholder="Nazwa materiału frontu"></label> · ${colorFieldHtml(m.materialId)} · <label class="kosztorys-mat-board-label">Płyta formatek: <input type="text" class="input kosztorys-mat-board" list="kosztorys-board-catalog" data-material-id="${escapeHtml(m.materialId)}" value="${escapeHtml((pricing.frontMaterials.find(x => x.id === m.materialId) || {}).board || '')}" placeholder="np. MDF dwustronny z bazy SAS"></label> · Zastosuj do: ${bulkBtns}</td></tr>`;
+            <tr class="kosztorys-mat-bulk-row kz-edit-row" data-edit="front" hidden><td colspan="6"><label>Nazwa materiału: <input type="text" class="input kosztorys-mat-name" data-material-id="${escapeHtml(m.materialId)}" value="${escapeHtml(m.materialName)}" placeholder="Nazwa materiału frontu"></label> · ${colorFieldHtml(m.materialId)} · <label class="kosztorys-mat-board-label">Płyta formatek: <input type="text" class="input kosztorys-mat-board" list="kosztorys-board-catalog" data-material-id="${escapeHtml(m.materialId)}" value="${escapeHtml((pricing.frontMaterials.find(x => x.id === m.materialId) || {}).board || '')}" placeholder="np. MDF dwustronny z bazy SAS"></label> · Zastosuj do: ${bulkBtns}${used.length > 4 ? `<div class="hint"><b>Użyte w:</b> ${escapeHtml(used.join(', '))}</div>` : ''}</td></tr>`;
     }
 
     function renderHardwareRows() {
