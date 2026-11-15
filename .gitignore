@@ -31,3 +31,6 @@ dist-ssr
 
 # Pliki mebli z projektów klientów (dane inwestorów)
 meble-import/
+
+# Cennik SAS i Heban na telefon - ceny kontrahenta (poufne), przekazanie dla Claude Code
+cennik-mobilny/

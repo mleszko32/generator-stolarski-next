@@ -328,6 +328,12 @@ export const HELP_SECTIONS = [
       dostają cenę dla nowych opcji, cena wpisana ręcznie zostaje.</p>
       <p><b>Baza cen</b> (przyciski na górze kosztorysu) zapamiętuje ceny z jednego projektu, żeby
       nałożyć je na kolejny bez przepisywania.</p>
+      <p>Przycisk <b>Cennik</b> na górnym pasku otwiera szybki cennik SAS i Heban, wygodny też na telefonie.
+      <b>Wyszukiwarka</b> szuka w obu katalogach po kilku słowach w dowolnej kolejności (kod, dekor, grubość), z filtrami
+      hurtowni i typu; dotknięcie pozycji pokazuje kod, cenę za m² i arkusz, stan magazynu SAS i przelicznik arkuszy na m²
+      dla płyt Hebanu. Zakładka <b>Szuflady Blum</b> wycenia komplet MERIVOBOX z obu hurtowni (też z szybkiego wpisu, np.
+      „merivobox 500 E boxcap biały x6”) i daje CSV do koszyka SAS i Heban. Dane są z katalogów wgranych w Kosztorysie,
+      więc cennik pokazuje je tylko po zalogowaniu; zamówienia składasz sam w hurtowni.</p>
       <p>Karta <b>Oferta dla klienta</b> drukuje ofertę z zakresem, ceną i (opcjonalnie) zdjęciem
       bieżącego widoku 3D - bez kosztów i marży.</p>`,
   },

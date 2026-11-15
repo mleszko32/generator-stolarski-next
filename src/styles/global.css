@@ -881,3 +881,34 @@ details.menu[open] > summary { border-color: var(--accent); color: var(--accent)
 .decor-legend-photo-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .decor-legend-photo .input { font-size: var(--fs-sm); padding: 3px 6px; width: auto; }
 .decor-legend-photo-width { max-width: 72px; }
+
+/* Cennik SAS i Heban (ui/priceListPage.js) */
+.pl-tabs, .pl-chips, .pl-seg { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pl-tabs { margin-bottom: 8px; }
+.pl-stamp { margin-bottom: 8px; }
+.pl-chips { margin-bottom: 8px; }
+.pl-sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 2px; }
+.pl-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; font-size: var(--fs-sm); color: var(--text-secondary); }
+.pl-meta .input { width: auto; }
+.pl-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 10px 12px; margin-bottom: 6px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface-panel); cursor: pointer; }
+.pl-card:hover, .pl-card:focus-visible { border-color: var(--accent); outline: none; }
+.pl-name { font-weight: 600; overflow-wrap: anywhere; }
+.pl-price { text-align: right; white-space: nowrap; }
+.pl-price small { display: block; font-size: var(--fs-xs); color: var(--text-secondary); }
+.pl-sub { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: var(--fs-sm); color: var(--text-secondary); }
+.pl-code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--fs-sm); color: var(--text-primary); overflow-wrap: anywhere; }
+.pl-more { grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 6px 0; padding-top: 8px; border-top: 1px dashed var(--border); font-size: var(--fs-md); }
+.pl-more dt { color: var(--text-secondary); }
+.pl-more dd { margin: 0; }
+.pl-cfg { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 8px 10px; align-items: center; margin-bottom: 12px; }
+.pl-cfg .input { width: 80px; }
+.pl-quotes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
+.pl-quote h3 { margin: 0 0 6px; font-size: var(--fs-lg); }
+.pl-quote .pl-code { display: block; color: var(--text-secondary); }
+.pl-total { margin: 8px 0; font-weight: 700; }
+.pl-total small { font-weight: 400; color: var(--text-secondary); }
+#pl-more { display: block; margin: 10px auto 0; }
+@media (max-width: 640px) {
+  .pl-cfg { grid-template-columns: 1fr; gap: 4px; }
+  .pl-quotes { grid-template-columns: 1fr; }
+}

@@ -621,6 +621,10 @@ z `core/costGroups.js` (`groupHardware`, czyste, z testami). Wiersz materiału f
 ołówek (`data-edit="price"`) jak w każdym wierszu, nazwa / kolor / płyta / przypisanie pod ⚙ (`data-edit="front"`). Wiersz ceny jest
 wspólny dla płyt, frontów i okuć (`priceEditRowHtml`, `priceInputFor`, porównanie `.kz-compare` z `boardOffers` / `hardware*Rows`); dobór cen wycenia front płytą (`frontMaterialBoard(mat) || mat.name` przez `pickBoard`), powiązanie pod
 kluczem `Front:<id>` w `pricing.sas.materials` / `pricing.heban.materials`.
+**Cennik na telefon**: dawna aplikacja „Cennik SAS i Heban” (artefakt claude.ai) z danymi i skryptami leży w `cennik-mobilny/`
+(poza gitem, ceny poufne) — opis, formaty danych, rozpiska Merivobox i plan etapów 2b–4 w `cennik-mobilny/README.md`.
+**Strona „Cennik”** (etap 4, przycisk na górnym pasku): `core/priceSearch.js` (czyste, z testami — `buildItems`, `searchItems`,
+`drawerQuote` przez `sasSuggest` / `hebanSuggest`, `csvSas` / `csvHeban`) + okno `ui/priceListPage.js`; dane z katalogów w Firestore.
 **Szuflady Blum w wycenie**: `core/blumDrawer.js` (czyste, z testami) — opcje `pricing.blumDrawer = { color: B|S|A, kg: 40|70,
 eVariant: reling|boxcap, fix: W|I }` (`drawerOptions`, domyślnie biały, 40 kg, reling, wkręty; wiersz selektów nad tabelą okuć) i
 `merivoboxRecipe(wys., NL, opcje)` — części kompletu MERIVOBOX (boki 470{M dla E}{NL}2S para, prowadnica 450/453.{NL}1B, mocowanie frontu

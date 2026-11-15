@@ -23,6 +23,7 @@ import { readLocalBackup, clearLocalBackup, startLocalBackup } from "./core/loca
 import { applyProjectData, loadDecorTextureFromCloud } from "./core/storage.js";
 import { setDecorPhotoLoader } from "./render/decorTextures.js";
 import { openHelp } from "./ui/helpModal.js";
+import { openPriceList } from "./ui/priceListPage.js";
 import { initAssistantBridge } from "./ui/assistantBridge.js";
 
 const navIcon = (name, text) => `<i class="ti ti-${name}" aria-hidden="true"></i> ${text}`;
@@ -165,6 +166,9 @@ window.addEventListener('keydown', (e) => {
   e.preventDefault(); // F1 w przeglądarce otwiera jej własną pomoc
   openHelp();
 });
+
+// --- CENNIK SAS I HEBAN (ui/priceListPage.js) ---
+document.getElementById('btn-price-list')?.addEventListener('click', () => openPriceList());
 
 // --- POMIESZCZENIE ---
 const btnRoom = document.getElementById('btn-room-settings');
