@@ -65,6 +65,9 @@ export function migratePricingExtras(p) {
   p.assembly = hr(p.assembly);
   p.transport = nonNeg(p.transport);
   p.cuttingPerPart = nonNeg(p.cuttingPerPart);
+  // Cięcie wg stawek hurtowni (engine/cuttingCost.js): manual = zł/szt. z cuttingPerPart (stare projekty), sas, heban.
+  const cut = p.cutting && typeof p.cutting === 'object' ? p.cutting : {};
+  p.cutting = { mode: ['sas', 'heban'].includes(cut.mode) ? cut.mode : 'manual', express: !!cut.express, pallet: !!cut.pallet };
   p.laborMarginPercent = p.laborMarginPercent == null ? nonNeg(p.marginPercent) : nonNeg(p.laborMarginPercent);
   p.discountPercent = Math.min(100, nonNeg(p.discountPercent));
   p.vatPercent = nonNeg(p.vatPercent, DEFAULT_VAT_PERCENT);

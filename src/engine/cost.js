@@ -6,6 +6,7 @@ import { state, migratePricingExtras } from "../core/state.js";
 import { calculateAllProjectParts } from "./cabinet.js";
 import { calculateProjectHardware } from "./hardware.js";
 import { baseCategory } from "../core/materialCatalog.js";
+import { cuttingCostFor } from "./cuttingCost.js";
 
 // Szacunkowy kosztorys materiałowy - liczy powierzchnię formatek Z OSOBNA dla
 // każdej kategorii (Korpus/Front/Szuflada/Plecy, patrz PRICING_MATERIAL_
@@ -85,7 +86,10 @@ export function calculateProjectCost() {
   const cutPartsCount = parts
     .filter(p => CUT_CATEGORIES.includes(baseCategory(p.category)))
     .reduce((sum, p) => sum + (parseFloat(p.qty) || 0), 0);
-  const cuttingCost = cutPartsCount * pricing.cuttingPerPart;
+  const cuttingMode = pricing.cutting.mode;
+  const cuttingCost = cuttingMode === 'manual'
+    ? cutPartsCount * pricing.cuttingPerPart
+    : cuttingCostFor(cuttingMode, parts, pricing, state.project.cutPlan, state.project.edgeBanding);
   const laborCost = pricing.labor.hours * pricing.labor.rate;
   const lacquerCost = pricing.lacquer.hours * pricing.lacquer.rate;
   const assemblyCost = pricing.assembly.hours * pricing.assembly.rate;
@@ -112,6 +116,7 @@ export function calculateProjectCost() {
     materialsSubtotal,
     hardwareSubtotal,
     cutPartsCount,
+    cuttingMode,
     cuttingCost,
     laborCost,
     lacquerCost,

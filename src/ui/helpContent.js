@@ -303,7 +303,9 @@ export const HELP_SECTIONS = [
       <b>Dobierz ceny z hurtowni</b> i <b>Cenniki i katalogi</b> (wgrywanie katalogów SAS / Heban i baza cen). Dalej zwijane
       sekcje z sumą w nagłówku: Płyty i cięcie, Okucia i akcesoria (w grupach: szuflady, zawiasy i podnośniki, nóżki / złącza /
       drążki, okleina, inne), Robocizna, Marża i VAT. Kolumna <b>Źródło</b> mówi, skąd jest cena: SAS, Heban, ręcznie albo
-      „brak ceny”. Ołówek na końcu każdego wiersza - płyty, frontu i okucia - działa tak samo: rozwija
+      „brak ceny”. Wiersz <b>Cięcie formatek</b>: stawka ręczna (zł/szt.) albo wg hurtowni - SAS za metr bieżący z rozkroju
+      (PREMIUM, czyli PerfectSense / „PM/”, drożej, z okleinowaniem; opcjonalnie paleta) albo Heban za formatkę; <b>express</b> ×1,5.
+      Pod wierszem jest porównanie obu hurtowni. Ołówek na końcu każdego wiersza - płyty, frontu i okucia - działa tak samo: rozwija
       „Szukaj w bazie SAS”, „Szukaj w bazie Heban” i ceny tej pozycji w obu hurtowniach (kliknięcie wpisuje cenę). Wiersze
       „Front: …” to materiały frontów z cennika frontów; dodatkowy przycisk ⚙ przy nich pokazuje nazwę materiału, kolor
       RAL / NCS, płytę formatek i przypisanie do frontów dolnych / górnych. Dobór cen wycenia front płytą z nazwy (np. „H1386 ST40 18mm”) albo z pola „Płyta formatek”; front

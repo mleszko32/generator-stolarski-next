@@ -1,6 +1,8 @@
 // src/ui/kosztorysModal.js
 // Okno kosztorysu projektu (ceny materiałów i okuć, robocizna, montaż, marża, rabat, VAT).
 import { calculateProjectCost } from "../engine/cost.js";
+import { calculateAllProjectParts } from "../engine/cabinet.js";
+import { cuttingQuote, cutGroups } from "../engine/cuttingCost.js";
 import { state } from "../core/state.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { escapeHtml, downloadFile } from "../utils/dom.js";
@@ -118,7 +120,13 @@ export function mountKosztorys(root) {
                 <table class="cost-table kz-table">
                     <thead><tr><th>Materiał</th><th>Źródło</th><th class="num">Ilość</th><th class="num">Cena</th><th class="num">Koszt</th><th></th></tr></thead>
                     <tbody id="kosztorys-materials-tbody"></tbody>
-                    <tbody><tr><td>Cięcie formatek (hurtownia)</td><td></td><td class="num" id="kosztorys-cut-count">—</td><td class="num">${numField('cutting', pricing.cuttingPerPart, 'zł/szt.')}</td><td class="num" id="kosztorys-cut-cost">—</td><td></td></tr></tbody>
+                    <tbody><tr><td>Cięcie formatek (hurtownia)
+                        <div class="kz-opts"><select class="input" id="kosztorys-cut-mode" aria-label="Sposób liczenia cięcia">
+                            ${[['manual', 'stawka ręczna'], ['sas', 'SAS (za mb)'], ['heban', 'Heban (za formatkę)']].map(([v, l]) => `<option value="${v}" ${pricing.cutting.mode === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+                            <label class="hint"><input type="checkbox" id="kosztorys-cut-express" ${pricing.cutting.express ? 'checked' : ''}> express ×1,5</label>
+                            <label class="hint" id="kosztorys-cut-pallet-wrap"><input type="checkbox" id="kosztorys-cut-pallet" ${pricing.cutting.pallet ? 'checked' : ''}> paleta SAS</label></div></td>
+                        <td></td><td class="num" id="kosztorys-cut-count">—</td><td class="num"><span id="kosztorys-cut-manual">${numField('cutting', pricing.cuttingPerPart, 'zł/szt.')}</span></td><td class="num" id="kosztorys-cut-cost">—</td><td></td></tr>
+                        <tr><td colspan="6" class="hint" id="kosztorys-cut-compare"></td></tr></tbody>
                 </table>`, true)}
             ${sec('okucia', 'Okucia i akcesoria', `
                 <div class="kz-opts" id="kosztorys-blum-opts">
@@ -227,6 +235,7 @@ export function mountKosztorys(root) {
         pricing.labor = { hours: num('#kosztorys-labor-hours'), rate: num('#kosztorys-labor-rate') };
         pricing.lacquer = { hours: num('#kosztorys-lacquer-hours'), rate: num('#kosztorys-lacquer-rate') };
         pricing.cuttingPerPart = num('#kosztorys-cutting');
+        pricing.cutting = { mode: modal.querySelector('#kosztorys-cut-mode').value, express: modal.querySelector('#kosztorys-cut-express').checked, pallet: modal.querySelector('#kosztorys-cut-pallet').checked };
         pricing.assembly = { hours: num('#kosztorys-assembly-hours'), rate: num('#kosztorys-assembly-rate') };
         pricing.transport = num('#kosztorys-transport');
         pricing.discountPercent = Math.min(100, num('#kosztorys-discount'));
@@ -283,6 +292,14 @@ export function mountKosztorys(root) {
         set('#kosztorys-foot-labormarginpct', cost.laborMarginPercent);
         set('#kosztorys-cut-count', cost.cutPartsCount + ' szt.');
         set('#kosztorys-cut-cost', formatPLN(cost.cuttingCost));
+        // sposób liczenia cięcia: pole zł/szt. tylko przy stawce ręcznej, porównanie SAS / Heban pod wierszem
+        modal.querySelector('#kosztorys-cut-manual').hidden = cost.cuttingMode !== 'manual';
+        modal.querySelector('#kosztorys-cut-pallet-wrap').hidden = cost.cuttingMode !== 'sas';
+        const cq = cuttingQuote(cutGroups(calculateAllProjectParts(), state.project.cutPlan, state.project.edgeBanding), pricing.cutting);
+        const mb = cq.cutMb.toFixed(1).replace('.', ',');
+        set('#kosztorys-cut-compare', cq.pieces
+            ? `Szacunek: SAS ${formatPLN(cq.sas.total)} (≈ ${mb} mb cięcia${cq.sas.edging ? ', okleina PREMIUM ' + formatPLN(cq.sas.edging) : ''}${cq.sas.pallet ? ', paleta' : ''}) · Heban ${formatPLN(cq.heban.total)} (${cq.pieces} formatek) · ${cq.sas.total <= cq.heban.total ? 'taniej SAS' : 'taniej Heban'}`
+            : '');
         set('#kosztorys-foot-cutting', formatPLN(cost.cuttingCost));
         set('#kosztorys-labor-cost', formatPLN(cost.laborCost));
         set('#kosztorys-lacquer-cost', formatPLN(cost.lacquerCost));
@@ -798,6 +815,7 @@ export function mountKosztorys(root) {
     renderMaterialRows();
     renderHardwareRows();
     recalc(INIT);
+    ['mode', 'express', 'pallet'].forEach(k => modal.querySelector('#kosztorys-cut-' + k).addEventListener('change', recalc));
     modal.querySelector('#kosztorys-margin').addEventListener('input', recalc);
     modal.querySelector('#kosztorys-labor-margin').addEventListener('input', recalc);
     ['labor-hours','labor-rate','lacquer-hours','lacquer-rate','cutting','assembly-hours','assembly-rate','transport','discount','vat'].forEach(k => modal.querySelector('#kosztorys-' + k).addEventListener('input', recalc));
