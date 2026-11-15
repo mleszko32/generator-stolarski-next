@@ -34,7 +34,7 @@ import { openWallFillModal } from "./wallFillModal.js";
 import { openSplitModuleModal } from "./splitModuleModal.js";
 import { listSplitPoints } from "../core/splitModule.js";
 import { BOARD_BACK_MIN, resolveBackPanel } from "../core/backPanel.js";
-import { catalogLabels, assignFrontMaterialByName, frontMaterialSuggestions, addCatalogDecor } from "../core/materialCatalog.js";
+import { catalogLabels, assignFrontMaterialByName, frontMaterialSuggestions, addCatalogDecor, frontMaterialLabel } from "../core/materialCatalog.js";
 import { moduleFrontMaterialId, PLINTH_KORPUS } from "../core/plinthMaterial.js";
 import { groupButtonsHtml, bindGroupButtons } from "./groupButtons.js";
 
@@ -43,9 +43,10 @@ function plinthMaterialHtml(mod) {
   const list = state.project.pricing?.frontMaterials || [];
   const cur = String(mod.legs?.plinthMaterial || '');
   const isDecor = cur.startsWith('decor:');
-  const frontName = (list.find(m => m.id === moduleFrontMaterialId(mod, state.project)) || {}).name || 'fronty';
+  const frontMat = list.find(m => m.id === moduleFrontMaterialId(mod, state.project));
+  const frontName = frontMat ? frontMaterialLabel(frontMat, list) : 'fronty';
   const opts = [['', `Jak fronty (${frontName})`], [PLINTH_KORPUS, 'Jak korpus'],
-    ...list.map(m => [`front:${m.id}`, `Front: ${m.name}`]), ['decor', 'Dekor płyty…']];
+    ...list.map(m => [`front:${m.id}`, `Front: ${frontMaterialLabel(m, list)}`]), ['decor', 'Dekor płyty…']];
   const sel = isDecor ? 'decor' : cur;
   return `
         <div class="property-group mb-8"><label style="font-size: 11px;">Materiał cokołu:</label><select id="input-plinth-material">${opts.map(([v, l]) => `<option value="${escapeHtml(v)}" ${v === sel ? 'selected' : ''}>${escapeHtml(l)}</option>`).join('')}</select></div>
@@ -320,7 +321,7 @@ export function initPropertiesPanel() {
           <div class="property-group mb-8">
             <label class="fs-xs">${escapeHtml(label)} — materiał:</label>
             <select class="input-front-material" data-front-id="${escapeHtml(front.id)}">
-              ${(state.project.pricing?.frontMaterials || []).map((mat, i) => `<option value="${escapeHtml(mat.id)}" ${(front.materialId ? front.materialId === mat.id : i === 0) ? 'selected' : ''}>${escapeHtml(mat.name)}</option>`).join('')}
+              ${(state.project.pricing?.frontMaterials || []).map((mat, i, all) => `<option value="${escapeHtml(mat.id)}" ${(front.materialId ? front.materialId === mat.id : i === 0) ? 'selected' : ''}>${escapeHtml(frontMaterialLabel(mat, all))}</option>`).join('')}
               <option value="__new__">+ Nowy materiał…</option>
             </select>
           </div>

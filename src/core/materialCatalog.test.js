@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { decorLabel, catalogLabels, addCatalogDecor, partMaterialLabel } from "./materialCatalog.js";
+import { decorLabel, catalogLabels, addCatalogDecor, partMaterialLabel, frontMaterialLabel } from "./materialCatalog.js";
 
 const project = () => ({
   materials: { boardThickness: 18, backThickness: 3, decors: { Korpus: "Egger W1000 ST9 Biały premium" } },
@@ -76,5 +76,22 @@ describe("lakier RAL / NCS z listy materiałów frontów", async () => {
     const mat = project.pricing.frontMaterials.find((m) => m.id === id);
     expect(mat).toMatchObject({ name: "Lakier", color: "RAL 9016 Traffic white", pricePerM2: 350 });
     expect(assignFrontMaterialByName(mods, "RAL 9016", project)).toBe(id);
+  });
+});
+
+describe("frontMaterialLabel - rozróżnialne nazwy w listach wyboru", () => {
+  const list = [
+    { id: "a", name: "Lakier", color: "NCS S 0500-N" },
+    { id: "b", name: "Lakier", color: "NCS S 2005-Y40R" },
+    { id: "c", name: "Lakier" },
+    { id: "d", name: "Lakier" },
+    { id: "e", name: "Standard" },
+  ];
+  it("dopisuje kolor, a identyczne pozycje numeruje", () => {
+    expect(frontMaterialLabel(list[0], list)).toBe("Lakier · NCS S 0500-N");
+    expect(frontMaterialLabel(list[1], list)).toBe("Lakier · NCS S 2005-Y40R");
+    expect(frontMaterialLabel(list[2], list)).toBe("Lakier (3)");
+    expect(frontMaterialLabel(list[3], list)).toBe("Lakier (4)");
+    expect(frontMaterialLabel(list[4], list)).toBe("Standard");
   });
 });

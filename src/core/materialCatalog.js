@@ -156,3 +156,11 @@ export function frontMaterialSuggestions(project) {
   const own = ((project && project.pricing && project.pricing.frontMaterials) || []).map((m) => m.name);
   return [...new Set([...own, ...lacquerSuggestions().map((l) => `Lakier ${l}`), ...catalogLabels(project)])];
 }
+
+// Nazwa materiału frontu do list wyboru: „Lakier · NCS S 2005-Y40R”. Gdy kilka materiałów ma identyczną nazwę i kolor
+// (albo żadnego koloru), dopisuje numer pozycji na liście, żeby dało się je rozróżnić.
+export function frontMaterialLabel(mat, list = []) {
+  const base = (mat.color && String(mat.color).trim()) ? `${mat.name} · ${String(mat.color).trim()}` : String(mat.name || "");
+  const same = list.filter((m) => ((m.color && String(m.color).trim()) ? `${m.name} · ${String(m.color).trim()}` : String(m.name || "")) === base);
+  return same.length > 1 ? `${base} (${list.indexOf(mat) + 1})` : base;
+}

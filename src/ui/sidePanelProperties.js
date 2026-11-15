@@ -5,7 +5,7 @@
 import { lacquerSuggestions } from "../core/lacquerColors.js";
 import { applyPanelDecorThickness } from "../core/boardThickness.js";
 import { DISHWASHER_WIDTHS, dishwasherGeometry } from "../core/dishwasher.js";
-import { catalogLabels } from "../core/materialCatalog.js";
+import { catalogLabels, frontMaterialLabel } from "../core/materialCatalog.js";
 import { state } from "../core/state.js";
 import { groupButtonsHtml, bindGroupButtons } from "./groupButtons.js";
 import { updateSidebar } from "./sidebar.js";
@@ -40,7 +40,7 @@ function materialSectionHtml(panel) {
     <div class="property-group">
       <label>Materiał (cennik frontów):</label>
       <select id="input-side-material">
-        ${mats.map((mat, i) => `<option value="${escapeHtml(mat.id)}" ${(panel.materialId ? panel.materialId === mat.id : i === 0) ? 'selected' : ''}>${escapeHtml(mat.name)}</option>`).join('')}
+        ${mats.map((mat, i) => `<option value="${escapeHtml(mat.id)}" ${(panel.materialId ? panel.materialId === mat.id : i === 0) ? 'selected' : ''}>${escapeHtml(frontMaterialLabel(mat, mats))}</option>`).join('')}
         <option value="__new__">+ Nowy materiał…</option>
       </select>
     </div>
@@ -115,7 +115,7 @@ function renderHorizontalPanelProperties(rightSidebar, panel) {
         <label>Materiał (cennik frontów):</label>
         <select id="input-side-material">
           <option value="" ${panel.materialId ? '' : 'selected'}>Płyta korpusu (dekor powyżej)</option>
-          ${(state.project.pricing?.frontMaterials || []).map(mat => `<option value="${escapeHtml(mat.id)}" ${panel.materialId === mat.id ? 'selected' : ''}>${escapeHtml(mat.name)}</option>`).join('')}
+          ${(state.project.pricing?.frontMaterials || []).map((mat, _i, all) => `<option value="${escapeHtml(mat.id)}" ${panel.materialId === mat.id ? 'selected' : ''}>${escapeHtml(frontMaterialLabel(mat, all))}</option>`).join('')}
           <option value="__new__">+ Nowy materiał…</option>
         </select>
       </div>
