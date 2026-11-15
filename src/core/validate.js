@@ -23,6 +23,7 @@ import { cornerFrontIssues, footprintBoxes, passageIssues } from "./cornerChecks
 import { computeWorktops, MIN_WORKTOP_OVERHANG } from "./worktops.js";
 import { boxInNotch } from "./roomShape.js";
 import { lacquerWarning } from "./lacquerColors.js";
+import { lacquerWithoutMaterial } from "../engine/lacquerSummary.js";
 
 export const MAX_DOOR_WIDTH = 600;   // szersze drzwi się wichrują / zawiasy nie dają rady
 export const MAX_SHELF_SPAN = 800;   // dłuższa półka ugina się pod obciążeniem
@@ -105,6 +106,7 @@ export function validateProject(project = state.project) {
     checkOpenings();
     checkWorktops();
     checkLacquerColors();
+    checkLacquerMaterials();
     checkParts();
   } finally {
     state.project = prev;
@@ -306,6 +308,15 @@ export function validateProject(project = state.project) {
     ((project.pricing || {}).frontMaterials || []).forEach((m) => {
       const w = lacquerWarning(m.color);
       if (w) add("warn", null, `Materiał frontów „${m.name || m.id}”: ${w}.`);
+    });
+  }
+
+  // Dekor „Lakier …” wpisany ręcznie w polu Dekor: liczy się jako zwykła płyta (Korpus) i nie wchodzi do
+  // zestawienia lakieru (ile m² w którym kolorze).
+  function checkLacquerMaterials() {
+    lacquerWithoutMaterial(project).forEach((x) => {
+      add("warn", null, `${x.kind === "szafka" ? "Szafka" : "Element"} „${x.name}” ma w polu Dekor wpisany lakier („${x.decor}”) - `
+        + `liczy się jako płyta „Korpus” z ręczną ceną i nie wejdzie do zestawienia lakieru. Wybierz materiał „Lakier” z cennika frontów i wyczyść pole Dekor.`);
     });
   }
 

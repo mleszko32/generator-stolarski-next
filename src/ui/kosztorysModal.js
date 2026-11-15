@@ -3,6 +3,7 @@
 import { calculateProjectCost } from "../engine/cost.js";
 import { calculateAllProjectParts } from "../engine/cabinet.js";
 import { cuttingQuote, cutGroups } from "../engine/cuttingCost.js";
+import { lacquerByColor } from "../engine/lacquerSummary.js";
 import { state } from "../core/state.js";
 import { scheduleCheckpoint } from "../core/history.js";
 import { escapeHtml, downloadFile } from "../utils/dom.js";
@@ -153,7 +154,8 @@ export function mountKosztorys(root) {
                         <tr><td>Montaż</td><td class="num">${numField('assembly-hours', pricing.assembly.hours, 'h')}</td><td class="num">${numField('assembly-rate', pricing.assembly.rate, 'zł/h')}</td><td class="num" id="kosztorys-assembly-cost">—</td></tr>
                         <tr><td>Transport</td><td></td><td class="num">${numField('transport', pricing.transport, 'zł')}</td><td></td></tr>
                     </tbody>
-                </table>`, true)}
+                </table>
+                <div id="kosztorys-lacquer-colors"></div>`, true)}
             ${sec('marza', 'Marża, rabat, VAT', `
                 <div class="field-row">
                     <div class="field"><label>Narzut na materiały i okucia (%)</label><input type="number" class="input" id="kosztorys-margin" value="${pricing.marginPercent}" step="1" min="0"></div>
@@ -246,6 +248,21 @@ export function mountKosztorys(root) {
         pricing.vatPercent = num('#kosztorys-vat');
         scheduleCheckpoint();
     }
+    // Ile lakieru na jaki kolor: m² jednej strony wszystkich lakierowanych elementów (fronty, blendy, boki, cokoły, panele).
+    function renderLacquerColors() {
+        const box = modal.querySelector('#kosztorys-lacquer-colors');
+        const rows = lacquerByColor(calculateAllProjectParts(), pricing.frontMaterials);
+        if (!rows.length) { box.innerHTML = ''; return; }
+        const total = rows.reduce((t, r) => t + r.areaM2, 0);
+        box.innerHTML = `<table class="cost-table kz-table"><thead><tr><th>Lakier wg koloru</th><th class="num">m² (jedna strona)</th><th class="num">Formatek</th></tr></thead><tbody>`
+            + rows.map(r => {
+                const c = lacquerColor(r.color);
+                const sw = c == null ? '' : `<span class="decor-legend-swatch" style="background:#${c.toString(16).padStart(6, '0')}"></span> `;
+                return `<tr><td>${sw}${escapeHtml(r.color)}</td><td class="num">${r.areaM2.toFixed(2)} m²</td><td class="num">${r.pieces}</td></tr>`;
+            }).join('')
+            + `<tr class="kz-group"><td>Razem do polakierowania</td><td class="num">${total.toFixed(2)} m²</td><td></td></tr></tbody></table>`;
+    }
+
     function renderTotals() {
         const cost = calculateProjectCost();
 
@@ -269,6 +286,13 @@ export function mountKosztorys(root) {
             const line = cost.materials.find(m => m.materialId === id);
             cell.textContent = formatPLN(line ? line.cost : 0);
         });
+        modal.querySelectorAll('.kz-board-sum').forEach(cell => {
+            const lines = cost.materials.filter(m => m.category === 'Front' && (frontMaterialBoard(pricing.frontMaterials.find(x => x.id === m.materialId)) || '') === cell.dataset.board);
+            const area = lines.reduce((t, m) => t + m.areaM2, 0);
+            const sheets = lines.some(m => m.sheets != null) ? lines.reduce((t, m) => t + (m.sheets || 0), 0) : null;
+            cell.textContent = areaText({ areaM2: area, sheets: sheets == null ? null : Math.round(sheets * 100) / 100 });
+        });
+        renderLacquerColors();
         modal.querySelectorAll('.kosztorys-hw-cost').forEach(cell => {
             const name = cell.getAttribute('data-name');
             const line = cost.hardware.find(h => h.name === name);
@@ -332,7 +356,17 @@ export function mountKosztorys(root) {
         // „Korpus” i „Korpus: <dekor>” (dekor korpusu szafki) - każdy dekor osobny wiersz z własną ceną.
         const isKorpus = (m) => baseCategory(m.category) === 'Korpus';
         const korpusHtml = cost.materials.filter(isKorpus).map(otherRowHtml).join('');
-        const frontHtml = cost.materials.filter(m => m.category === 'Front').map(frontRowHtml).join('');
+        // Materiały frontów na tej samej płycie (np. wszystkie lakiery na MDF W908) pod wspólnym nagłówkiem płyty -
+        // arkusze liczą się razem, a rozróżnia je kolor w nazwie wiersza.
+        const frontLines = cost.materials.filter(m => m.category === 'Front');
+        const boardOf = (m) => frontMaterialBoard(pricing.frontMaterials.find(x => x.id === m.materialId)) || '';
+        const frontHtml = [...new Set(frontLines.map(boardOf))].map(board => {
+            const lines = frontLines.filter(m => boardOf(m) === board);
+            const rows = lines.map(frontRowHtml).join('');
+            return board && lines.length > 1
+                ? `<tr class="kz-group"><td colspan="2">Płyta: ${escapeHtml(board)} <span class="hint">(${lines.length} kolory / materiały, wspólne arkusze)</span></td><td class="num kz-board-sum" data-board="${escapeHtml(board)}"></td><td colspan="3"></td></tr>${rows}`
+                : rows;
+        }).join('');
         const restHtml = cost.materials.filter(m => !isKorpus(m) && m.category !== 'Front').map(otherRowHtml).join('');
 
         materialsTbody.innerHTML = ((korpusHtml + frontHtml + restHtml) || `<tr><td colspan="6" class="empty-note">Projekt jest pusty</td></tr>`)
@@ -354,6 +388,10 @@ export function mountKosztorys(root) {
             });
         });
         materialsTbody.querySelectorAll('.kosztorys-mat-color').forEach(input => {
+            input.addEventListener('input', () => {
+                const label = [...materialsTbody.querySelectorAll('.kz-front-color')].find(b => b.dataset.materialId === input.dataset.materialId);
+                if (label) label.textContent = input.value.trim() ? ' · ' + input.value.trim() : '';
+            });
             input.addEventListener('change', () => update3D());
         });
         materialsTbody.querySelectorAll('.kosztorys-mat-del').forEach(btn => {
@@ -410,7 +448,7 @@ export function mountKosztorys(root) {
         const note = board ? `płyta: ${board}${lacquer ? ' · lakierowanie liczysz w „Lakierni” (sekcja Robocizna)' : ''}` : '';
         return `
             <tr>
-                <td>Front: <b class="kz-front-name" data-material-id="${escapeHtml(m.materialId)}">${escapeHtml(m.materialName)}</b>${note ? `<div class="hint">${escapeHtml(note)}</div>` : ''}</td>
+                <td>Front: <b class="kz-front-name" data-material-id="${escapeHtml(m.materialId)}">${escapeHtml(m.materialName)}</b><b class="kz-front-color" data-material-id="${escapeHtml(m.materialId)}">${mat.color ? ' · ' + escapeHtml(mat.color) : ''}</b>${note ? `<div class="hint">${escapeHtml(note)}</div>` : ''}</td>
                 <td>${srcBadgeHtml('materials', 'Front:' + m.materialId)}</td>
                 <td class="num kosztorys-front-mat-area" data-material-id="${escapeHtml(m.materialId)}">${areaText(m)}</td>
                 <td class="num"><span class="cost-input"><input type="number" class="input kosztorys-front-mat-price" data-material-id="${escapeHtml(m.materialId)}" value="${m.pricePerM2}" step="1" min="0"> zł/m²</span></td>
