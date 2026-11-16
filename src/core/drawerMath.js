@@ -172,8 +172,17 @@ export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick
 
   let localFrontHolesBase = systemParams.frontHolesBase;
   if (isBottom) {
-    const bottomOverlap = boardThick - bottomGap; 
+    const bottomOverlap = boardThick - bottomGap;
     localFrontHolesBase += bottomOverlap;
+  }
+
+  // Dolna prowadnica zawsze leży na wieńcu (półce) pod szufladą, niezależnie od położenia
+  // frontu (nakładany / wewnętrzny / luz dołu). Dopiero front dostaje otwory na swojej
+  // wysokości: stały odstęp od prowadnicy (frontHolesBase - railOffset), liczony od
+  // dolnej krawędzi frontu. Drewniane skrzynki (MOVENTO) już tak liczą wyżej.
+  if (!systemEntry.woodenBox && index === 0 && zoneBottom !== null && Number.isFinite(zoneBottom)) {
+    slideY = zoneBottom + systemParams.railOffset;
+    localFrontHolesBase = slideY + (systemParams.frontHolesBase - systemParams.railOffset) - currentY;
   }
 
   const localFrontHolesX_Left = systemParams.frontHolesXBase + (boardThick - leftGap);

@@ -102,6 +102,8 @@ export const drawerSystems = {
   // 250-600 (2020: 300-550); GTV nie oferuje NL 650 (to wyłącznie Blum antaro/
   // tandembox). Katalog 2025 wspomina też o piątym, jeszcze niższym wariancie
   // "H=68" — pominięty tu, bo nie udało się potwierdzić jego wymiarów dna/tyłu.
+  // Pierwszy otwór we froncie: min. 47,5 mm nad wieńcem (spód prowadnicy stoi na wieńcu) wg rysunku GTV
+  // (frontHolesBase). 22 mm z rysunku to odległość dna szuflady od wieńca, nie otworu we froncie.
   'gtv_axis_16': {
     name: 'GTV Axis Pro (płyta 16mm)',
     bottomWidthDeduct: 75,   // LW - 75 mm
@@ -116,7 +118,7 @@ export const drawerSystems = {
       wysoka:       { type: 'C', height: 167, minSpace: 198 },
       bardzowysoka: { type: 'D', height: 199, minSpace: 230 }
     },
-    mounting: { railOffset: 33, frontHolesBase: 22, frontHolesXBase: 15.5 }
+    mounting: { railOffset: 33, frontHolesBase: 47.5, frontHolesXBase: 15.5 }
   },
   'gtv_axis_18': {
     name: 'GTV Axis Pro (płyta 18mm)',
@@ -132,7 +134,7 @@ export const drawerSystems = {
       wysoka:       { type: 'C', height: 167, minSpace: 198 },
       bardzowysoka: { type: 'D', height: 199, minSpace: 230 }
     },
-    mounting: { railOffset: 33, frontHolesBase: 22, frontHolesXBase: 15.5 }
+    mounting: { railOffset: 33, frontHolesBase: 47.5, frontHolesXBase: 15.5 }
   },
 
   // Blum MOVENTO - ukryte prowadnice pod szufladę DREWNIANĄ (woodenBox: true).
