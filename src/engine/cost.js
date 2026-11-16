@@ -7,6 +7,7 @@ import { calculateAllProjectParts } from "./cabinet.js";
 import { calculateProjectHardware } from "./hardware.js";
 import { baseCategory, frontMaterialBoard } from "../core/materialCatalog.js";
 import { narrowProjectForCost } from "../core/costSelection.js";
+import { categoryDecor } from "../core/boardMatch.js";
 import { cuttingCostFor, cutGroups, cutGroupKey } from "./cuttingCost.js";
 
 // Szacunkowy kosztorys materiałowy - liczy powierzchnię formatek Z OSOBNA dla
@@ -43,7 +44,7 @@ export function calculateProjectCost() {
 
 function costOfCurrentProject() {
   const pricing = migratePricingExtras({ materials: {}, marginPercent: 0, hardware: {}, ...(state.project.pricing || {}) });
-  const parts = calculateAllProjectParts();
+  const allParts = calculateAllProjectParts();
   const hardware = calculateProjectHardware();
 
   // Fronty mają WŁASNY katalog materiałów (pricing.frontMaterials, core/
@@ -57,6 +58,18 @@ function costOfCurrentProject() {
     : [{ id: 'default', name: 'Standard', pricePerM2: 0 }];
   const frontMaterialById = Object.fromEntries(frontCatalog.map(m => [m.id, m]));
   const resolveFrontMaterial = (materialId) => (materialId && frontMaterialById[materialId]) || frontCatalog[0];
+
+  // Szuflady (dno, boki, tył) z tej samej płyty co korpus tną się z nim na wspólnych arkuszach (jak w SAS),
+  // a nie jako osobna pula: ten sam dekor albo (bez dekoru) ta sama cena za m².
+  const priceOfCat = (cat) => { const own = (pricing.materials || {})[cat]; return parseFloat(own !== undefined ? own : (pricing.materials || {})[baseCategory(cat)]) || 0; };
+  const korpusKeys = [...new Set(allParts.filter(p => baseCategory(p.category) === 'Korpus').map(p => p.category))];
+  const sheetPoolOf = (cat) => {
+    if (baseCategory(cat) !== 'Szuflada') return cat;
+    const dec = categoryDecor(cat, state.project);
+    const hit = korpusKeys.find(k => dec ? categoryDecor(k, state.project) === dec : (priceOfCat(cat) > 0 && priceOfCat(cat) === priceOfCat(k)));
+    return hit || cat;
+  };
+  const parts = allParts.map(p => { const pool = sheetPoolOf(p.category); return pool === p.category ? p : { ...p, cutCategory: pool }; });
 
   // Cięcie wg hurtowni (SAS / Heban) = rachunek jak w hurtowni: płyty liczone w PEŁNYCH ARKUSZACH z rozkroju
   // (odpad też się płaci), nie po powierzchni formatek. Tryb ręczny zostaje po powierzchni (stare projekty).

@@ -36,7 +36,8 @@ const round2 = (v) => Math.round(v * 100) / 100;
 export function cutGroupKey(p, frontKey) {
   if (!CUT_CATEGORIES.includes(baseCategory(p.category))) return null;
   if (p.category === "Front" && p.materialId) return `Front::${frontKey ? frontKey(p.materialId) : p.materialId}`;
-  return p.category || "Inne";
+  // cutCategory: formatki z tej samej płyty cięte razem (np. szuflady z korpusem, cost.js)
+  return p.cutCategory || p.category || "Inne";
 }
 
 export function cutGroups(parts, cutPlan = {}, edgeRules = null, frontKey = null) {

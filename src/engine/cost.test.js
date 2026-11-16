@@ -221,3 +221,23 @@ describe('migracja pól kosztorysu', () => {
     expect(migratePricingExtras({ ...once })).toEqual(once);
   });
 });
+
+describe('kosztorys - blenda poziomo i wspólne arkusze szuflad', () => {
+  it('czoło poziomej blendy ma dłuższy bok jako długość (1670 × 80, nie 80 × 1670)', () => {
+    setProject(freshProject({ modules: [] }));
+    state.project.sidePanels = [{ id: 'b1', kind: 'blenda', name: 'Górna', dimensions: { width: 1670, height: 80, depth: 100 }, flange: 'brak' }];
+    const czolo = calculateAllProjectParts().find(p => p.name.includes('Czoło'));
+    expect([czolo.length, czolo.width]).toEqual([1670, 80]);
+  });
+
+  it('formatki z cutCategory tną się na wspólnych arkuszach z korpusem', async () => {
+    const { cutGroups } = await import('./cuttingCost.js');
+    const parts = [
+      { category: 'Korpus', length: 2000, width: 500, qty: 5 },
+      { category: 'Szuflada', cutCategory: 'Korpus', length: 540, width: 191, qty: 4 },
+    ];
+    const groups = cutGroups(parts, {});
+    expect(groups).toHaveLength(1);
+    expect(groups[0].pieces).toBe(9);
+  });
+});

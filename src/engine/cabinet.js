@@ -399,7 +399,9 @@ function getBlendaParts(panel, config) {
   const d = parseFloat(panel.dimensions?.depth) || 0;
   const label = panel.decor ? `Blenda (${panel.decor})` : 'Blenda';
   const base = panel.name ? `${label} — ${panel.name}` : label;
-  const parts = [{ name: `${base} (Czoło)`, length: h, width: w, qty: 1, category: "Front", materialId: panel.materialId }];
+  // dłuższy bok jako długość (jak „Blenda przy ścianie” 2550 × 39): poziomej blendy 1670 × 80 nie układamy
+  // w rozkroju jako pasa 1670 mm wysokości (fronty się nie obracają), a SAS tnie ją wzdłuż
+  const parts = [{ name: `${base} (Czoło)`, length: Math.max(h, w), width: Math.min(h, w), qty: 1, category: "Front", materialId: panel.materialId }];
   const flange = panel.flange || 'prawa';
   if (flange !== 'brak' && d - th > 0) {
     const along = (flange === 'lewa' || flange === 'prawa') ? h : w;
