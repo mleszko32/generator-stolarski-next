@@ -6,6 +6,7 @@ import { state, migratePricingExtras } from "../core/state.js";
 import { calculateAllProjectParts } from "./cabinet.js";
 import { calculateProjectHardware } from "./hardware.js";
 import { baseCategory, frontMaterialBoard } from "../core/materialCatalog.js";
+import { narrowProjectForCost } from "../core/costSelection.js";
 import { cuttingCostFor, cutGroups, cutGroupKey } from "./cuttingCost.js";
 
 // Szacunkowy kosztorys materiałowy - liczy powierzchnię formatek Z OSOBNA dla
@@ -26,7 +27,21 @@ const MATERIAL_CATEGORY_ORDER = ['Korpus', 'Front', 'Szuflada', 'Plecy', 'Blat']
 // docina się na miejscu, więc nie wchodzi do liczby cięć.
 const CUT_CATEGORIES = ['Korpus', 'Front', 'Szuflada', 'Plecy'];
 
+// Wycena częściowa (project.costSelection): liczy od nowa na kopii projektu z samymi zaznaczonymi
+// meblami, żeby arkusze, cokół i zawiasy między szafkami wyszły jak dla tego etapu osobno.
 export function calculateProjectCost() {
+  const full = state.project;
+  const narrowed = narrowProjectForCost(full);
+  if (narrowed === full) return costOfCurrentProject();
+  state.project = narrowed;
+  try {
+    return costOfCurrentProject();
+  } finally {
+    state.project = full;
+  }
+}
+
+function costOfCurrentProject() {
   const pricing = migratePricingExtras({ materials: {}, marginPercent: 0, hardware: {}, ...(state.project.pricing || {}) });
   const parts = calculateAllProjectParts();
   const hardware = calculateProjectHardware();

@@ -5,6 +5,7 @@
 // pokazuje klientowi tylko zakres zabudowy i cenę (wartość, rabat, netto, VAT,
 // brutto), bez rozbicia na koszty i marżę.
 import { escapeHtml } from "../utils/dom.js";
+import { costScopeLabel, narrowProjectForCost } from "./costSelection.js";
 
 export const OFFER_DEFAULTS = {
   company: "",
@@ -59,6 +60,8 @@ export function buildOfferHtml({ project, cost, snapshot, now = new Date() }) {
   const s = getOfferSettings(project);
   const dateStr = now.toLocaleDateString("pl-PL");
   const validUntil = new Date(now.getTime() + (parseFloat(s.validDays) || 0) * 86400000).toLocaleDateString("pl-PL");
+  const scopeLabel = costScopeLabel(project);
+  project = narrowProjectForCost(project);  // wycena częściowa: w ofercie tylko zaznaczone meble
   const modules = project.modules || [];
 
   const rows = modules.map((m) => {
@@ -117,7 +120,7 @@ export function buildOfferHtml({ project, cost, snapshot, now = new Date() }) {
     <div><h1>${escapeHtml(s.company || "Oferta")}</h1><div style="font-size:13px;color:#475569;white-space:pre-line;margin-top:4px">${escapeHtml(s.contact)}</div></div>
     <div class="meta">Oferta${s.number ? ` nr <b>${escapeHtml(s.number)}</b>` : ""}<br>Data: <b>${dateStr}</b>${(parseFloat(s.validDays) || 0) > 0 ? `<br>Ważna do: <b>${validUntil}</b>` : ""}</div>
   </div>
-  <div style="font-size:15px"><b>${escapeHtml(project.name || "Zabudowa")}</b>${s.clientName ? `<br><span style="color:#475569;font-size:13px">Dla: ${escapeHtml(s.clientName)}</span>` : ""}</div>
+  <div style="font-size:15px"><b>${escapeHtml(project.name || "Zabudowa")}</b>${scopeLabel ? `<br><span style="color:#475569;font-size:13px">${escapeHtml(scopeLabel)}</span>` : ""}${s.clientName ? `<br><span style="color:#475569;font-size:13px">Dla: ${escapeHtml(s.clientName)}</span>` : ""}</div>
   ${snapshot ? `<h2>Wizualizacja</h2><img class="snap" src="${snapshot}" alt="Wizualizacja zabudowy">` : ""}
   <h2>Zakres zabudowy</h2>
   ${modules.length === 0 ? '<p style="color:#64748b">Projekt nie zawiera jeszcze szafek.</p>' : `<table><thead><tr><th>Element</th><th>Rodzaj</th><th>Wymiary</th><th>Wyposażenie</th></tr></thead><tbody>${rows}</tbody></table>`}

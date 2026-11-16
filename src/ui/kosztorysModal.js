@@ -22,6 +22,7 @@ import { loadHebanCatalog, resetHebanCatalog, parseHebanCatalog, hebanLabel, heb
 import { BLUM_COLORS, drawerOptions, parseDrawerKit } from "../core/blumDrawer.js";
 import { pickBoard, categoryDecor, boardOffers } from "../core/boardMatch.js";
 import { groupHardware } from "../core/costGroups.js";
+import { getCostExcluded, setCostExcluded, costChoices, costScopeLabel } from "../core/costSelection.js";
 
 // "Zastosuj do wszystkich dolnych/górnych" (zgłoszona potrzeba: w kuchni
 // fronty szafek dolnych i wiszących często mają inny materiał/kolor, ale
@@ -87,11 +88,23 @@ export function mountKosztorys(root) {
     };
 
     root.innerHTML = `
+            <div id="kosztorys-scope-note" class="notice-warn" style="display:none"></div>
             <div class="kz-sticky">
                 <div class="kz-total"><span>Koszty</span><b id="kosztorys-top-subtotal">—</b></div>
                 <div class="kz-total"><span>Netto</span><b id="kosztorys-top-net">—</b></div>
                 <div class="kz-total kz-total-main"><span>Brutto</span><b id="kosztorys-top-total">—</b></div>
             </div>
+            <details class="kz-tools" id="kosztorys-scope">
+                <summary>Co liczyć w kosztorysie</summary>
+                <div class="kz-tools-body">
+                    <div id="kosztorys-scope-list"></div>
+                    <div class="kz-tools-row">
+                        <button type="button" class="btn btn-sm" id="kosztorys-scope-all">Zaznacz wszystko</button>
+                        <button type="button" class="btn btn-sm" id="kosztorys-scope-none">Odznacz wszystko</button>
+                    </div>
+                    <div class="hint">Wycena etapami: odznaczone meble nie wchodzą do płyt, okuć, cięcia ani oferty. Nie zmienia to listy formatek ani rozkroju. Godziny robocizny, montaż i transport wpisz sam dla tego etapu.</div>
+                </div>
+            </details>
             <div class="kz-toolbar">
                 <button id="kosztorys-auto" type="button" class="btn btn-primary" title="Płyty z hurtowni, która ma dany dekor (Egger / Woodeco - SAS, Swiss Krono - Heban), okucia z wybranej hurtowni. Czego nie ma - zostaje bez zmian.">Dobierz ceny z hurtowni</button>
                 <label class="kz-inline">okucia: <select class="input input-sm" id="kosztorys-hw-source"><option value="sas" ${pricing.hardwareSource !== 'heban' ? 'selected' : ''}>wszystkie z SAS</option><option value="heban" ${pricing.hardwareSource === 'heban' ? 'selected' : ''}>wszystkie z Hebanu</option></select></label>
@@ -887,6 +900,32 @@ export function mountKosztorys(root) {
         priceFileInput.value = '';
         showAlert(ok ? 'Baza cen zaimportowana. Użyj „Wczytaj z bazy cen", żeby nałożyć ją na ten projekt.' : '❌ To nie jest poprawny plik bazy cen.');
     });
+
+    // Wybór mebli liczonych w kosztorysie (wycena etapami) - osobny od wyboru w formatkach / rozkroju.
+    const scopeList = modal.querySelector('#kosztorys-scope-list');
+    const scopeNote = modal.querySelector('#kosztorys-scope-note');
+    function renderScope() {
+        const excluded = new Set(getCostExcluded(state.project));
+        scopeList.innerHTML = costChoices(state.project).map(c =>
+            `<label class="kz-inline" style="display:block"><input type="checkbox" data-key="${escapeHtml(c.key)}" ${excluded.has(c.key) ? '' : 'checked'}> ${escapeHtml(c.label)}</label>`).join('')
+            || '<div class="empty-note">Projekt jest pusty</div>';
+        const label = costScopeLabel(state.project);
+        scopeNote.style.display = label ? '' : 'none';
+        scopeNote.textContent = label;
+    }
+    function applyScope(excluded) {
+        setCostExcluded(state.project, excluded);
+        scheduleCheckpoint();
+        renderScope();
+        renderMaterialRows();
+        renderHardwareRows();
+    }
+    scopeList.addEventListener('change', () => {
+        applyScope([...scopeList.querySelectorAll('input:not(:checked)')].map(i => i.dataset.key));
+    });
+    modal.querySelector('#kosztorys-scope-all').addEventListener('click', () => applyScope([]));
+    modal.querySelector('#kosztorys-scope-none').addEventListener('click', () => applyScope(costChoices(state.project).map(c => c.key)));
+    renderScope();
 
     renderMaterialRows();
     renderHardwareRows();
