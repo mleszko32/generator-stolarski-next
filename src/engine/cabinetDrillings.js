@@ -24,6 +24,7 @@ import { getBlindStile, blindGeometry, getBlindCorner, PARALLEL_PLATE_INSET } fr
 import { SHELF_PIN_DROP, SHELF_PIN_OFFSETS } from "../core/hingeMath.js";
 import { moduleBoardThickness } from "../core/boardThickness.js";
 import { isFlap, flapHinges, FLAP_PLATE_FROM_FRONT } from "../core/liftFlap.js";
+import { hangerHoles } from "../core/hanger.js";
 const EPS = 2;
 
 // Średnice i głębokości (jak legenda rysunku 2D: kołek Ø8 + wkręt, podpórki / prowadnice /
@@ -143,10 +144,13 @@ export function getCabinetPanels(mod, project) {
   const ext = sideFloorExt(mod, project);
   const lift = (e) => (h) => (e && h.y !== undefined ? { ...h, y: round1(h.y + e) } : h);
   const floorNote = (e) => (e ? { note: `bok do podłogi - dłuższy o ${e} mm (nóżki), otwory liczone od dołu boku` } : {});
+  // Zawieszki Camar 818 (core/hanger.js): kołki Ø10 w licu wewnętrznym boku, otwory Ø12 w plecach.
+  const hangerH = hangerHoles(mod, project, { depth: sideD, panelHeight: sideH, topY: calcY(H), backWidth: W - 2 * th, backTopY: H });
+  const hangerSide = hangerH ? hangerH.side : [];
   panels.push({ id: "bok-lewy", kind: "bok", name: "Bok lewy", qty: 1, length: sideD, width: sideH + ext.left, thickness: th, frontOnRight: false, ...floorNote(ext.left),
-    holes: [...corpusOnSide, ...sideEdgeHoles, ...verticalFaceHoles(th, true, 0, sideH)].map(lift(ext.left)) });
+    holes: [...corpusOnSide, ...sideEdgeHoles, ...verticalFaceHoles(th, true, 0, sideH), ...hangerSide].map(lift(ext.left)) });
   panels.push({ id: "bok-prawy", kind: "bok", name: "Bok prawy", qty: 1, length: sideD, width: sideH + ext.right, thickness: th, frontOnRight: true, ...floorNote(ext.right),
-    holes: [...corpusOnSide, ...sideEdgeHoles, ...verticalFaceHoles(W - th, false, 0, sideH)].map(lift(ext.right)) });
+    holes: [...corpusOnSide, ...sideEdgeHoles, ...verticalFaceHoles(W - th, false, 0, sideH), ...hangerSide].map(lift(ext.right)) });
 
   // --- Przegrody (obie strony + łączniki w czołach górnym i dolnym, jeśli stała) ---
   els.filter((e) => e.typ === "pion").sort((a, b) => a.x - b.x).forEach((p, i) => {
@@ -249,7 +253,11 @@ export function getCabinetPanels(mod, project) {
   const backNote = inset ? `wpuszczane między boki, za wieńcami, na całą wysokość, ${backP.insetOffset > 0 ? `cofnięte o ${backP.insetOffset} mm od tyłu boków` : "tył równo z tyłem boków"} (płyta ${backThick} mm) - przykręcić przez boki i wieńce`
     : backP.type === "nut" ? `w nucie (głęb. ${num(backP.grooveDepth, 6)} mm, ${num(backP.offset, 16)} mm od tyłu) - wsunąć przed zamknięciem korpusu`
     : "nakładane - przybić / przykręcić od tyłu po złożeniu korpusu";
-  if (back) panels.push({ id: "plecy", kind: "plecy", name: inset ? "Plecy wpuszczane" : boardOverlay ? `Plecy nakładane (płyta ${backThick} mm)` : "Plecy (HDF)", qty: 1, length: back.length, width: back.width, thickness: backThick, holes: [], note: backNote });
+  // Otwory Ø10 na śruby regulacji zawieszek: rysunek od wnętrza, długość = wysokość pleców (x od dołu), szerokość od lewego boku (z).
+  const backHangerHoles = hangerH ? hangerH.back.map((h) => ({ edge: "lico", x: h.y, z: h.x, kind: h.kind, d: h.d, depth: h.depth, to: h.to })) : [];
+  const hangerNote = hangerH ? " · otwory Ø10 pod śruby regulacji zawieszek Camar 818 (rysunek od wnętrza: dół korpusu z lewej, lewy bok u góry)" : "";
+  if (back) panels.push({ id: "plecy", kind: "plecy", name: inset ? "Plecy wpuszczane" : boardOverlay ? `Plecy nakładane (płyta ${backThick} mm)` : "Plecy (HDF)", qty: 1, length: back.length, width: back.width, thickness: backThick, holes: backHangerHoles, note: backNote + hangerNote,
+    ...(backHangerHoles.length ? { viewTitle: "widok od wnętrza (otwory pod zawieszki)", topLabel: "LEWY BOK", bottomLabel: "PRAWY BOK", fromLabel: "od dołu", zLabel: "od lewego boku" } : {}) });
 
   return panels;
 }

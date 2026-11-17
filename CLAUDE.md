@@ -478,6 +478,11 @@ zaślepce ma `parallelMount`, więc otwory prowadników nie trafiają na bok (`c
 `kind: 'blind'` dla szafki ślepej, `'corner'` dla `mod.cornerFitting` szafki L) — pozycja na liście okuć
 (`hardware.js`) i ostrzeżenia wymiarów w kontroli projektu. UI: sekcja „Narożnik” (`ui/blindCornerProperties.js`).
 
+**Zawieszki Camar 818**: `core/hanger.js` (czyste, z testami), pole `mod.hanger = { active, topOffset }`, przełącznik w sekcji Plecy
+(plecy wpuszczane, cofnięte min. 15 mm od tyłu boków). 3 kołki Ø10 × 12,5 w boku (65 / 97 / 129 od góry, oś `insetOffset − 5` od
+tyłu), 2 otwory Ø10 w plecach (rysunek producenta: Ø12, min. Ø10) (69 i 119 od góry, 18 od boku) — `getCabinetPanels`, lista okuć (`hangerHardware`), ostrzeżenie w
+kontroli, 3D w `viewer3d.js` (typ materiału `hanger`). Nośność 70 kg ze sklepu, niezweryfikowana na karcie producenta.
+
 **Kontrola projektu**: `core/validate.js` (`validateProject`) zasila sekcję huba „Kontrola
 projektu” (`ui/projectCheck.js`): kolizje, granice pokoju, za szerokie drzwi/półki, formatki
 niemieszczące się w płycie (arkusz minus obrzeże `cutPlan.trim`, jak w rozkroju), szuflady za płytkie (`drawerSpec().fitsDepth`) i za niskie (`fitsHeight`: wnęka < najniższy wariant systemu, MOVENTO `comps.fits`), otwory. Narożniki: `core/cornerChecks.js` (czyste, z testami) — front przy narożniku

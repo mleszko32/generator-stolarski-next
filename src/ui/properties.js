@@ -34,6 +34,7 @@ import { openWallFillModal } from "./wallFillModal.js";
 import { openSplitModuleModal } from "./splitModuleModal.js";
 import { listSplitPoints } from "../core/splitModule.js";
 import { BOARD_BACK_MIN, resolveBackPanel } from "../core/backPanel.js";
+import { hangerOf, hangerProblems } from "../core/hanger.js";
 import { catalogLabels, assignFrontMaterialByName, frontMaterialSuggestions, addCatalogDecor, frontMaterialLabel } from "../core/materialCatalog.js";
 import { moduleFrontMaterialId, PLINTH_KORPUS } from "../core/plinthMaterial.js";
 import { groupButtonsHtml, bindGroupButtons } from "./groupButtons.js";
@@ -420,6 +421,11 @@ export function initPropertiesPanel() {
       <div class="prop-box" id="inset-back-options" style="display: ${backP.type === 'wpuszczane' ? 'block' : 'none'};">
         <div class="property-group mb-0"><label class="fs-xs">Grubość pleców (mm):</label><input type="number" id="input-back-thickness" value="${resolveBackPanel(activeModule, state.project).thickness}" /></div>
         <div class="property-group mb-0"><label class="fs-xs">Cofnięcie od tyłu boków (mm):</label><input type="number" id="input-back-inset-offset" value="${backP.insetOffset || 0}" /></div>
+        <div class="property-group row-center mb-0">
+          <input type="checkbox" id="input-hanger-active" ${hangerOf(activeModule) ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer;" />
+          <label for="input-hanger-active" class="fs-xs" style="cursor: pointer; margin: 0;" title="Regulowane zawieszki za plecami: kołki Ø10 w bokach, otwory Ø12 w plecach, 3D, lista okuć.">Zawieszki Camar 818 (szafka wisząca)</label>
+        </div>
+        ${hangerProblems(activeModule, state.project).map(m => `<div class="notice-warn fs-xs">${escapeHtml(m)}</div>`).join('')}
       </div>
       <div class="prop-box" id="overlay-back-options" style="display: ${backP.type === 'nakladane' ? 'block' : 'none'};">
         <div class="property-group mb-0"><label class="fs-xs">Grubość pleców nakładanych (mm, puste = z projektu):</label><input type="number" id="input-back-overlay-thickness" value="${backP.overlayThickness > 0 ? backP.overlayThickness : ''}" placeholder="HDF" /></div>
@@ -557,6 +563,16 @@ function setupEventListeners() {
       getSelectedMods().forEach(mod => { mod.legs.active = e.target.checked; });
       legsOptions.style.display = e.target.checked ? 'block' : 'none';
       updateAll();
+    });
+  }
+
+  // Zawieszki Camar 818 (core/hanger.js): mod.hanger = { active, topOffset }.
+  const hangerInput = document.getElementById('input-hanger-active');
+  if (hangerInput) {
+    hangerInput.addEventListener('change', (e) => {
+      getSelectedMods().forEach(mod => { mod.hanger = { ...(mod.hanger || {}), active: e.target.checked }; });
+      updateAll();
+      initPropertiesPanel();
     });
   }
 

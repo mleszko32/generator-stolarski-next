@@ -23,6 +23,7 @@ import { cornerFrontIssues, footprintBoxes, passageIssues } from "./cornerChecks
 import { computeWorktops, MIN_WORKTOP_OVERHANG } from "./worktops.js";
 import { boxInNotch } from "./roomShape.js";
 import { lacquerWarning } from "./lacquerColors.js";
+import { hangerProblems } from "./hanger.js";
 import { lacquerWithoutMaterial } from "../engine/lacquerSummary.js";
 
 export const MAX_DOOR_WIDTH = 600;   // szersze drzwi się wichrują / zawiasy nie dają rady
@@ -125,6 +126,8 @@ export function validateProject(project = state.project) {
       const sideDepth = sideDepthOf(mod, project, dep);
       if (sideDepth > RC_MAX_DEPTH) add("warn", mod, `Bok ma ${Math.round(sideDepth)} mm głębokości - więcej niż ${RC_MAX_DEPTH} mm, które przyjmuje stół RC System; wierć poza stołem.`);
     }
+    // Zawieszki Camar 818: włączone, ale plecy nie spełniają wymagań - otworów nie wywiercimy.
+    hangerProblems(mod, project).forEach((msg) => add("warn", mod, `Zawieszki Camar 818: ${msg}.`));
     if (mod.type !== "corner_cabinet" && w < 100) {
       add("warn", mod, `Bardzo wąska (${Math.round(w)} mm) - sprawdź, czy to nie pomyłka w wymiarze.`);
     }

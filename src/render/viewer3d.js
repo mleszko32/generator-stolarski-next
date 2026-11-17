@@ -3,6 +3,7 @@ import { moduleBoardThickness } from "../core/boardThickness.js";
 import * as THREE from 'three';
 import { resolveBackPanel, backThicknessOf, isBoardOverlayBack } from '../core/backPanel.js';
 import { bottomSetbackOf, sideFloorExt } from '../engine/carcaseParts.js';
+import { hangerGeometry, HANGER_818 } from '../core/hanger.js';
 import { buildPlinthRuns } from '../engine/plinthRuns.js';
 import { computeDimensions } from '../core/dimensions3d.js';
 import { buildDimensionGroup } from './dimensions3d.js';
@@ -33,7 +34,7 @@ import { moveSelectionOf } from '../core/alignCommands.js';
 import { clickSelection, groupMembers, pickedSelection } from '../core/groupSelection.js';
 import { refreshModuleInfoCard } from '../ui/moduleInfoPanel.js';
 import { initPropertiesPanel } from '../ui/properties.js';
-import { mats, disposeObject, createLabelSprite, addBox, addHole, addHardware, addLegsAndPlinth, isXrayMode, setXrayMode, colorMode, setColorMode, setMaterialPalette, highlightKey, setHighlightKey } from './meshBuilders.js';
+import { mats, disposeObject, createLabelSprite, addBox, addHole, addHardware, addHangerHole, addHangerPin, addLegsAndPlinth, isXrayMode, setXrayMode, colorMode, setColorMode, setMaterialPalette, highlightKey, setHighlightKey } from './meshBuilders.js';
 import { renderCornerCabinet } from './cornerCabinet3d.js';
 import { renderSlopeCabinet } from './slopeCabinet3d.js';
 import { getBlindPanel, getBlindStile, blindGeometry, PARALLEL_PLATE_INSET } from '../core/blindCorner.js';
@@ -1693,6 +1694,34 @@ export function update3D() {
       else if (backP.type === 'wpuszczane') addBox(W - 2*th, H, backThick, posX + th, posY, backZ, 'corpus', isActive, udBack, innerGroup);
       else if (boardOverlayBack) addBox(W, H, backThick, posX, posY, backZ, 'corpus', isActive, udBack, innerGroup);
       else addBox(W - 4, H - 4, backThick, posX + 2, posY + 2, backZ, 'hdf', isActive, udBack, innerGroup);
+
+      // Zawieszki Camar 818 (core/hanger.js): lewa i prawa za plecami wpuszczanymi, w szczelinie
+      // cofnięcia; trzy kołki Ø10 wchodzą w boki (osie 5 mm od lica pleców w stronę tyłu).
+      const hg = hangerGeometry(mod, state.project);
+      if (hg) {
+          const HG = HANGER_818;
+          const udHg = { moduleId: mod.id, type: 'corpus', part: 'hanger' };
+          const bodyZ = backZ - HG.bodyThickness;
+          const bodyH = HG.bodyHeight;
+          const bodyY = posY + H - hg.bodyBottomFromTop;
+          [[true, posX + th], [false, posX + W - th]].forEach(([left, faceX]) => {
+              const bodyX = left ? faceX + HG.backHoleFromSide - HG.bodyWidth / 2 : faceX - HG.backHoleFromSide - HG.bodyWidth / 2;
+              addBox(HG.bodyWidth, bodyH, HG.bodyThickness, bodyX, bodyY, bodyZ, 'hanger', isActive, udHg, innerGroup);
+              // kołki: od lica boku do korpusu zawieszki (w głąb boku - kołek 12,5 mm)
+              const pinLen = HG.backHoleFromSide - HG.bodyWidth / 2;
+              // Okrągłe otwory Ø10 w licu wewnętrznym boku (ciemne krążki) i okrągłe kołki Ø8 wchodzące w nie.
+              const dirIn = left ? 1 : -1;   // od lica boku do wnętrza korpusu
+              hg.pinsFromTop.forEach((d) => {
+                  const py = posY + H - d, pz = posZ + hg.pinFromRear;
+                  addHangerHole(HG.pinDiameter / 2, 0.6, faceX + dirIn * 0.3, py, pz, 'x', innerGroup);
+                  addHangerPin(4, pinLen + HG.pinDepth, left ? faceX - HG.pinDepth + (pinLen + HG.pinDepth) / 2 : faceX - pinLen + (pinLen + HG.pinDepth) / 2, py, pz, 'x', innerGroup);
+              });
+              // Okrągłe otwory Ø12 w plecach pod śruby regulacji (przelotowe).
+              hg.backHolesFromTop.forEach((d) => {
+                  addHangerHole(HG.backHoleDiameter / 2, backThick + 0.6, faceX + dirIn * HG.backHoleFromSide, posY + H - d, backZ + backThick / 2, 'z', innerGroup);
+              });
+          });
+      }
 
       const hwAxis = isTopBottomFull ? 'y' : 'x';
       const jointXs = [posX + th/2, posX + W - th/2];

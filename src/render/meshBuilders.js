@@ -29,6 +29,7 @@ export const mats = {
       hdf: new THREE.MeshStandardMaterial({ color: 0xf4f2ed, roughness: 0.9, metalness: 0.0 }),
       plinth: new THREE.MeshStandardMaterial({ color: 0x3a3532, roughness: 0.8, metalness: 0.0 }),
       appliance: new THREE.MeshStandardMaterial({ color: 0xb8bec6, roughness: 0.35, metalness: 0.6 }), // urządzenie AGD (zmywarka)
+      hanger: new THREE.MeshStandardMaterial({ color: 0xc23b22, roughness: 0.4, metalness: 0.5 }), // zawieszka Camar 818 (czerwona, widoczna za plecami)
       worktop: new THREE.MeshStandardMaterial({ color: 0x8a6a4a, roughness: 0.55, metalness: 0.0 }) // blat
   },
   xray: {
@@ -39,6 +40,7 @@ export const mats = {
       hdf: new THREE.MeshStandardMaterial({ color: 0x475569, transparent: true, opacity: 0.3, depthWrite: false }),
       plinth: new THREE.MeshStandardMaterial({ color: 0x1c1917, transparent: true, opacity: 0.7, depthWrite: true }),
       appliance: new THREE.MeshStandardMaterial({ color: 0x64748b, transparent: true, opacity: 0.25, depthWrite: false }),
+      hanger: new THREE.MeshStandardMaterial({ color: 0xdc2626, transparent: true, opacity: 0.85, depthWrite: false }),
       worktop: new THREE.MeshStandardMaterial({ color: 0x64748b, transparent: true, opacity: 0.3, depthWrite: false })
   }
 };
@@ -270,6 +272,21 @@ export function addHole(radius, depth, x, y, z, rotationAxis, parentGroup, kind)
   mesh.position.set(x, y, z);
   parentGroup.add(mesh);
 }
+
+// Okrągły otwór zawieszki (ciemny walec, widoczny też w widoku pełnym) i okrągły kołek zawieszki.
+// axis: 'x' | 'z'; (x, y, z) = środek walca. Geometrie z cache, materiał otworu współdzielony.
+const hangerHoleMat = new THREE.MeshBasicMaterial({ color: 0x1c1917 });
+hangerHoleMat.userData.shared = true;
+function addCylinder(radius, length, x, y, z, axis, mat, parentGroup) {
+  const geo = cachedGeometry(`cyl|${radius}|${length}`, () => new THREE.CylinderGeometry(radius, radius, length, 24));
+  const mesh = new THREE.Mesh(geo, mat);
+  if (axis === 'x') mesh.rotation.z = Math.PI / 2;
+  else if (axis === 'z') mesh.rotation.x = Math.PI / 2;
+  mesh.position.set(x, y, z);
+  parentGroup.add(mesh);
+}
+export const addHangerHole = (radius, length, x, y, z, axis, parentGroup) => addCylinder(radius, length, x, y, z, axis, hangerHoleMat, parentGroup);
+export const addHangerPin = (radius, length, x, y, z, axis, parentGroup) => addCylinder(radius, length, x, y, z, axis, (isXrayMode ? mats.xray : mats.solid).hanger, parentGroup);
 
 // Okucia (podpórki, kołki, wkręty) - jedna geometria i jeden materiał na typ (wcześniej
 // nowy materiał dla każdej sztuki, przy kilkunastu szafkach tysiące obiektów na GPU).

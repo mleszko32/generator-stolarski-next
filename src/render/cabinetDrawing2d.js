@@ -156,10 +156,10 @@ export function horizontalPanelSVG(panel, startNo = 1, scale = null) {
   const u = unitFor(Math.max(L, Dd));
   setUnit(u);
   const Z = (z) => z;                                     // przód (z = 0) u góry rysunku, jak w 2D
-  let b = title(L / 2, -58 * u, `${panel.name} — widok z góry`, `${fmt(L)} × ${fmt(Dd)} × ${fmt(panel.thickness)} mm · ${panel.qty} szt.${scaleNote(scale)}`);
+  let b = title(L / 2, -58 * u, `${panel.name} — ${panel.viewTitle || "widok z góry"}`, `${fmt(L)} × ${fmt(Dd)} × ${fmt(panel.thickness)} mm · ${panel.qty} szt.${scaleNote(scale)}`);
   b += `<rect x="0" y="0" width="${r1(L)}" height="${r1(Dd)}" fill="${C.white}" stroke="${C.slate600}" stroke-width="${r1(1.5 * u)}"/>`;
-  b += text(L / 2, -10 * u, "PRZÓD", { size: 11, color: C.slate400, weight: "bold" });
-  b += text(L / 2, Dd + 20 * u, "TYŁ", { size: 11, color: C.slate400, weight: "bold" });
+  b += text(L / 2, -10 * u, panel.topLabel || "PRZÓD", { size: 11, color: C.slate400, weight: "bold" });
+  b += text(L / 2, Dd + 20 * u, panel.bottomLabel || "TYŁ", { size: 11, color: C.slate400, weight: "bold" });
   panel.holes.forEach((h) => {
     if (h.edge === "lewe") b += edgeHole(0, Z(h.z), 1, 0, h);
     else if (h.edge === "prawe") b += edgeHole(L, Z(h.z), -1, 0, h);
@@ -178,7 +178,7 @@ export function horizontalPanelSVG(panel, startNo = 1, scale = null) {
   uniq(panel.holes.map((h) => h.z)).forEach((z) => {
     b += line(L, Z(z), L + 32 * u, Z(z), C.slate300, dash) + text(L + 36 * u, Z(z) + 4 * u, `${fmt(z)}`, { size: 10, color: C.slate600, anchor: "start" });
   });
-  b += text(L + 36 * u, -10 * u, "od przodu", { size: 9, color: C.slate400, anchor: "start" });
+  b += text(L + 36 * u, -10 * u, panel.zLabel || "od przodu", { size: 9, color: C.slate400, anchor: "start" });
   const below = Dd + (32 + Math.max(0, uniq(lico.map((h) => h.x)).length) * 16 + 20) * u;
   b += dimH(0, L, below, fmt(L)) + dimV(-22 * u, 0, Dd, fmt(Dd));
   const svg = wrap(-40 * u, -80 * u, L + 130 * u, below + 30 * u + 80 * u, b, scale);

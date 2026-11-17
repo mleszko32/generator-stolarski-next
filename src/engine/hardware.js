@@ -17,6 +17,7 @@ import { getBlindCorner, blindGeometry, BLIND_MOUNTS } from "../core/blindCorner
 import { getCornerFitting } from "../core/cornerFittings.js";
 import { cornerHingeName } from "../core/cornerHinge.js";
 import { wardrobeRodLength } from "../core/slopeNiche.js";
+import { hangerHardware } from "../core/hanger.js";
 import { moduleBoardThickness } from "../core/boardThickness.js";
 import { isFlap, flapHardware, frontThickness } from "../core/liftFlap.js";
 import { collectDrawers, innerFrontPurchases, profileKerf } from "../core/drawerAssembly.js";
@@ -56,6 +57,12 @@ export function calculateProjectHardware() {
       if (!hardwareList['Wspornik drążka']) hardwareList['Wspornik drążka'] = { name: 'Wspornik drążka', qty: 0, unit: 'szt.' };
       hardwareList['Wspornik drążka'].qty += 2;
     }
+
+    // Zawieszki Camar 818 szafek wiszących (core/hanger.js).
+    hangerHardware(mod, config).forEach((it) => {
+      if (!hardwareList[it.name]) hardwareList[it.name] = { name: it.name, qty: 0, unit: it.unit };
+      hardwareList[it.name].qty += it.qty;
+    });
 
     const joinKey = `Złącze korpusowe (Kołek 8x30 + wkręt 4x50)`;
     // Faktyczna liczba zestawów z otworów korpusu (engine/cabinetDrillings.js - wieńce, trawersy,

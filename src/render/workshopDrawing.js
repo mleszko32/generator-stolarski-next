@@ -22,6 +22,7 @@ export const KIND = {
   prowadnica: { color: C.sky600, label: "prowadnica szuflady" },
   zawias: { color: C.teal700, label: "prowadnik zawiasu" },
   puszka: { color: C.teal700, label: "puszka zawiasu Ø35" },
+  zawieszka: { color: C.red600, label: "zawieszka Camar 818" },
 };
 
 // Jednostka opisu (U): przy dużych formatkach (słupek) czcionki, odstępy opisów i znaczniki
