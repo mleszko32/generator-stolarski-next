@@ -7,6 +7,7 @@ import { state } from '../core/state.js';
 import { escapeHtml } from '../utils/dom.js';
 import { C, FONT, FONT_UI } from './drawingPalette.js';
 import { jointSetsFor, jointDepthOf } from '../engine/carcaseParts.js';
+import { hangerGeometry, HANGER_818 } from '../core/hanger.js';
 import { rcPinLabel } from '../core/rcSystem.js';
 
 export const formatVal = (val) => Number(Number(val).toFixed(1));
@@ -383,6 +384,20 @@ function drawSideDetails(ctx) {
                        let holeX = panel.isOuterRight ? (depth - h.xFromFront) : h.xFromFront;
 
                        svg += `<circle cx="${panel.svgX + holeX}" cy="${sideH - calcY}" r="${r}" fill="${C.purple600}" />`;
+                   });
+               }
+               // Zawieszki Camar 818 (core/hanger.js): 3 otwory Ø10 × 12,5 w licu wewnętrznym boku, oś
+               // insetOffset - 5 mm od tyłu; opis: odległość od góry korpusu.
+               const hg = hangerGeometry(mod, state.project);
+               if (hg) {
+                   const topCalcY = isTopBottomFullWidth ? mod.dimensions.height - th : mod.dimensions.height;
+                   const hx = depth - hg.pinFromRear;                       // od przodu boku
+                   const cx = panel.svgX + (panel.isOuterRight ? depth - hx : hx);
+                   hg.pinsFromTop.forEach((d) => {
+                       const cy = sideH - (topCalcY - d);
+                       svg += `<circle cx="${cx}" cy="${cy}" r="${HANGER_818.pinDiameter / 2}" fill="${C.red600}" fill-opacity="0.35" stroke="${C.red600}" stroke-width="1.2" />`;
+                       const toFront = panel.isOuterRight ? 1 : -1;       // przód: z prawej dla prawego boku, z lewej dla lewego
+                       svg += `<text x="${cx + toFront * 10}" y="${cy + 4}" text-anchor="${toFront > 0 ? 'start' : 'end'}" font-size="10" fill="${C.red600}" font-family="${FONT}">zawieszka 818: Ø10×12,5 · ${d} od góry · ${hg.pinFromRear} od tyłu</text>`;
                    });
                }
                // Stół RC System: pin dla każdego zestawu łączników nad górną krawędzią boku
