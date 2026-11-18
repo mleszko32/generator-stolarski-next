@@ -174,8 +174,8 @@ describe("calculateDrawerHoles - prowadnica na wieńcu", () => {
     // nakładany: front od 0 (zachodzi na wieniec 18), wewnętrzny: front od 21 (wieniec 18 + luz 3)
     const nakladany = calculateDrawerHoles("gtv_axis_18", 0, 163, 18, 0, true, null, 18, { sides: 2.5, bottom: 0 });
     const wewnetrzny = calculateDrawerHoles("gtv_axis_18", 21, 230, 18, 0, false, null, 18, { sides: 1.5, bottom: 3 });
-    expect(nakladany.slideSideHoles[0].y).toBe(51);
-    expect(wewnetrzny.slideSideHoles[0].y).toBe(51);
+    expect(nakladany.slideSideHoles[0].y).toBe(62);
+    expect(wewnetrzny.slideSideHoles[0].y).toBe(62);
     // otwory we froncie: ta sama wysokość bezwzględna - 47,5 mm nad wieńcem (18 + 47,5)
     expect(nakladany.frontHoles[0].y).toBe(65.5);
     expect(21 + wewnetrzny.frontHoles[0].y).toBe(65.5);

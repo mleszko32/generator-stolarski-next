@@ -118,7 +118,7 @@ export const drawerSystems = {
       wysoka:       { type: 'C', height: 167, minSpace: 198 },
       bardzowysoka: { type: 'D', height: 199, minSpace: 230 }
     },
-    mounting: { railOffset: 33, frontHolesBase: 47.5, frontHolesXBase: 15.5 }
+    mounting: { railOffset: 44, frontHolesBase: 47.5, frontHolesXBase: 15.5 }
   },
   'gtv_axis_18': {
     name: 'GTV Axis Pro (płyta 18mm)',
@@ -134,7 +134,9 @@ export const drawerSystems = {
       wysoka:       { type: 'C', height: 167, minSpace: 198 },
       bardzowysoka: { type: 'D', height: 199, minSpace: 230 }
     },
-    mounting: { railOffset: 33, frontHolesBase: 47.5, frontHolesXBase: 15.5 }
+    // Prowadnica: oś otworu w boku 44 mm nad wieńcem (instrukcja GTV - wymiar montażowy 44; 32 to odstęp
+    // między osiami dwóch kołków, 37,5 od przodu).
+    mounting: { railOffset: 44, frontHolesBase: 47.5, frontHolesXBase: 15.5 }
   },
 
   // Blum MOVENTO - ukryte prowadnice pod szufladę DREWNIANĄ (woodenBox: true).
