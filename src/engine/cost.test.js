@@ -150,6 +150,18 @@ describe('kosztorys - materiały frontów (per front, pricing.frontMaterials)', 
     expect(frontLines[0].materialId).toBe('lakier');
   });
 
+  it('front bez materialId i front z materialId tego samego materiału tną się na wspólnych arkuszach (cięcie wg hurtowni)', () => {
+    setProject(freshProject({ modules: [
+      baseModule({ id: 'a', elements: [fullZoneFront({ id: 'fa' })] }),
+      baseModule({ id: 'b', elements: [fullZoneFront({ id: 'fb', materialId: 'lakier' })], position: { x: 700, y: 0, z: 0 } }),
+    ] }));
+    state.project.pricing = { cutting: { mode: 'sas' }, frontMaterials: [{ id: 'lakier', name: 'Lakier', pricePerM2: 1000 }] };
+    ensurePricingDefaults(state.project);
+    const line = calculateProjectCost().materials.find(m => m.category === 'Front');
+    // dwa małe fronty mieszczą się na jednym arkuszu - nie na 25 (dawny błąd: powierzchnia / arkusze samego cokołu)
+    expect(line.sheets).toBeLessThanOrEqual(1);
+  });
+
   it('materialId wskazujący na skasowany wpis katalogu po cichu wraca do pierwszego materiału (bez crasha)', () => {
     const c = withTwoFronts('nieistniejacy-material', 'lakier');
     const frontLines = c.materials.filter(m => m.category === 'Front');

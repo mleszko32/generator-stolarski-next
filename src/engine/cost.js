@@ -69,7 +69,13 @@ function costOfCurrentProject() {
     const hit = korpusKeys.find(k => dec ? categoryDecor(k, state.project) === dec : (priceOfCat(cat) > 0 && priceOfCat(cat) === priceOfCat(k)));
     return hit || cat;
   };
-  const parts = allParts.map(p => { const pool = sheetPoolOf(p.category); return pool === p.category ? p : { ...p, cutCategory: pool }; });
+  // Front bez materialId (np. fronty szafki) i z materialId (np. cokół) to ten sam materiał - bez ujednolicenia
+  // lądowały w dwóch grupach arkuszy, a rachunek dzielił powierzchnię frontów przez arkusze samego cokołu.
+  const parts = allParts.map(p => {
+    const pool = sheetPoolOf(p.category);
+    const q = p.category === 'Front' ? { ...p, materialId: resolveFrontMaterial(p.materialId).id } : p;
+    return pool === p.category ? q : { ...q, cutCategory: pool };
+  });
 
   // Cięcie wg hurtowni (SAS / Heban) = rachunek jak w hurtowni: płyty liczone w PEŁNYCH ARKUSZACH z rozkroju
   // (odpad też się płaci), nie po powierzchni formatek. Tryb ręczny zostaje po powierzchni (stare projekty).
