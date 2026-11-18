@@ -1,5 +1,5 @@
 // src/core/drawerMath.js
-import { drawerSystems, moventoRunnerName, moventoRunnerHoles } from './drawerSystems.js';
+import { drawerSystems, moventoRunnerName, moventoRunnerHoles, gtvRunnerHoles } from './drawerSystems.js';
 import { state } from './state.js';
 
 // Domyślna, "Blumowa" seria NL — używana gdy system nie podaje własnej
@@ -206,7 +206,7 @@ export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick
   }
 
   return {
-    slideSideHoles: (systemEntry.woodenBox && nl ? moventoRunnerHoles(systemEntry, nl) : [37, 69, 261]).map((x) => ({ x, y: slideY })),
+    slideSideHoles: (systemEntry.woodenBox && nl ? moventoRunnerHoles(systemEntry, nl) : String(safeSystemId).startsWith('gtv_axis') && nl ? gtvRunnerHoles(nl) : [37, 69, 261]).map((x) => ({ x, y: slideY })),
     frontHoles: frontHoles
   };
 }

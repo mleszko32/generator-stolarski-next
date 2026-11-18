@@ -181,3 +181,14 @@ describe("calculateDrawerHoles - prowadnica na wieńcu", () => {
     expect(21 + wewnetrzny.frontHoles[0].y).toBe(65.5);
   });
 });
+
+describe("calculateDrawerHoles - GTV Axis Pro: tylny otwór zależny od NL", () => {
+  const xs = (nl) => calculateDrawerHoles("gtv_axis_18", 21, 230, 18, 0, false, nl, 18, { sides: 1.5, bottom: 3 }).slideSideHoles.map((h) => h.x);
+  it("wg karty GTV", () => {
+    expect(xs(250)).toEqual([37, 69, 133]);
+    expect(xs(350)).toEqual([37, 69, 165]);
+    expect(xs(400)).toEqual([37, 69, 229]);
+    expect(xs(500)).toEqual([37, 69, 261]);
+    expect(xs(600)).toEqual([37, 69, 261, 389]);
+  });
+});

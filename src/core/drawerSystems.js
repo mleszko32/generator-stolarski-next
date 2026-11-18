@@ -222,6 +222,16 @@ export const drawerSystems = {
   }
 };
 
+// Otwory prowadnicy GTV Axis Pro w boku (mm od frontu) wg karty GTV "Wymiary montażowe": pierwszy 37 (+ drugi 32 dalej),
+// tylny zależnie od NL: 250 → 37+96, 300/350 → 37+128, 400 → 37+192, 450-550 → 37+224, 600 → 37+224 i 37+224+128.
+export function gtvRunnerHoles(nl) {
+  const n = Number(nl) || 0;
+  const d = n <= 250 ? 96 : n <= 350 ? 128 : n <= 400 ? 192 : 224;
+  const rear = [37 + d];
+  if (n >= 600) rear.push(37 + d + 128);
+  return [37, 69, ...rear];
+}
+
 // Otwory prowadnicy MOVENTO w boku szafki (mm od frontu) wg karty katalogu Blum
 // "Hole spacing - runners": 37 i 37+32, tylne mierzone od otworu 37 o 160 / 224 /
 // 256 (760H) albo 224 / 256 / 320 / 416 (766H) - zależnie od długości NL.
