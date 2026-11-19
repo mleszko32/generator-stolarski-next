@@ -18,6 +18,7 @@ export const formatVal = (val) => Number(Number(val).toFixed(1));
 // rysunku z 3.09 to zgubił i otwory wypadły na samej wysokości półki).
 import { SHELF_PIN_DROP } from '../core/hingeMath.js';
 import { moduleBoardThickness } from "../core/boardThickness.js";
+import { innerFrontSpec } from '../core/drawerAssembly.js';
 import { getCabinetPanels } from "../engine/cabinetDrillings.js";
 import { moduleDrillPanels } from "../engine/drillSheets.js";
 
@@ -613,8 +614,11 @@ function drawOuterFronts(ctx) {
 
 // Widok szuflad wewnętrznych (detail-front-inner). Część generateSidePanelSVG - wspólne wartości przychodzą w ctx.
 function drawInnerFronts(ctx) {
-  const { cabWidth, innerFrontX, isTopBottomFullWidth, mod, sideH, svgTopY, th } = ctx;
+  const { cabWidth, config, innerFrontX, isTopBottomFullWidth, mod, mountingData, sideH, svgTopY, th } = ctx;
   let svg = '';
+  // Czoło MERIVOBOX to gotowy element Blum - bez wierceń; w pozostałych systemach czoło jest z płyty.
+  const sysId = String({ ...(config?.front || {}), ...(mod?.front || {}) }.drawerSystem || 'merivobox').toLowerCase();
+  const innerIsSystem = !!innerFrontSpec(sysId, 'M', 500);
 
   svg += `<g id="detail-front-inner" style="display:none;">`;
   svg += `<text x="${innerFrontX + cabWidth/2}" y="${svgTopY - 25}" font-size="16" fill="${C.blue900}" font-weight="bold" text-anchor="middle">FRONTY (Szuflady wewn.)</text>`;
@@ -631,6 +635,25 @@ function drawInnerFronts(ctx) {
 
       svg += `<rect x="${fSvgX}" y="${elSvgY}" width="${fWidth}" height="${front.h}" fill="${C.orange50}" stroke="${C.orange600}" stroke-width="1.5" />`;
       svg += `<text x="${fSvgX + fWidth/2}" y="${elSvgY + front.h/2}" font-size="12" fill="${C.slate800}" font-weight="bold" text-anchor="middle">Szuflada Wewn.</text>`;
+
+      // Nawierty mocowania frontu (te same dane co fronty zewnętrzne).
+      const drawerData = !innerIsSystem && mountingData
+        ? mountingData.find(m => m.type === 'drawer' && m.frontId === front.id) : null;
+      if (drawerData && drawerData.frontHoles) {
+        svg += `<g class="layer-front-holes">`;
+        drawerData.frontHoles.forEach(hole => {
+          const xL = Number(hole.xOffsetLeft ?? hole.xOffset ?? 20.5);
+          const xR = Number(hole.xOffsetRight ?? hole.xOffset ?? 20.5);
+          const holeX_Left = fSvgX + xL;
+          const holeX_Right = fSvgX + fWidth - xR;
+          const drawHoleY = isTopBottomFullWidth ? front.y + hole.y - th : front.y + hole.y;
+          const holeSvgY = sideH - drawHoleY;
+          svg += `<circle cx="${holeX_Left}" cy="${holeSvgY}" r="2.5" fill="${C.red600}" />`;
+          svg += `<circle cx="${holeX_Right}" cy="${holeSvgY}" r="2.5" fill="${C.red600}" />`;
+          svg += `<text x="${holeX_Left - 8}" y="${holeSvgY + 4}" text-anchor="end" font-family="${FONT}">${getDimText(hole.y, front.h, C.red600)}</text>`;
+        });
+        svg += `</g>`;
+      }
     });
   }
   svg += `</g>`;
