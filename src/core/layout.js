@@ -381,18 +381,22 @@ export function recalculateLayout(mod) {
               // nakładany zakrywa całe zamknięcie góry: wieniec / trawers poziomy = th, trawers pionowy = jego szerokość
               const topCover = slopeRect ? (cons.topType === 'brak' ? 0 : th) : height - topInnerY(cons, height, th);
               // nakładanie na granicach wewnętrznych (wieniec / półka / przegroda / inny front) nie zależy od luzów
-              const innerLeft = isBoundLeftFront ? -gapVal : ((th / 2) - (gapVal / 2));
-              const innerRight = isBoundRightFront ? -gapVal : ((th / 2) - (gapVal / 2));
-              const innerBottom = isBoundBottomFront ? -gapVal : (gapFromAxisBottom !== null ? (th / 2) - gapFromAxisBottom : (th / 2) - (gapVal / 2));
-              const innerTop = isBoundTopFront ? -gapVal : (gapFromAxisTop !== null ? (th / 2) - gapFromAxisTop : (th / 2) - (gapVal / 2));
+              // Front WPUSZCZANY leży w świetle wnęki i nie zachodzi na płytę - szczelina po połowie `gap`
+              // od jej lica (ujemne nakładanie); front nakładany zachodzi na połowę grubości płyty.
+              const innerHalf = isInset ? -(gapVal / 2) : ((th / 2) - (gapVal / 2));
+              const innerLeft = isBoundLeftFront ? -gapVal : innerHalf;
+              const innerRight = isBoundRightFront ? -gapVal : innerHalf;
+              const innerBottom = isBoundBottomFront ? -gapVal : (gapFromAxisBottom !== null ? (th / 2) - gapFromAxisBottom : innerHalf);
+              const innerTop = isBoundTopFront ? -gapVal : (gapFromAxisTop !== null ? (th / 2) - gapFromAxisTop : innerHalf);
 
               // luzy Auto liczą się dla wnęki TEGO frontu (co stoi obok niego), ręczne - dla szafki.
               // `span` = rozmiar frontu przed odjęciem luzów zewnętrznych - z niego Auto zaokrągla
               // front do pełnych mm (core/autoClearance.js: roundToFullMm).
               const span = {
                   outer: { left: isLeftOuter, right: isRightOuter, top: isTopOuter, bottom: isBottomOuter },
-                  w: (maxX - minX) + (isLeftOuter ? th : innerLeft) + (isRightOuter ? th : innerRight),
-                  h: (maxY - minY) + (isBottomOuter ? th : innerBottom) + (isTopOuter ? topCover : innerTop),
+                  // front wpuszczany nie zachodzi na płyty korpusu - na krawędzi zewnętrznej bez nakładania
+                  w: (maxX - minX) + (isLeftOuter ? (isInset ? 0 : th) : innerLeft) + (isRightOuter ? (isInset ? 0 : th) : innerRight),
+                  h: (maxY - minY) + (isBottomOuter ? (isInset ? 0 : th) : innerBottom) + (isTopOuter ? (isInset ? 0 : topCover) : innerTop),
               };
               // dwoje drzwi i szuflady mają wyjść równe i w pełnych mm - reszta trafia do luzu
               if (el.subtype === 'drzwi-lp') span.wDiv = { off: gapVal, n: 2 };
