@@ -18,8 +18,18 @@ describe('isOpenFlush', () => {
   it('półka w kolumnie z frontami ustępuje frontowi', () => {
     expect(isOpenFlush(mod, mod.elements[2])).toBe(false);
   });
-  it('przegroda przy froncie ustępuje, bez frontów jest równo', () => {
-    expect(isOpenFlush(mod, mod.elements[0])).toBe(false);
+  it('przegroda z otwartym regałem po jednej stronie jest równo z licem', () => {
+    expect(isOpenFlush(mod, mod.elements[0])).toBe(true);
+  });
+  it('przegroda z frontami po obu stronach ustępuje', () => {
+    const m = { elements: [
+      { typ: 'pion', x: 285, y: 18, w: 18, h: 1904 },
+      { typ: 'front', x: 20, y: 18, w: 260, h: 500 },
+      { typ: 'front', x: 306, y: 18, w: 260, h: 500 },
+    ] };
+    expect(isOpenFlush(m, m.elements[0])).toBe(false);
+  });
+  it('przegroda bez frontów jest równo', () => {
     expect(isOpenFlush({ elements: [mod.elements[0], mod.elements[1]] }, mod.elements[0])).toBe(true);
   });
   it('front o zerowej szerokości nie liczy się', () => {

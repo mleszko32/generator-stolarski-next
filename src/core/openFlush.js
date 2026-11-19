@@ -18,6 +18,8 @@ export function isOpenFlush(mod, el) {
   }
   const y0 = Number(el.y) || 0;
   const y1 = y0 + (Number(el.h) || 0);
-  // Front przy przegrodzie, po którejkolwiek stronie, na wspólnej wysokości.
-  return !fronts.some((f) => overlap(y0, y1, f.y, f.y + f.h) && overlap(x0 - SIDE_TOL, x1 + SIDE_TOL, f.x, f.x + f.w));
+  // Front wpuszczany leży OBOK przegrody, nie przed nią — więc przegroda sięga do lica, gdy choć
+  // z jednej strony (przy otwartym regale) nie ma frontu na wspólnej wysokości.
+  const frontBeside = (from, to) => fronts.some((f) => overlap(y0, y1, f.y, f.y + f.h) && overlap(from, to, f.x, f.x + f.w));
+  return !frontBeside(x0 - SIDE_TOL, x0) || !frontBeside(x1, x1 + SIDE_TOL);
 }
