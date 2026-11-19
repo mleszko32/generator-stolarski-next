@@ -42,6 +42,7 @@ import { frontClearance } from '../core/autoClearance.js';
 import { initMeasureTool, isMeasureActive, setMeasureButton, toggleMeasureMode, updateMeasureHover, handleMeasureClick, measureHoverMouse } from './measureTool.js';
 import { showAlert } from "../utils/modal.js";
 import { shelfStiffener } from '../core/shelfStiffener.js';
+import { isOpenFlush } from '../core/openFlush.js';
 import { projectDecorLegend, materialPaletteMap, horizontalPanelType } from '../core/decorColors.js';
 import { getDecorPhoto, setDecorPhoto, photoFileToDataUrl } from './decorTextures.js';
 import { saveDecorTextureToCloud, deleteDecorTextureFromCloud } from '../core/storage.js';
@@ -1762,13 +1763,15 @@ export function update3D() {
       // muszą się przed nim zatrzymać — inaczej kolidowałyby z nim w tym samym miejscu, gdzie
       // engine/cabinet.js (getInteriorParts) już skraca ich formatki o tę samą wartość.
       const shelfDepth = (posZ + D - 2 - (isInsetFront ? th : 0)) - innerZ;
+      // Część bez frontów (otwarty regał): półka / przegroda do lica korpusu, nie w głębi.
+      const elDepth = (el) => (isInsetFront && isOpenFlush(mod, el) ? shelfDepth + th : shelfDepth);
 
       if (mod.elements) {
           mod.elements.forEach((el) => {
               const udElement = { moduleId: mod.id, type: el.typ === 'front' ? 'front' : 'shelf', elementId: el.id };
 
               if (el.typ === 'poziom') {
-                  addBox(el.w, el.h, shelfDepth, posX + el.x, posY + el.y, innerZ, 'shelf', isActive, udElement, innerGroup);
+                  addBox(el.w, el.h, elDepth(el), posX + el.x, posY + el.y, innerZ, 'shelf', isActive, udElement, innerGroup);
                   // Listwa usztywniająca od spodu, przy tylnej krawędzi (core/shelfStiffener.js).
                   const stiff = shelfStiffener(mod, el, state.project);
                   if (stiff) addBox(el.w, stiff.height, stiff.thickness, posX + el.x, posY + el.y - stiff.height, innerZ, 'shelf', isActive, udElement, innerGroup);
@@ -1810,7 +1813,7 @@ export function update3D() {
                   }
               } 
               else if (el.typ === 'pion') {
-                  addBox(el.w, el.h, shelfDepth, posX + el.x, posY + el.y, innerZ, 'shelf', isActive, udElement, innerGroup);
+                  addBox(el.w, el.h, elDepth(el), posX + el.x, posY + el.y, innerZ, 'shelf', isActive, udElement, innerGroup);
 
                   // Mocowanie na kołek+wkręt (patrz core/zoneTree.js: toggleStructural) -
                   // analogicznie do konstrukcyjnej półki (wyżej, oś X przez bok), tylko

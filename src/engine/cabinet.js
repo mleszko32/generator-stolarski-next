@@ -17,6 +17,7 @@ import { isFlap } from "../core/liftFlap.js";
 import { splitPlinthRun, maxPlinthLength } from "./plinthSplit.js";
 import { buildPlinthRuns } from "./plinthRuns.js";
 import { shelfStiffener } from "../core/shelfStiffener.js";
+import { isOpenFlush } from "../core/openFlush.js";
 import { KORPUS, korpusCategory, moduleKorpusDecor, PLECY, plecyCategory, moduleBackDecor } from "../core/materialCatalog.js";
 import { furnitureGroups, sharedFurnitureKey, COLLECTIVE_KEY } from "../core/furnitureGroups.js";
 import { getDishwasherParts } from "../core/dishwasher.js";
@@ -264,7 +265,7 @@ function getInteriorParts(mod, config) {
   // przy depthA≠depthB formatka wychodziłaby błędnej głębokości.
   const cornerDepths = mod.type === 'corner_cabinet' ? getCornerDepths(mod) : null;
   const innerPartDepthForEl = (el) => {
-    if (!cornerDepths) return innerPartDepth;
+    if (!cornerDepths) return innerPartDepth + (isInset && isOpenFlush(mod, el) ? board : 0);
     return depthFor(el.cornerArm === 'B' ? cornerDepths.depthB : cornerDepths.depthA);
   };
 
