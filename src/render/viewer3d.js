@@ -1891,7 +1891,7 @@ export function update3D() {
                           // NL z doboru szuflady - MOVENTO ma tylne otwory prowadnicy zależne od długości.
                           // Szuflada wewnętrzna drewniana: prowadnica od dołu szczeliny czoła (drawerBaseY).
                           const holeY = drawerComps?.woodenBox && isInternal ? drawerBaseY(el, th, isInsetFront) : el.y;
-                          const dHoles = calculateDrawerHoles(sysName, holeY, simulatedSpace, th, el.frontIndex, isBottomOverlay, spec.nl, el.baseZone ? (parseFloat(el.baseZone.minY) || 0) + (parseFloat(el.baseZone.offsetBottom) || 0) : null, fcMerged);
+                          const dHoles = calculateDrawerHoles(sysName, holeY, simulatedSpace, th, el.frontIndex, isBottomOverlay, spec.nl, el.baseZone ? (parseFloat(el.baseZone.minY) || 0) + (parseFloat(el.baseZone.offsetBottom) || 0) : null, fcMerged, drawerComps?.back?.variantType);
 
                           if (drawerComps && drawerComps.woodenBox) {
                               // MOVENTO: skrzynka z płyty (core/drawerMath.js) - boki na całą

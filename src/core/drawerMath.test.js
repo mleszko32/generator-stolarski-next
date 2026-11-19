@@ -135,6 +135,13 @@ describe("calculateDrawerHoles", () => {
   it("dodaje trzeci otwór we froncie dopiero od 200 mm wysokości", () => {
     expect(calculateDrawerHoles("merivobox", 0, 150, 18, 0, false).frontHoles).toHaveLength(2);
     expect(calculateDrawerHoles("merivobox", 0, 200, 18, 0, false).frontHoles).toHaveLength(3);
+    // GTV Axis Pro wg rysunku z instrukcji: 4 otwory co 32 / 64 / 32 (wysoki front)
+    const gtv = calculateDrawerHoles("gtv_axis_18", 0, 250, 18, 0, false).frontHoles.map((h) => h.y);
+    expect(gtv.map((y) => y - gtv[0])).toEqual([0, 32, 96, 128]);
+    // o liczbie otworów decyduje wariant skrzynki: A/B - 2, C/D - 4 (niezależnie od wysokości frontu)
+    const gtvHoles = (h, v) => calculateDrawerHoles("gtv_axis_18", 0, h, 18, 0, false, 450, null, null, v).frontHoles.length;
+    expect(gtvHoles(300, "B")).toBe(2);
+    expect(gtvHoles(180, "C")).toBe(4);
   });
 });
 

@@ -144,7 +144,7 @@ export function getDrawerComponents(systemId, internalWidth, internalDepth, avai
 // clearance - luzy frontu SCALONE z ustawieniami szafki ({ ...project.front.clearance,
 // ...mod.front.clearance }); bez niego tylko luzy projektu (lokalny luz szafki przesuwał
 // otwory frontu względem frontu policzonego w core/layout.js).
-export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick, index, isBottom, nl = null, zoneBottom = null, clearance = null) {
+export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick, index, isBottom, nl = null, zoneBottom = null, clearance = null, variantType = null) {
   const fc = clearance || state.project.front?.clearance || {};
   const bottomGap = Number(fc.bottom ?? 0);
 
@@ -196,7 +196,17 @@ export function calculateDrawerHoles(systemId, currentY, frontHeight, boardThick
   // Szuflada drewniana (MOVENTO): front przykręca się od środka przez czoło
   // wewnętrzne skrzynki, nie do metalowych zaczepów - brak katalogowych otworów.
   if (systemEntry.woodenBox) frontHoles.length = 0;
-  else if (frontHeight >= 200) {
+  else if (String(safeSystemId).startsWith('gtv_axis')) {
+    // GTV Axis Pro (instrukcja, wymiary montażowe): skrzynka niska i średnia (A, B) - 2 otwory co 32 mm,
+    // wysoka i bardzo wysoka (C, D) - 4 otwory co 32 / 64 / 32 mm. Wariant z doboru szuflady;
+    // bez niego (stare wywołania) według wysokości frontu.
+    const tall = variantType ? ['C', 'D'].includes(String(variantType).toUpperCase()) : frontHeight >= 198;
+    if (tall) {
+      [96, 128].forEach((dy) => frontHoles.push({
+        y: localFrontHolesBase + dy, xOffsetLeft: localFrontHolesX_Left, xOffsetRight: localFrontHolesX_Right, diameter: 3
+      }));
+    }
+  } else if (frontHeight >= 200) {
     frontHoles.push({
       y: localFrontHolesBase + 160, 
       xOffsetLeft: localFrontHolesX_Left, 

@@ -1,6 +1,7 @@
 // src/engine/cabinet.js
 import { state } from "../core/state.js";
 import { calculateDrawerHoles, drawerComponentsToParts } from "../core/drawerMath.js";
+import { drawerSystems } from "../core/drawerSystems.js";
 import { drawerSpec, drawerBaseY, isBottomOverlayFront } from "../core/drawerSpec.js";
 import { innerFrontSpec } from "../core/drawerAssembly.js";
 import { corpusInnerDepth } from "../core/backPanel.js";
@@ -352,7 +353,7 @@ function getFrontsAndDrawers(mod, config) {
       const zoneBottom = front.baseZone ? (parseFloat(front.baseZone.minY) || 0) + (parseFloat(front.baseZone.offsetBottom) || 0) : null;
       // Szuflada wewnętrzna drewniana: prowadnica od dołu szczeliny czoła (drawerBaseY).
       const holeY = spec.comps?.woodenBox && front.subtype === 'szuflada-wewnetrzna' ? drawerBaseY(front, board, isInset) : front.y;
-      const drawerHoles = calculateDrawerHoles(sysName, holeY, simulatedSpace, board, front.frontIndex, isBottomOverlay, drawerNL, zoneBottom, fc);
+      const drawerHoles = calculateDrawerHoles(sysName, holeY, simulatedSpace, board, front.frontIndex, isBottomOverlay, drawerNL, zoneBottom, fc, spec.comps?.back?.variantType);
       if (drawerHoles) { 
         const adjustedHoles = JSON.parse(JSON.stringify(drawerHoles));
         
@@ -370,7 +371,8 @@ function getFrontsAndDrawers(mod, config) {
                 // Zakład frontu na krawędź wnęki (kolumna za przegrodą: krawędź przegrody, nie boku).
                 const actualOverlapLeft = spec.openingX0 - (front.x || 0);
                 const actualOverlapRight = ((front.x || 0) + (front.w || 0)) - spec.openingX1;
-                const innerDist = 20.5;
+                // oś otworu od krawędzi wnęki - z katalogu systemu (GTV Axis Pro 15,5, Blum 20,5)
+                const innerDist = drawerSystems[String(sysName).toLowerCase()]?.mounting?.frontHolesXBase ?? 20.5;
                 
                 h.xOffsetLeft = actualOverlapLeft + innerDist;
                 h.xOffsetRight = actualOverlapRight + innerDist;

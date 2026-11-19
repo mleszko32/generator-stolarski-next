@@ -757,7 +757,7 @@ export function getSlopeDrillings(mod, config, opts = {}) {
   getSlopeFronts(mod, config).forEach((fr) => {
     const el = fr.el, bz = el.baseZone || {};
     if (fr.type === 'szuflada') {
-      const holes = calculateDrawerHoles(sys, el.y, el.h, th, el.frontIndex, isBottomOverlayFront(el, th, isInset),fr.drawer && fr.drawer.comps.nominalLength, (parseFloat(bz.minY) || 0) + (parseFloat(bz.offsetBottom) || 0));
+      const holes = calculateDrawerHoles(sys, el.y, el.h, th, el.frontIndex, isBottomOverlayFront(el, th, isInset),fr.drawer && fr.drawer.comps.nominalLength, (parseFloat(bz.minY) || 0) + (parseFloat(bz.offsetBottom) || 0), null, fr.drawer && fr.drawer.comps.back?.variantType);
       const shift = el.subtype === 'szuflada-wewnetrzna' ? parseFloat(el.innerFrontThickness ?? 18) + parseFloat(el.innerSetback ?? 2) : 0;
       [['R', parseFloat(bz.minX)], ['L', parseFloat(bz.maxX)]].forEach(([dir, x]) => {
         const fc = faceAt(x, dir);

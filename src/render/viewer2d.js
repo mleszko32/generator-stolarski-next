@@ -514,6 +514,19 @@ function drawSideDetails(ctx) {
   return svg;
 }
 
+// Poziomy wymiar: krawędź boczna frontu -> oś otworu (nad otworem), osobno z lewej i z prawej.
+function frontHoleEdgeDims(fSvgX, fWidth, xL, xR, holeSvgY) {
+  const y = holeSvgY - 12;
+  const one = (x1, x2, v) => {
+    const mid = (x1 + x2) / 2;
+    return `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${C.red600}" stroke-width="0.8" />`
+      + `<line x1="${x1}" y1="${y - 4}" x2="${x1}" y2="${y + 4}" stroke="${C.red600}" stroke-width="0.8" />`
+      + `<line x1="${x2}" y1="${y - 4}" x2="${x2}" y2="${y + 4}" stroke="${C.red600}" stroke-width="0.8" />`
+      + `<text x="${mid}" y="${y - 3}" font-size="10" fill="${C.red600}" text-anchor="middle" font-family="${FONT}">${fmtMm(v)}</text>`;
+  };
+  return one(fSvgX, fSvgX + xL, xL) + one(fSvgX + fWidth - xR, fSvgX + fWidth, xR);
+}
+
 // Widok frontów zewnętrznych całej grupy (detail-front). Część generateSidePanelSVG - wspólne wartości przychodzą w ctx.
 function drawOuterFronts(ctx) {
   const { cabWidth, config, frontX, getDy, getLocalRelX, mod, mountingData, sideH, stackModules, svgTopY, th } = ctx;
@@ -601,6 +614,7 @@ function drawOuterFronts(ctx) {
 
              const tspanHtml = getDimText(hole.y, front.h, C.red600);
              svg += `<text x="${holeX_Left - 8}" y="${holeSvgY + 4}" text-anchor="end" font-family="${FONT}">${tspanHtml}</text>`;
+             if (idx === 0) svg += frontHoleEdgeDims(fSvgX, fWidth, xL, xR, holeSvgY);
           });
         }
         svg += `</g>`;
@@ -641,7 +655,7 @@ function drawInnerFronts(ctx) {
         ? mountingData.find(m => m.type === 'drawer' && m.frontId === front.id) : null;
       if (drawerData && drawerData.frontHoles) {
         svg += `<g class="layer-front-holes">`;
-        drawerData.frontHoles.forEach(hole => {
+        drawerData.frontHoles.forEach((hole, idx) => {
           const xL = Number(hole.xOffsetLeft ?? hole.xOffset ?? 20.5);
           const xR = Number(hole.xOffsetRight ?? hole.xOffset ?? 20.5);
           const holeX_Left = fSvgX + xL;
@@ -651,6 +665,7 @@ function drawInnerFronts(ctx) {
           svg += `<circle cx="${holeX_Left}" cy="${holeSvgY}" r="2.5" fill="${C.red600}" />`;
           svg += `<circle cx="${holeX_Right}" cy="${holeSvgY}" r="2.5" fill="${C.red600}" />`;
           svg += `<text x="${holeX_Left - 8}" y="${holeSvgY + 4}" text-anchor="end" font-family="${FONT}">${getDimText(hole.y, front.h, C.red600)}</text>`;
+          if (idx === 0) svg += frontHoleEdgeDims(fSvgX, fWidth, xL, xR, holeSvgY);
         });
         svg += `</g>`;
       }
